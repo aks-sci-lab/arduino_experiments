@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>걷기·뛰기 판정기</title>
+  <meta name="description" content="스마트폰 가속도 센서로 걷기와 뛰기를 판정하는 고등학교 물리 실험 웹앱">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>🏃 걷기·뛰기 판정기</h1>
+    <p class="sub">스마트폰 가속도 센서로 내 움직임을 측정하고, 물리적으로 걷기와 뛰기를 구분해 봅시다.</p>
+  </header>
+
+  <main>
+    <!-- 1. 측정 -->
+    <section class="card">
+      <h2>1. 측정</h2>
+      <div id="sensor-warning" class="notice warn" hidden></div>
+      <div class="btn-row">
+        <button id="btn-start" class="primary">▶ 측정 시작</button>
+        <button id="btn-stop" disabled>■ 정지</button>
+        <button id="btn-reset">↺ 초기화</button>
+      </div>
+      <div class="btn-row small">
+        <span class="muted">센서가 없는 PC에서는:</span>
+        <button id="btn-sim-walk">시뮬레이션: 걷기</button>
+        <button id="btn-sim-run">시뮬레이션: 뛰기</button>
+      </div>
+      <p id="status" class="muted">대기 중 — 스마트폰을 손에 쥐거나 팔에 고정한 뒤 측정을 시작하세요.</p>
+
+      <div class="verdict" id="verdict" data-state="idle">
+        <div class="verdict-label" id="verdict-label">—</div>
+        <div class="verdict-reason" id="verdict-reason">측정을 시작하면 최근 4초 데이터로 판정합니다.</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span class="k">|a| 현재</span><span class="v" id="s-now">—</span><span class="u">m/s²</span></div>
+        <div class="stat"><span class="k">표준편차 σ</span><span class="v" id="s-std">—</span><span class="u">m/s²</span></div>
+        <div class="stat"><span class="k">최대 |a|</span><span class="v" id="s-max">—</span><span class="u">m/s²</span></div>
+        <div class="stat"><span class="k">최소 |a|</span><span class="v" id="s-min">—</span><span class="u">m/s²</span></div>
+        <div class="stat"><span class="k">걸음 수(4초)</span><span class="v" id="s-steps">—</span><span class="u">걸음</span></div>
+        <div class="stat"><span class="k">케이던스</span><span class="v" id="s-cad">—</span><span class="u">걸음/분</span></div>
+      </div>
+
+      <canvas id="chart" height="220" aria-label="가속도 크기 그래프"></canvas>
+      <div class="legend">
+        <span><i class="sw line"></i>|a| (중력 포함 가속도 크기)</span>
+        <span><i class="sw g"></i>g = 9.8 m/s²</span>
+        <span><i class="sw peak"></i>감지된 걸음</span>
+      </div>
+      <canvas id="timeline" height="28" aria-label="판정 타임라인"></canvas>
+      <div class="legend">
+        <span><i class="sw st-still"></i>정지</span>
+        <span><i class="sw st-walk"></i>걷기</span>
+        <span><i class="sw st-run"></i>뛰기</span>
+      </div>
+
+      <div class="btn-row">
+        <button id="btn-csv" disabled>⬇ 원본 데이터 CSV</button>
+        <button id="btn-csv-win" disabled>⬇ 구간 분석 CSV</button>
+      </div>
+    </section>
+
+    <!-- 2. 기준값 -->
+    <section class="card">
+      <h2>2. 판정 기준 (직접 바꿔 보세요)</h2>
+      <p class="muted">판정은 최근 4초 동안의 |a| 표준편차(흔들림의 크기)와 케이던스(분당 걸음 수)를 사용합니다.</p>
+      <div class="form-grid">
+        <label>정지 판정: σ &lt; <input id="th-still" type="number" step="0.1" value="0.6"> m/s²</label>
+        <label>뛰기 판정: σ ≥ <input id="th-run" type="number" step="0.1" value="4.0"> m/s²</label>
+        <label>또는 최소 |a| ≤ <input id="th-flight" type="number" step="0.1" value="2.5"> m/s² (공중 체공)</label>
+      </div>
+      <details>
+        <summary>나만의 기준값 만들기 (보정)</summary>
+        <p class="muted">각 버튼을 누르고 10초 동안 해당 동작을 하세요. 두 동작의 σ 중간값으로 뛰기 기준을 자동 설정합니다.</p>
+        <div class="btn-row">
+          <button id="btn-cal-walk">🚶 걷기 10초 기록</button>
+          <button id="btn-cal-run">🏃 뛰기 10초 기록</button>
+        </div>
+        <p id="cal-status" class="muted">보정 기록 없음</p>
+      </details>
+    </section>
+
+    <!-- 3. AI -->
+    <section class="card">
+      <h2>3. AI 분석 (Claude)</h2>
+      <p class="muted">측정 결과 요약을 AI에게 보내 판정 근거와 물리적 해석을 받아봅니다. 원본 데이터 전체가 아니라 통계 요약과 짧은 샘플만 전송됩니다.</p>
+      <div class="form-grid">
+        <label>API 키
+          <input id="api-key" type="password" placeholder="sk-ant-..." autocomplete="off">
+        </label>
+        <label class="inline"><input id="api-remember" type="checkbox"> 이 기기에 키 저장</label>
+        <label>모델
+          <select id="api-model">
+            <option value="claude-opus-5-5">Claude Opus 5.5 (가장 정확)</option>
+            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (균형)</option>
+            <option value="claude-haiku-5-5">Claude Haiku 5.5 (저렴·빠름)</option>
+          </select>
+        </label>
+        <label>실험 메모 (선택)
+          <input id="ai-memo" type="text" placeholder="예) 휴대폰을 오른손에 쥐고 복도에서 걷다가 뛰었음">
+        </label>
+      </div>
+      <div class="btn-row">
+        <button id="btn-ai" class="primary">🤖 AI에게 결과 분석 요청</button>
+      </div>
+      <div id="ai-result" class="ai-box" hidden></div>
+
+      <h3>AI에게 질문하기</h3>
+      <div class="ask">
+        <textarea id="ai-question" rows="2" placeholder="예) 뛸 때 최소 |a|가 거의 0이 되는 이유는 뭔가요?"></textarea>
+        <button id="btn-ask">질문</button>
+      </div>
+      <div id="ai-answer" class="ai-box" hidden></div>
+      <p class="notice">⚠ API 키는 비밀번호처럼 다루세요. 키는 이 브라우저에서 Anthropic 서버로만 직접 전송되며, 다른 곳에 저장·공유되지 않습니다.</p>
+    </section>
+
+    <!-- 4. 원리 -->
+    <section class="card">
+      <h2>4. 물리 원리</h2>
+      <details open>
+        <summary>가속도 센서는 무엇을 재나요?</summary>
+        <p>스마트폰 가속도 센서는 <b>중력을 포함한 가속도</b>를 잽니다. 가만히 놓아 두면 |a| ≈ g = 9.8 m/s²이 나오고,
+          자유낙하하면 |a| ≈ 0이 됩니다. 센서는 내부의 작은 추가 받는 힘(수직항력과 같은 접촉력)을 측정하기 때문입니다.</p>
+      </details>
+      <details>
+        <summary>걷기와 뛰기는 왜 다르게 보이나요?</summary>
+        <ul>
+          <li><b>걷기</b>: 항상 한 발 이상이 땅에 닿아 있습니다. 몸의 위아래 흔들림이 작아 |a|는 대략 0.6g~1.5g 사이에서 부드럽게 오르내립니다.</li>
+          <li><b>뛰기</b>: 두 발이 모두 땅에서 떨어지는 <b>체공 구간</b>이 있습니다. 이때 몸은 거의 자유낙하 상태라 |a|가 0 근처까지 떨어지고,
+            착지 순간에는 지면이 짧은 시간에 큰 힘을 주어 2g~3g 이상의 큰 봉우리가 생깁니다.</li>
+          <li>그래서 뛰기는 <b>σ(흔들림)</b>가 크고, <b>최소 |a|</b>가 작으며, <b>케이던스</b>도 보통 더 높습니다.</li>
+        </ul>
+      </details>
+      <details>
+        <summary>탐구 활동 아이디어</summary>
+        <ol>
+          <li>천천히 걷기 → 빠르게 걷기 → 조깅 → 전력 질주 순서로 σ와 케이던스가 어떻게 변하는지 표로 정리해 보세요.</li>
+          <li>휴대폰 위치(손, 주머니, 팔)를 바꾸면 결과가 어떻게 달라지나요? 이유는?</li>
+          <li>운동량-충격량 관계(F·Δt = Δp)로 착지 봉우리의 크기를 설명해 보세요. 쿠션 있는 신발은 무엇을 바꿀까요?</li>
+          <li>친구들과 기준값을 비교해 보고, 모두에게 잘 맞는 기준을 찾아보세요.</li>
+        </ol>
+      </details>
+    </section>
+  </main>
+
+  <footer class="muted">센서 데이터는 기기 밖으로 나가지 않습니다(AI 분석 요청 시 요약만 전송). · HTTPS 주소에서만 센서가 동작합니다.</footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
