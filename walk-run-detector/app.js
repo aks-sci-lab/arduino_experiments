@@ -1,5 +1,6 @@
 import { G, DEFAULT_THRESHOLDS, LABELS, analyzeWindow, simulate } from './analysis.js';
-import { analyzeWithClaude, askClaude, explainError } from './ai.js';
+import { analyzeWithGemini, askGemini, listModels, testConnection, explainError } from './ai.js';
+import { initAccounts, signIn, signOut, loadAIConfig, saveAIConfig, deleteAIConfig } from './accounts.js';
 
 const WINDOW_MS = 4000;      // 판정에 쓰는 구간 길이
 const STEP_MS = 500;         // 판정 주기
@@ -251,6 +252,7 @@ function fitCanvas(canvas) {
 }
 
 function drawChart() {
+  if ($('panel-measure').hidden) return;
   const { ctx, w, h } = fitCanvas($('chart'));
   ctx.clearRect(0, 0, w, h);
   const pad = { l: 34, r: 8, t: 8, b: 20 };
@@ -310,6 +312,7 @@ function drawChart() {
 }
 
 function drawTimeline() {
+  if ($('panel-measure').hidden) return;
   const { ctx, w, h } = fitCanvas($('timeline'));
   ctx.clearRect(0, 0, w, h);
   const wins = state.windows;
@@ -328,7 +331,7 @@ function drawTimeline() {
 
 let lastDraw = 0;
 function loop(ts) {
-  if (state.running && ts - lastDraw > 80) {
+  if (state.running && ts - lastDraw > 80 && !$('panel-measure').hidden) {
     lastDraw = ts;
     drawChart();
     const last = state.samples[state.samples.length - 1];
@@ -424,15 +427,10 @@ function buildSummary() {
   };
 }
 
-function apiSettings() {
-  const apiKey = $('api-key').value.trim();
-  if (!apiKey) throw new Error('API 키를 입력하세요.');
-  try {
-    if ($('api-remember').checked) localStorage.setItem('wr-api-key', apiKey);
-    else localStorage.removeItem('wr-api-key');
-    localStorage.setItem('wr-model', $('api-model').value);
-  } catch { /* 저장소를 쓸 수 없는 환경(사생활 보호 모드 등)은 무시 */ }
-  return { apiKey, model: $('api-model').value };
+function aiSettings() {
+  const cfg = account.aiConfig;
+  if (!cfg) throw new Error('AI 설정을 불러오지 못했습니다. 로그인 상태와 관리자 설정을 확인하세요.');
+  return { apiKey: cfg.apiKey, model: cfg.model };
 }
 
 function el(tag, text, cls) {
@@ -481,7 +479,7 @@ function onAnalyze() {
     return;
   }
   runAI($('btn-ai'), box, async () => {
-    const r = await analyzeWithClaude({ ...apiSettings(), summary });
+    const r = await analyzeWithGemini({ ...aiSettings(), summary });
     renderAnalysis(box, r);
   });
 }
@@ -491,7 +489,7 @@ function onAsk() {
   const question = $('ai-question').value.trim();
   if (!question) return;
   runAI($('btn-ask'), box, async () => {
-    box.textContent = await askClaude({ ...apiSettings(), question, summary: buildSummary() });
+    box.textContent = await askGemini({ ...aiSettings(), question, summary: buildSummary() });
   });
 }
 
@@ -510,6 +508,175 @@ function releaseWakeLock() {
   state.wakeLock = null;
 }
 
+// ---------- 탭 ----------
+const TABS = ['measure', 'criteria', 'ai', 'theory', 'admin'];
+
+function showTab(name) {
+  if (!TABS.includes(name)) name = 'measure';
+  if (name === 'admin' && !account.isAdmin) name = 'measure';
+  for (const t of TABS) {
+    const selected = t === name;
+    $('tab-' + t).setAttribute('aria-selected', String(selected));
+    $('tab-' + t).tabIndex = selected ? 0 : -1;
+    $('panel-' + t).hidden = !selected;
+  }
+  try { history.replaceState(null, '', '#' + name); } catch { /* 무시 */ }
+  $('tab-' + name).scrollIntoView({ inline: 'center', block: 'nearest' });
+  if (name === 'measure') redraw();
+}
+
+function initTabs() {
+  for (const t of TABS) {
+    $('tab-' + t).addEventListener('click', () => showTab(t));
+  }
+  $('tab-measure').parentElement.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const visible = TABS.filter(t => !$('tab-' + t).hidden);
+    const cur = visible.findIndex(t => $('tab-' + t).getAttribute('aria-selected') === 'true');
+    const next = visible[(cur + (e.key === 'ArrowRight' ? 1 : visible.length - 1)) % visible.length];
+    showTab(next);
+    $('tab-' + next).focus();
+  });
+  showTab(location.hash.slice(1));
+}
+
+function redraw() {
+  if ($('panel-measure').hidden) return;
+  drawChart();
+  drawTimeline();
+}
+
+// ---------- 로그인 · AI 설정 ----------
+const account = { user: null, isAdmin: false, aiState: 'loading', aiConfig: null, unavailable: false };
+
+async function onAccountChange({ user, isAdmin, unavailable }) {
+  account.user = user;
+  account.isAdmin = isAdmin;
+  account.unavailable = !!unavailable;
+  account.aiConfig = null;
+  account.aiState = user ? 'loading' : 'signedOut';
+  renderAccount();
+  if (!user) return;
+  const r = await loadAIConfig();
+  // 로딩 중 로그아웃/계정 전환이 있었다면 결과를 버린다.
+  if (account.user?.uid !== user.uid) return;
+  account.aiState = r.status;
+  account.aiConfig = r.status === 'ok' ? r.config : null;
+  renderAccount();
+}
+
+function renderAccount() {
+  const { user, isAdmin } = account;
+  $('btn-login').hidden = !!user;
+  $('btn-logout').hidden = !user;
+  $('account-info').textContent = user ? `${user.displayName || user.email}${isAdmin ? ' · 관리자' : ''}` : '';
+  $('tab-admin').hidden = !isAdmin;
+  if (!isAdmin && $('tab-admin').getAttribute('aria-selected') === 'true') showTab('measure');
+  renderAIGate();
+  if (isAdmin) fillAdminForm();
+}
+
+function renderAIGate() {
+  const gate = $('ai-gate');
+  const body = $('ai-body');
+  const { aiState, user, aiConfig } = account;
+  let msg = '';
+  let ok = false;
+  if (account.unavailable) msg = 'Firebase를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요.';
+  else if (!user) msg = 'AI 분석은 로그인한 사용자만 사용할 수 있습니다. 오른쪽 위의 "Google 로그인"을 눌러 주세요.';
+  else if (aiState === 'loading') msg = 'AI 설정을 불러오는 중…';
+  else if (aiState === 'denied') msg = '현재 AI 분석은 관리자만 사용할 수 있습니다. 선생님께 사용 허용을 요청하세요.';
+  else if (aiState === 'unset') msg = account.isAdmin ? '아직 AI 설정이 없습니다. 🔧 관리자 탭에서 모델과 API 키를 저장하세요.' : 'AI 분석이 아직 준비되지 않았습니다. 선생님께 문의하세요.';
+  else if (aiState === 'error') msg = 'AI 설정을 불러오지 못했습니다. 잠시 후 다시 시도하세요.';
+  else ok = !!aiConfig;
+  gate.textContent = msg;
+  gate.hidden = ok;
+  body.hidden = !ok;
+}
+
+async function onLogin() {
+  try {
+    await signIn();
+  } catch (e) {
+    if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return;
+    alert('로그인에 실패했습니다: ' + (e.message || e));
+  }
+}
+
+// ---------- 관리자 ----------
+function admStatus(msg) { $('adm-status').textContent = msg; }
+
+function fillAdminForm() {
+  const cfg = account.aiConfig;
+  if (document.activeElement !== $('adm-model')) $('adm-model').value = cfg?.model || $('adm-model').value || '';
+  $('adm-allow').checked = cfg ? !!cfg.allowStudents : $('adm-allow').checked;
+  $('adm-key-hint').textContent = cfg?.apiKey
+    ? `저장된 키: …${cfg.apiKey.slice(-4)} (바꾸려면 새 키를 입력, 비워 두면 유지)`
+    : '저장된 키 없음';
+}
+
+// 입력칸에 새 키가 있으면 그것을, 없으면 저장된 키를 쓴다.
+function adminKey() {
+  return $('adm-key').value.trim() || account.aiConfig?.apiKey || '';
+}
+
+async function adminAction(btn, task) {
+  btn.disabled = true;
+  try {
+    await task();
+  } catch (e) {
+    admStatus('오류: ' + (e.code === 'permission-denied' ? '권한이 없습니다. Firestore 규칙이 배포되었는지 확인하세요.' : explainError(e)));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function initAdmin() {
+  $('btn-login').addEventListener('click', onLogin);
+  $('btn-logout').addEventListener('click', () => signOut());
+
+  $('btn-adm-models').addEventListener('click', () => adminAction($('btn-adm-models'), async () => {
+    const apiKey = adminKey();
+    if (!apiKey) return admStatus('API 키를 먼저 입력하세요.');
+    admStatus('모델 목록을 불러오는 중…');
+    const names = await listModels(apiKey);
+    $('adm-model-list').replaceChildren(...names.map(n => { const o = document.createElement('option'); o.value = n; return o; }));
+    admStatus(`사용 가능한 모델 ${names.length}개를 불러왔습니다. 모델 칸을 눌러 선택하세요.`);
+  }));
+
+  $('btn-adm-test').addEventListener('click', () => adminAction($('btn-adm-test'), async () => {
+    const apiKey = adminKey();
+    const model = $('adm-model').value.trim();
+    if (!apiKey || !model) return admStatus('API 키와 모델을 모두 입력하세요.');
+    admStatus('연결 테스트 중…');
+    const reply = await testConnection({ apiKey, model });
+    admStatus(`✔ 연결 성공 (응답: ${reply.slice(0, 40)})`);
+  }));
+
+  $('btn-adm-save').addEventListener('click', () => adminAction($('btn-adm-save'), async () => {
+    const apiKey = adminKey();
+    const model = $('adm-model').value.trim();
+    if (!apiKey || !model) return admStatus('API 키와 모델을 모두 입력하세요.');
+    await saveAIConfig({ apiKey, model, allowStudents: $('adm-allow').checked, updatedBy: account.user.email });
+    $('adm-key').value = '';
+    const r = await loadAIConfig();
+    account.aiState = r.status;
+    account.aiConfig = r.status === 'ok' ? r.config : null;
+    renderAccount();
+    admStatus('✔ 저장했습니다.');
+  }));
+
+  $('btn-adm-clear').addEventListener('click', () => adminAction($('btn-adm-clear'), async () => {
+    if (!confirm('저장된 API 키와 모델 설정을 삭제할까요?')) return;
+    await deleteAIConfig();
+    account.aiState = 'unset';
+    account.aiConfig = null;
+    $('adm-key').value = '';
+    renderAccount();
+    admStatus('삭제했습니다.');
+  }));
+}
+
 function init() {
   $('btn-start').addEventListener('click', startSensor);
   $('btn-stop').addEventListener('click', stop);
@@ -522,14 +689,11 @@ function init() {
   $('btn-csv-win').addEventListener('click', exportWindows);
   $('btn-ai').addEventListener('click', onAnalyze);
   $('btn-ask').addEventListener('click', onAsk);
-  try {
-    const key = localStorage.getItem('wr-api-key');
-    if (key) { $('api-key').value = key; $('api-remember').checked = true; }
-    const model = localStorage.getItem('wr-model');
-    if (model) $('api-model').value = model;
-  } catch { /* 무시 */ }
-  window.addEventListener('resize', () => { drawChart(); drawTimeline(); });
-  drawChart();
+  window.addEventListener('resize', redraw);
+  initTabs();
+  initAdmin();
+  initAccounts(onAccountChange);
+  redraw();
   requestAnimationFrame(loop);
 }
 

@@ -139,3 +139,23 @@ summary { cursor: pointer; font-weight: 600; }
 .ai-box h4 { margin: 10px 0 4px; }
 .ai-box ul { margin: 4px 0; padding-left: 20px; white-space: normal; }
 .ai-box .big { font-size: 1.3rem; font-weight: 700; }
+
+/* 헤더 · 계정 · 탭 */
+.top { position: sticky; top: 0; z-index: 10; background: var(--bg); max-width: none; padding: 10px 16px 0; border-bottom: 1px solid var(--border); }
+.top-row, .tabs { max-width: 728px; margin: 0 auto; }
+.top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.top h1 { font-size: 1.15rem; margin: 0; }
+.account { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+button.small { padding: 5px 10px; font-size: 0.8rem; }
+.tabs { display: flex; gap: 4px; overflow-x: auto; margin-top: 8px; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button[role="tab"] {
+  flex: 1 0 auto; border: none; border-bottom: 3px solid transparent; border-radius: 6px 6px 0 0;
+  background: transparent; padding: 10px 12px; white-space: nowrap;
+}
+.tabs button[role="tab"][aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+.tabs button[hidden] { display: none; }
+[hidden] { display: none !important; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; margin: 10px 0; }
+.field.inline { flex-direction: row; align-items: center; gap: 8px; }
+.field input[type="text"], .field input[type="password"] { width: 100%; }

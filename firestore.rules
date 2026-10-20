@@ -23,6 +23,14 @@ service cloud.firestore {
                                      (resource.data.userId == request.auth.uid || isTeacher(request));
     }
 
+    // 걷기·뛰기 판정기 AI 설정 (Gemini 모델·API 키)
+    // 읽기: 로그인한 사용자 중 교사, 또는 교사가 학생 사용을 허용(allowStudents)한 경우. 쓰기: 교사만.
+    match /appConfig/{docId} {
+      allow read: if request.auth != null &&
+                     (isTeacher(request) || resource.data.allowStudents == true);
+      allow write: if request.auth != null && isTeacher(request);
+    }
+
     // Roles collection (read-only for clients, managed by Admin SDK)
     match /roles/{uid} {
       allow read: if request.auth != null;
