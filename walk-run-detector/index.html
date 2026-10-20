@@ -4,44 +4,56 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>걷기·뛰기 판정기</title>
-  <meta name="description" content="스마트폰 가속도 센서로 걷기와 뛰기를 판정하는 고등학교 물리 실험 웹앱">
+  <meta name="description" content="스마트폰 가속도 센서 데이터를 모아 직접 학습시키고, 조별 모델을 비교하는 고등학교 빅데이터 수업용 웹앱">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="top">
-    <h1>🏃 걷기·뛰기 판정기</h1>
-    <p class="sub">스마트폰 가속도 센서로 내 움직임을 측정하고, 물리적으로 걷기와 뛰기를 구분해 봅시다.</p>
+    <div class="top-row">
+      <h1>🏃 걷기·뛰기 판정기</h1>
+      <div class="account" id="account">
+        <span id="account-info" class="muted"></span>
+        <button id="btn-login" class="small">Google 로그인</button>
+        <button id="btn-logout" class="small" hidden>로그아웃</button>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="화면 전환">
+      <button role="tab" id="tab-measure" aria-controls="panel-measure" aria-selected="true">📱 판정</button>
+      <button role="tab" id="tab-data" aria-controls="panel-data" aria-selected="false">🧪 데이터</button>
+      <button role="tab" id="tab-explore" aria-controls="panel-explore" aria-selected="false">🔍 탐색</button>
+      <button role="tab" id="tab-train" aria-controls="panel-train" aria-selected="false">🧠 학습</button>
+      <button role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false">🏆 조별 비교</button>
+      <button role="tab" id="tab-ai" aria-controls="panel-ai" aria-selected="false">🤖 AI</button>
+      <button role="tab" id="tab-theory" aria-controls="panel-theory" aria-selected="false">📘 원리</button>
+      <button role="tab" id="tab-admin" aria-controls="panel-admin" aria-selected="false" hidden>🔧 관리자</button>
+    </nav>
   </header>
 
   <main>
-    <!-- 1. 측정 -->
-    <section class="card">
-      <h2>1. 측정</h2>
+    <!-- ===== 판정 ===== -->
+    <section class="card" id="panel-measure" role="tabpanel" aria-labelledby="tab-measure">
+      <div id="model-line" class="model-line"></div>
       <div id="sensor-warning" class="notice warn" hidden></div>
       <div class="btn-row">
         <button id="btn-start" class="primary">▶ 측정 시작</button>
         <button id="btn-stop" disabled>■ 정지</button>
         <button id="btn-reset">↺ 초기화</button>
       </div>
-      <div class="btn-row small">
-        <span class="muted">센서가 없는 PC에서는:</span>
-        <button id="btn-sim-walk">시뮬레이션: 걷기</button>
-        <button id="btn-sim-run">시뮬레이션: 뛰기</button>
-      </div>
       <p id="status" class="muted">대기 중 — 스마트폰을 손에 쥐거나 팔에 고정한 뒤 측정을 시작하세요.</p>
 
       <div class="verdict" id="verdict" data-state="idle">
         <div class="verdict-label" id="verdict-label">—</div>
-        <div class="verdict-reason" id="verdict-reason">측정을 시작하면 최근 4초 데이터로 판정합니다.</div>
+        <div class="verdict-reason" id="verdict-reason">측정을 시작하면 최근 4초 데이터를 학습된 모델로 판정합니다.</div>
       </div>
+      <div id="prob-bars" class="prob-bars"></div>
 
       <div class="stats">
         <div class="stat"><span class="k">|a| 현재</span><span class="v" id="s-now">—</span><span class="u">m/s²</span></div>
         <div class="stat"><span class="k">표준편차 σ</span><span class="v" id="s-std">—</span><span class="u">m/s²</span></div>
         <div class="stat"><span class="k">최대 |a|</span><span class="v" id="s-max">—</span><span class="u">m/s²</span></div>
         <div class="stat"><span class="k">최소 |a|</span><span class="v" id="s-min">—</span><span class="u">m/s²</span></div>
-        <div class="stat"><span class="k">걸음 수(4초)</span><span class="v" id="s-steps">—</span><span class="u">걸음</span></div>
         <div class="stat"><span class="k">케이던스</span><span class="v" id="s-cad">—</span><span class="u">걸음/분</span></div>
+        <div class="stat"><span class="k">확신도</span><span class="v" id="s-prob">—</span><span class="u">모델 출력</span></div>
       </div>
 
       <canvas id="chart" height="220" aria-label="가속도 크기 그래프"></canvas>
@@ -51,103 +63,388 @@
         <span><i class="sw peak"></i>감지된 걸음</span>
       </div>
       <canvas id="timeline" height="28" aria-label="판정 타임라인"></canvas>
-      <div class="legend">
-        <span><i class="sw st-still"></i>정지</span>
-        <span><i class="sw st-walk"></i>걷기</span>
-        <span><i class="sw st-run"></i>뛰기</span>
-      </div>
+      <div id="timeline-legend" class="legend"></div>
 
       <div class="btn-row">
         <button id="btn-csv" disabled>⬇ 원본 데이터 CSV</button>
-        <button id="btn-csv-win" disabled>⬇ 구간 분석 CSV</button>
-      </div>
-    </section>
-
-    <!-- 2. 기준값 -->
-    <section class="card">
-      <h2>2. 판정 기준 (직접 바꿔 보세요)</h2>
-      <p class="muted">판정은 최근 4초 동안의 |a| 표준편차(흔들림의 크기)와 케이던스(분당 걸음 수)를 사용합니다.</p>
-      <div class="form-grid">
-        <label>정지 판정: σ &lt; <input id="th-still" type="number" step="0.1" value="0.6"> m/s²</label>
-        <label>뛰기 판정: σ ≥ <input id="th-run" type="number" step="0.1" value="4.0"> m/s²</label>
-        <label>또는 최소 |a| ≤ <input id="th-flight" type="number" step="0.1" value="2.5"> m/s² (공중 체공)</label>
+        <button id="btn-csv-win" disabled>⬇ 구간 판정 CSV</button>
       </div>
       <details>
-        <summary>나만의 기준값 만들기 (보정)</summary>
-        <p class="muted">각 버튼을 누르고 10초 동안 해당 동작을 하세요. 두 동작의 σ 중간값으로 뛰기 기준을 자동 설정합니다.</p>
+        <summary>센서가 없는 PC에서 체험하기</summary>
         <div class="btn-row">
-          <button id="btn-cal-walk">🚶 걷기 10초 기록</button>
-          <button id="btn-cal-run">🏃 뛰기 10초 기록</button>
+          <button id="btn-sim-walk">시뮬레이션: 걷기</button>
+          <button id="btn-sim-run">시뮬레이션: 뛰기</button>
         </div>
-        <p id="cal-status" class="muted">보정 기록 없음</p>
       </details>
     </section>
 
-    <!-- 3. AI -->
-    <section class="card">
-      <h2>3. AI 분석 (Claude)</h2>
-      <p class="muted">측정 결과 요약을 AI에게 보내 판정 근거와 물리적 해석을 받아봅니다. 원본 데이터 전체가 아니라 통계 요약과 짧은 샘플만 전송됩니다.</p>
-      <div class="form-grid">
-        <label>API 키
-          <input id="api-key" type="password" placeholder="sk-ant-..." autocomplete="off">
-        </label>
-        <label class="inline"><input id="api-remember" type="checkbox"> 이 기기에 키 저장</label>
-        <label>모델
-          <select id="api-model">
-            <option value="claude-opus-5-5">Claude Opus 5.5 (가장 정확)</option>
-            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (균형)</option>
-            <option value="claude-haiku-5-5">Claude Haiku 5.5 (저렴·빠름)</option>
-          </select>
-        </label>
-        <label>실험 메모 (선택)
-          <input id="ai-memo" type="text" placeholder="예) 휴대폰을 오른손에 쥐고 복도에서 걷다가 뛰었음">
-        </label>
+    <!-- ===== 데이터 ===== -->
+    <section class="card" id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
+      <div class="subtabs" data-group="data" role="tablist">
+        <button role="tab" data-sub="rec" aria-selected="true">⏺ 기록하기</button>
+        <button role="tab" data-sub="mine" aria-selected="false">📂 내 데이터</button>
+        <button role="tab" data-sub="labels" aria-selected="false">🏷 라벨</button>
       </div>
-      <div class="btn-row">
-        <button id="btn-ai" class="primary">🤖 AI에게 결과 분석 요청</button>
-      </div>
-      <div id="ai-result" class="ai-box" hidden></div>
 
-      <h3>AI에게 질문하기</h3>
-      <div class="ask">
-        <textarea id="ai-question" rows="2" placeholder="예) 뛸 때 최소 |a|가 거의 0이 되는 이유는 뭔가요?"></textarea>
-        <button id="btn-ask">질문</button>
+      <div class="subpanel" data-group="data" data-sub="rec">
+        <p class="muted">라벨(동작)을 고르고 휴대폰을 든 채로 그 동작을 하세요. 사람·속도·휴대폰 위치를 바꿔 여러 번 기록할수록 모델이 좋아집니다.</p>
+        <div id="rec-warning" class="notice warn" hidden></div>
+        <div class="form-grid">
+          <label class="field">라벨 <select id="rec-label"></select></label>
+          <fieldset class="choice"><legend>데이터 출처</legend>
+            <label><input type="radio" name="rec-source" value="sensor" checked> 📱 스마트폰 센서</label>
+            <label><input type="radio" name="rec-source" value="sim"> 🖥 시뮬레이션(걷기·뛰기만)</label>
+          </fieldset>
+          <label class="field">기록 시간
+            <select id="rec-seconds"><option value="12">12초</option><option value="20" selected>20초</option><option value="30">30초</option></select>
+          </label>
+        </div>
+        <div class="btn-row">
+          <button id="btn-rec-start" class="primary">⏺ 기록 시작 (3초 뒤 시작)</button>
+          <button id="btn-rec-cancel" disabled>취소</button>
+        </div>
+        <div id="rec-progress" class="progress" hidden><div id="rec-bar"></div></div>
+        <p id="rec-status" class="muted">버튼을 누르면 3초 카운트다운 뒤 기록이 시작됩니다. 시작 전에 휴대폰을 몸에 고정하세요.</p>
+        <canvas id="rec-chart" height="160" aria-label="기록 중인 가속도 그래프"></canvas>
+        <div id="rec-result" class="ai-box" hidden>
+          <div id="rec-result-text"></div>
+          <label class="field inline"><input id="rec-upload" type="checkbox"> 학급 공용 데이터(클라우드)에도 올리기 (로그인 필요)</label>
+          <div class="btn-row">
+            <button id="btn-rec-save" class="primary">💾 이 기록 저장</button>
+            <button id="btn-rec-discard">버리기</button>
+          </div>
+        </div>
       </div>
-      <div id="ai-answer" class="ai-box" hidden></div>
-      <p class="notice">⚠ API 키는 비밀번호처럼 다루세요. 키는 이 브라우저에서 Anthropic 서버로만 직접 전송되며, 다른 곳에 저장·공유되지 않습니다.</p>
+
+      <div class="subpanel" data-group="data" data-sub="mine" hidden>
+        <div id="data-summary" class="muted"></div>
+        <div class="btn-row">
+          <button id="btn-cloud-load">☁ 학급 데이터 불러오기</button>
+          <button id="btn-gen-sim">🖥 시뮬레이션 데이터 만들기</button>
+          <button id="btn-data-csv">⬇ 특징 CSV</button>
+          <button id="btn-data-clear">🗑 이 기기 기록 삭제</button>
+        </div>
+        <p id="data-status" class="muted"></p>
+        <div class="table-wrap"><table id="data-table" class="data-table"></table></div>
+        <p class="muted">☆ 평가용: 교사가 지정한 기록은 학습에서 빠지고 조별 모델 비교에만 쓰입니다.</p>
+      </div>
+
+      <div class="subpanel" data-group="data" data-sub="labels" hidden>
+        <p class="muted">걷기·뛰기 말고도 동작을 추가해 보세요 (예: 계단 오르기, 제자리 뛰기, 천천히 걷기). 라벨이 3개 이상이면 모델이 여러 동작을 구별합니다. 최대 6개.</p>
+        <div class="ask">
+          <input id="label-new" type="text" maxlength="10" placeholder="새 라벨 이름 (10자 이하)">
+          <button id="btn-label-add">추가</button>
+        </div>
+        <p id="label-status" class="muted"></p>
+        <div class="table-wrap"><table id="label-table" class="data-table"></table></div>
+        <p class="muted">추가한 라벨에는 시뮬레이션 데이터가 없습니다. 센서로 직접 기록하세요. 라벨마다 기록이 2개 이상 있어야 학습할 수 있습니다.</p>
+      </div>
     </section>
 
-    <!-- 4. 원리 -->
-    <section class="card">
-      <h2>4. 물리 원리</h2>
+    <!-- ===== 탐색 ===== -->
+    <section class="card" id="panel-explore" role="tabpanel" aria-labelledby="tab-explore" hidden>
+      <p class="muted"><b>두 동작을 구별하려면 어떤 데이터가 필요할까?</b> 모은 데이터를 특징별로 살펴보고, 가장 잘 구별하는 특징을 찾아보세요. 이 결과를 보고 🧠 학습 탭에서 쓸 특징을 직접 고를 수 있습니다.</p>
+      <div class="form-grid two">
+        <label class="field">라벨 A <select id="ex-a"></select></label>
+        <label class="field">라벨 B <select id="ex-b"></select></label>
+      </div>
+      <p id="ex-status" class="muted"></p>
+      <div class="subtabs" data-group="explore" role="tablist">
+        <button role="tab" data-sub="rank" aria-selected="true">📊 특징 순위·분포</button>
+        <button role="tab" data-sub="scatter" aria-selected="false">⬤ 2차원 산점도</button>
+      </div>
+      <div class="subpanel" data-group="explore" data-sub="rank">
+        <p class="muted">"정확도" = 그 특징 하나에 기준선 한 줄만 그어 맞힌 비율 (50%는 찍기). 줄을 누르면 아래에 분포가 나옵니다.</p>
+        <div class="table-wrap"><table id="ex-table" class="data-table"></table></div>
+        <h4 id="ex-hist-title">분포</h4>
+        <canvas id="ex-hist" height="180" aria-label="특징 분포 히스토그램"></canvas>
+        <div id="ex-hist-legend" class="legend"></div>
+        <div id="ex-think" class="notice"></div>
+      </div>
+      <div class="subpanel" data-group="explore" data-sub="scatter" hidden>
+        <div class="btn-row">
+          <label class="field inline">가로 <select id="sc-x"></select></label>
+          <label class="field inline">세로 <select id="sc-y"></select></label>
+        </div>
+        <canvas id="scatter" height="280" aria-label="특징 산점도"></canvas>
+        <div id="scatter-legend" class="legend"></div>
+        <p class="muted">★ = 📱 판정 탭에서 방금 판정한 구간. 점들이 라벨별로 뭉쳐 갈라질수록 구별하기 쉬운 특징 조합입니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== 학습 ===== -->
+    <section class="card" id="panel-train" role="tabpanel" aria-labelledby="tab-train" hidden>
+      <div class="subtabs" data-group="train" role="tablist">
+        <button role="tab" data-sub="setup" aria-selected="true">⚙ 설정·학습</button>
+        <button role="tab" data-sub="result" aria-selected="false">📈 결과</button>
+        <button role="tab" data-sub="curve" aria-selected="false">📉 학습곡선</button>
+      </div>
+
+      <div class="subpanel" data-group="train" data-sub="setup">
+        <p class="muted">기록을 4초 구간(2초씩 이동)으로 잘라 특징을 계산하고, 라벨을 구별하도록 학습합니다. 학습은 이 브라우저 안에서 이루어집니다.</p>
+        <div id="train-summary" class="muted"></div>
+        <h4>사용할 특징 <button class="small" id="btn-feat-all">모두</button> <button class="small" id="btn-feat-top">탐색 상위 3개</button></h4>
+        <div id="feat-list" class="feat-list"></div>
+        <div class="form-grid">
+          <label class="field">모델 종류
+            <select id="train-type">
+              <option value="logistic">로지스틱(소프트맥스) 회귀 — 특징별 가중치를 볼 수 있음</option>
+              <option value="knn">k-최근접 이웃 — 가까운 예시 5개의 다수결</option>
+            </select>
+          </label>
+          <label class="field">테스트용으로 따로 둘 기록 비율
+            <select id="train-test"><option value="0.2">20%</option><option value="0.25" selected>25%</option><option value="0.34">34%</option></select>
+          </label>
+          <label class="field inline"><input id="train-sim" type="checkbox"> 시뮬레이션 데이터도 학습에 포함</label>
+          <label class="field inline"><input id="train-refit" type="checkbox" checked> 평가 뒤 전체 데이터로 다시 학습해 최종 모델로 사용</label>
+        </div>
+        <div class="btn-row">
+          <button id="btn-train" class="primary">🧠 학습 시작</button>
+          <button id="btn-class-load">☁ 반 모델 불러오기</button>
+          <button id="btn-class-publish" hidden>📣 반 모델로 게시</button>
+        </div>
+        <p id="train-status" class="muted"></p>
+      </div>
+
+      <div class="subpanel" data-group="train" data-sub="result" hidden>
+        <p id="result-empty" class="muted">아직 학습한 결과가 없습니다. ⚙ 설정·학습에서 학습을 시작하세요.</p>
+        <div id="train-result" hidden>
+          <div class="stats" id="train-metrics"></div>
+          <p class="muted">테스트 정확도는 <b>학습에 쓰지 않은 기록</b>으로 잰 값입니다. 학습 정확도만 높고 테스트 정확도가 낮으면 외워버린(과적합) 것입니다.</p>
+          <h4>라벨별 성적 (테스트)</h4>
+          <div class="table-wrap"><table id="perclass" class="data-table"></table></div>
+          <h4>혼동 행렬 (테스트) — 행: 실제, 열: 예측</h4>
+          <div class="table-wrap"><table id="confusion" class="data-table"></table></div>
+          <div id="weights-box">
+            <h4>어떤 특징을 중요하게 봤나? (표준화 가중치)</h4>
+            <p class="muted">양수(빨강)면 그 특징이 클수록 해당 라벨 쪽으로, 음수(파랑)면 반대쪽으로 판단합니다.</p>
+            <div class="table-wrap"><table id="weights" class="data-table"></table></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="subpanel" data-group="train" data-sub="curve" hidden>
+        <p class="muted"><b>데이터가 얼마나 있어야 할까?</b> 같은 테스트 기록으로, 학습 기록을 라벨마다 1개, 2개, 3개… 늘려 가며 정확도가 어떻게 달라지는지 봅니다. (⚙ 설정의 특징·모델 종류로 계산)</p>
+        <div class="btn-row"><button id="btn-curve" class="primary">📉 학습곡선 그리기</button></div>
+        <p id="curve-status" class="muted"></p>
+        <canvas id="curve-chart" height="220" aria-label="학습곡선"></canvas>
+        <p class="muted">선: 평균 테스트 정확도, 음영: 4번 반복했을 때의 최소~최대. 곡선이 아직 오르고 있다면 데이터를 더 모으면 좋아진다는 뜻입니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== 조별 비교 ===== -->
+    <section class="card" id="panel-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+      <div class="subtabs" data-group="compare" role="tablist">
+        <button role="tab" data-sub="publish" aria-selected="true">📤 내 모델 게시</button>
+        <button role="tab" data-sub="rank" aria-selected="false">🏆 순위 비교</button>
+      </div>
+
+      <div class="subpanel" data-group="compare" data-sub="publish">
+        <p class="muted">조별로 모델을 만들어 게시하면, 모든 조의 모델을 <b>같은 평가용 기록</b>으로 채점해 비교할 수 있습니다. 로그인이 필요합니다.</p>
+        <label class="field">우리 조 이름 <input id="group-name" type="text" maxlength="12" placeholder="예) 3조"></label>
+        <div id="cmp-model-line" class="model-line"></div>
+        <div class="btn-row">
+          <button id="btn-gm-publish" class="primary">📤 내 모델을 이 조 이름으로 게시</button>
+          <button id="btn-gm-delete">게시 취소</button>
+        </div>
+        <p id="gm-status" class="muted"></p>
+        <p class="muted">한 사람당 모델 하나만 게시됩니다(다시 게시하면 덮어씀). 같은 조 학생이 각자 만든 모델도 같은 조 이름으로 게시해 비교할 수 있습니다.</p>
+      </div>
+
+      <div class="subpanel" data-group="compare" data-sub="rank" hidden>
+        <div class="form-grid">
+          <label class="field">평가 데이터
+            <select id="cmp-eval">
+              <option value="teacher">교사가 지정한 평가용 기록 (공정한 비교, 권장)</option>
+              <option value="cloud">불러온 학급 데이터 전체 (학습에 쓴 기록 포함 → 점수가 높게 나옴)</option>
+              <option value="local">이 기기의 내 기록</option>
+            </select>
+          </label>
+          <div class="field">비교할 라벨 <div id="cmp-labels" class="chips"></div></div>
+        </div>
+        <div class="btn-row"><button id="btn-compare" class="primary">🏆 모든 조 모델 불러와 채점</button></div>
+        <p id="cmp-status" class="muted"></p>
+        <div id="cmp-list" class="cards"></div>
+        <p class="muted">"자체 정확도"는 학생이 학습할 때 본 테스트 정확도, "평가 정확도"는 여기서 새로 채점한 값입니다. 둘의 차이가 크면 처음 보는 데이터에 약한 모델입니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== AI ===== -->
+    <section class="card" id="panel-ai" role="tabpanel" aria-labelledby="tab-ai" hidden>
+      <div class="subtabs" data-group="ai" role="tablist">
+        <button role="tab" data-sub="api" aria-selected="true">🔑 API 선택</button>
+        <button role="tab" data-sub="ask" aria-selected="false">💬 분석·질문</button>
+        <button role="tab" data-sub="tokens" aria-selected="false">🔢 토큰 비교</button>
+      </div>
+
+      <div class="subpanel" data-group="ai" data-sub="api">
+        <fieldset class="choice stack"><legend>어떤 API를 쓸까요?</legend>
+          <label><input type="radio" name="ai-source" value="teacher" checked> 🏫 교사가 제공한 API (제한됨: 하루 사용 횟수 등)</label>
+          <label><input type="radio" name="ai-source" value="personal"> 👤 내 API 키 (내가 발급한 Gemini 키)</label>
+        </fieldset>
+        <div id="ai-teacher-box">
+          <div id="ai-gate" class="notice"></div>
+          <p id="ai-quota" class="muted"></p>
+        </div>
+        <div id="ai-personal-box" hidden>
+          <label class="field">내 Gemini API 키
+            <input id="ps-key" type="password" autocomplete="off" placeholder="AIza...">
+          </label>
+          <label class="field">모델
+            <input id="ps-model" list="ps-model-list" placeholder="예) gemini-2.5-flash" autocomplete="off">
+            <datalist id="ps-model-list"></datalist>
+          </label>
+          <label class="field inline"><input id="ps-remember" type="checkbox"> 이 기기(브라우저)에 키 저장 — 공용 컴퓨터에서는 체크하지 마세요</label>
+          <div class="btn-row">
+            <button id="btn-ps-models">모델 목록 불러오기</button>
+            <button id="btn-ps-test">연결 테스트</button>
+          </div>
+          <p id="ps-status" class="muted"></p>
+          <div class="notice">키는 이 브라우저에서 Google 서버로만 전송되며 선생님·다른 학생에게 보이지 않습니다. 사용 요금은 키 주인에게 청구됩니다. 키는 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>에서 발급합니다.</div>
+        </div>
+      </div>
+
+      <div class="subpanel" data-group="ai" data-sub="ask" hidden>
+        <p id="ai-need" class="notice" hidden></p>
+        <div id="ai-body">
+          <p class="muted">측정·학습 결과 요약을 AI에게 보내 판정 근거와 물리적 해석을 받아봅니다. 원본 데이터 전체가 아니라 통계 요약과 짧은 파형만 전송됩니다.</p>
+          <label class="field">실험 메모 (선택)
+            <input id="ai-memo" type="text" placeholder="예) 휴대폰을 오른손에 쥐고 복도에서 걷다가 뛰었음">
+          </label>
+          <div class="btn-row"><button id="btn-ai" class="primary">🤖 방금 측정한 결과 분석</button></div>
+          <div id="ai-result" class="ai-box" hidden></div>
+          <h4>학습 결과 해석</h4>
+          <div class="btn-row"><button id="btn-ai-train">🧠 학습 결과를 AI에게 해석 요청</button></div>
+          <div id="ai-train-result" class="ai-box" hidden></div>
+          <h4>AI에게 질문하기</h4>
+          <div class="ask">
+            <textarea id="ai-question" rows="2" placeholder="예) 뛸 때 최소 |a|가 거의 0이 되는 이유는 뭔가요?"></textarea>
+            <button id="btn-ask">질문</button>
+          </div>
+          <div id="ai-answer" class="ai-box" hidden></div>
+        </div>
+      </div>
+
+      <div class="subpanel" data-group="ai" data-sub="tokens" hidden>
+        <p class="muted"><b>LLM으로 동작을 분류하면 토큰이 얼마나 들까?</b> 같은 4초 구간을 Gemini에게 "무슨 동작이야?" 하고 물을 때, 입력 형식에 따라 토큰이 달라집니다. 우리가 학습시킨 모델은 같은 일을 토큰 0개로 합니다.</p>
+        <p id="tk-need" class="notice" hidden></p>
+        <div class="form-grid">
+          <label class="field">라벨마다 비교할 구간 수
+            <select id="tk-n"><option value="1">1개</option><option value="2">2개</option><option value="3" selected>3개</option><option value="5">5개</option></select>
+          </label>
+          <div class="field">입력 형식 <div id="tk-formats" class="chips"></div></div>
+        </div>
+        <div class="btn-row">
+          <button id="btn-tk-count">🔢 토큰 수만 세기 (생성 안 함)</button>
+          <button id="btn-tk-run" class="primary">🤖 실제로 분류시키기</button>
+        </div>
+        <p id="tk-status" class="muted"></p>
+        <div id="tk-list" class="cards"></div>
+        <div id="tk-note" class="notice" hidden></div>
+      </div>
+    </section>
+
+    <!-- ===== 원리 ===== -->
+    <section class="card" id="panel-theory" role="tabpanel" aria-labelledby="tab-theory" hidden>
       <details open>
         <summary>가속도 센서는 무엇을 재나요?</summary>
         <p>스마트폰 가속도 센서는 <b>중력을 포함한 가속도</b>를 잽니다. 가만히 놓아 두면 |a| ≈ g = 9.8 m/s²이 나오고,
-          자유낙하하면 |a| ≈ 0이 됩니다. 센서는 내부의 작은 추가 받는 힘(수직항력과 같은 접촉력)을 측정하기 때문입니다.</p>
+          자유낙하하면 |a| ≈ 0이 됩니다. 세 축의 크기 |a| = √(ax²+ay²+az²) 는 휴대폰을 어떻게 들었는지와 상관없이 쓸 수 있습니다.</p>
       </details>
       <details>
         <summary>걷기와 뛰기는 왜 다르게 보이나요?</summary>
         <ul>
-          <li><b>걷기</b>: 항상 한 발 이상이 땅에 닿아 있습니다. 몸의 위아래 흔들림이 작아 |a|는 대략 0.6g~1.5g 사이에서 부드럽게 오르내립니다.</li>
-          <li><b>뛰기</b>: 두 발이 모두 땅에서 떨어지는 <b>체공 구간</b>이 있습니다. 이때 몸은 거의 자유낙하 상태라 |a|가 0 근처까지 떨어지고,
-            착지 순간에는 지면이 짧은 시간에 큰 힘을 주어 2g~3g 이상의 큰 봉우리가 생깁니다.</li>
-          <li>그래서 뛰기는 <b>σ(흔들림)</b>가 크고, <b>최소 |a|</b>가 작으며, <b>케이던스</b>도 보통 더 높습니다.</li>
+          <li><b>걷기</b>: 항상 한 발 이상이 땅에 닿아 있어 |a|가 g 근처에서 부드럽게 오르내립니다.</li>
+          <li><b>뛰기</b>: 두 발이 모두 떨어지는 <b>체공</b> 때문에 |a|가 0 근처까지 내려가고, 착지 때 지면이 짧은 시간에 큰 힘을 주어 큰 봉우리가 생깁니다. (F·Δt = Δp)</li>
+        </ul>
+      </details>
+      <details>
+        <summary>이 앱은 어떻게 "학습"하나요? (머신러닝)</summary>
+        <ol>
+          <li><b>데이터 모으기</b>: 동작 이름(라벨)을 붙여 기록합니다.</li>
+          <li><b>특징 뽑기</b>: 4초 구간마다 평균, 흔들림 σ, 최소·최대, 케이던스 등 10개 숫자로 요약합니다.</li>
+          <li><b>탐색</b>: 어떤 특징이 두 동작을 잘 가르는지 살펴봅니다.</li>
+          <li><b>학습</b>: 정답이 있는 예시에서 "어떤 특징이 어떤 값일 때 어느 라벨이었나"를 컴퓨터가 스스로 찾습니다.</li>
+          <li><b>평가</b>: 학습에 쓰지 않은 기록으로 정확도를 잽니다. 이것이 진짜 실력입니다.</li>
+          <li><b>비교</b>: 조마다 만든 모델을 같은 평가용 기록으로 채점해 가장 잘 구별하는 모델을 찾습니다.</li>
+        </ol>
+      </details>
+      <details>
+        <summary>빅데이터와 공정한 비교</summary>
+        <ul>
+          <li>데이터가 많고 다양할수록(사람·속도·휴대폰 위치) 처음 보는 상황에서도 잘 맞힙니다. 학습곡선으로 확인해 보세요.</li>
+          <li>모델 점수를 비교하려면 <b>모든 조가 같은 평가용 기록</b>으로 채점해야 하고, 그 기록은 <b>학습에 쓰면 안 됩니다</b>(시험 문제를 미리 보고 공부하면 점수가 부풀려지므로).</li>
+          <li>라벨을 틀리게 붙이면 모델이 나빠집니다. 데이터 품질이 양만큼 중요합니다.</li>
+        </ul>
+      </details>
+      <details>
+        <summary>토큰이란? 머신러닝 모델과 LLM의 차이</summary>
+        <ul>
+          <li><b>토큰</b>은 LLM이 글을 읽고 쓰는 단위(대략 단어 조각)입니다. 입력·출력 토큰 수에 따라 시간과 비용이 정해집니다.</li>
+          <li>숫자 200개를 그대로 넣으면 토큰이 많이 들고, 특징 10개로 요약하면 훨씬 적게 듭니다. 좋은 요약(특징)은 비용도 줄입니다.</li>
+          <li>우리가 학습시킨 소형 모델은 곱셈·덧셈만 하므로 토큰이 0이고 1000분의 몇 초면 끝납니다. 대신 이 일 하나만 할 수 있습니다. LLM은 무엇이든 설명할 수 있지만 느리고 비쌉니다.</li>
         </ul>
       </details>
       <details>
         <summary>탐구 활동 아이디어</summary>
         <ol>
-          <li>천천히 걷기 → 빠르게 걷기 → 조깅 → 전력 질주 순서로 σ와 케이던스가 어떻게 변하는지 표로 정리해 보세요.</li>
-          <li>휴대폰 위치(손, 주머니, 팔)를 바꾸면 결과가 어떻게 달라지나요? 이유는?</li>
-          <li>운동량-충격량 관계(F·Δt = Δp)로 착지 봉우리의 크기를 설명해 보세요. 쿠션 있는 신발은 무엇을 바꿀까요?</li>
-          <li>친구들과 기준값을 비교해 보고, 모두에게 잘 맞는 기준을 찾아보세요.</li>
+          <li>특징 하나만으로 걷기/뛰기를 얼마나 맞힐 수 있나요? 가장 약한 특징과 강한 특징은?</li>
+          <li>특징을 1개, 3개, 10개로 바꿔 학습해 정확도와 모델 크기를 비교해 보세요.</li>
+          <li>기록을 2개, 10개, 40개로 늘리며 학습곡선을 그려 보세요. 데이터는 얼마나 필요한가요?</li>
+          <li>나 혼자 모은 데이터 vs 학급 전체 데이터로 학습한 모델, 평가용 기록에서 어느 쪽이 높나요?</li>
+          <li>"계단 오르기" 같은 라벨을 추가하면 걷기와 헷갈리나요? 혼동 행렬로 확인해 보세요.</li>
+          <li>일부러 라벨을 틀리게 섞으면 정확도가 얼마나 떨어지나요?</li>
+          <li>같은 구간을 LLM에게 물을 때 입력 형식별 토큰과 정확도를 비교하고, 우리 모델과 비교해 보세요.</li>
         </ol>
       </details>
     </section>
+
+    <!-- ===== 관리자 ===== -->
+    <section class="card" id="panel-admin" role="tabpanel" aria-labelledby="tab-admin" hidden>
+      <h2>교사 제공 API 설정 (Gemini)</h2>
+      <p class="muted">여기에 저장한 모델과 API 키는 Firebase에 저장되며, 로그인하지 않은 사람은 읽을 수 없습니다. 학생이 "교사가 제공한 API"를 고르면 이 키를 씁니다.</p>
+      <div class="form-grid">
+        <label class="field">Gemini API 키
+          <input id="adm-key" type="password" autocomplete="off" placeholder="AIza...">
+          <span id="adm-key-hint" class="muted"></span>
+        </label>
+        <label class="field">모델
+          <input id="adm-model" list="adm-model-list" placeholder="예) gemini-2.5-flash" autocomplete="off">
+          <datalist id="adm-model-list">
+            <option value="gemini-2.5-flash"></option>
+            <option value="gemini-2.5-flash-lite"></option>
+            <option value="gemini-2.5-pro"></option>
+          </datalist>
+        </label>
+        <label class="field">학생 1인당 하루 사용 횟수 (0 = 제한 없음)
+          <input id="adm-limit" type="number" min="0" step="1" value="30">
+        </label>
+        <label class="field inline">
+          <input id="adm-allow" type="checkbox">
+          로그인한 학생도 교사 API 사용 허용 (끄면 관리자만 사용)
+        </label>
+      </div>
+      <div class="btn-row">
+        <button id="btn-adm-models">모델 목록 불러오기</button>
+        <button id="btn-adm-test">연결 테스트</button>
+        <button id="btn-adm-save" class="primary">저장</button>
+        <button id="btn-adm-clear">키 삭제</button>
+      </div>
+      <p id="adm-status" class="muted"></p>
+      <div class="notice">
+        ⚠ 학생 사용을 허용하면 로그인한 학생의 브라우저로 키가 전달되어 개발자도구로 볼 수 있고, <b>하루 사용 횟수 제한은 앱 화면에서만 적용되는 안내용</b>입니다(강제 불가).
+        실제 상한은 Google AI Studio / Cloud 콘솔에서 이 키에 <b>웹사이트(HTTP 리퍼러) 제한</b>과 <b>사용량(할당량) 한도</b>로 꼭 설정하세요.
+      </div>
+      <h3>평가용 기록 지정</h3>
+      <p class="muted">🧪 데이터 → 내 데이터에서 학급 데이터를 불러온 뒤, 표의 "평가용" 칸을 눌러 지정합니다. 평가용 기록은 학생 학습에서 빠지고 조별 모델 비교에만 쓰입니다. 교사가 직접 다양한 동작을 기록해 지정하는 것을 권장합니다.</p>
+    </section>
   </main>
 
-  <footer class="muted">센서 데이터는 기기 밖으로 나가지 않습니다(AI 분석 요청 시 요약만 전송). · HTTPS 주소에서만 센서가 동작합니다.</footer>
+  <footer class="muted">센서 데이터는 기기 밖으로 나가지 않습니다(직접 올리기를 선택하거나 AI를 쓸 때만 전송). · HTTPS 주소에서만 센서가 동작합니다.</footer>
 
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>
