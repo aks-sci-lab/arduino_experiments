@@ -88,3 +88,66 @@ export async function saveAIConfig({ apiKey, model, allowStudents, updatedBy }) 
 export async function deleteAIConfig() {
   await db.collection(CONFIG_DOC[0]).doc(CONFIG_DOC[1]).delete();
 }
+
+// ---------- 학습 데이터 · 반 모델 (로그인한 사용자만 접근, firestore.rules 참고) ----------
+
+const DATA_COLLECTION = 'walkRunData';
+const MODEL_DOC = ['walkRunModel', 'current'];
+const CLOUD_LIMIT = 400;
+
+export async function uploadRecording(rec) {
+  const ref = await db.collection(DATA_COLLECTION).add({
+    userId: auth.currentUser.uid,
+    label: rec.label,
+    hz: rec.hz,
+    m: rec.m,
+    source: rec.source,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  return ref.id;
+}
+
+// 최근 기록부터 최대 CLOUD_LIMIT개
+export async function loadCloudRecordings() {
+  const snap = await db.collection(DATA_COLLECTION).orderBy('createdAt', 'desc').limit(CLOUD_LIMIT).get();
+  return snap.docs.map(d => {
+    const v = d.data();
+    return {
+      id: 'c_' + d.id,
+      cloudId: d.id,
+      label: v.label,
+      source: 'cloud',
+      hz: v.hz,
+      m: v.m,
+      userId: v.userId,
+      createdAt: v.createdAt?.toMillis?.() ?? 0,
+    };
+  });
+}
+
+export function deleteCloudRecording(cloudId) {
+  return db.collection(DATA_COLLECTION).doc(cloudId).delete();
+}
+
+export function currentUid() {
+  return auth?.currentUser?.uid ?? null;
+}
+
+// Firestore는 배열 안의 배열을 허용하지 않으므로 모델은 JSON 문자열로 저장한다.
+export async function publishModel(model, updatedBy) {
+  const json = JSON.stringify(model);
+  if (json.length > 900000) throw new Error('모델이 너무 큽니다. 로지스틱 회귀를 사용하거나 데이터를 줄이세요.');
+  await db.collection(MODEL_DOC[0]).doc(MODEL_DOC[1]).set({
+    json,
+    type: model.type,
+    testAccuracy: model.metrics?.test?.accuracy ?? null,
+    updatedBy,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+export async function loadClassModel() {
+  const doc = await db.collection(MODEL_DOC[0]).doc(MODEL_DOC[1]).get();
+  if (!doc.exists) return null;
+  return JSON.parse(doc.data().json);
+}

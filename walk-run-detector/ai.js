@@ -4,12 +4,15 @@
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 const SYSTEM_PROMPT = `당신은 고등학교 물리학 실험 수업을 돕는 조교입니다.
-학생이 스마트폰 가속도 센서(중력 포함 가속도, accelerationIncludingGravity)로 측정한 데이터의 요약을 보고
-걷기/뛰기/정지 판정과 그 물리적 근거를 설명합니다.
+학생들은 스마트폰 가속도 센서(중력 포함 가속도, accelerationIncludingGravity)의 크기 |a|를 4초 구간마다
+10가지 특징(평균, 표준편차, 최소·최대, 90%-10% 폭, 평균 변화율, 케이던스, 주기성, 낮은/높은 구간 비율)으로 요약하고,
+직접 모은 걷기/뛰기 데이터로 머신러닝 모델(로지스틱 회귀 또는 k-최근접 이웃)을 학습시켜 걷기와 뛰기를 구별합니다.
+당신은 학생이 측정한 데이터와 학습 결과의 요약을 보고 판정의 물리적 근거와 모델의 상태를 설명합니다.
 - 고등학생이 이해할 수 있는 한국어로, 핵심부터 간결하게 씁니다.
 - 뉴턴 운동 법칙, 수직항력, 자유낙하(겉보기 무중력), 충격량-운동량 관계 등 교과 개념과 연결합니다.
 - 숫자를 근거로 들 때는 제공된 값만 사용하고, 없는 값을 지어내지 않습니다.
 - 데이터가 부족하거나 측정 방법에 문제가 보이면 솔직하게 지적하고 개선 방법을 제안합니다.
+- 머신러닝 개념(라벨, 특징, 학습/테스트 분리, 과적합, 데이터 다양성)도 필요하면 쉬운 말로 연결합니다.
 - 정답을 바로 주기보다 학생이 스스로 생각해 볼 수 있는 탐구 질문도 함께 제시합니다.`;
 
 const str = description => ({ type: 'STRING', description });
@@ -20,13 +23,13 @@ const ANALYSIS_SCHEMA = {
   properties: {
     verdict: { type: 'STRING', enum: ['정지', '걷기', '뛰기', '혼합', '판단 불가'] },
     confidence: { type: 'INTEGER', description: '0~100' },
-    agrees_with_rule: { type: 'BOOLEAN', description: '앱의 규칙 기반 판정과 같은 결론인지' },
+    consistent_with_model: { type: 'BOOLEAN', description: '학습된 모델의 예측과 같은 결론인지(모델이 없으면 false)' },
     evidence: strList('수치를 근거로 한 판정 이유'),
     physics_explanation: str('관련 물리 개념 설명'),
     measurement_tips: strList('측정 개선 팁'),
     inquiry_questions: strList('학생용 탐구 질문'),
   },
-  required: ['verdict', 'confidence', 'agrees_with_rule', 'evidence', 'physics_explanation', 'measurement_tips', 'inquiry_questions'],
+  required: ['verdict', 'confidence', 'consistent_with_model', 'evidence', 'physics_explanation', 'measurement_tips', 'inquiry_questions'],
 };
 
 class GeminiError extends Error {
@@ -81,7 +84,7 @@ async function generate({ apiKey, model, userText, schema }) {
 }
 
 export async function analyzeWithGemini({ apiKey, model, summary }) {
-  const userText = `다음은 학생이 측정한 가속도 데이터 요약(JSON)입니다. 걷기/뛰기 판정과 근거를 분석해 주세요.
+  const userText = `다음은 학생이 측정한 가속도 데이터와 학습된 모델의 요약(JSON)입니다. 걷기/뛰기 판정과 근거를 분석해 주세요.
 
 ${JSON.stringify(summary, null, 2)}`;
   const text = await generate({ apiKey, model, userText, schema: ANALYSIS_SCHEMA });
@@ -97,6 +100,16 @@ export async function askGemini({ apiKey, model, question, summary }) {
     ? `참고용 측정 데이터 요약(JSON):\n${JSON.stringify(summary)}\n\n`
     : '아직 측정 데이터는 없습니다.\n\n';
   return generate({ apiKey, model, userText: `${context}학생 질문: ${question}` });
+}
+
+export async function interpretTraining({ apiKey, model, summary }) {
+  const userText = `다음은 학생이 걷기/뛰기 분류 모델을 학습한 결과(JSON)입니다.
+1) 정확도와 혼동 행렬을 쉬운 말로 해석하고, 2) 학습/테스트 정확도 차이로 과적합 여부를 판단하고,
+3) (가중치가 있으면) 중요하게 본 특징이 물리적으로 말이 되는지 설명하고, 4) 데이터를 어떻게 더 모으면 좋을지 제안해 주세요.
+데이터가 적거나 한쪽 라벨에 치우쳤다면 그 점도 지적해 주세요. 다섯 문단 이내로 답하세요.
+
+${JSON.stringify(summary, null, 2)}`;
+  return generate({ apiKey, model, userText });
 }
 
 // 이 키로 generateContent를 쓸 수 있는 모델 이름 목록

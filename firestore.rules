@@ -31,6 +31,26 @@ service cloud.firestore {
       allow write: if request.auth != null && isTeacher(request);
     }
 
+    // 걷기·뛰기 판정기 학습 데이터: 로그인한 사용자만 읽고, 본인 이름으로만 올리며, 본인 또는 교사만 삭제
+    match /walkRunData/{docId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+                    request.resource.data.userId == request.auth.uid &&
+                    request.resource.data.label in ['walk', 'run'] &&
+                    request.resource.data.m is list &&
+                    request.resource.data.m.size() >= 200 &&
+                    request.resource.data.m.size() <= 6000;
+      allow update: if false;
+      allow delete: if request.auth != null &&
+                    (resource.data.userId == request.auth.uid || isTeacher(request));
+    }
+
+    // 교사가 게시하는 반 공용 모델: 로그인한 사용자 읽기, 교사만 쓰기
+    match /walkRunModel/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isTeacher(request);
+    }
+
     // Roles collection (read-only for clients, managed by Admin SDK)
     match /roles/{uid} {
       allow read: if request.auth != null;

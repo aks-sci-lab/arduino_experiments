@@ -18,9 +18,10 @@
       </div>
     </div>
     <nav class="tabs" role="tablist" aria-label="화면 전환">
-      <button role="tab" id="tab-measure" aria-controls="panel-measure" aria-selected="true">📱 측정</button>
-      <button role="tab" id="tab-criteria" aria-controls="panel-criteria" aria-selected="false">⚖ 기준</button>
-      <button role="tab" id="tab-ai" aria-controls="panel-ai" aria-selected="false">🤖 AI 분석</button>
+      <button role="tab" id="tab-measure" aria-controls="panel-measure" aria-selected="true">📱 판정</button>
+      <button role="tab" id="tab-data" aria-controls="panel-data" aria-selected="false">🧪 데이터</button>
+      <button role="tab" id="tab-train" aria-controls="panel-train" aria-selected="false">🧠 학습</button>
+      <button role="tab" id="tab-ai" aria-controls="panel-ai" aria-selected="false">🤖 AI</button>
       <button role="tab" id="tab-theory" aria-controls="panel-theory" aria-selected="false">📘 원리</button>
       <button role="tab" id="tab-admin" aria-controls="panel-admin" aria-selected="false" hidden>🔧 관리자</button>
     </nav>
@@ -29,6 +30,7 @@
   <main>
     <!-- 측정 -->
     <section class="card" id="panel-measure" role="tabpanel" aria-labelledby="tab-measure">
+      <div id="model-line" class="model-line"></div>
       <div id="sensor-warning" class="notice warn" hidden></div>
       <div class="btn-row">
         <button id="btn-start" class="primary">▶ 측정 시작</button>
@@ -39,7 +41,7 @@
 
       <div class="verdict" id="verdict" data-state="idle">
         <div class="verdict-label" id="verdict-label">—</div>
-        <div class="verdict-reason" id="verdict-reason">측정을 시작하면 최근 4초 데이터로 판정합니다.</div>
+        <div class="verdict-reason" id="verdict-reason">측정을 시작하면 최근 4초 데이터를 학습된 모델로 판정합니다.</div>
       </div>
 
       <div class="stats">
@@ -47,8 +49,8 @@
         <div class="stat"><span class="k">표준편차 σ</span><span class="v" id="s-std">—</span><span class="u">m/s²</span></div>
         <div class="stat"><span class="k">최대 |a|</span><span class="v" id="s-max">—</span><span class="u">m/s²</span></div>
         <div class="stat"><span class="k">최소 |a|</span><span class="v" id="s-min">—</span><span class="u">m/s²</span></div>
-        <div class="stat"><span class="k">걸음 수(4초)</span><span class="v" id="s-steps">—</span><span class="u">걸음</span></div>
         <div class="stat"><span class="k">케이던스</span><span class="v" id="s-cad">—</span><span class="u">걸음/분</span></div>
+        <div class="stat"><span class="k">뛰기 확률</span><span class="v" id="s-prob">—</span><span class="u">모델 출력</span></div>
       </div>
 
       <canvas id="chart" height="220" aria-label="가속도 크기 그래프"></canvas>
@@ -59,7 +61,7 @@
       </div>
       <canvas id="timeline" height="28" aria-label="판정 타임라인"></canvas>
       <div class="legend">
-        <span><i class="sw st-still"></i>정지</span>
+        <span><i class="sw st-still"></i>움직임 없음/모델 없음</span>
         <span><i class="sw st-walk"></i>걷기</span>
         <span><i class="sw st-run"></i>뛰기</span>
       </div>
@@ -77,22 +79,99 @@
       </details>
     </section>
 
-    <!-- 기준 -->
-    <section class="card" id="panel-criteria" role="tabpanel" aria-labelledby="tab-criteria" hidden>
-      <h2>판정 기준 (직접 바꿔 보세요)</h2>
-      <p class="muted">판정은 최근 4초 동안의 |a| 표준편차(흔들림의 크기)와 케이던스(분당 걸음 수)를 사용합니다.</p>
+    <!-- 데이터 -->
+    <section class="card" id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
+      <h2>학습 데이터 모으기</h2>
+      <p class="muted">라벨(걷기/뛰기)을 정하고 스마트폰을 든 채로 그 동작을 하세요. 같은 동작을 사람·속도·휴대폰 위치를 바꿔 여러 번 기록할수록 모델이 좋아집니다.</p>
+      <div id="rec-warning" class="notice warn" hidden></div>
       <div class="form-grid">
-        <label>정지 판정: σ &lt; <input id="th-still" type="number" step="0.1" value="0.6"> m/s²</label>
-        <label>뛰기 판정: σ ≥ <input id="th-run" type="number" step="0.1" value="4.0"> m/s²</label>
-        <label>또는 최소 |a| ≤ <input id="th-flight" type="number" step="0.1" value="2.5"> m/s² (공중 체공)</label>
+        <fieldset class="choice"><legend>라벨</legend>
+          <label><input type="radio" name="rec-label" value="walk" checked> 🚶 걷기</label>
+          <label><input type="radio" name="rec-label" value="run"> 🏃 뛰기</label>
+        </fieldset>
+        <fieldset class="choice"><legend>데이터 출처</legend>
+          <label><input type="radio" name="rec-source" value="sensor" checked> 📱 스마트폰 센서</label>
+          <label><input type="radio" name="rec-source" value="sim"> 🖥 시뮬레이션(센서 없는 PC)</label>
+        </fieldset>
+        <label class="field">기록 시간
+          <select id="rec-seconds"><option value="12">12초</option><option value="20" selected>20초</option><option value="30">30초</option></select>
+        </label>
       </div>
-      <h3>나만의 기준값 만들기 (보정)</h3>
-      <p class="muted">먼저 <b>측정 탭에서 측정을 시작</b>한 뒤, 이 탭의 버튼을 누르고 10초 동안 해당 동작을 하세요. 두 동작의 σ 중간값으로 뛰기 기준이 자동 설정됩니다.</p>
       <div class="btn-row">
-        <button id="btn-cal-walk">🚶 걷기 10초 기록</button>
-        <button id="btn-cal-run">🏃 뛰기 10초 기록</button>
+        <button id="btn-rec-start" class="primary">⏺ 기록 시작 (3초 뒤 시작)</button>
+        <button id="btn-rec-cancel" disabled>취소</button>
       </div>
-      <p id="cal-status" class="muted">보정 기록 없음</p>
+      <div id="rec-progress" class="progress" hidden><div id="rec-bar"></div></div>
+      <p id="rec-status" class="muted">버튼을 누르면 3초 카운트다운 뒤 기록이 시작됩니다. 시작 전에 휴대폰을 몸에 고정하세요.</p>
+      <canvas id="rec-chart" height="160" aria-label="기록 중인 가속도 그래프"></canvas>
+      <div id="rec-result" class="ai-box" hidden>
+        <div id="rec-result-text"></div>
+        <label class="field inline"><input id="rec-upload" type="checkbox"> 학급 공용 데이터(클라우드)에도 올리기 (로그인 필요)</label>
+        <div class="btn-row">
+          <button id="btn-rec-save" class="primary">💾 이 기록 저장</button>
+          <button id="btn-rec-discard">버리기</button>
+        </div>
+      </div>
+
+      <h3>내 데이터셋</h3>
+      <div id="data-summary" class="muted"></div>
+      <div class="btn-row">
+        <button id="btn-cloud-load">☁ 학급 데이터 불러오기</button>
+        <button id="btn-gen-sim">🖥 시뮬레이션 데이터 만들기 (걷기·뛰기 각 6개)</button>
+        <button id="btn-data-csv">⬇ 특징 CSV</button>
+        <button id="btn-data-clear">🗑 이 기기 기록 모두 삭제</button>
+      </div>
+      <p id="data-status" class="muted"></p>
+      <div class="table-wrap"><table id="data-table" class="data-table"></table></div>
+    </section>
+
+    <!-- 학습 -->
+    <section class="card" id="panel-train" role="tabpanel" aria-labelledby="tab-train" hidden>
+      <h2>모델 학습</h2>
+      <p class="muted">모은 기록을 4초 구간(2초씩 이동)으로 잘라 10가지 특징을 계산하고, 걷기/뛰기를 구분하도록 학습합니다. 학습은 이 브라우저 안에서 이루어집니다.</p>
+      <div id="train-summary" class="muted"></div>
+      <div class="form-grid">
+        <label class="field">모델 종류
+          <select id="train-type">
+            <option value="logistic">로지스틱 회귀 (특징별 가중치를 볼 수 있음)</option>
+            <option value="knn">k-최근접 이웃 (가까운 예시 5개의 다수결)</option>
+          </select>
+        </label>
+        <label class="field">테스트용으로 따로 둘 기록 비율
+          <select id="train-test"><option value="0.2">20%</option><option value="0.25" selected>25%</option><option value="0.34">34%</option></select>
+        </label>
+        <label class="field inline"><input id="train-sim" type="checkbox"> 시뮬레이션 데이터도 학습에 포함</label>
+        <label class="field inline"><input id="train-refit" type="checkbox" checked> 평가 뒤 전체 데이터로 다시 학습해 최종 모델로 사용</label>
+      </div>
+      <div class="btn-row">
+        <button id="btn-train" class="primary">🧠 학습 시작</button>
+        <button id="btn-class-load">☁ 반 모델 불러오기</button>
+        <button id="btn-class-publish" hidden>📣 이 모델을 반 모델로 게시</button>
+      </div>
+      <p id="train-status" class="muted"></p>
+
+      <div id="train-result" hidden>
+        <h3>평가</h3>
+        <div class="stats" id="train-metrics"></div>
+        <p class="muted">테스트 정확도는 <b>학습에 쓰지 않은 기록</b>으로 잰 값입니다. 학습 정확도만 높고 테스트 정확도가 낮으면 외워버린(과적합) 것입니다.</p>
+        <h4>혼동 행렬 (테스트)</h4>
+        <table id="confusion" class="data-table"></table>
+        <div id="weights-box">
+          <h4>어떤 특징을 중요하게 봤나? (표준화 가중치)</h4>
+          <p class="muted">오른쪽(+)이면 클수록 "뛰기", 왼쪽(−)이면 클수록 "걷기" 쪽으로 판단합니다.</p>
+          <div id="weights"></div>
+        </div>
+        <h4>데이터 분포 보기</h4>
+        <div class="btn-row">
+          <label class="field inline">가로 <select id="sc-x"></select></label>
+          <label class="field inline">세로 <select id="sc-y"></select></label>
+        </div>
+        <canvas id="scatter" height="260" aria-label="특징 산점도"></canvas>
+        <div class="legend">
+          <span><i class="sw st-walk"></i>걷기(학습)</span><span><i class="sw st-run"></i>뛰기(학습)</span>
+          <span>○ 테스트 데이터</span><span>★ 방금 판정한 구간</span>
+        </div>
+      </div>
     </section>
 
     <!-- AI -->
@@ -100,7 +179,7 @@
       <h2>AI 분석 (Gemini)</h2>
       <div id="ai-gate" class="notice"></div>
       <div id="ai-body" hidden>
-        <p class="muted">측정 결과 요약을 AI에게 보내 판정 근거와 물리적 해석을 받아봅니다. 원본 데이터 전체가 아니라 통계 요약과 짧은 파형만 전송됩니다.</p>
+        <p class="muted">측정·학습 결과 요약을 AI에게 보내 판정 근거와 물리적 해석을 받아봅니다. 원본 데이터 전체가 아니라 통계 요약과 짧은 파형만 전송됩니다.</p>
         <label class="field">실험 메모 (선택)
           <input id="ai-memo" type="text" placeholder="예) 휴대폰을 오른손에 쥐고 복도에서 걷다가 뛰었음">
         </label>
@@ -108,6 +187,10 @@
           <button id="btn-ai" class="primary">🤖 AI에게 결과 분석 요청</button>
         </div>
         <div id="ai-result" class="ai-box" hidden></div>
+
+        <h3>학습 결과 해석</h3>
+        <div class="btn-row"><button id="btn-ai-train">🧠 학습 결과를 AI에게 해석 요청</button></div>
+        <div id="ai-train-result" class="ai-box" hidden></div>
 
         <h3>AI에게 질문하기</h3>
         <div class="ask">
@@ -123,24 +206,35 @@
       <details open>
         <summary>가속도 센서는 무엇을 재나요?</summary>
         <p>스마트폰 가속도 센서는 <b>중력을 포함한 가속도</b>를 잽니다. 가만히 놓아 두면 |a| ≈ g = 9.8 m/s²이 나오고,
-          자유낙하하면 |a| ≈ 0이 됩니다. 센서는 내부의 작은 추가 받는 힘(수직항력과 같은 접촉력)을 측정하기 때문입니다.</p>
+          자유낙하하면 |a| ≈ 0이 됩니다. 센서는 내부의 작은 추가 받는 힘(수직항력과 같은 접촉력)을 측정하기 때문입니다.
+          세 축의 크기 |a| = √(ax²+ay²+az²) 는 휴대폰을 어떻게 들었는지와 상관없이 쓸 수 있습니다.</p>
       </details>
       <details>
         <summary>걷기와 뛰기는 왜 다르게 보이나요?</summary>
         <ul>
-          <li><b>걷기</b>: 항상 한 발 이상이 땅에 닿아 있습니다. 몸의 위아래 흔들림이 작아 |a|는 대략 0.6g~1.5g 사이에서 부드럽게 오르내립니다.</li>
-          <li><b>뛰기</b>: 두 발이 모두 땅에서 떨어지는 <b>체공 구간</b>이 있습니다. 이때 몸은 거의 자유낙하 상태라 |a|가 0 근처까지 떨어지고,
-            착지 순간에는 지면이 짧은 시간에 큰 힘을 주어 2g~3g 이상의 큰 봉우리가 생깁니다.</li>
-          <li>그래서 뛰기는 <b>σ(흔들림)</b>가 크고, <b>최소 |a|</b>가 작으며, <b>케이던스</b>도 보통 더 높습니다.</li>
+          <li><b>걷기</b>: 항상 한 발 이상이 땅에 닿아 있어 |a|가 g 근처에서 부드럽게 오르내립니다.</li>
+          <li><b>뛰기</b>: 두 발이 모두 떨어지는 <b>체공</b> 때문에 |a|가 0 근처까지 내려가고, 착지 때 지면이 짧은 시간에 큰 힘을 주어 큰 봉우리가 생깁니다. (F·Δt = Δp)</li>
         </ul>
+      </details>
+      <details>
+        <summary>이 앱은 어떻게 "학습"하나요? (머신러닝)</summary>
+        <ol>
+          <li><b>데이터 모으기</b>: 걷기/뛰기라는 <i>정답(라벨)</i>을 붙여 기록합니다.</li>
+          <li><b>특징 뽑기</b>: 4초 구간마다 평균, 흔들림 σ, 최소·최대, 케이던스 등 10개 숫자로 요약합니다.</li>
+          <li><b>학습</b>: 정답이 있는 예시에서 "어떤 특징이 어떤 값일 때 뛰기였나"를 컴퓨터가 스스로 찾습니다. 사람이 기준값을 정하지 않습니다.</li>
+          <li><b>평가</b>: 학습에 쓰지 않은 기록으로 정확도를 잽니다. 이것이 진짜 실력입니다.</li>
+          <li><b>판정</b>: 새 구간의 특징을 모델에 넣으면 "뛰기일 확률"이 나옵니다. 0.5 이상이면 뛰기입니다.</li>
+        </ol>
+        <p>데이터가 많고 다양할수록(사람, 속도, 휴대폰 위치) 처음 보는 상황에서도 잘 맞힙니다. 이것이 "빅데이터"의 힘입니다.</p>
       </details>
       <details>
         <summary>탐구 활동 아이디어</summary>
         <ol>
-          <li>천천히 걷기 → 빠르게 걷기 → 조깅 → 전력 질주 순서로 σ와 케이던스가 어떻게 변하는지 표로 정리해 보세요.</li>
-          <li>휴대폰 위치(손, 주머니, 팔)를 바꾸면 결과가 어떻게 달라지나요? 이유는?</li>
-          <li>운동량-충격량 관계(F·Δt = Δp)로 착지 봉우리의 크기를 설명해 보세요. 쿠션 있는 신발은 무엇을 바꿀까요?</li>
-          <li>친구들과 기준값을 비교해 보고, 모두에게 잘 맞는 기준을 찾아보세요.</li>
+          <li>기록을 2개, 10개, 40개로 늘리며 테스트 정확도가 어떻게 변하는지 그래프로 그려 보세요.</li>
+          <li>나 혼자 모은 데이터로 학습한 모델이 친구에게도 잘 맞을까요? 학급 데이터를 합치면 달라지나요?</li>
+          <li>휴대폰을 손/주머니/팔에 둔 기록만 따로 학습시켜 비교해 보세요.</li>
+          <li>로지스틱 회귀의 가중치가 큰 특징은 물리적으로 왜 중요할까요?</li>
+          <li>일부러 걷기를 "뛰기"라고 잘못 붙인 기록을 섞으면(라벨 오류) 정확도가 얼마나 떨어지나요?</li>
         </ol>
       </details>
     </section>
@@ -181,7 +275,7 @@
     </section>
   </main>
 
-  <footer class="muted">센서 데이터는 기기 밖으로 나가지 않습니다(AI 분석 요청 시 요약만 전송). · HTTPS 주소에서만 센서가 동작합니다.</footer>
+  <footer class="muted">센서 데이터는 기기 밖으로 나가지 않습니다(직접 올리기를 선택하거나 AI 분석을 요청할 때만 전송). · HTTPS 주소에서만 센서가 동작합니다.</footer>
 
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
