@@ -31,18 +31,35 @@ service cloud.firestore {
       allow write: if request.auth != null && isTeacher(request);
     }
 
-    // 걷기·뛰기 판정기 학습 데이터: 로그인한 사용자만 읽고, 본인 이름으로만 올리며, 본인 또는 교사만 삭제
+    // 걷기·뛰기 판정기 학습 데이터: 로그인한 사용자만 읽고, 본인 이름으로만 올리며, 본인 또는 교사만 삭제.
+    // 라벨은 학생이 만든 이름도 허용(1~10자). 교사만 evalSet(평가용 지정) 값을 바꿀 수 있다.
     match /walkRunData/{docId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null &&
                     request.resource.data.userId == request.auth.uid &&
-                    request.resource.data.label in ['walk', 'run'] &&
+                    request.resource.data.label is string &&
+                    request.resource.data.label.size() >= 1 &&
+                    request.resource.data.label.size() <= 10 &&
                     request.resource.data.m is list &&
                     request.resource.data.m.size() >= 200 &&
-                    request.resource.data.m.size() <= 6000;
-      allow update: if false;
+                    request.resource.data.m.size() <= 6000 &&
+                    request.resource.data.evalSet == false;
+      allow update: if request.auth != null && isTeacher(request) &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evalSet']);
       allow delete: if request.auth != null &&
                     (resource.data.userId == request.auth.uid || isTeacher(request));
+    }
+
+    // 조별 모델: 학생 한 명당 문서 하나(문서 id = 본인 uid). 로그인한 사용자 읽기, 본인만 쓰기, 본인 또는 교사 삭제.
+    match /walkRunGroupModels/{uid} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == uid &&
+                            request.resource.data.json is string &&
+                            request.resource.data.json.size() < 900000 &&
+                            request.resource.data.group is string &&
+                            request.resource.data.group.size() >= 1 &&
+                            request.resource.data.group.size() <= 12;
+      allow delete: if request.auth != null && (request.auth.uid == uid || isTeacher(request));
     }
 
     // 교사가 게시하는 반 공용 모델: 로그인한 사용자 읽기, 교사만 쓰기

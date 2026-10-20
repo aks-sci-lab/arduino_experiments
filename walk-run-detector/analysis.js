@@ -8,9 +8,6 @@ export const WIN_N = HZ * WIN_SEC;      // 한 판정 구간의 표본 수
 export const STEP_N = HZ * 2;           // 학습용 구간을 자를 때 이동 간격 (2초, 절반 겹침)
 export const MIN_MOVEMENT_STD = 0.5;    // 이보다 흔들림이 작으면 "움직임 없음"으로 보고 분류하지 않는다
 
-export const LABELS = { walk: '걷기', run: '뛰기' };
-export const LABEL_KEYS = ['walk', 'run'];
-
 // 모델이 보는 특징 (|a|는 휴대폰 방향과 무관한 가속도 크기)
 export const FEATURES = [
   { key: 'mean', name: '평균 |a|', unit: 'm/s²', hint: '구간 동안의 평균. 대체로 g(9.8) 근처' },

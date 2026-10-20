@@ -1,8 +1,9 @@
 // canvas 그래프 (의존성 없음). 색은 style.css의 변수를 읽어 다크 모드에 맞춘다.
 import { G } from './analysis.js';
+import { labelColorVar } from './labels.js';
 
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-export const labelColor = label => css(label === 'run' ? '--run' : label === 'walk' ? '--walk' : '--still');
+export const labelColor = label => css(label === 'idle' || label === 'none' ? '--still' : labelColorVar(label));
 
 function fit(canvas) {
   const dpr = window.devicePixelRatio || 1;
@@ -141,5 +142,100 @@ export function drawScatter(canvas, points, xName, yName, marker) {
     ctx.fillStyle = css('--text');
     ctx.font = '16px system-ui, sans-serif';
     ctx.fillText('★', X(marker.x) - 7, Y(marker.y) + 6);
+  }
+}
+
+// 히스토그램: hist = { lo, hi, bins, counts: { 라벨: [개수…] } }, 세로선(threshold)은 선택
+export function drawHistogram(canvas, hist, labels, threshold) {
+  if (!canvas.clientWidth) return;
+  const { ctx, w, h } = fit(canvas);
+  if (!hist) return;
+  const pad = { l: 34, r: 8, t: 8, b: 24 };
+  const pw = w - pad.l - pad.r;
+  const ph = h - pad.t - pad.b;
+  const maxCount = Math.max(1, ...labels.flatMap(l => hist.counts[l]));
+  const bw = pw / hist.bins;
+  const X = v => pad.l + ((v - hist.lo) / (hist.hi - hist.lo)) * pw;
+  ctx.font = '11px system-ui, sans-serif';
+  ctx.strokeStyle = css('--border');
+  ctx.fillStyle = css('--muted');
+  ctx.lineWidth = 1;
+  ctx.strokeRect(pad.l, pad.t, pw, ph);
+  ctx.textAlign = 'right';
+  ctx.fillText(String(maxCount), pad.l - 4, pad.t + 9);
+  ctx.fillText('0', pad.l - 4, pad.t + ph);
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 4; i++) {
+    const v = hist.lo + ((hist.hi - hist.lo) * i) / 4;
+    ctx.fillText(v.toFixed(Math.abs(hist.hi - hist.lo) < 5 ? 2 : 1), X(v), h - 8);
+  }
+  ctx.globalAlpha = 0.55;
+  for (const l of labels) {
+    ctx.fillStyle = labelColor(l);
+    hist.counts[l].forEach((c, i) => {
+      const bh = (c / maxCount) * ph;
+      ctx.fillRect(pad.l + i * bw + 1, pad.t + ph - bh, Math.max(1, bw - 2), bh);
+    });
+  }
+  ctx.globalAlpha = 1;
+  if (threshold !== undefined && threshold >= hist.lo && threshold <= hist.hi) {
+    ctx.strokeStyle = css('--text');
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(X(threshold), pad.t);
+    ctx.lineTo(X(threshold), pad.t + ph);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// 학습곡선: curve = [{ n, mean, min, max }] (정확도 0~1)
+export function drawCurve(canvas, curve) {
+  if (!canvas.clientWidth) return;
+  const { ctx, w, h } = fit(canvas);
+  if (!curve || !curve.length) return;
+  const pad = { l: 40, r: 12, t: 10, b: 28 };
+  const pw = w - pad.l - pad.r;
+  const ph = h - pad.t - pad.b;
+  const ns = curve.map(c => c.n);
+  const nMin = Math.min(...ns);
+  const nMax = Math.max(...ns);
+  const lo = Math.max(0, Math.floor((Math.min(...curve.map(c => c.min)) - 0.05) * 10) / 10);
+  const X = n => pad.l + (nMax === nMin ? pw / 2 : ((n - nMin) / (nMax - nMin)) * pw);
+  const Y = v => pad.t + ph - ((v - lo) / (1 - lo)) * ph;
+  ctx.font = '11px system-ui, sans-serif';
+  ctx.strokeStyle = css('--border');
+  ctx.fillStyle = css('--muted');
+  ctx.lineWidth = 1;
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const v = lo + ((1 - lo) * i) / 4;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, Y(v));
+    ctx.lineTo(w - pad.r, Y(v));
+    ctx.stroke();
+    ctx.fillText(Math.round(v * 100) + '%', pad.l - 4, Y(v) + 4);
+  }
+  ctx.textAlign = 'center';
+  for (const c of curve) ctx.fillText(String(c.n), X(c.n), h - 12);
+  ctx.fillText('라벨마다 학습에 쓴 기록 수', pad.l + pw / 2, h - 1);
+  ctx.fillStyle = css('--accent');
+  ctx.globalAlpha = 0.18;
+  ctx.beginPath();
+  curve.forEach((c, i) => (i ? ctx.lineTo(X(c.n), Y(c.max)) : ctx.moveTo(X(c.n), Y(c.max))));
+  [...curve].reverse().forEach(c => ctx.lineTo(X(c.n), Y(c.min)));
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = css('--accent');
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  curve.forEach((c, i) => (i ? ctx.lineTo(X(c.n), Y(c.mean)) : ctx.moveTo(X(c.n), Y(c.mean))));
+  ctx.stroke();
+  ctx.fillStyle = css('--accent');
+  for (const c of curve) {
+    ctx.beginPath();
+    ctx.arc(X(c.n), Y(c.mean), 3.5, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
