@@ -105,6 +105,17 @@ firebase deploy --only firestore:rules
 - 업로드에는 이메일을 넣지 않고 Firebase uid만 저장합니다.
 - 교사 지정: `lany0665@gmail.com` 또는 `roles/{uid}.isTeacher == true` (`Grant Teacher Role` 워크플로).
 
+## 구글 로그인이 안 될 때
+
+화면 위쪽에 원인이 표시됩니다. 자주 있는 경우:
+
+| 표시되는 내용 | 원인 · 해결 |
+|---|---|
+| "승인된 도메인에 없습니다" (`auth/unauthorized-domain`) | **가장 흔한 원인.** 배포 주소(예: `aks-sci-lab.github.io`)를 Firebase 콘솔 → Authentication → 설정 → **승인된 도메인**에 추가 |
+| "Google 로그인이 꺼져 있습니다" | Firebase 콘솔 → Authentication → 로그인 방법 → **Google 사용 설정** |
+| "앱 안의 브라우저에서는 막힙니다" | 카카오톡·네이버 등에서 링크를 연 경우. Chrome/Safari에서 주소를 직접 열기 (구글 정책상 앱 내 브라우저는 로그인 불가) |
+| 팝업이 안 뜸 | 팝업 차단 시 자동으로 페이지 이동 방식으로 다시 시도 |
+
 ## 파일 구조
 
 ```
