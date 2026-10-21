@@ -189,3 +189,19 @@ export async function loadGroupModels() {
 export function deleteGroupModel(uid) {
   return db.collection(GROUP_COLLECTION).doc(uid).delete();
 }
+
+// ---------- 화면 편집 내용 (모든 사용자가 읽고, 교사만 저장) ----------
+const LAYOUT_DOC = ['walkRunLayout', 'current'];
+
+export async function loadLayout() {
+  const doc = await db.collection(LAYOUT_DOC[0]).doc(LAYOUT_DOC[1]).get();
+  return doc.exists ? doc.data().json : null;
+}
+
+export function saveLayout(json, updatedBy) {
+  return db.collection(LAYOUT_DOC[0]).doc(LAYOUT_DOC[1]).set({
+    json,
+    updatedBy: updatedBy ?? '',
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}

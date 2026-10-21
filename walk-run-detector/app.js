@@ -8,6 +8,7 @@ import { initTrain, loadClass } from './ui-train.js';
 import { initCompare } from './ui-compare.js';
 import { initAI } from './ui-ai.js';
 import { initAdmin } from './ui-admin.js';
+import { initEdit, loadSavedLayout, exitEdit } from './ui-edit.js';
 import { initAccounts, signIn, signOut, loadAIConfig } from './accounts.js';
 
 async function onAccountChange({ user, isAdmin, unavailable }) {
@@ -35,6 +36,8 @@ function renderAccount() {
   $('account-info').textContent = user ? `${user.displayName || user.email}${isAdmin ? ' · 관리자' : ''}` : '';
   $('tab-admin').hidden = !isAdmin;
   $('btn-class-publish').hidden = !isAdmin;
+  $('btn-edit-mode').hidden = !isAdmin;
+  if (!isAdmin) exitEdit(true);
   if (!isAdmin && currentTab() === 'admin') showTab('measure');
   emit('account');
 }
@@ -49,6 +52,7 @@ async function onLogin() {
 }
 
 function init() {
+  initEdit();          // 화면이 바뀌기 전에 원래 화면을 기록해 둔다
   initJudge();
   initData();
   initExplore();
@@ -61,6 +65,7 @@ function init() {
   initTabs();
   renderModelLine();
   initAccounts(onAccountChange);
+  loadSavedLayout();
 }
 
 init();
