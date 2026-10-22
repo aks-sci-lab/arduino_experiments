@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>전자기 유도 측정기</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        body { font-family: sans-serif; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+        .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+        .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        button { padding: 8px 14px; border: 1px solid #ccc; border-radius: 5px; background: #f0f0f0; cursor: pointer; }
+        button:disabled { background: #e9ecef; color: #999; cursor: not-allowed; }
+        button.primary { background: #007BFF; border-color: #007BFF; color: #fff; }
+        button.primary:disabled { background: #a0cfff; border-color: #a0cfff; }
+        button.rec { background: #DC3545; border-color: #DC3545; color: #fff; }
+        button.ok { background: #28A745; border-color: #28A745; color: #fff; }
+        label.f { display: flex; flex-direction: column; font-size: 0.85em; color: #555; gap: 3px; }
+        input[type=number], select { padding: 6px; border: 1px solid #ccc; border-radius: 5px; width: 110px; }
+        .tabs { display: flex; gap: 4px; margin-bottom: 1rem; flex-wrap: wrap; }
+        .tabs button { border-radius: 6px 6px 0 0; }
+        .tabs button[aria-selected=true] { background: #007BFF; color: #fff; border-color: #007BFF; }
+        .panel[hidden] { display: none; }
+        .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .readout { background: #f8f9fa; border-radius: 8px; padding: 10px; text-align: center; }
+        .readout .k { font-size: 0.8em; color: #666; }
+        .readout .v { font-size: 1.7em; font-weight: bold; font-variant-numeric: tabular-nums; }
+        .readout .u { font-size: 0.8em; color: #666; }
+        .v-volt { color: #d63384; } .v-curr { color: #0d6efd; }
+        canvas { width: 100%; height: 320px; display: block; background: #fff; border: 1px solid #ddd; border-radius: 6px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+        th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid #eee; }
+        th:first-child, td:first-child { text-align: left; }
+        thead th { background: #f8f9fa; }
+        .muted { color: #666; font-size: 0.9em; }
+        .warn { background: #fff3cd; border: 1px solid #ffe69c; padding: 8px 12px; border-radius: 6px; }
+        pre { background: #212529; color: #e9ecef; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 0.8em; }
+        .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+        .result-grid div { background: #f8f9fa; border-radius: 6px; padding: 8px 10px; }
+        .result-grid b { display: block; font-size: 1.15em; font-variant-numeric: tabular-nums; }
+        ol li, ul li { margin-bottom: 4px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
+    <h1>⚡ 전자기 유도 측정기 <small class="muted">전압·전류 센서</small></h1>
+
+    <div class="tabs" role="tablist">
+        <button role="tab" id="tab-measure" aria-selected="true">📈 측정</button>
+        <button role="tab" id="tab-build" aria-selected="false">🔧 센서 제작</button>
+        <button role="tab" id="tab-theory" aria-selected="false">📘 원리</button>
+    </div>
+
+    <!-- ================= 측정 ================= -->
+    <section class="panel" id="panel-measure">
+        <div class="card">
+            <div class="row">
+                <button id="btnConnect" class="primary">🔌 아두이노 연결 (USB)</button>
+                <button id="btnDemo">🧪 시뮬레이션 (센서 없이 체험)</button>
+                <button id="btnDisconnect" disabled>연결 해제</button>
+                <span id="status" class="muted">연결 대기</span>
+            </div>
+            <div id="serialWarn" class="warn" style="margin-top:10px;" hidden>
+                이 브라우저는 Web Serial을 지원하지 않습니다. 데스크톱 Chrome 또는 Edge를 사용하거나, 시뮬레이션 모드를 이용하세요.
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="row">
+                <label class="f">코일 감은 수 N (회)<input type="number" id="turns" value="200" min="1"></label>
+                <label class="f">션트 저항 R (Ω)<input type="number" id="shunt" value="10" min="0.01" step="0.01"></label>
+                <label class="f">전압 이득(PGA)
+                    <select id="pga">
+                        <option value="5" selected>±256 mV</option>
+                        <option value="4">±512 mV</option>
+                        <option value="3">±1.024 V</option>
+                        <option value="2">±2.048 V</option>
+                    </select>
+                </label>
+                <label class="f">측정 시간 (s)<input type="number" id="duration" value="5" min="1" max="60"></label>
+                <button id="btnZero" disabled title="코일이 정지한 상태에서 눌러 영점을 맞춥니다">⚖ 영점 보정</button>
+            </div>
+            <p class="muted" style="margin-bottom:0">
+                전류 I = (션트 양단 전압) ÷ R. 영점 보정은 자석을 코일에서 멀리 둔 채 1초간 평균값을 0으로 맞춥니다.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="readouts">
+                <div class="readout"><div class="k">코일 전압 ε</div><div class="v v-volt" id="rV">—</div><div class="u">mV</div></div>
+                <div class="readout"><div class="k">전류 I</div><div class="v v-curr" id="rI">—</div><div class="u">mA</div></div>
+                <div class="readout"><div class="k">전력 P = εI</div><div class="v" id="rP">—</div><div class="u">µW</div></div>
+                <div class="readout"><div class="k">샘플링</div><div class="v" id="rHz">—</div><div class="u">Hz</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="row" style="margin-bottom:10px;">
+                <button id="btnRec" class="ok" disabled>● 측정 시작</button>
+                <button id="btnSave" disabled>💾 이 측정 저장</button>
+                <button id="btnCsv" disabled>⬇ CSV 저장</button>
+                <span id="recInfo" class="muted"></span>
+            </div>
+            <canvas id="chart" width="1100" height="320"></canvas>
+            <div class="muted" style="margin-top:6px;">
+                <span style="color:#d63384">━ 전압(mV, 왼쪽 축)</span> &nbsp;
+                <span style="color:#0d6efd">━ 전류(mA, 오른쪽 축)</span> &nbsp;
+                측정 중에는 최근 구간이, 측정 후에는 전체가 표시됩니다.
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top:0">분석 결과</h3>
+            <div class="result-grid" id="results"><div>측정을 완료하면 결과가 표시됩니다.</div></div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top:0">저장한 측정 비교</h3>
+            <div style="overflow-x:auto">
+            <table>
+                <thead><tr>
+                    <th>이름</th><th>N</th><th>최대 +ε (mV)</th><th>최대 −ε (mV)</th>
+                    <th>최대 |I| (mA)</th><th>∫ε dt (mV·s)</th><th>ΔΦ (µWb)</th><th></th>
+                </tr></thead>
+                <tbody id="trials"></tbody>
+            </table>
+            </div>
+            <p class="muted" id="trialsEmpty">저장한 측정이 없습니다. 자석 속도, 코일 감은 수 등을 바꿔가며 저장하고 비교해 보세요.</p>
+        </div>
+    </section>
+
+    <!-- ================= 센서 제작 ================= -->
+    <section class="panel" id="panel-build" hidden>
+        <div class="card">
+            <h3 style="margin-top:0">1. 준비물</h3>
+            <ul>
+                <li>아두이노 Uno / Nano (또는 ESP32) + USB 케이블</li>
+                <li>ADS1115 16비트 ADC 모듈 1개 (차동 입력 2채널 사용)</li>
+                <li>션트 저항 10 Ω (1%, 1/4 W) 1개 — 전류 측정용</li>
+                <li>에나멜선 코일(예: 0.3 mm, 200~600회) + 네오디뮴 자석 / 막대자석</li>
+                <li>점퍼선, 브레드보드</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h3 style="margin-top:0">2. 회로</h3>
+            <table style="max-width:520px">
+                <thead><tr><th>연결점</th><th>ADS1115</th><th>의미</th></tr></thead>
+                <tbody>
+                <tr><td>코일 끝 a</td><td>A0(+), 아두이노 GND</td><td>코일 전압 측정 (기준 전위)</td></tr>
+                <tr><td>코일 끝 b</td><td>A1(−), 션트 한쪽</td><td>코일 − 션트 접점</td></tr>
+                <tr><td>션트 한쪽 (b)</td><td>A2(+)</td><td>전류 측정</td></tr>
+                <tr><td>션트 다른 쪽 c</td><td>A3(−), 코일 끝 a로 되돌림</td><td>직렬 회로 닫기</td></tr>
+                </tbody></table>
+            <p class="muted">회로: 코일 a → 코일 b → 션트(10 Ω) → c → 다시 a. 코일 → 션트 → 코일의 하나의 고리입니다.</p>
+            <ol>
+                <li><b>직렬 회로</b>: 코일 → 션트 저항(10 Ω) → 다시 코일로 이어 닫힌 회로를 만듭니다. 한쪽 연결점(a)은 아두이노 <b>GND</b>에 연결해 기준 전위를 잡아 줍니다.</li>
+                <li><b>전압 센서</b>: 코일 양 끝(a, b)을 ADS1115 <b>A0(+), A1(−)</b>에 연결합니다. 차동 측정이라 코일 극성을 바꾸면 그래프 부호가 뒤집힙니다.</li>
+                <li><b>전류 센서</b>: 션트 저항 양 끝(b, c)을 <b>A2(+), A3(−)</b>에 연결합니다. 직렬 회로의 전류가 곧 션트를 흐르는 전류이므로 I = V<sub>션트</sub> ÷ R.</li>
+                <li>ADS1115 <b>VDD→5V, GND→GND, SDA→A4, SCL→A5, ADDR→GND</b>.</li>
+                <li>아래 스케치를 업로드합니다. 시리얼 속도는 <b>115200</b>입니다.</li>
+            </ol>
+            <div class="warn">
+                ⚠ 션트 저항은 클수록 전류 해상도가 좋아지지만 회로 저항이 커져 전류가 작아집니다. 코일 기전력이 수 mV~수십 mV이면 10 Ω, 전류가 너무 작게 보이면 1 Ω으로 바꾸고 화면의 R 값도 같이 바꾸세요.
+                입력 전압은 ADS1115 전원 전압(5 V)을 넘지 않게 하세요.
+            </div>
+        </div>
+        <div class="card">
+            <h3 style="margin-top:0">3. 아두이노 스케치</h3>
+            <p class="muted">저장소의 <code>firmware/em-induction/em-induction.ino</code> 파일과 같습니다. 한 줄에 <code>t_ms,vcoil_uV,vshunt_uV</code> 형식으로 보냅니다.</p>
+            <pre id="sketchSample">// 전체 스케치는 firmware/em-induction/em-induction.ino 를 아두이노 IDE로 여세요.
+// 출력 예) 한 줄에 한 샘플:
+1520,-1250,-12480
+1522,-1180,-11800
+1524, 310, 3100</pre>
+        </div>
+        <div class="card">
+            <h3 style="margin-top:0">4. 검증하기</h3>
+            <ol>
+                <li>자석을 코일에서 멀리 둔 상태에서 <b>영점 보정</b>을 누릅니다. 값이 0 근처에서 흔들리면 정상입니다.</li>
+                <li>전압 센서 검증: 1.5 V 건전지를 A0/A1에 직접 대고 이득을 ±2.048 V로 하면 약 1500 mV가 표시되어야 합니다 (멀티미터와 비교).</li>
+                <li>전류 센서 검증: 코일 대신 100 Ω 저항을 션트(10 Ω)와 직렬로 건전지(1.5 V)에 연결하면 1.5 ÷ 110 ≈ 13.6 mA가 표시되어야 합니다.</li>
+                <li>자석을 코일에 넣었다 빼 보며 부호가 반대로 나오는지(렌츠 법칙) 확인합니다.</li>
+            </ol>
+        </div>
+    </section>
+
+    <!-- ================= 원리 ================= -->
+    <section class="panel" id="panel-theory" hidden>
+        <div class="card">
+            <h3 style="margin-top:0">패러데이 법칙</h3>
+            <p>코일을 통과하는 자기선속 Φ가 변하면 코일에 유도기전력이 생깁니다.</p>
+            <p style="font-size:1.2em"><b>ε = −N · dΦ/dt</b></p>
+            <p>양변을 시간에 대해 적분하면 <b>∫ε dt = −N·ΔΦ</b> 이므로, 측정한 전압 그래프의 넓이(적분)로 코일을 통과한 선속의 변화량을 구할 수 있습니다.
+                화면의 ΔΦ = −∫ε dt ÷ N 이 이 값입니다.</p>
+            <h3>렌츠 법칙</h3>
+            <p>유도 전류는 선속의 변화를 방해하는 방향으로 흐릅니다. 자석이 들어갈 때와 나올 때 전압의 부호가 반대인 것을 그래프에서 확인할 수 있습니다.</p>
+            <h3>탐구 질문</h3>
+            <ul>
+                <li>자석을 빠르게 움직이면 최대 전압과 ∫ε dt는 각각 어떻게 달라질까요? (ΔΦ는 속도와 무관한가?)</li>
+                <li>코일 감은 수 N을 두 배로 하면 최대 전압과 ΔΦ(=−∫ε dt ÷ N) 중 무엇이 두 배가 될까요?</li>
+                <li>떨어뜨린 자석이 코일을 통과할 때 두 번째 봉우리가 첫 번째보다 큰 이유는?</li>
+                <li>전압과 전류의 비 ε/I는 무엇을 뜻할까요? (코일 + 션트 저항의 합)</li>
+            </ul>
+        </div>
+    </section>
+</div>
+
+<script>
+(() => {
+    const $ = id => document.getElementById(id);
+
+    // ---------- 탭 ----------
+    const tabs = ['measure', 'build', 'theory'];
+    tabs.forEach(t => $('tab-' + t).addEventListener('click', () => {
+        tabs.forEach(o => {
+            $('tab-' + o).setAttribute('aria-selected', o === t);
+            $('panel-' + o).hidden = o !== t;
+        });
+    }));
+
+    // ---------- 상태 ----------
+    // 한 샘플: { t: 초, v: mV, i: mA }
+    let live = [];          // 연결 중 최근 샘플 (그래프용 버퍼)
+    let rec = [];           // 기록된 샘플
+    let recording = false;
+    let recStart = 0;
+    let offV = 0, offI = 0; // 영점 보정값 (mV, mA)
+    let source = null;      // 'serial' | 'demo'
+    let port = null, reader = null, demoTimer = null;
+    let sampleTimes = [];
+    const LIVE_WINDOW = 5;  // 초
+    const trials = loadTrials();
+
+    function loadTrials() {
+        try { return JSON.parse(localStorage.getItem('emTrials') || '[]'); } catch (e) { return []; }
+    }
+    function persistTrials() {
+        try { localStorage.setItem('emTrials', JSON.stringify(trials)); } catch (e) { /* 무시 */ }
+    }
+
+    if (!('serial' in navigator)) $('serialWarn').hidden = false;
+
+    // ---------- 샘플 입력 ----------
+    function addSample(tSec, vMilli, iMilli) {
+        const s = { t: tSec, v: vMilli - offV, i: iMilli - offI, rawV: vMilli, rawI: iMilli };
+        live.push(s);
+        while (live.length && s.t - live[0].t > LIVE_WINDOW + 1) live.shift();
+        sampleTimes.push(s.t);
+        while (sampleTimes.length && s.t - sampleTimes[0] > 1) sampleTimes.shift();
+        if (recording) {
+            rec.push({ t: s.t - recStart, v: s.v, i: s.i });
+            if (s.t - recStart >= duration()) stopRecording();
+        }
+    }
+    const duration = () => Math.max(1, Math.min(60, +$('duration').value || 5));
+    const shuntOhm = () => Math.max(0.001, +$('shunt').value || 10);
+    const turns = () => Math.max(1, +$('turns').value || 1);
+
+    // ---------- 시리얼 연결 ----------
+    let lineBuf = '';
+    let t0Dev = null;
+    function handleLine(line) {
+        line = line.trim();
+        if (!line || line[0] === '#') return;
+        const p = line.split(',');
+        if (p.length !== 3) return;
+        const t = +p[0], vUv = +p[1], iUv = +p[2];
+        if (![t, vUv, iUv].every(Number.isFinite)) return;
+        if (t0Dev === null) t0Dev = t;
+        // 전압: µV -> mV,  전류: 션트 전압(µV) ÷ R(Ω) -> µA -> mA
+        addSample((t - t0Dev) / 1000, vUv / 1000, (iUv / shuntOhm()) / 1000);
+    }
+
+    async function connectSerial() {
+        if (!('serial' in navigator)) { alert('Web Serial을 지원하지 않는 브라우저입니다.'); return; }
+        try {
+            port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 115200 });
+        } catch (e) {
+            setStatus('연결 실패: ' + e.message);
+            return;
+        }
+        startSession('serial', '연결됨 (USB 시리얼)');
+        sendPga();
+        const decoder = new TextDecoderStream();
+        port.readable.pipeTo(decoder.writable).catch(() => {});
+        reader = decoder.readable.getReader();
+        try {
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                lineBuf += value;
+                let idx;
+                while ((idx = lineBuf.indexOf('\n')) >= 0) {
+                    handleLine(lineBuf.slice(0, idx));
+                    lineBuf = lineBuf.slice(idx + 1);
+                }
+                if (lineBuf.length > 4096) lineBuf = '';
+            }
+        } catch (e) {
+            setStatus('연결 끊김: ' + e.message);
+        }
+        endSession();
+    }
+
+    async function sendPga() {
+        if (source !== 'serial' || !port || !port.writable) return;
+        const w = port.writable.getWriter();
+        try { await w.write(new TextEncoder().encode('G' + $('pga').value + '\n')); }
+        finally { w.releaseLock(); }
+    }
+
+    async function disconnect() {
+        if (source === 'demo') { endSession(); return; }
+        try { if (reader) await reader.cancel(); } catch (e) { /* 무시 */ }
+        try { if (port) await port.close(); } catch (e) { /* 무시 */ }
+    }
+
+    // ---------- 시뮬레이션: 자석이 코일을 통과하는 파형 ----------
+    // 선속 Φ(t)가 시그모이드 형태로 증가(진입) 후 감소(이탈) -> 이중 봉우리 기전력
+    function startDemo() {
+        startSession('demo', '시뮬레이션 모드 (자석이 약 2초마다 코일을 통과)');
+        const start = performance.now();
+        const Rcircuit = 25;     // 코일+션트 (Ω)
+        let lastT = -1;
+        demoTimer = setInterval(() => {
+            const t = (performance.now() - start) / 1000;
+            // 100 Hz 로 샘플 생성
+            while (lastT + 0.01 <= t) {
+                lastT += 0.01;
+                const ph = ((lastT + 0.6) % 2.4);      // 한 사이클 2.4 s
+                const c = 0.5;                         // 코일 중심 시각
+                const gauss = (x, s) => Math.exp(-(x * x) / (2 * s * s));
+                // 진입: 양의 봉우리, 이탈: 더 큰 음의 봉우리(자석이 가속되었으므로)
+                let eps = 0;
+                eps += 38 * ((ph - (c - 0.07)) / 0.05) * gauss(ph - (c - 0.07), 0.05);
+                eps -= 62 * ((ph - (c + 0.07)) / 0.04) * gauss(ph - (c + 0.07), 0.04);
+                eps = -eps;
+                const noise = (Math.random() - 0.5) * 0.8;
+                const v = eps + noise + 1.2;                  // 1.2 mV 의 센서 오프셋
+                const i = eps / Rcircuit + (Math.random() - 0.5) * 0.02 + 0.03;   // mV ÷ Ω = mA
+                addSample(lastT, v, i);
+            }
+        }, 20);
+    }
+
+    // ---------- 세션 ----------
+    function setStatus(s) { $('status').textContent = s; }
+    function startSession(kind, msg) {
+        source = kind; live = []; rec = []; t0Dev = null; lineBuf = '';
+        offV = 0; offI = 0;
+        setStatus(msg);
+        $('btnConnect').disabled = true; $('btnDemo').disabled = true;
+        $('btnDisconnect').disabled = false; $('btnZero').disabled = false; $('btnRec').disabled = false;
+    }
+    function endSession() {
+        if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+        if (recording) stopRecording();
+        port = null; reader = null; source = null;
+        $('btnConnect').disabled = false; $('btnDemo').disabled = false;
+        $('btnDisconnect').disabled = true; $('btnZero').disabled = true; $('btnRec').disabled = true;
+        setStatus('연결 해제됨');
+    }
+
+    // ---------- 영점 / 기록 ----------
+    function zeroCalibrate() {
+        if (live.length < 5) { alert('데이터가 충분하지 않습니다.'); return; }
+        const tEnd = live[live.length - 1].t;
+        const seg = live.filter(s => tEnd - s.t <= 1);
+        offV = seg.reduce((a, s) => a + s.rawV, 0) / seg.length;
+        offI = seg.reduce((a, s) => a + s.rawI, 0) / seg.length;
+        setStatus(`영점 보정 완료 (전압 ${offV.toFixed(2)} mV, 전류 ${offI.toFixed(3)} mA 보정)`);
+    }
+
+    function startRecording() {
+        rec = [];
+        recStart = live.length ? live[live.length - 1].t : 0;
+        recording = true;
+        $('btnRec').textContent = '■ 측정 중지'; $('btnRec').className = 'rec';
+        $('btnSave').disabled = true; $('btnCsv').disabled = true;
+        $('results').innerHTML = '<div>측정 중…</div>';
+    }
+    function stopRecording() {
+        recording = false;
+        $('btnRec').textContent = '● 측정 시작'; $('btnRec').className = 'ok';
+        $('recInfo').textContent = `${rec.length}개 샘플`;
+        if (rec.length > 3) {
+            $('btnSave').disabled = false; $('btnCsv').disabled = false;
+            showResults(analyze(rec));
+        } else {
+            $('results').innerHTML = '<div>기록된 데이터가 없습니다.</div>';
+        }
+    }
+
+    // ---------- 분석 ----------
+    function analyze(data) {
+        let maxV = -Infinity, minV = Infinity, tMax = 0, tMin = 0, maxAbsI = 0;
+        let integral = 0, integralI = 0;
+        for (let k = 0; k < data.length; k++) {
+            const d = data[k];
+            if (d.v > maxV) { maxV = d.v; tMax = d.t; }
+            if (d.v < minV) { minV = d.v; tMin = d.t; }
+            if (Math.abs(d.i) > maxAbsI) maxAbsI = Math.abs(d.i);
+            if (k > 0) {
+                const dt = d.t - data[k - 1].t;
+                integral += 0.5 * (d.v + data[k - 1].v) * dt;       // mV·s
+                integralI += 0.5 * (d.i + data[k - 1].i) * dt;      // mA·s = mC
+            }
+        }
+        const N = turns();
+        const dPhi = -integral / N * 1000;                          // mV·s = mWb·turn → µWb : ×1000
+        const total = data[data.length - 1].t - data[0].t;
+        const rms = Math.sqrt(data.reduce((a, d) => a + d.v * d.v, 0) / data.length);
+        const charge = integralI;                                   // 순 전하(mC)
+        const hasPair = maxV > 0 && minV < 0;
+        return { maxV, minV, tMax, tMin, maxAbsI, integral, dPhi, total, rms, charge, N, hasPair,
+                 order: hasPair ? (tMax < tMin ? '+ 먼저, − 나중' : '− 먼저, + 나중') : '—' };
+    }
+
+    function showResults(r) {
+        const cell = (k, v) => `<div>${k}<b>${v}</b></div>`;
+        $('results').innerHTML = [
+            cell('최대 양의 기전력', `${r.maxV.toFixed(2)} mV @ ${r.tMax.toFixed(2)} s`),
+            cell('최대 음의 기전력', `${r.minV.toFixed(2)} mV @ ${r.tMin.toFixed(2)} s`),
+            cell('봉우리 순서 (렌츠 법칙)', r.order),
+            cell('최대 전류 |I|', `${r.maxAbsI.toFixed(3)} mA`),
+            cell('전압 넓이 ∫ε dt', `${r.integral.toFixed(3)} mV·s`),
+            cell('선속 변화 ΔΦ = −∫ε dt ÷ N', `${r.dPhi.toFixed(2)} µWb`),
+            cell('실효 전압 (RMS)', `${r.rms.toFixed(2)} mV`),
+            cell('측정 시간', `${r.total.toFixed(2)} s`)
+        ].join('');
+    }
+
+    // ---------- 그래프 ----------
+    const cv = $('chart'), ctx = cv.getContext('2d');
+    function fit() {
+        const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+        cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', fit); fit();
+
+    function niceRange(lo, hi) {
+        if (!isFinite(lo) || !isFinite(hi) || lo === hi) { lo = -1; hi = 1; }
+        const pad = (hi - lo) * 0.1; lo -= pad; hi += pad;
+        // 0을 항상 포함
+        return [Math.min(lo, 0), Math.max(hi, 0)];
+    }
+
+    function draw() {
+        const W = cv.clientWidth, H = cv.clientHeight;
+        ctx.clearRect(0, 0, W, H);
+        const L = 55, R = 55, T = 12, B = 28;
+        const pw = W - L - R, ph = H - T - B;
+
+        const showRec = !recording && rec.length > 3;
+        let pts, tLo, tHi;
+        if (showRec) {
+            pts = rec; tLo = rec[0].t; tHi = rec[rec.length - 1].t;
+        } else if (recording) {
+            pts = rec; tLo = 0; tHi = duration();
+        } else {
+            pts = live;
+            tHi = live.length ? live[live.length - 1].t : LIVE_WINDOW;
+            tLo = tHi - LIVE_WINDOW;
+        }
+        const vis = pts.filter(p => p.t >= tLo - 1e-9 && p.t <= tHi + 1e-9);
+        let [vLo, vHi] = niceRange(Math.min(...vis.map(p => p.v)), Math.max(...vis.map(p => p.v)));
+        let [iLo, iHi] = niceRange(Math.min(...vis.map(p => p.i)), Math.max(...vis.map(p => p.i)));
+        if (!vis.length) { vLo = -1; vHi = 1; iLo = -1; iHi = 1; }
+
+        const X = t => L + (t - tLo) / (tHi - tLo || 1) * pw;
+        const Yv = v => T + (1 - (v - vLo) / (vHi - vLo)) * ph;
+        const Yi = i => T + (1 - (i - iLo) / (iHi - iLo)) * ph;
+
+        // 격자 + 눈금
+        ctx.font = '11px sans-serif'; ctx.lineWidth = 1;
+        for (let g = 0; g <= 4; g++) {
+            const y = T + ph * g / 4;
+            ctx.strokeStyle = '#eee'; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke();
+            ctx.fillStyle = '#d63384'; ctx.textAlign = 'right';
+            ctx.fillText((vHi - (vHi - vLo) * g / 4).toFixed(1), L - 5, y + 4);
+            ctx.fillStyle = '#0d6efd'; ctx.textAlign = 'left';
+            ctx.fillText((iHi - (iHi - iLo) * g / 4).toFixed(2), L + pw + 5, y + 4);
+        }
+        ctx.fillStyle = '#555'; ctx.textAlign = 'center';
+        for (let g = 0; g <= 5; g++) {
+            const t = tLo + (tHi - tLo) * g / 5;
+            ctx.fillText(t.toFixed(1) + ' s', X(t), H - 8);
+        }
+        // 0 기준선
+        ctx.strokeStyle = '#999'; ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(L, Yv(0)); ctx.lineTo(L + pw, Yv(0)); ctx.stroke(); ctx.setLineDash([]);
+
+        const line = (key, Y, color) => {
+            ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath();
+            let started = false;
+            for (const p of vis) {
+                const x = X(p.t), y = Y(p[key]);
+                if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        };
+        ctx.save(); ctx.beginPath(); ctx.rect(L, T, pw, ph); ctx.clip();
+        line('v', Yv, '#d63384'); line('i', Yi, '#0d6efd');
+        ctx.restore();
+    }
+
+    function updateReadouts() {
+        if (live.length) {
+            const s = live[live.length - 1];
+            $('rV').textContent = s.v.toFixed(2);
+            $('rI').textContent = s.i.toFixed(3);
+            $('rP').textContent = (s.v * s.i).toFixed(1);   // mV·mA = µW
+            $('rHz').textContent = sampleTimes.length;
+        }
+        if (recording) $('recInfo').textContent = `측정 중… ${rec.length}개 (${(rec.length ? rec[rec.length - 1].t : 0).toFixed(1)} / ${duration()} s)`;
+    }
+    (function loop() { draw(); updateReadouts(); requestAnimationFrame(loop); })();
+
+    // ---------- 저장 / 비교 / CSV ----------
+    function renderTrials() {
+        const tb = $('trials');
+        tb.innerHTML = '';
+        trials.forEach((t, idx) => {
+            const tr = document.createElement('tr');
+            [t.name, t.N, t.maxV.toFixed(2), t.minV.toFixed(2), t.maxAbsI.toFixed(3),
+             t.integral.toFixed(3), t.dPhi.toFixed(2)].forEach(v => {
+                const td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
+            });
+            const td = document.createElement('td');
+            const b = document.createElement('button'); b.textContent = '삭제';
+            b.addEventListener('click', () => { trials.splice(idx, 1); persistTrials(); renderTrials(); });
+            td.appendChild(b); tr.appendChild(td);
+            tb.appendChild(tr);
+        });
+        $('trialsEmpty').hidden = trials.length > 0;
+    }
+
+    function saveTrial() {
+        if (rec.length < 4) return;
+        const name = prompt('이 측정의 이름 (예: 자석 빠르게)', `측정 ${trials.length + 1}`);
+        if (name === null) return;
+        const r = analyze(rec);
+        trials.push({ name: name || `측정 ${trials.length + 1}`, N: r.N, maxV: r.maxV, minV: r.minV,
+                      maxAbsI: r.maxAbsI, integral: r.integral, dPhi: r.dPhi });
+        persistTrials(); renderTrials();
+    }
+
+    function downloadCsv() {
+        const lines = ['time_s,voltage_mV,current_mA'];
+        rec.forEach(d => lines.push(`${d.t.toFixed(4)},${d.v.toFixed(4)},${d.i.toFixed(5)}`));
+        const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = 'em-induction.csv'; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    // ---------- 이벤트 ----------
+    $('btnConnect').addEventListener('click', connectSerial);
+    $('btnDemo').addEventListener('click', startDemo);
+    $('btnDisconnect').addEventListener('click', disconnect);
+    $('btnZero').addEventListener('click', zeroCalibrate);
+    $('btnRec').addEventListener('click', () => recording ? stopRecording() : startRecording());
+    $('btnSave').addEventListener('click', saveTrial);
+    $('btnCsv').addEventListener('click', downloadCsv);
+    $('pga').addEventListener('change', sendPga);
+    renderTrials();
+})();
+</script>
+</body>
+</html>
