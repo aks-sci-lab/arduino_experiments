@@ -96,5 +96,47 @@
         return { slope, intercept: my - slope * mx, r2 };
     }
 
-    return { RAD, linearTable, mean, std, fitMalus, linearRegression };
+    // 밝기 배열(w×h)에서 빛 번짐의 중심을 찾는다.
+    // 가장자리 한 줄의 평균을 바닥값으로 빼고, 남은 밝기로 가중 평균 위치를 구한다.
+    // 반환: { x, y, contrast } (x, y 는 픽셀 좌표, contrast = 최댓값 − 바닥값). 빛이 없으면 null.
+    function spotCentroid(v, w, h) {
+        if (w < 3 || h < 3) return null;
+        let edge = 0, ne = 0;
+        for (let x = 0; x < w; x++) { edge += v[x] + v[(h - 1) * w + x]; ne += 2; }
+        for (let y = 1; y < h - 1; y++) { edge += v[y * w] + v[y * w + w - 1]; ne += 2; }
+        const base = edge / ne;
+        let peak = 0;
+        for (let i = 0; i < v.length; i++) if (v[i] > peak) peak = v[i];
+        const contrast = peak - base;
+        if (!(contrast > 0)) return null;
+        // 바닥 잡음을 피하려고 (최댓값−바닥값)의 20% 이상인 픽셀만 사용
+        const cut = base + 0.2 * contrast;
+        let sw = 0, sx = 0, sy = 0;
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const wt = v[y * w + x] - cut;
+                if (wt > 0) { sw += wt; sx += wt * x; sy += wt * y; }
+            }
+        }
+        if (sw === 0) return null;
+        return { x: sx / sw, y: sy / sw, contrast };
+    }
+
+    // 정사각 영역(s×s)의 가장자리 띠(두께 = s의 10%) 평균이 전체 평균에서 차지하는 비율.
+    // 빛 번짐이 영역 안에 다 들어 있으면 작고(≈ 0), 영역 밖으로 넘치면 1에 가까워진다.
+    function edgeRatio(v, s) {
+        const t = Math.max(1, Math.round(s * 0.1));
+        let all = 0, edge = 0, ne = 0;
+        for (let y = 0; y < s; y++) {
+            for (let x = 0; x < s; x++) {
+                const val = v[y * s + x];
+                all += val;
+                if (x < t || y < t || x >= s - t || y >= s - t) { edge += val; ne++; }
+            }
+        }
+        const m = all / (s * s);
+        return m > 0 ? (edge / ne) / m : 0;
+    }
+
+    return { RAD, linearTable, mean, std, fitMalus, linearRegression, spotCentroid, edgeRatio };
 });
