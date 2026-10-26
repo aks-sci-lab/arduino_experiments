@@ -658,13 +658,14 @@
     $('btn-zoom').onclick = () => setZoom(!state.zoom);
     $('btn-new-run').onclick = newRun;
     $('delay').onchange = $('track').onchange = save;
-    // 블루투스 키보드·리모컨의 Enter/Space 로도 기록. 각도 칸에서 Enter 를 눌러도 기록한다.
-    // (다른 입력칸·선택 상자에서는 원래 동작을 그대로 둔다)
+    // 블루투스 키보드·리모컨의 Enter/Space 로도 기록한다. 각도 칸에서는 Enter 로 기록한다.
+    // 버튼·링크·다른 입력칸에 포커스가 있으면 그 요소의 원래 동작(삭제, 결측 등)을 그대로 둔다.
     document.addEventListener('keydown', e => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
-        const t = e.target || {}, tag = t.tagName || '';
+        if (e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+        const t = e.target || {};
         if (t.id === 'angle') { if (e.key !== 'Enter') return; }
-        else if (/INPUT|SELECT|TEXTAREA/.test(tag)) return;
+        else if (t !== document.body && t !== document.documentElement && t !== view) return;
         e.preventDefault();
         recordPoint();
     });
