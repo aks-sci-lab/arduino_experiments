@@ -314,7 +314,7 @@
             $('tbody').appendChild(tr);
         });
         $('cnt').textContent = '(' + state.points.length + '개)';
-        $('btn-csv').disabled = $('btn-clear').disabled = $('btn-copy').disabled = $('btn-gs').disabled = state.points.length === 0;
+        $('btn-csv').disabled = $('btn-clear').disabled = $('btn-copy').disabled = $('btn-gs').disabled = $('btn-gs-oauth').disabled = state.points.length === 0;
         const locked = state.points.length > 0;
         $('sel-channel').disabled = $('sel-gamma').disabled = locked;
         $('chan-warn').hidden = !locked;
@@ -436,6 +436,7 @@
         const t = new Date().toLocaleString('ko-KR'), name = $('gs-name').value.trim();
         return state.points.map(p => [t, name, p.theta, intensity(p), p.sd, p.raw, p.raw - intensity(p), p.sat, p.ch, p.gamma]);
     }
+    window.__malus = { header: GS_HEADER, rows: sheetRows };
     async function copyText(text, okMsg, el) {
         try { await navigator.clipboard.writeText(text); el.textContent = okMsg; }
         catch (e) {

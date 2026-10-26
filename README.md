@@ -295,3 +295,4 @@ HI = T + (H - 60) × 0.05
 - `I = A·cos²(θ−θ₀)+B` 최소제곱 적합, R²·소광비·cos² 직선성 그래프, CSV 저장
 - 계산 로직: `js/malus-math.js`, UI: `js/malus-law.js`
 - 구글 스프레드시트: "표 복사"로 붙여넣기, 또는 본인 시트에 Apps Script 웹 앱을 배포하고 URL을 입력해 전송 (페이지 5번 카드 참고)
+- 각자의 구글 계정으로 로그인해 본인 드라이브에 새 스프레드시트를 만들어 내보내기 (`js/malus-sheets.js`, drive.file 권한만 사용)
