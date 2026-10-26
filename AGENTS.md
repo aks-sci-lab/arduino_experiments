@@ -33,10 +33,20 @@
 - Firebase 설정값은 기존 파일(`js/phone-accel-cloud.js` 등)의 것을 그대로 쓴다. 로그인 세션은 같은 사이트 안에서 공유된다.
 - 비밀값(API 키 파일 `key.txt`, 서비스 계정 JSON)은 커밋하지 않는다.
 
+## ⚠️ 현재 주의 사항 (2026-10-26)
+
+- 라이브 사이트(aks-sci-lab.web.app)는 2026-10-06 에 PC 의 Firebase CLI 로 배포된 상태이며,
+  **그 배포에 포함된 센서 작업이 `main` 에 없다** (Copilot 확인): Pico 환경·가속도 펌웨어와 Bluetooth 연결,
+  ±16g·재연결 개선, 200Hz 측정·10개 묶음 전송·측정 품질 표시, 조도·자외선·VOC Index 환경 화면, 관련 테스트·캐시 방지 설정.
+- 그래서 **복구가 끝날 때까지 `main` 을 Hosting 에 배포하지 않는다** (자동 배포 꺼 둠, CLI 배포도 금지).
+- 복구 방법: 이전 작업(Copilot 자동 저장본)을 새 브랜치로 가져와 `main` 의 새 기능(말루스 법칙, 걷기·뛰기 판정기)을
+  지우지 않도록 **필요한 변경만 합쳐** PR 로 올린다. 머지 후 `deploy-hosting.yml` 의 push 트리거를 되살리고 배포한다.
+- 확인된 값: Hosting site `aks-sci-lab`, Firebase 프로젝트 `web-experiment-f9b24`.
+
 ## 작업 흐름과 배포
 
 1. `main` 에 직접 커밋하지 않고 브랜치에서 작업한 뒤 PR 을 만든다.
-2. PR 이 `main` 에 머지되면 `.github/workflows/deploy-hosting.yml` 이 aks-sci-lab.web.app 에 자동 배포한다.
+2. PR 이 `main` 에 머지되면 `.github/workflows/deploy-hosting.yml` 이 aks-sci-lab.web.app 에 자동 배포한다. (현재는 위 주의 사항 때문에 꺼져 있음)
 3. `firestore.rules` 를 바꾸면 PR 설명과 커밋 메시지에 "(규칙 배포 필요)"를 적는다. 규칙은 자동 배포되지 않는다.
 
 자세한 배포 설정: `docs/DEPLOY.md`

@@ -1,12 +1,15 @@
 name: Deploy to Firebase Hosting
 
-# main 에 반영될 때마다 https://aks-sci-lab.web.app 에 자동 배포한다.
+# https://aks-sci-lab.web.app 에 배포한다.
+# ⚠️ 현재는 수동 실행만 가능하다 (Actions 탭 → Run workflow).
+#    라이브 사이트에 main 에 없는 센서 작업(2026-10-06 CLI 배포분)이 있어, 그 작업을 main 에 복구하기 전에
+#    자동 배포하면 해당 기능이 사라진다. 복구 PR 이 머지된 뒤 아래 push 트리거를 되살린다.
 # 저장소 Secrets 에 FIREBASE_SERVICE_ACCOUNT 가 없으면 배포를 건너뛴다 (실패로 표시되지 않음).
 # 설정 방법: docs/DEPLOY.md
 
 on:
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
   workflow_dispatch:
 
 jobs:
