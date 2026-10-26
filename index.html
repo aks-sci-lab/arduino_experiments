@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Arduino 웹 실험실 - 가속도계, 환경 센서, 자유낙하 실험">
-    <title>아두이노 웹 실험실</title>
+    <meta name="description" content="센서 기반 웹실험실 - 가속도, 환경, 조도, 자외선, VOC 측정">
+    <title>센서 기반 웹실험실</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
         .auth-bar {
@@ -133,14 +133,18 @@
             </div>
         </div>
 
-        <h1>아두이노 웹 실험실</h1>
+        <h1>센서 기반 웹실험실</h1>
         <p>환영합니다! 아래에서 수행할 실험 프로젝트를 선택하세요.</p>
-        <p>프로젝트를 시작하기 전에, <a href="uploader.html">펌웨어 업로더</a> 페이지에서 아두이노를 먼저 준비해주세요.</p>
+        <p>센서 실험은 <strong>Bluetooth 지원 제어 보드 + Pico-Environment-Sensor</strong>를 사용합니다.
+            각 실험 페이지의 Thonny 준비 안내에서 동일한 MicroPython 파일 네 개를 다운로드하세요.
+            한 실험의 연결을 해제한 뒤 다른 실험에 연결합니다. 기존 아두이노 펌웨어 업로더는 사용하지 않습니다.</p>
 
         <h2>프로젝트 목록</h2>
         <ul class="project-list">
-            <li><a href="projects/accelerometer-lab.html">➡️ 가속도계 데이터 분석</a></li>
-            <li><a href="projects/environment-lab.html">➡️ 환경 센서 실시간 모니터</a></li>
+            <li><a href="projects/accelerometer-lab.html">➡️ 가속도계 데이터 분석 (Thonny)</a></li>
+            <li><a href="projects/environment-lab.html">➡️ 환경 센서 실시간 모니터 (VOC Index 포함)</a></li>
+            <li><a href="projects/light-lab.html">➡️ 조도 센서 측정 (TSL2591)</a></li>
+            <li><a href="projects/uv-lab.html">➡️ 자외선 센서 측정 (LTR390)</a></li>
             <li><a href="projects/free-fall.html">➡️ 자유낙하 궤적 분석 (스마트폰 영상)</a></li>
             <li><a href="projects/phone-accelerometer.html">➡️ 스마트폰 가속도 센서 실험</a></li>
             <li><a href="projects/malus-law.html">➡️ 말루스 법칙 실험 (스마트폰 카메라)</a></li>

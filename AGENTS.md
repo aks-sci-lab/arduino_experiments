@@ -18,6 +18,8 @@
 | `index.html` | 메인 페이지: 구글 로그인, 교사/학생 역할, 실험 목록, 기록 조회 |
 | `projects/*.html` | 실험 페이지 (가속도계, 환경 센서, 자유낙하, 스마트폰 가속도, 말루스 법칙) |
 | `js/`, `css/` | 실험 페이지용 스크립트·스타일 (`malus-*.js`: 말루스 법칙 실험) |
+| `firmware/pico2w-environment/` | Pico 센서 보드용 MicroPython 펌웨어와 Thonny 설치 안내 |
+| `tests/`, `tools/`, `vendor/sensirion/` | 센서 테스트, VOC 알고리즘 재빌드 도구, 제조사 원본·라이선스·WebAssembly |
 | `walk-run-detector/` | 걷기·뛰기 판정 머신러닝 수업 앱 (자체 README 참고) |
 | `uploader.html` | 아두이노 펌웨어 업로더 |
 | `app.py` | 날씨 API 로컬 서버 (Firebase Hosting 에는 배포되지 않음) |
@@ -42,6 +44,9 @@
 - 복구 방법: 이전 작업(Copilot 자동 저장본)을 새 브랜치로 가져와 `main` 의 새 기능(말루스 법칙, 걷기·뛰기 판정기)을
   지우지 않도록 **필요한 변경만 합쳐** PR 로 올린다. 머지 후 `deploy-hosting.yml` 의 push 트리거를 되살리고 배포한다.
 - 확인된 값: Hosting site `aks-sci-lab`, Firebase 프로젝트 `web-experiment-f9b24`.
+- 센서 복구 브랜치에서는 자동 저장본 `07c3ac3`의 변경 44개 파일을 합치고 라이브 배포 전체 36개 파일과 대조했다.
+  Firebase 자동 제공 파일 2개를 제외한 34개 중 33개는 줄바꿈 차이 외에 같으며, `index.html`은 새 실험 링크를 유지해 합쳤다.
+  **복구 PR이 머지되기 전까지 위 배포 금지를 유지한다.** 이번 복구에서는 배포 트리거와 Firestore 규칙을 바꾸지 않았다.
 
 ## 작업 흐름과 배포
 
@@ -59,3 +64,4 @@
 - 2026-10-19~21: 걷기·뛰기 판정기(`walk-run-detector/`) — Claude Code
 - 2026-10-26: 말루스 법칙 실험(`projects/malus-law.html`, 카메라 밝기 측정·cos² 적합·내 구글 시트 내보내기), Firebase Hosting 자동 배포 설정 — Claude Code
   - 확인 필요: 내 시트 내보내기는 Google Sheets API 가 Firebase 프로젝트에서 켜져 있어야 동작
+- 2026-10-26: 10월 6일 라이브 센서 작업(Pico 펌웨어·BLE·±16g·200Hz 묶음 전송·환경/VOC·조도·자외선·테스트·캐시 설정)을 최신 main과 합쳐 복구 PR 준비, 말루스·걷기/뛰기 유지 및 라이브 파일 대조 완료, 배포하지 않음 — Copilot
