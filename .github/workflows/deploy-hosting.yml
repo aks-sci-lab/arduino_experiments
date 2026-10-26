@@ -1,5 +1,9 @@
 name: Deploy to Firebase Hosting
 
+# main 에 반영될 때마다 https://aks-sci-lab.web.app 에 자동 배포한다.
+# 저장소 Secrets 에 FIREBASE_SERVICE_ACCOUNT 가 없으면 배포를 건너뛴다 (실패로 표시되지 않음).
+# 설정 방법: docs/DEPLOY.md
+
 on:
   push:
     branches: [main]
@@ -9,13 +13,27 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Check deploy key
+        id: key
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::notice::FIREBASE_SERVICE_ACCOUNT 가 없어 배포를 건너뜁니다. docs/DEPLOY.md 를 참고하세요."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout code
+        if: steps.key.outputs.ready == 'true'
         uses: actions/checkout@v4
 
       - name: Deploy to https://aks-sci-lab.web.app
+        if: steps.key.outputs.ready == 'true'
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: web-experiment-f9b24
+          projectId: ${{ vars.FIREBASE_PROJECT_ID || 'web-experiment-f9b24' }}
           channelId: live
