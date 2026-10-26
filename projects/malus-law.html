@@ -108,6 +108,39 @@
         <canvas id="chart2" class="chart"></canvas>
         <p class="note">위 그래프: 각도별 밝기와 적합 곡선. 아래 그래프: 정규화한 밝기 (I−B)/A 를 cos²(θ−θ₀) 에 대해 그린 것으로, 말루스 법칙이 맞으면 점들이 기울기 1인 점선 위에 놓입니다.</p>
     </div>
+
+    <div class="card">
+        <h2>5. 구글 스프레드시트로 보내기</h2>
+        <div class="row">
+            <button id="btn-copy" class="secondary" disabled>📋 표 복사 (시트에 붙여넣기)</button>
+            <span class="note">복사 후 시트에서 A1 셀을 선택하고 붙여넣기(Ctrl+V)</span>
+        </div>
+        <div class="row">
+            <label style="flex:1">이름/조 <input type="text" id="gs-name" placeholder="예: 3조" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;width:100%"></label>
+        </div>
+        <div class="row">
+            <label style="flex:1">웹 앱 URL <input type="url" id="gs-url" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;width:100%"></label>
+        </div>
+        <div class="row"><button id="btn-gs" class="good" disabled>📤 내 시트로 전송</button><span id="gs-status" class="note"></span></div>
+        <details>
+            <summary>🔧 내 시트 연결 방법 (1회만)</summary>
+            <ol>
+                <li>구글 스프레드시트를 새로 만들고 <b>확장 프로그램 → Apps Script</b>를 엽니다.</li>
+                <li>아래 코드를 붙여넣고 저장합니다.</li>
+                <li><b>배포 → 새 배포 → 유형: 웹 앱</b>, 실행 사용자 <b>나</b>, 액세스 권한 <b>모든 사용자</b>로 배포하고 권한을 승인합니다.</li>
+                <li>나온 <b>웹 앱 URL</b>을 위 칸에 붙여넣습니다.</li>
+            </ol>
+            <pre id="gs-code" style="background:#f1f3f5;padding:10px;border-radius:6px;overflow-x:auto;font-size:.8em;white-space:pre-wrap">function doPost(e) {
+  var d = JSON.parse(e.postData.contents);
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sh.getLastRow() === 0) sh.appendRow(d.header);
+  d.rows.forEach(function (r) { sh.appendRow(r); });
+  return ContentService.createTextOutput('ok');
+}</pre>
+            <button id="btn-copy-code" class="secondary">코드 복사</button>
+            <p class="note">브라우저 보안상 전송 성공 여부는 앱에서 확인할 수 없으니 시트에 행이 생겼는지 확인하세요. URL을 아는 사람은 누구나 시트에 쓸 수 있으므로 URL을 공유하지 마세요.</p>
+        </details>
+    </div>
 </div>
 <script src="../js/malus-math.js"></script>
 <script src="../js/malus-law.js"></script>

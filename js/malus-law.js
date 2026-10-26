@@ -314,7 +314,7 @@
             $('tbody').appendChild(tr);
         });
         $('cnt').textContent = '(' + state.points.length + '개)';
-        $('btn-csv').disabled = $('btn-clear').disabled = state.points.length === 0;
+        $('btn-csv').disabled = $('btn-clear').disabled = $('btn-copy').disabled = $('btn-gs').disabled = state.points.length === 0;
         const locked = state.points.length > 0;
         $('sel-channel').disabled = $('sel-gamma').disabled = locked;
         $('chan-warn').hidden = !locked;
@@ -429,6 +429,44 @@
         a.download = 'malus-law.csv';
         document.body.appendChild(a); a.click(); a.remove();
     }
+
+    // ---------- 구글 스프레드시트 ----------
+    const GS_HEADER = ['시각', '이름/조', '각도(°)', '밝기 I', '표준편차', '원값', '배경', '포화비율', '채널', '감마'];
+    function sheetRows() {
+        const t = new Date().toLocaleString('ko-KR'), name = $('gs-name').value.trim();
+        return state.points.map(p => [t, name, p.theta, intensity(p), p.sd, p.raw, p.raw - intensity(p), p.sat, p.ch, p.gamma]);
+    }
+    async function copyText(text, okMsg, el) {
+        try { await navigator.clipboard.writeText(text); el.textContent = okMsg; }
+        catch (e) {
+            const ta = document.createElement('textarea');
+            ta.value = text; document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); el.textContent = okMsg; } catch (e2) { el.textContent = '복사 실패: 직접 선택해서 복사하세요.'; }
+            ta.remove();
+        }
+    }
+    function copyTable() {
+        const rows = [GS_HEADER].concat(sheetRows());
+        copyText(rows.map(r => r.join('\t')).join('\n'), '복사됨 — 시트에 붙여넣으세요.', $('gs-status'));
+    }
+    async function sendToSheet() {
+        const url = $('gs-url').value.trim();
+        if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) { $('gs-status').textContent = 'script.google.com 웹 앱 URL을 입력하세요.'; return; }
+        try { localStorage.setItem(STORE_KEY + '-gs', JSON.stringify({ url, name: $('gs-name').value })); } catch (e) { /* 무시 */ }
+        $('gs-status').textContent = '전송 중…';
+        try {
+            // text/plain + no-cors: 사전 요청(CORS preflight) 없이 보내며, 응답은 읽을 수 없다.
+            await fetch(url, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ header: GS_HEADER, rows: sheetRows() }) });
+            $('gs-status').textContent = state.points.length + '행 전송 요청 완료 — 시트에서 확인하세요.';
+        } catch (e) { $('gs-status').textContent = '전송 실패: ' + e.message; }
+    }
+    try {
+        const g = JSON.parse(localStorage.getItem(STORE_KEY + '-gs') || 'null');
+        if (g) { $('gs-url').value = g.url || ''; $('gs-name').value = g.name || ''; }
+    } catch (e) { /* 무시 */ }
+    $('btn-copy').onclick = copyTable;
+    $('btn-gs').onclick = sendToSheet;
+    $('btn-copy-code').onclick = () => copyText($('gs-code').textContent, '코드 복사됨', $('gs-status'));
 
     // ---------- 이벤트 ----------
     $('btn-cam').onclick = startCamera;
