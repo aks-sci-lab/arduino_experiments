@@ -1,0 +1,24 @@
+.lab-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 16px 0; }
+.container button { background-color: #495057; color: #fff; }
+.container #connectButton { background-color: #007bff; }
+.container #disconnectButton { background-color: #343a40; }
+.container #recordButton { background-color: #218838; }
+.container #downloadButton { background-color: #117a8b; }
+.container #clearTrialsButton { background-color: #bd2130; }
+.container button:disabled { background-color: #e9ecef; color: #495057; opacity: 1; cursor: not-allowed; }
+.sensor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.sensor-readout { border: 1px solid #ddd; border-radius: 8px; padding: 16px; text-align: center; background: #f8f9fa; }
+.sensor-readout p { font-size: 1.5rem; font-weight: bold; color: #007bff; }
+.sensor-chart { height: 350px; margin: 20px 0; }
+.sensor-lab-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 24px; margin-top: 20px; }
+.sensor-lab-layout > section { min-width: 0; }
+.sensor-lab-layout .sensor-chart { height: 455px; }
+@media (max-width: 800px) {
+    .sensor-lab-layout { grid-template-columns: minmax(0, 1fr); }
+    .sensor-lab-layout .sensor-chart { height: 350px; }
+}
+.firmware-guide { padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+#trialList { padding-left: 20px; }
+#trialList li { margin: 8px 0; }
+#trialList button { margin-left: 8px; }
+.table-container { max-height: 350px; overflow: auto; }

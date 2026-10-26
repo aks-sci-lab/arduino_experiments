@@ -1,0 +1,13 @@
+{
+  "upstream": "https://github.com/Sensirion/gas-index-algorithm",
+  "commit": "2ef9f13d225e8a0dedd3ff42dd229af4dbb1aae4",
+  "version": "3.2.0",
+  "implementation": "fixed-point",
+  "samplingIntervalSeconds": 1,
+  "blobs": {
+    "sensirion_gas_index_algorithm.c": "acb510e81fb1713eefccbd97ee0038b5f900a390",
+    "sensirion_gas_index_algorithm.h": "8d9c192e6b403c0bdcf1c16f921ec38ac1cf1128",
+    "LICENSE": "ff20c41dfa2a1145b9caf1435f2b89e2e5bdec43"
+  },
+  "wasmSha256": "d1cc7d52bf205de8a6e05467f27184789dc0f9f4b47e7c192f41d6fc20bb8ea2"
+}

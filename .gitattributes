@@ -1,0 +1,4 @@
+# 제조사 원본 해시를 Windows에서도 유지한다.
+vendor/sensirion/*.c text eol=lf
+vendor/sensirion/*.h text eol=lf
+vendor/sensirion/LICENSE text eol=lf

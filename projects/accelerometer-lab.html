@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>가속도계 데이터 분석</title>
     
     <link rel="stylesheet" href="../css/style.css">
@@ -80,10 +81,46 @@
                 <p>상태: <span id="status">연결 대기</span></p>
             </div>
             <div class="header-controls">
-                <button id="connectBleButton" class="ble-button">아두이노 연결</button>
+                <button id="connectBleButton" class="ble-button">Bluetooth 연결</button>
                 <button id="disconnectBleButton" class="ble-button" style="display: none; background-color: #343a40;">연결 해제</button>
             </div>
         </div>
+
+        <details class="trial-management">
+            <summary>센서 준비 안내 (Thonny · BLE 검색 v2)</summary>
+            <p>Pico-Environment-Sensor의 IMU를 사용합니다. I2C0: SDA GP20, SCL GP21, 주소 0x68.
+                ICM-20948 또는 MPU-9250/9255를 칩 ID로 확인합니다. 측정값은 중력을 포함한 가속도(g), 최대 범위는 축별 ±16g입니다.
+                정지 상태에서 Total은 약 1g이며 축 방향은 보드에 따라 다릅니다.</p>
+            <p><a href="https://micropython.org/download/RPI_PICO2_W/" target="_blank" rel="noopener">이 장치용 MicroPython</a>을 설치하고
+                Thonny에서 다음 네 파일을 Pico 루트에 저장한 뒤 main.py를 실행하세요.
+                기존 main.py와 imu.py도 새 버전으로 교체해야 합니다. ±16g 설정은 최신 imu.py에 적용됩니다.</p>
+            <p><a href="../firmware/pico2w-environment/main.py?v=batch-200-v4" download="main.py">main.py</a> ·
+                <a href="../firmware/pico2w-environment/bme280.py" download>bme280.py</a> ·
+                <a href="../firmware/pico2w-environment/imu.py?firmware=impact-200-v3" download="imu.py">imu.py</a> ·
+                <a href="../firmware/pico2w-environment/extra_sensors.py" download>extra_sensors.py</a> ·
+                <a href="../firmware/pico2w-environment/README.md">상세 안내</a></p>
+            <p>PC/Android Chrome·Edge에서 PicoEnv-XXXX를 선택합니다. 환경 실험 연결을 먼저 해제하세요.
+                Wi-Fi 설정은 필요 없습니다. 선택 속도는 목표 전송 속도이며 실제 간격은 BLE 환경에 따라 달라집니다.
+                시간축은 Pico 측정 시각을 사용합니다. Cloud 제출은 요약만 저장하며 원시 값은 CSV로 보관하세요.</p>
+            <p>검색이 안 되면 최신 main.py를 다시 저장하고 <strong>Thonny → 보기 → 셸</strong>에서 F5로 실행하세요.
+                5초마다 <code>[STATUS] ... BLE=ADVERTISING</code>이 나오면 검색 대기 상태입니다.
+                <code>[FATAL]</code>은 실행 오류, <code>[STOP]</code>은 정지 상태입니다.
+                검색 중에는 Thonny의 중지 버튼을 누르지 마세요.
+                <a href="../firmware/pico2w-environment/README.md">USB 시리얼 모니터 안내</a></p>
+            <p>2g 부근에서 측정이 제한되면 최신 imu.py와 main.py를 <strong>Pico 내부에 덮어쓰고 재시작</strong>하세요.
+                셸에 <code>driver=impact-200-v3</code>와 <code>+/-16g VERIFIED</code>가 표시되어야 합니다.
+                범위·필터 검증 실패 시 측정을 중단합니다.</p>
+            <p>200Hz는 목표 5ms 간격입니다. 최신 main.py와 imu.py를 장치에 저장하고 재시작하세요.
+                200Hz에서는 필터 대역폭을 ICM-20948 약 111Hz, MPU-9250/9255 약 99Hz로 높입니다.
+                다른 속도에서는 기존 약 45~50Hz 필터를 유지합니다. 넓어진 대역폭은 잡음과 앨리어싱 위험도 높입니다.
+                수 ms 충격의 최대값·축별 ±16g 초과는 정확히 복원할 수 없습니다.
+                200Hz에서는 장치 RAM에 10개(약 50ms)를 모아 전송하며 BLE MTU가 작으면 분할 후 웹에서 재조립합니다.
+                중지 시 남은 샘플도 전송합니다. 센서 하드웨어 FIFO 방식은 아니므로 전송 중 지연은 여전히 발생할 수 있습니다.
+                아래 간격 경고와 CSV 측정 시각을 확인하세요.</p>
+            <p>환경 페이지에서 보이던 장치가 여기서 보이지 않으면 환경 페이지의 <strong>연결 해제</strong>를 먼저 누르세요.
+                Thonny에 <code>BLE=ADVERTISING</code>이 표시된 뒤 검색합니다.
+                이전 페이지가 남아 있으면 Ctrl+Shift+R로 강력 새로고침하세요.</p>
+        </details>
 
         <div class="main-layout">
             <div class="content-column">
@@ -92,16 +129,18 @@
                     <div class="table-controls">
                         <button id="recordButton" disabled>측정 시작</button>
                         <select id="samplingRateSelect">
-                            <option value="200">5ms (200 Hz)</option>
+                            <option value="200">5ms (200 Hz · 충돌 비교)</option>
                             <option value="100" selected>10ms (100 Hz)</option>
+                            <option value="50">20ms (50 Hz)</option>
                             <option value="25">40ms (25 Hz)</option>
                         </select>
                         <button id="downloadButton" disabled>엑셀 저장</button>
                     </div>
+                    <p id="acquisitionQuality" role="status">측정 품질: 측정 대기</p>
                 </div>
                 <div class="table-container">
                     <table id="historyTable">
-                        <thead><tr><th>Time (s)</th><th>X</th><th>Y</th><th>Z</th><th>Total</th></tr></thead>
+                        <thead><tr><th>Time (s)</th><th>X (g)</th><th>Y (g)</th><th>Z (g)</th><th>Total (g)</th></tr></thead>
                         <tbody id="historyTbody"></tbody>
                     </table>
                 </div>
@@ -159,6 +198,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="../js/environment-protocol.js?v=extra-v1"></script>
+    <script src="../js/accelerometer-protocol.js?v=batch-200-v4"></script>
+    <script src="../js/pico-ble.js?v=discovery-v2"></script>
 
     <script>
     document.addEventListener('DOMContentLoaded', (event) => {
@@ -187,7 +229,7 @@
                 if (!auth || !currentUser) {
                     return alert('실험 데이터를 제출하려면 메인 페이지에서 구글 로그인이 필요합니다.');
                 }
-                if (trialsData.length === 0 && recordedData.length === 0) {
+                if (Object.keys(savedTrials).length === 0 && recordedData.length === 0) {
                     return alert('저장할 측정 데이터가 없습니다.');
                 }
                 try {
@@ -199,8 +241,8 @@
                         experimentName: '가속도계 데이터 분석',
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                         tab: 'accelerometer-lab',
-                        trialsCount: trialsData.length,
-                        dataSummary: `회차 ${trialsData.length}개 / 현재 샘플 ${recordedData.length}개`,
+                        trialsCount: Object.keys(savedTrials).length,
+                        dataSummary: `회차 ${Object.keys(savedTrials).length}개 / 현재 샘플 ${recordedData.length}개`,
                         weatherSample: {},
                         stargazingSample: []
                     };
@@ -240,9 +282,31 @@
         let isRecording = false;
         let myChart;
         let commandCharacteristic;
+        let dataCharacteristic, statusCharacteristic;
         let bleDevice;
         let savedTrials = {};
-        let startTime = 0;
+        let lastSampleAt = null;
+        let commandPending = false;
+        let sensorErrorVersion = 0;
+        let pageLeaving = false;
+        const receiver = new AccelerometerProtocol.Receiver();
+        let previousSampleTimestamp = null;
+        let abnormalIntervals = 0;
+        let saturatedSamples = 0;
+        let qualitySamples = 0;
+        let qualityElapsedMs = 0;
+        const acquisitionQuality = document.getElementById('acquisitionQuality');
+        let finishBufferedStop = null;
+        const statusReceiver = new EnvironmentProtocol.Receiver(
+            () => { if (finishBufferedStop) finishBufferedStop(); },
+            reportSensorError,
+            packet => {
+                if (packet?.type !== 'imu_stopped' || packet.ts !== 0 || packet.seq !== 0 || !finishBufferedStop) {
+                    throw new Error('예상하지 않은 센서 상태 메시지입니다. 다른 실험 연결을 해제하세요.');
+                }
+                return packet;
+            }
+        );
         
         let chartUpdateScheduled = false;
 
@@ -253,6 +317,7 @@
         const UART_SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
         const UART_TX_CHAR_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
         const UART_CMD_CHAR_UUID = "19b10002-e8f2-537e-4f6c-d104768a1214";
+        const ACCEL_CHAR_UUID = "19b10004-e8f2-537e-4f6c-d104768a1214";
         
         const AXES = ['X', 'Y', 'Z', 'Total'];
         const COL_MAP = { 'Time': 0, 'X': 1, 'Y': 2, 'Z': 3, 'Total': 4, 'Timestamp': 5 };
@@ -277,11 +342,26 @@
             }
         });
 
-        window.addEventListener('load', loadTrials);
+        loadTrials();
+        window.addEventListener('pagehide', () => {
+            pageLeaving = true;
+            disconnectBLE();
+            onDisconnected();
+        });
+        window.addEventListener('pageshow', () => { pageLeaving = false; });
+        if (!window.isSecureContext || !navigator.bluetooth) {
+            connectBleButton.disabled = true;
+            statusSpan.textContent = 'HTTPS에서 PC/Android Chrome 또는 Edge를 사용하세요. Web Bluetooth가 필요합니다.';
+        }
+        setInterval(() => {
+            if (isRecording && lastSampleAt !== null && performance.now() - lastSampleAt > 15000) {
+                reportSensorError(new Error('15초 동안 가속도 데이터가 없습니다. Pico 상태를 확인하고 다시 연결하세요.'));
+            }
+        }, 1000);
         connectBleButton.addEventListener('click', connectBLE);
         disconnectBleButton.addEventListener('click', disconnectBLE);
-        samplingRateSelect.addEventListener('change', handleRateChange);
-        recordButton.addEventListener('click', toggleRecording);
+        samplingRateSelect.addEventListener('change', () => handleRateChange().catch(reportSensorError));
+        recordButton.addEventListener('click', () => toggleRecording());
         resetZoomButton.addEventListener('click', () => myChart.resetZoom());
         fitButton.addEventListener('click', fitPolynomialToRange);
         downloadButton.addEventListener('click', downloadData);
@@ -299,62 +379,151 @@
         chartCanvas.addEventListener('mouseleave', handleDragEnd);
 
         async function connectBLE() {
+            connectBleButton.disabled = true;
+            if (bleDevice) {
+                const previousDevice = bleDevice;
+                if (isRecording) toggleRecording(false);
+                previousDevice.removeEventListener('gattserverdisconnected', onDisconnected);
+                onDisconnected();
+                if (previousDevice.gatt.connected) previousDevice.gatt.disconnect();
+            }
+            statusSpan.textContent = 'PicoEnv 장치 선택 — 환경 페이지 연결을 먼저 해제하세요 (BLE 검색 v2)';
             try {
-                const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [UART_SERVICE_UUID], namePrefix: 'Sensor-' }] });
+                const device = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'PicoEnv-' }], optionalServices: [UART_SERVICE_UUID] });
+                if (pageLeaving) throw new Error('페이지 이동으로 연결을 취소했습니다.');
                 bleDevice = device;
-                device.addEventListener('gattserverdisconnected', onDisconnected);
                 statusSpan.textContent = `연결 중: ${device.name}`;
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(UART_SERVICE_UUID);
-                const dataCharacteristic = await service.getCharacteristic(UART_TX_CHAR_UUID);
-                commandCharacteristic = await service.getCharacteristic(UART_CMD_CHAR_UUID);
-                await dataCharacteristic.startNotifications();
+                [dataCharacteristic, statusCharacteristic, commandCharacteristic] = await PicoBLE.discover(
+                    device, UART_SERVICE_UUID, [ACCEL_CHAR_UUID, UART_TX_CHAR_UUID, UART_CMD_CHAR_UUID],
+                    attempt => { statusSpan.textContent = `연결 재시도 ${attempt}/2: ${device.name}`; }
+                );
+                if (pageLeaving) {
+                    device.gatt.disconnect();
+                    throw new Error('페이지 이동으로 연결을 취소했습니다.');
+                }
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+                receiver.reset();
+                statusReceiver.reset();
                 dataCharacteristic.addEventListener('characteristicvaluechanged', handleBleNotifications);
-                // [수정] 연결 시 START:IMU 대신 STOP을 보내서 바로 시작하지 않도록 변경 (선택사항)
-                // await commandCharacteristic.writeValue(new TextEncoder().encode("START:IMU")); 
-                await commandCharacteristic.writeValue(new TextEncoder().encode("STOP")); 
+                statusCharacteristic.addEventListener('characteristicvaluechanged', handleStatusNotification);
+                await dataCharacteristic.startNotifications();
+                await statusCharacteristic.startNotifications();
+                await sendCommand("STOP");
+                await handleRateChange();
                 statusSpan.textContent = `연결됨: ${device.name}`;
                 connectBleButton.style.display = 'none';
                 disconnectBleButton.style.display = 'inline-block';
                 recordButton.disabled = false;
-                handleRateChange(); // 연결 시 선택된 샘플링 속도 적용
             } catch (error) {
+                if (bleDevice?.gatt.connected) bleDevice.gatt.disconnect();
+                onDisconnected();
                 console.error('BLE 연결 실패:', error);
-                statusSpan.textContent = 'BLE 연결 실패';
+                statusSpan.textContent = 'BLE 연결 실패: ' + error.message;
+            } finally {
+                connectBleButton.disabled = false;
             }
         }
 
         function disconnectBLE() {
             if (bleDevice && bleDevice.gatt.connected) {
-                // 연결 해제 시 STOP 명령 전송 시도 (이미 끊겼을 수도 있음)
-                try { commandCharacteristic.writeValue(new TextEncoder().encode("STOP")); } catch(e) {}
                 bleDevice.gatt.disconnect();
             }
         }
 
         function onDisconnected() {
+            if (isRecording) toggleRecording(false);
+            dataCharacteristic?.removeEventListener('characteristicvaluechanged', handleBleNotifications);
+            statusCharacteristic?.removeEventListener('characteristicvaluechanged', handleStatusNotification);
+            bleDevice?.removeEventListener('gattserverdisconnected', onDisconnected);
+            dataCharacteristic = null;
+            statusCharacteristic = null;
+            lastSampleAt = null;
+            receiver.reset();
+            statusReceiver.reset();
             statusSpan.textContent = '연결 해제됨';
             connectBleButton.style.display = 'inline-block';
             disconnectBleButton.style.display = 'none';
             recordButton.disabled = true;
-            if (isRecording) { toggleRecording(); } // 측정 중이었다면 강제 중지
             bleDevice = null;
             commandCharacteristic = null; // 특성 참조 해제
         }
 
-        function handleRateChange() {
-            if (!commandCharacteristic || !bleDevice || !bleDevice.gatt.connected) return;
-            const command = `SET_IMU_RATE:${samplingRateSelect.value}`;
-            try { commandCharacteristic.writeValue(new TextEncoder().encode(command)); } 
-            catch (error) { console.error(`명령 전송 실패: ${command}`, error); }
+        async function sendCommand(command) {
+            if (!bleDevice?.gatt.connected || !commandCharacteristic) throw new Error('Pico 연결이 해제되었습니다.');
+            await commandCharacteristic.writeValueWithResponse(new TextEncoder().encode(command));
         }
 
-        function toggleRecording() {
+        async function handleRateChange() {
+            if (!commandCharacteristic || !bleDevice || !bleDevice.gatt.connected) return;
+            samplingRateSelect.disabled = true;
+            recordButton.disabled = true;
+            try {
+                await sendCommand(`SET_IMU_RATE:${samplingRateSelect.value}`);
+            } finally {
+                samplingRateSelect.disabled = isRecording;
+                recordButton.disabled = !bleDevice?.gatt.connected;
+            }
+        }
+
+        function handleStatusNotification(event) {
+            statusReceiver.push(event.target.value);
+        }
+
+        function reportSensorError(error) {
+            sensorErrorVersion++;
+            console.error('Pico accelerometer error:', error);
+            if (isRecording) toggleRecording(false);
+            recordButton.disabled = true;
+            lastSampleAt = null;
+            statusSpan.textContent = '센서 오류: ' + error.message;
+        }
+
+        async function toggleRecording(writeCommand = true) {
+            if (writeCommand) {
+                if (commandPending) return;
+                commandPending = true;
+                const errorVersion = sensorErrorVersion;
+                recordButton.disabled = true;
+                try {
+                    const buffered = samplingRateSelect.value === '200';
+                    if (isRecording && buffered) {
+                        statusReceiver.reset();
+                        let timer;
+                        const completed = new Promise((resolve, reject) => {
+                            finishBufferedStop = resolve;
+                            timer = setTimeout(() => reject(new Error('버퍼 전송 완료 확인 시간이 초과되었습니다. 마지막 데이터가 불완전할 수 있습니다.')), 5000);
+                        });
+                        try {
+                            await Promise.all([sendCommand('STOP:IMU_BATCH'), completed]);
+                        } finally {
+                            clearTimeout(timer);
+                            finishBufferedStop = null;
+                        }
+                    } else {
+                        await sendCommand(isRecording ? 'STOP' : buffered ? 'START:IMU_BATCH' : 'START:IMU');
+                    }
+                    if (!bleDevice?.gatt.connected) throw new Error('측정 명령 중 연결이 해제되었습니다.');
+                    if (sensorErrorVersion !== errorVersion) return;
+                } catch (error) {
+                    reportSensorError(error);
+                    return;
+                } finally {
+                    commandPending = false;
+                }
+                recordButton.disabled = false;
+            }
             isRecording = !isRecording;
             if (isRecording) {
+                previousSampleTimestamp = null;
+                abnormalIntervals = 0;
+                saturatedSamples = 0;
+                qualitySamples = 0;
+                qualityElapsedMs = 0;
+                acquisitionQuality.textContent = '측정 품질: 수신 중';
                 // --- 측정 시작 시 작업 ---
                 recordedData = [];
-                startTime = 0; // startTime 초기화
+                receiver.reset();
+                lastSampleAt = performance.now();
                 historyTbody.innerHTML = ''; // 테이블 비우기
                 equationSpan.textContent = ''; r2ValueSpan.textContent = ''; // 피팅 결과 초기화
                 
@@ -366,19 +535,8 @@
                 statusSpan.textContent = `측정 중... (${samplingRateSelect.selectedOptions[0].text})`;
                 updateChartWithSelectedTrials(); // 차트 초기화 (빈 데이터셋)
 
-                // 아두이노에 START 명령 전송
-                if (commandCharacteristic && bleDevice && bleDevice.gatt.connected) {
-                    try { commandCharacteristic.writeValue(new TextEncoder().encode("START:IMU")); } 
-                    catch (error) { console.error("START 명령 전송 실패:", error); }
-                }
-
             } else {
-                // --- 측정 중지 시 작업 ---
-                // 아두이노에 STOP 명령 전송
-                if (commandCharacteristic && bleDevice && bleDevice.gatt.connected) {
-                    try { commandCharacteristic.writeValue(new TextEncoder().encode("STOP")); } 
-                    catch (error) { console.error("STOP 명령 전송 실패:", error); }
-                }
+                lastSampleAt = null;
 
                 // 버튼 상태 변경
                 recordButton.textContent = '측정 시작'; recordButton.style.backgroundColor = '#28A745'; // 녹색
@@ -394,76 +552,49 @@
             }
         }
 
-        // [수정] RangeError 디버깅 강화 및 startTime 버그 수정된 바이너리 핸들러
         function handleBleNotifications(event) {
-            if (!isRecording) return; 
-
-            const view = event.target.value; 
-            const packetSize = 16; 
-
-            if (!(view instanceof DataView) || view.byteLength === 0) {
-                 console.error("Received invalid data format or empty buffer:", view);
-                 return; 
+            if (!isRecording) return;
+            let samples;
+            try {
+                samples = samplingRateSelect.value === '200'
+                    ? receiver.readBatch(event.target.value) : receiver.read(event.target.value);
+            } catch (error) {
+                reportSensorError(error);
+                return;
             }
-
-            if (view.byteLength % packetSize !== 0) {
-                 console.warn(`Received buffer size (${view.byteLength}) is not a multiple of packet size (${packetSize}). Data might be incomplete.`);
-            }
+            lastSampleAt = performance.now();
 
             const newPointsForChart = { X: [], Y: [], Z: [], Total: [] };
             let newRowsHtml = '';
 
-            for (let i = 0; i <= view.byteLength - packetSize; i += packetSize) {
-                try {
-                    if (i + packetSize > view.byteLength) {
-                        console.error(`Attempting to read beyond bounds at index ${i}. Need ${packetSize} bytes, but only ${view.byteLength - i} available.`);
-                        continue; 
-                    }
-
-                    // --- [수정] timestampMs 값을 읽은 직후 콘솔에 출력 ---
-                    const timestampMs = view.getUint32(i, true);
-                    console.log(`[Debug] Raw Timestamp at index ${i}: ${timestampMs}`); // <-- 이 로그 추가!
-                    // --- [수정 끝] ---
-
-                    const x = view.getFloat32(i + 4, true);
-                    const y = view.getFloat32(i + 8, true);
-                    const z = view.getFloat32(i + 12, true);
-                    console.log(`[Debug] Before calc: index=${i}, timestampMs=${timestampMs}, startTime=${startTime}`);
-                    if (startTime === 0) {
-                        startTime = timestampMs;
-                    }
-                    const elapsedTime = (timestampMs - startTime) / 1000.0; 
-                    
-                    if (isNaN(elapsedTime) || isNaN(x) || isNaN(y) || isNaN(z)) {
-                        console.error("Parsed NaN value:", { timestampMs, x, y, z, startTime, index: i });
-                        continue; 
-                    }
-
-                    const total = Math.sqrt(x * x + y * y + z * z);
-
-                    const currentData = [];
-                    currentData[COL_MAP.Time] = elapsedTime;
-                    currentData[COL_MAP.X] = x;
-                    currentData[COL_MAP.Y] = y;
-                    currentData[COL_MAP.Z] = z;
-                    currentData[COL_MAP.Total] = total;
-                    currentData[COL_MAP.Timestamp] = timestampMs;
-                    recordedData.push(currentData);
-
-                    newRowsHtml += `<tr><td>${elapsedTime.toFixed(3)}</td><td>${x.toFixed(2)}</td><td>${y.toFixed(2)}</td><td>${z.toFixed(2)}</td><td>${total.toFixed(2)}</td></tr>`; 
-                    
-                    newPointsForChart.X.push({ x: elapsedTime, y: x });
-                    newPointsForChart.Y.push({ x: elapsedTime, y: y });
-                    newPointsForChart.Z.push({ x: elapsedTime, y: z });
-                    newPointsForChart.Total.push({ x: elapsedTime, y: total });
-
-                } catch (error) { 
-                    console.error(`Error processing packet at index ${i} with buffer size ${view.byteLength}:`, error);
+            for (const { timestamp: timestampMs, time: elapsedTime, x, y, z, total } of samples) {
+                if (previousSampleTimestamp !== null) {
+                    const delta = (timestampMs - previousSampleTimestamp) >>> 0;
+                    qualityElapsedMs += delta;
+                    const expected = 1000 / Number(samplingRateSelect.value);
+                    if (Math.abs(delta - expected) > Math.max(2, expected * 0.25)) abnormalIntervals++;
                 }
-            } // (for 루프 끝)
+                previousSampleTimestamp = timestampMs;
+                qualitySamples++;
+                if ([x, y, z].some(value => Math.abs(value) >= 15.9)) saturatedSamples++;
+                const currentData = [];
+                currentData[COL_MAP.Time] = elapsedTime;
+                currentData[COL_MAP.X] = x;
+                currentData[COL_MAP.Y] = y;
+                currentData[COL_MAP.Z] = z;
+                currentData[COL_MAP.Total] = total;
+                currentData[COL_MAP.Timestamp] = timestampMs;
+                recordedData.push(currentData);
+                newRowsHtml += `<tr><td>${elapsedTime.toFixed(3)}</td><td>${x.toFixed(2)}</td><td>${y.toFixed(2)}</td><td>${z.toFixed(2)}</td><td>${total.toFixed(2)}</td></tr>`;
+                newPointsForChart.X.push({ x: elapsedTime, y: x });
+                newPointsForChart.Y.push({ x: elapsedTime, y: y });
+                newPointsForChart.Z.push({ x: elapsedTime, y: z });
+                newPointsForChart.Total.push({ x: elapsedTime, y: total });
+            }
 
             if (newRowsHtml.length > 0) {
                  historyTbody.insertAdjacentHTML('beforeend', newRowsHtml);
+                 while (historyTbody.rows.length > 500) historyTbody.deleteRow(0);
             }
 
             myChart.data.datasets.forEach(dataset => {
@@ -486,6 +617,10 @@
 
             chartUpdateScheduled = true;
             setTimeout(() => {
+                const actualHz = qualityElapsedMs > 0 ? (qualitySamples - 1) * 1000 / qualityElapsedMs : null;
+                acquisitionQuality.textContent = `측정 품질: 평균 ${actualHz === null ? '--' : actualHz.toFixed(1)}Hz / 간격 이상 ${abnormalIntervals}회 / ±16g 포화 의심 ${saturatedSamples}개 / 묶음 누락 ${receiver.droppedBatches}개`
+                    + (abnormalIntervals ? ' — 누락 또는 타이밍 지연 가능' : '')
+                    + (saturatedSamples ? ' — 충격 최대값을 신뢰할 수 없음' : '');
                 myChart.update('none'); 
                 chartUpdateScheduled = false; 
             }, CHART_UPDATE_INTERVAL_MS);
@@ -619,13 +754,12 @@
             const cropped = recordedData.filter(row => row[COL_MAP.Time] >= startTimeVal && row[COL_MAP.Time] <= endTimeVal);
             if (cropped.length === 0) return alert("선택된 범위에 데이터가 없습니다.");
             
-            const firstTimestamp = cropped[0][COL_MAP.Timestamp];
+            const firstTime = cropped[0][COL_MAP.Time];
             recordedData = cropped.map(row => {
                 const newRow = [...row];
-                newRow[COL_MAP.Time] = (newRow[COL_MAP.Timestamp] - firstTimestamp) / 1000.0;
+                newRow[COL_MAP.Time] -= firstTime;
                 return newRow;
             });
-            startTime = recordedData.length > 0 ? recordedData[0][COL_MAP.Timestamp] : 0;
             
             alert(`데이터를 편집했습니다. (총 ${recordedData.length}개)`);
             updateTable();

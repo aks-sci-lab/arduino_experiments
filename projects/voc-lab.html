@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOC Index 측정 | 센서 기반 웹실험실</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/sensor-lab.css?v=layout-v3">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        if (new URLSearchParams(location.search).get('legacy') !== '1') {
+            location.replace('environment-lab.html');
+        }
+    </script>
+</head>
+<body data-sensor="voc">
+    <main class="container">
+        <a href="../index.html">&laquo; 메인 페이지</a>
+        <h1 id="pageTitle">VOC Index 측정</h1>
+        <p>VOC 측정은 <a href="environment-lab.html">환경 센서 실시간 모니터</a>에 통합되었습니다.
+            이 페이지는 이전 VOC 전용 회차를 확인·내보내기 위한 보관 페이지입니다.</p>
+        <p id="description"></p>
+        <p>상태: <span id="status" role="status">연결 대기</span></p>
+        <details class="firmware-guide">
+            <summary>센서 / Thonny 준비 안내</summary>
+            <p>Pico-Environment-Sensor를 방향에 맞춰 결합하세요. I2C0 SDA GP20, SCL GP21, SGP40 주소 0x59.
+                온도·습도 보정을 위해 BME280(0x76)도 정상 동작해야 합니다.</p>
+            <p><a href="https://micropython.org/download/RPI_PICO2_W/">이 장치용 MicroPython</a>을 설치하고 아래 네 파일을 Thonny에서 Pico 루트에 저장하세요.
+                기존 main.py도 교체한 뒤 실행합니다. 다른 실험의 BLE 연결을 먼저 해제하세요.</p>
+            <p><a href="../firmware/pico2w-environment/main.py?v=extra-v1" download="main.py">main.py</a> ·
+                <a href="../firmware/pico2w-environment/bme280.py" download>bme280.py</a> ·
+                <a href="../firmware/pico2w-environment/imu.py" download>imu.py</a> ·
+                <a href="../firmware/pico2w-environment/extra_sensors.py" download>extra_sensors.py</a> ·
+                <a href="../firmware/pico2w-environment/README.md">상세 안내</a></p>
+            <p>PC/Android Chrome·Edge에서 PicoEnv-XXXX를 선택합니다. Thonny 셸에 BLE=ADVERTISING을 확인하고 중지 버튼을 누르지 마세요.
+                첫 60초와 알고리즘 초기화 중에는 VOC Index 대신 준비 중 안내를 표시합니다.
+                유해가스나 용제를 사용하지 말고 일상적인 환기 전후 변화 비교로 활용하세요.</p>
+        </details>
+        <details>
+            <summary>VOC 값은 어떻게 해석하나요?</summary>
+            <p>VOC Index는 1~500의 상대 지표입니다. 100은 학습한 평소 VOC 수준을 뜻하며,
+                100보다 높으면 평소보다 VOC가 많은 방향, 낮으면 적은 방향입니다.
+                200이 100의 두 배 농도라는 뜻은 아닙니다. 100이 깨끗하거나 안전한 공기를 보장하지도 않습니다.</p>
+            <p>SGP40의 온도·습도 보정 SRAW를 <a href="https://github.com/Sensirion/gas-index-algorithm" target="_blank" rel="noopener noreferrer">Sensirion 공식 Gas Index Algorithm v3.2.0</a>의
+                고정소수점 구현으로 웹브라우저에서 1초마다 처리합니다. 초기 약 45초는 알고리즘 출력이 없고,
+                센서의 첫 60초 안정화 구간까지는 값과 그래프를 비워 둡니다. 그 이후에도 기준은 계속 학습됩니다(기본 학습 시정수 12시간).</p>
+            <p>측정 기록을 중지해도 BLE 연결 중에는 학습이 계속됩니다. 새로 연결하거나 데이터 누락·측정 주기 변경이 있으면
+                알고리즘을 초기화하고 준비 구간을 다시 시작합니다. 이전 원시 신호 회차는 학습 이력이 없어 VOC Index로 자동 변환하지 않습니다.</p>
+            <p>ppm 농도, 특정 물질의 농도 또는 건강·안전 기준으로 해석하지 마세요.
+                같은 위치에서 연속 측정하며 환기 전후의 변화 추세를 비교하세요.
+                <a href="../vendor/sensirion/NOTICE">알고리즘 저작권 고지</a> ·
+                <a href="../vendor/sensirion/LICENSE">라이선스</a></p>
+        </details>
+        <div class="lab-controls">
+            <button id="connectButton" class="ble-button">Bluetooth 연결</button>
+            <button id="disconnectButton" style="display:none;">연결 해제</button>
+            <button id="recordButton" disabled>측정 시작</button>
+            <label>샘플링 <select id="samplingRateSelect"><option value="1000">1초 (고정)</option></select></label>
+            <button id="downloadButton" disabled>CSV 저장</button>
+        </div>
+        <div class="sensor-lab-layout">
+        <section aria-label="측정 데이터">
+        <div id="readouts" class="sensor-grid"></div>
+        <h2>측정 로그</h2>
+        <div class="table-container"><table><thead><tr id="tableHead"><th>시간 (s)</th></tr></thead><tbody id="historyTbody"></tbody></table></div>
+        <h2>회차 저장</h2>
+        <div class="lab-controls"><button id="saveTrialButton" disabled>현재 회차 저장</button><button id="clearTrialsButton">모든 회차 삭제</button></div>
+        <ul id="trialList"></ul>
+        <p id="authNotice">메인 페이지에서 Google 로그인 후 Cloud 제출이 가능합니다.</p>
+        <p>화면에는 VOC Index만 표시합니다. CSV·로컬 회차에는 Index와 원시 신호·보정 온습도·알고리즘 버전도 보관합니다.
+            준비 구간의 Index는 빈칸입니다. Cloud에는 회차 수·샘플 수 요약만 제출합니다.</p>
+        <button id="saveCloudButton">Cloud에 요약 제출</button>
+        </section>
+        <section aria-label="측정 그래프">
+            <h2>실시간 변화 그래프</h2>
+            <div class="sensor-chart"><canvas id="chart"></canvas></div>
+        </section>
+        </div>
+    </main>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
+    <script src="../js/pico-ble.js?v=setup-v3"></script>
+    <script src="../js/sensor-definitions.js?v=voc-index-v3"></script>
+    <script src="../js/voc-index.js?v=official-v1"></script>
+    <script src="../js/sensor-lab.js?v=voc-index-v6"></script>
+</body>
+</html>

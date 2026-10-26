@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>환경 센서 모니터</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>환경 센서 실시간 모니터</title>
     
     <link rel="stylesheet" href="../css/style.css">
     
@@ -59,16 +60,56 @@
                 <p>상태: <span id="status">연결 대기</span></p>
             </div>
             <div class="header-controls">
-                <button id="connectBleButton" class="ble-button">아두이노 연결</button>
+                <button id="connectBleButton" class="ble-button">Bluetooth 연결</button>
                 <button id="disconnectBleButton" class="ble-button btn-secondary" style="display:none;">연결 해제</button>
             </div>
         </div>
+
+        <details class="trial-management">
+            <summary>센서 준비 및 연결 안내 (Thonny)</summary>
+            <p>Waveshare Pico-Environment-Sensor의 BME280과 SGP40을 사용합니다. 전원을 끈 뒤 보드 방향을 맞춰 결합하세요.
+                I2C0: SDA GP20, SCL GP21, 주소 0x76입니다.</p>
+            <p><a href="https://micropython.org/download/RPI_PICO2_W/" target="_blank" rel="noopener">이 장치용 MicroPython UF2</a>를 설치하고,
+                Thonny에서 아래 네 파일을 Pico 루트에 같은 이름으로 저장하세요. <code>main.py</code> 실행 후
+                <strong>Bluetooth 연결</strong>을 눌러 <code>PicoEnv-XXXX</code> 장치를 선택합니다.</p>
+            <p><a href="../firmware/pico2w-environment/bme280.py" download>bme280.py 다운로드</a> ·
+                <a href="../firmware/pico2w-environment/main.py?v=env-voc-v2" download="main.py">main.py 다운로드</a> ·
+                <a href="../firmware/pico2w-environment/imu.py" download>imu.py 다운로드</a> ·
+                <a href="../firmware/pico2w-environment/extra_sensors.py?v=env-voc-v2" download="extra_sensors.py">extra_sensors.py 다운로드</a> ·
+                <a href="../firmware/pico2w-environment/README.md">상세 설치 안내</a></p>
+            <p>PC/Android Chrome·Edge와 Bluetooth가 필요합니다. iPhone/iPad Safari·Firefox는 지원하지 않습니다.
+                Pico의 Wi-Fi 설정은 필요 없습니다. 연결 중 실시간 값이 표시되며, 측정 시작부터 로그를 기록합니다.
+                통합 측정에는 최신 main.py와 extra_sensors.py로 교체 후 재시작이 필요합니다.
+                센서는 1초마다 읽고 선택한 간격으로 기록합니다. Cloud 제출은 측정값 전체가 아닌 요약만 저장합니다.</p>
+            <p>검색이 안 되면 최신 main.py를 다시 저장하고 <strong>Thonny → 보기 → 셸</strong>에서 F5로 실행하세요.
+                5초마다 <code>[STATUS] ... BLE=ADVERTISING</code>이 나오면 검색 대기 상태입니다.
+                <code>[FATAL]</code>은 실행 오류, <code>[STOP]</code>은 정지 상태입니다.
+                검색 중에는 Thonny의 중지 버튼을 누르지 마세요.</p>
+        </details>
+        <details class="trial-management">
+            <summary>수증기 분압과 VOC Index 해석</summary>
+            <p>수증기 분압은 온도에서의 포화수증기압에 상대습도/100을 곱한 계산값(kPa)입니다.
+                포화수증기압 자체가 아니며 기압과도 다릅니다. Magnus 근사식(상수 0.61094, 17.625, 243.04)을 사용합니다.
+                예: 25°C·50%RH에서 약 1.581kPa입니다. 액체 물 기준으로 영하에서도 같은 기준을 사용하며,
+                얼음 기준 포화압은 아닙니다. 권장 근사 범위는 -40~50°C이고 그 이상에서는 외삽임을 표시합니다.
+                실제 오차에는 온습도 센서의 정확도·설치 위치 영향도 포함됩니다.</p>
+            <p>계산식 참고:
+                <a href="https://doi.org/10.1175/1520-0450(1996)035%3C0601:IMFAOS%3E2.0.CO;2" target="_blank" rel="noopener">Alduchov·Eskridge의 Magnus 근사식</a>.</p>
+            <p>VOC Index는 Sensirion 공식 알고리즘으로 계산한 상대 지표(1~500)입니다.
+                100은 학습한 평소 수준이며, 더 높으면 상대적으로 VOC가 많은 방향입니다.
+                농도(ppm)나 건강·안전 기준이 아닙니다. 첫 60초와 알고리즘 초기화 중에는 값을 비웁니다.
+                기록을 멈춰도 연결 중에는 1초마다 학습하며, 재연결·데이터 누락 시 초기화합니다.
+                기본 학습 시정수는 12시간입니다.
+                <a href="../vendor/sensirion/NOTICE">저작권 고지</a> · <a href="../vendor/sensirion/LICENSE">라이선스</a></p>
+            <p><a href="voc-lab.html?legacy=1">이전 VOC 전용 회차 확인·CSV 내보내기</a></p>
+        </details>
+        <p id="measurementNotice" role="status"></p>
 
         <div class="table-header">
               <h2>실시간 현황</h2>
               <div class="table-controls">
                     <button id="recordButton" disabled>측정 시작</button>
-                    <span>샘플링 속도:</span>
+                    <span>기록 간격 (센서 수신은 1초):</span>
                     <select id="samplingRateSelect">
                         <option value="1000" selected>1s</option>
                         <option value="2000">2s</option>
@@ -82,7 +123,8 @@
             <div class="sensor-readout"><h3>🌡️ 온도</h3><p><span id="temp-value" class="value">--</span> °C</p></div>
             <div class="sensor-readout"><h3>💧 습도</h3><p><span id="humidity-value" class="value">--</span> %</p></div>
             <div class="sensor-readout"><h3>💨 압력</h3><p><span id="pressure-value" class="value">--</span> kPa</p></div>
-            <div class="sensor-readout"><h3>🌫️ 증기압</h3><p><span id="vapor-pressure-value" class="value">--</span> kPa</p></div>
+            <div class="sensor-readout"><h3>🌫️ 수증기 분압 (계산)</h3><p><span id="vapor-pressure-value" class="value">--</span> kPa</p></div>
+            <div class="sensor-readout"><h3>VOC Index</h3><p><span id="voc-index-value" class="value">--</span></p></div>
         </div>
 
         <div class="main-layout">
@@ -96,7 +138,7 @@
                 </div>
                 <div class="table-container" id="tableContainer">
                     <table id="historyTable">
-                        <thead><tr><th>Time (s)</th><th>온도</th><th>습도</th><th>압력</th><th>증기압</th></tr></thead>
+                        <thead><tr><th>Time (s)</th><th>온도 (°C)</th><th>습도 (%RH)</th><th>압력 (kPa)</th><th>수증기 분압 (kPa)</th><th>VOC Index</th></tr></thead>
                         <tbody id="historyTbody"></tbody>
                     </table>
                 </div>
@@ -116,7 +158,7 @@
                     <span>X축:</span>
                     <select id="xAxisSelect">
                         <option value="time" selected>시간</option><option value="temp">온도</option><option value="humidity">습도</option><option value="pressure">압력</option>
-                        <option value="vaporPressure">증기압</option>
+                        <option value="vaporPressure">수증기 분압</option><option value="vocIndex">VOC Index</option>
                     </select>
                     
                     <span>Y축 (중복):</span>
@@ -124,7 +166,8 @@
                         <label><input type="checkbox" class="y-axis-cb" value="temp" checked> 온도</label>
                         <label><input type="checkbox" class="y-axis-cb" value="humidity"> 습도</label>
                         <label><input type="checkbox" class="y-axis-cb" value="pressure"> 압력</label>
-                        <label><input type="checkbox" class="y-axis-cb" value="vaporPressure"> 증기압</label>
+                        <label><input type="checkbox" class="y-axis-cb" value="vaporPressure"> 수증기 분압</label>
+                        <label><input type="checkbox" class="y-axis-cb" value="vocIndex"> VOC Index</label>
                     </div>
                  </div>
                 <div class="chart-container" style="height: 455px;"><canvas id="myChart"></canvas></div>
@@ -142,6 +185,11 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
+    <script src="../js/pico-ble.js?v=setup-v3"></script>
+    <script src="../js/sensor-definitions.js?v=voc-index-v3"></script>
+    <script src="../js/voc-index.js?v=official-v1"></script>
+    <script src="../js/environment-metrics.js?v=env-voc-v1"></script>
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -206,6 +254,8 @@
         const pressureValue = document.getElementById('pressure-value');
         // ★★★ 변경됨 ★★★ (조도 -> 증기압)
         const vaporPressureValue = document.getElementById('vapor-pressure-value');
+        const vocIndexValue = document.getElementById('voc-index-value');
+        const measurementNotice = document.getElementById('measurementNotice');
         const historyTbody = document.getElementById('historyTbody');
         const chartCanvas = document.getElementById('myChart');
         const samplingRateSelect = document.getElementById('samplingRateSelect');
@@ -221,7 +271,15 @@
         const resetZoomButton = document.getElementById('resetZoomButton');
         const copyAndGoButton = document.getElementById('copyAndGoButton'); 
         
-        let bleDevice, commandCharacteristic;
+        let bleDevice, commandCharacteristic, dataCharacteristic;
+        let lastSampleAt = null;
+        let recordingStartTimestamp = null;
+        let pageLeaving = false;
+        const receiver = new EnvironmentProtocol.Receiver(handleSample, reportSensorError, EnvironmentMetrics.validateCombined);
+        let vocProcessor = null;
+        let lastRecordedTimestamp = null;
+        let connecting = false;
+        let setupFailure = null;
         let recordedData = [];
         let myChart;
         let isRecording = false;
@@ -233,17 +291,8 @@
         const UART_CMD_CHAR_UUID = "19b10002-e8f2-537e-4f6c-d104768a1214";
 
         // ★★★ 변경됨 ★★★ (조도 -> 증기압)
-        const SENSOR_UNITS = { time: '시간 (s)', temp: '온도 (°C)', humidity: '습도 (%)', pressure: '압력 (kPa)', vaporPressure: '증기압 (kPa)' };
+        const SENSOR_UNITS = { time: '시간 (s)', temp: '온도 (°C)', humidity: '습도 (%)', pressure: '압력 (kPa)', vaporPressure: '수증기분압 (kPa)', vocIndex: 'VOC Index' };
         const TRIAL_COLORS = ['rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)', 'rgba(75, 192, 192, 0.8)', 'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)', 'rgba(201, 203, 207, 0.8)'];
-
-        // ★★★ 추가됨 ★★★ (증기압 계산 함수)
-        function calculateVaporPressure(temp, humidity) {
-            // Magnus-Tetens formula (kPa)
-            const saturationPressure = 0.61094 * Math.exp((17.625 * temp) / (temp + 243.04));
-            // Actual Vapor Pressure
-            const actualVaporPressure = saturationPressure * (humidity / 100.0);
-            return actualVaporPressure;
-        }
 
         myChart = new Chart(chartCanvas, {
             type: 'scatter',
@@ -264,10 +313,28 @@
             } 
         });
 
-        window.addEventListener('load', loadTrials);
+        loadTrials();
+        window.addEventListener('pagehide', () => {
+            pageLeaving = true;
+            disconnectBLE();
+            onDisconnected();
+        });
+        window.addEventListener('pageshow', () => { pageLeaving = false; });
+        if (!window.isSecureContext || !navigator.bluetooth) {
+            connectBleButton.disabled = true;
+            statusSpan.textContent = 'HTTPS에서 PC/Android Chrome 또는 Edge를 사용하세요. Web Bluetooth가 필요합니다.';
+        }
+        setInterval(() => {
+            if (bleDevice?.gatt.connected && lastSampleAt !== null && performance.now() - lastSampleAt > 15000) {
+                reportSensorError(new Error('15초 동안 센서 데이터가 없습니다. Pico 실행 상태를 확인하고 다시 연결하세요.'));
+                lastSampleAt = null;
+            }
+        }, 1000);
         connectBleButton.addEventListener('click', connectBLE);
         disconnectBleButton.addEventListener('click', disconnectBLE);
-        samplingRateSelect.addEventListener('change', handleRateChange);
+        samplingRateSelect.addEventListener('change', () => {
+            handleRateChange().catch(reportSensorError);
+        });
         recordButton.addEventListener('click', toggleRecording);
         xAxisSelect.addEventListener('change', redrawChart);
         document.querySelectorAll('.y-axis-cb').forEach(cb => cb.addEventListener('change', redrawChart));
@@ -282,29 +349,71 @@
         copyAndGoButton.addEventListener('click', copyDataAndOpenLink);
 
         async function connectBLE() {
+            if (connecting) return;
+            connecting = true;
+            setupFailure = null;
+            connectBleButton.disabled = true;
+            if (bleDevice) {
+                const previousDevice = bleDevice;
+                previousDevice.removeEventListener('gattserverdisconnected', onDisconnected);
+                onDisconnected();
+                if (previousDevice.gatt.connected) previousDevice.gatt.disconnect();
+                bleDevice = null;
+            }
             try {
                 const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: 'Sensor-' }],
+                    filters: [{ namePrefix: 'PicoEnv-' }],
                     optionalServices: [UART_SERVICE_UUID] 
                 });
+                if (pageLeaving) throw new Error('페이지 이동으로 연결을 취소했습니다.');
                 
                 bleDevice = device;
-                device.addEventListener('gattserverdisconnected', onDisconnected);
                 statusSpan.textContent = `연결 중: ${device.name}`;
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(UART_SERVICE_UUID);
-                const dataCharacteristic = await service.getCharacteristic(UART_TX_CHAR_UUID);
-                commandCharacteristic = await service.getCharacteristic(UART_CMD_CHAR_UUID);
-                await dataCharacteristic.startNotifications();
-                dataCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
-                await commandCharacteristic.writeValue(new TextEncoder().encode("START:ENV"));
-                handleRateChange();
-                statusSpan.textContent = `연결됨: ${device.name}`;
+                if (!vocProcessor) vocProcessor = await VOCIndex.create();
+                if (pageLeaving || bleDevice !== device) throw new Error('페이지 이동으로 연결을 취소했습니다.');
+                await PicoBLE.discover(
+                    device, UART_SERVICE_UUID, [UART_TX_CHAR_UUID, UART_CMD_CHAR_UUID],
+                    attempt => { statusSpan.textContent = `연결 재시도 ${attempt}/2: ${device.name}`; },
+                    {
+                        isCancelled: () => pageLeaving || bleDevice !== device || setupFailure !== null,
+                        cleanup: () => {
+                            dataCharacteristic?.removeEventListener('characteristicvaluechanged', handleNotifications);
+                            dataCharacteristic = null;
+                            commandCharacteristic = null;
+                            receiver.reset();
+                            vocProcessor.reset();
+                        },
+                        prepare: async characteristics => {
+                            [dataCharacteristic, commandCharacteristic] = characteristics;
+                            dataCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
+                            await dataCharacteristic.startNotifications();
+                            for (const command of ['STOP', 'START:ENV_VOC']) {
+                                if (setupFailure) throw setupFailure;
+                                if (pageLeaving || bleDevice !== device) throw new Error('연결 준비가 취소되었습니다.');
+                                await commandCharacteristic.writeValueWithResponse(new TextEncoder().encode(command));
+                                if (setupFailure) throw setupFailure;
+                            }
+                        }
+                    }
+                );
+                if (pageLeaving) {
+                    device.gatt.disconnect();
+                    throw new Error('페이지 이동으로 연결을 취소했습니다.');
+                }
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+                lastSampleAt = performance.now();
+                await handleRateChange();
+                if (recordButton.disabled) statusSpan.textContent = `연결됨: ${device.name} — 센서 데이터 대기 중`;
                 connectBleButton.style.display = 'none';
                 disconnectBleButton.style.display = 'inline-block';
-                recordButton.disabled = false;
             } catch(error) {
-                statusSpan.textContent = '연결 실패'; console.error(error);
+                if (bleDevice?.gatt.connected) bleDevice.gatt.disconnect();
+                onDisconnected();
+                statusSpan.textContent = '연결 실패: ' + (setupFailure || error).message;
+                console.error('Pico BLE connection failed:', error);
+            } finally {
+                connecting = false;
+                connectBleButton.disabled = false;
             }
         }
 
@@ -316,18 +425,35 @@
         }
 
         function onDisconnected() {
+            if (isRecording) toggleRecording();
+            if (dataCharacteristic) {
+                dataCharacteristic.removeEventListener('characteristicvaluechanged', handleNotifications);
+            }
+            if (bleDevice) bleDevice.removeEventListener('gattserverdisconnected', onDisconnected);
+            bleDevice = null;
+            dataCharacteristic = null;
+            commandCharacteristic = null;
+            lastSampleAt = null;
+            receiver.reset();
+            vocProcessor?.reset();
+            vocIndexValue.textContent = '--';
+            measurementNotice.textContent = '';
             statusSpan.textContent = '연결 해제됨';
             connectBleButton.style.display = 'inline-block';
             disconnectBleButton.style.display = 'none';
             recordButton.disabled = true;
-            copyAndGoButton.disabled = true; 
         }
         
         async function handleRateChange() {
             envIntervalMs = parseInt(samplingRateSelect.value);
-            if (bleDevice && bleDevice.gatt.connected) {
-                await commandCharacteristic.writeValue(new TextEncoder().encode(`SET_ENV_RATE:${envIntervalMs}`));
-            }
+        }
+
+        function reportSensorError(error) {
+            if (connecting) setupFailure = error;
+            console.error('Pico environment error:', error);
+            disconnectBLE();
+            onDisconnected();
+            statusSpan.textContent = '센서 오류: ' + error.message;
         }
 
         function toggleRecording() {
@@ -335,6 +461,8 @@
             if (isRecording) {
                 myChart.resetZoom(); 
                 recordedData = [];
+                recordingStartTimestamp = null;
+                lastRecordedTimestamp = null;
                 historyTbody.innerHTML = '';
                 recordButton.textContent = '측정 중지'; recordButton.style.backgroundColor = '#DC3545';
                 statusSpan.textContent = `측정 중...`;
@@ -361,57 +489,60 @@
         }
 
         function handleNotifications(event) {
-            const value = new TextDecoder().decode(event.target.value);
-            try { 
-                const json = JSON.parse(value);
-                if (json.type === 'env') {
-                    const data = json.data;
-                    
-                    // ★★★ 변경됨 ★★★ (증기압 계산 및 표시)
-                    const vaporPressure = calculateVaporPressure(data.temp, data.humidity);
+            receiver.push(event.target.value);
+        }
 
-                    tempValue.textContent = data.temp.toFixed(2);
-                    humidityValue.textContent = data.humidity.toFixed(2);
-                    pressureValue.textContent = data.pressure.toFixed(2);
-                    vaporPressureValue.textContent = vaporPressure.toFixed(3); // 3자리로 표시
-                    
-                    if (isRecording) {
-                        // ★★★ 변경됨 ★★★ (newDataPoint 객체 수정)
-                        const newDataPoint = {
-                            id: Date.now(),
-                            time: recordedData.length * (envIntervalMs / 1000.0),
-                            timestamp: json.ts,
-                            temp: data.temp,
-                            humidity: data.humidity,
-                            pressure: data.pressure,
-                            vaporPressure: vaporPressure // light 대신 vaporPressure 저장
-                        };
-                        recordedData.push(newDataPoint);
-                        
-                        const newRow = historyTbody.insertRow(-1); 
-                        addTableRow(newRow, newDataPoint);
+        function handleSample(json) {
+            const voc = vocProcessor.process(json);
+            lastSampleAt = performance.now();
+            if (recordButton.disabled) {
+                recordButton.disabled = false;
+                statusSpan.textContent = `연결됨: ${bleDevice.name}`;
+            }
+            const data = json.data;
+            const vaporPressure = EnvironmentMetrics.vaporPressure(data.temp, data.humidity);
+            tempValue.textContent = data.temp.toFixed(2);
+            humidityValue.textContent = data.humidity.toFixed(2);
+            pressureValue.textContent = data.pressure.toFixed(2);
+            vaporPressureValue.textContent = vaporPressure.toFixed(3);
+            vocIndexValue.textContent = voc.index === null ? '준비 중' : String(voc.index);
+            measurementNotice.textContent = [
+                voc.index === null ? `VOC Index 준비 중 (${Math.max(data.warmup, voc.learningRemaining, 1)}초 남음)` : '',
+                voc.interrupted ? '데이터 누락/주기 변경으로 VOC 알고리즘을 초기화했습니다.' : '',
+                data.temp > 50 ? '수증기 분압은 권장 근사 범위(-40~50°C)를 벗어난 외삽값입니다.' : ''
+            ].filter(Boolean).join(' / ');
 
-                        if(historyTbody.rows.length > 500) {
-                            historyTbody.deleteRow(0);
-                        }
-                        
-                        tableContainer.scrollTop = tableContainer.scrollHeight;
+            if (isRecording && (lastRecordedTimestamp === null || json.ts - lastRecordedTimestamp >= envIntervalMs - 100)) {
+                lastRecordedTimestamp = json.ts;
+                if (recordingStartTimestamp === null) recordingStartTimestamp = json.ts;
+                const newDataPoint = {
+                    id: Date.now(),
+                    time: (json.ts - recordingStartTimestamp) / 1000.0,
+                    timestamp: json.ts,
+                    temp: data.temp,
+                    humidity: data.humidity,
+                    pressure: data.pressure,
+                    vaporPressure,
+                    vocIndex: voc.index,
+                    sraw: data.sraw,
+                    warmup: data.warmup,
+                    vocAlgorithm: voc.algorithm
+                };
+                recordedData.push(newDataPoint);
+                const newRow = historyTbody.insertRow(-1);
+                addTableRow(newRow, newDataPoint);
+                if (historyTbody.rows.length > 500) historyTbody.deleteRow(0);
+                tableContainer.scrollTop = tableContainer.scrollHeight;
 
-                        const xKey = xAxisSelect.value;
-                        const yKeys = Array.from(document.querySelectorAll('.y-axis-cb:checked')).map(cb => cb.value);
-
-                        yKeys.forEach(yKey => {
-                            const datasetLabel = `현재 측정 - ${SENSOR_UNITS[yKey].split(' ')[0]}`;
-                            const dataset = myChart.data.datasets.find(ds => ds.label === datasetLabel);
-                            if(dataset) {
-                                dataset.data.push({ x: newDataPoint[xKey], y: newDataPoint[yKey] }); 
-                            }
-                        });
-                        
-                        myChart.update('resize'); 
-                    }
-                }
-            } catch(e) { console.error("Invalid JSON:", value); } 
+                const xKey = xAxisSelect.value;
+                const yKeys = Array.from(document.querySelectorAll('.y-axis-cb:checked')).map(cb => cb.value);
+                yKeys.forEach(yKey => {
+                    const datasetLabel = `현재 측정 - ${SENSOR_UNITS[yKey].split(' ')[0]}`;
+                    const dataset = myChart.data.datasets.find(ds => ds.label === datasetLabel);
+                    if (dataset && Number.isFinite(newDataPoint[xKey])) dataset.data.push({ x: newDataPoint[xKey], y: newDataPoint[yKey] });
+                });
+                myChart.update('none');
+            }
         }
 
         function saveCurrentTrial() {
@@ -544,7 +675,7 @@
                     myChart.data.datasets.push({
                         label: `${trial.name} - ${SENSOR_UNITS[yKey].split(' ')[0]}`,
                         // ★★★ 변경됨 ★★★ (hasProperty'light' -> 'vaporPressure' 자동 처리)
-                        data: trial.data.filter(d => d && d.hasOwnProperty(xKey) && d.hasOwnProperty(yKey)).map(d => ({ x: d[xKey], y: d[yKey] })),
+                        data: trial.data.filter(d => d && Number.isFinite(d[xKey])).map(d => ({ x: d[xKey], y: d[yKey] ?? null })),
                         borderColor: color, 
                         backgroundColor: color.replace('0.8)', '0.5)'),
                         showLine: true
@@ -558,7 +689,7 @@
         // ★★★ 변경됨 ★★★ (addTableRow 함수 수정)
         function addTableRow(row, data) {
              if (data && data.time !== undefined && data.temp !== undefined && data.humidity !== undefined && data.pressure !== undefined && data.vaporPressure !== undefined) {
-                 row.innerHTML = `<td>${data.time.toFixed(2)}</td><td>${data.temp.toFixed(2)}</td><td>${data.humidity.toFixed(2)}</td><td>${data.pressure.toFixed(2)}</td><td>${data.vaporPressure.toFixed(3)}</td>`;
+                 row.innerHTML = `<td>${data.time.toFixed(2)}</td><td>${data.temp.toFixed(2)}</td><td>${data.humidity.toFixed(2)}</td><td>${data.pressure.toFixed(2)}</td><td>${data.vaporPressure.toFixed(3)}</td><td>${Number.isFinite(data.vocIndex) ? data.vocIndex : '—'}</td>`;
              } else {
                  console.error("Invalid data passed to addTableRow:", data);
              }
@@ -579,10 +710,10 @@
         // ★★★ 변경됨 ★★★ (downloadData 함수 수정)
         function downloadData() {
             if (!Array.isArray(recordedData) || recordedData.length === 0) return alert("다운로드할 데이터가 없습니다.");
-            let csvContent = "data:text/csv;charset=utf-8,ID,Time (s),Temperature,Humidity,Pressure,VaporPressure (kPa),Timestamp (ms)\n";
+            let csvContent = "data:text/csv;charset=utf-8,ID,Time (s),Temperature (C),Humidity (%RH),Pressure (kPa),VaporPressure (kPa),Timestamp (ms),VOC Index,SRAW,Warmup (s),VOC algorithm\n";
             recordedData.forEach(d => {
                  if (d && d.id !== undefined && d.time !== undefined && d.temp !== undefined && d.humidity !== undefined && d.pressure !== undefined && d.vaporPressure !== undefined && d.timestamp !== undefined) {
-                     csvContent += `${d.id},${d.time.toFixed(3)},${d.temp.toFixed(2)},${d.humidity.toFixed(2)},${d.pressure.toFixed(2)},${d.vaporPressure.toFixed(3)},${d.timestamp}\n`;
+                     csvContent += `${d.id},${d.time.toFixed(3)},${d.temp.toFixed(2)},${d.humidity.toFixed(2)},${d.pressure.toFixed(2)},${d.vaporPressure.toFixed(3)},${d.timestamp},${d.vocIndex ?? ''},${d.sraw ?? ''},${d.warmup ?? ''},${d.vocAlgorithm ?? ''}\n`;
                  } else {
                      console.warn("Skipping invalid data row during CSV export:", d);
                  }
@@ -602,10 +733,10 @@
                 return;
             }
 
-            let dataString = "Time (s)\tTemperature\tHumidity\tPressure\tVaporPressure\n"; 
+            let dataString = "Time (s)\tTemperature (C)\tHumidity (%RH)\tPressure (kPa)\tVaporPressure (kPa)\tVOC Index\n";
             recordedData.forEach(d => {
                  if (d && d.time !== undefined && d.temp !== undefined && d.humidity !== undefined && d.pressure !== undefined && d.vaporPressure !== undefined) {
-                      dataString += `${d.time.toFixed(3)}\t${d.temp.toFixed(2)}\t${d.humidity.toFixed(2)}\t${d.pressure.toFixed(2)}\t${d.vaporPressure.toFixed(3)}\n`;
+                      dataString += `${d.time.toFixed(3)}\t${d.temp.toFixed(2)}\t${d.humidity.toFixed(2)}\t${d.pressure.toFixed(2)}\t${d.vaporPressure.toFixed(3)}\t${d.vocIndex ?? ''}\n`;
                  }
             });
 

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>자외선 센서 측정 | 센서 기반 웹실험실</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/sensor-lab.css?v=layout-v3">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body data-sensor="uv">
+    <main class="container">
+        <a href="../index.html">&laquo; 메인 페이지</a>
+        <h1 id="pageTitle">자외선 센서 측정</h1>
+        <p id="description"></p>
+        <p>상태: <span id="status" role="status">연결 대기</span></p>
+        <details class="firmware-guide">
+            <summary>센서 / Thonny 준비 안내</summary>
+            <p>Pico-Environment-Sensor를 방향에 맞춰 결합하세요. I2C0 SDA GP20, SCL GP21, LTR390 주소 0x53.</p>
+            <p><a href="https://micropython.org/download/RPI_PICO2_W/">이 장치용 MicroPython</a>을 설치하고 아래 네 파일을 Thonny에서 Pico 루트에 저장하세요.
+                기존 main.py도 교체한 뒤 실행합니다. 다른 실험의 BLE 연결을 먼저 해제하세요.</p>
+            <p><a href="../firmware/pico2w-environment/main.py?v=extra-v1" download="main.py">main.py</a> ·
+                <a href="../firmware/pico2w-environment/bme280.py" download>bme280.py</a> ·
+                <a href="../firmware/pico2w-environment/imu.py" download>imu.py</a> ·
+                <a href="../firmware/pico2w-environment/extra_sensors.py" download>extra_sensors.py</a> ·
+                <a href="../firmware/pico2w-environment/README.md">상세 안내</a></p>
+            <p>PC/Android Chrome·Edge에서 PicoEnv-XXXX를 선택합니다. Thonny 셸에 BLE=ADVERTISING을 확인하고 중지 버튼을 누르지 마세요.
+                센서 포화 시 측정을 중단합니다. UVS 원시 값은 UV Index가 아닙니다.</p>
+        </details>
+        <div class="lab-controls">
+            <button id="connectButton" class="ble-button">Bluetooth 연결</button>
+            <button id="disconnectButton" style="display:none;">연결 해제</button>
+            <button id="recordButton" disabled>측정 시작</button>
+            <label>샘플링 <select id="samplingRateSelect"><option value="1000">1초</option><option value="2000">2초</option><option value="5000">5초</option></select></label>
+            <button id="downloadButton" disabled>CSV 저장</button>
+        </div>
+        <div class="sensor-lab-layout">
+        <section aria-label="측정 데이터">
+        <div id="readouts" class="sensor-grid"></div>
+        <h2>측정 로그</h2>
+        <div class="table-container"><table><thead><tr id="tableHead"><th>시간 (s)</th></tr></thead><tbody id="historyTbody"></tbody></table></div>
+        <h2>회차 저장</h2>
+        <div class="lab-controls"><button id="saveTrialButton" disabled>현재 회차 저장</button><button id="clearTrialsButton">모든 회차 삭제</button></div>
+        <ul id="trialList"></ul>
+        <p id="authNotice">메인 페이지에서 Google 로그인 후 Cloud 제출이 가능합니다.</p>
+        <p>로컬 회차와 CSV는 원시 값을 보관합니다. Cloud에는 회차 수·샘플 수 요약만 제출합니다.</p>
+        <button id="saveCloudButton">Cloud에 요약 제출</button>
+        </section>
+        <section aria-label="측정 그래프">
+            <h2>실시간 변화 그래프</h2>
+            <div class="sensor-chart"><canvas id="chart"></canvas></div>
+        </section>
+        </div>
+    </main>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
+    <script src="../js/pico-ble.js?v=setup-v3"></script>
+    <script src="../js/sensor-definitions.js?v=voc-index-v3"></script>
+    <script src="../js/sensor-lab.js?v=voc-index-v6"></script>
+</body>
+</html>
