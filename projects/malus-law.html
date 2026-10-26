@@ -30,7 +30,7 @@
                 <label><input type="radio" name="hyp" value="cos2"> <span>cos θ 보다 더 빨리 어두워진다 (cos²θ 모양)</span></label>
                 <label><input type="radio" name="hyp" value="other"> <span>잘 모르겠다 / 다른 모양</span></label>
             </div>
-            <p class="note" style="margin-bottom:4px"><b>예상 그래프 그리기:</b> 아래 칸에 손가락으로 그려 보세요. (가로: 각도 0~180°, 세로: 밝기)</p>
+            <p class="note" style="margin-bottom:4px"><b>예상 그래프 그리기:</b> 아래 칸에 손가락으로 그려 보세요. (가로: <b>가장 밝은 위치에서</b> 편광판을 돌린 각도 0~180°, 세로: 밝기)</p>
             <canvas id="sketch" class="sketch"></canvas>
             <div class="row"><button id="btn-sketch-clear" class="secondary">지우고 다시 그리기</button><span id="sketch-status" class="note"></span></div>
             <label class="block">왜 그렇게 예측했나요?
@@ -164,6 +164,14 @@
                 <label>평균 프레임 수 <input type="number" id="frames" value="30" min="1" max="300" style="width:70px"></label>
             </div>
             <p class="note" style="margin:4px 0">버튼을 누른 뒤 대기 시간 동안 폰에서 손을 떼세요. 각도 칸에서 <b>Enter</b>, 블루투스 키보드의 <b>Enter</b>로도 기록됩니다.</p>
+            <details class="tip">
+                <summary>ℹ️ 빛 위치 자동 추적과 이동 경고의 한계</summary>
+                <ul>
+                    <li>자동 추적은 <b>화면 속 빛 번짐의 위치</b>를 따라 초록 사각형을 옮길 뿐입니다. 편광판이나 폰이 <b>돌아간 것(각도·영점 변화)</b>은 보정하지 못합니다.</li>
+                    <li>이동 경고는 초록 사각형의 위치 변화로 판단합니다. 추적을 끄거나 가장 어두운 각도 근처라 추적을 건너뛰면 실제로 움직여도 경고하지 못할 수 있고, 손으로 사각형을 옮기면 움직이지 않았어도 경고할 수 있습니다.</li>
+                    <li>그래서 <b>폰과 스크린은 거치대나 테이프로 고정</b>하는 것이 가장 확실합니다.</li>
+                </ul>
+            </details>
             <div id="move-warn" class="warn" hidden></div>
             <div class="row"><button id="btn-record" class="good big" disabled>✅ 측정 기록</button><span id="rec-status" class="note"></span></div>
             <div id="recent" class="recent"></div>
@@ -253,11 +261,12 @@
             <div class="row">
                 <label style="flex:1">웹 앱 URL <input type="url" id="gs-url" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;width:100%"></label>
             </div>
+            <div class="warn">⚠️ 보내는 열 구성이 바뀌었습니다(회차·결측 사유·의심 열 추가). <b>예전에 이 기능으로 쓰던 시트에 이어 보내지 마세요.</b> 머리글과 데이터 열이 어긋납니다. 새 스프레드시트를 만들어 아래 방법으로 다시 연결하세요. (예전 머리글 줄만 지우는 방법은 새 머리글이 생기지 않으므로 쓰지 마세요.)</div>
             <div class="row"><button id="btn-gs" class="good" disabled>📤 내 시트로 전송</button><span id="gs-status" class="note"></span></div>
             <details>
                 <summary>🔧 내 시트 연결 방법 (1회만)</summary>
                 <ol>
-                    <li>구글 스프레드시트를 새로 만들고 <b>확장 프로그램 → Apps Script</b>를 엽니다.</li>
+                    <li>구글 스프레드시트를 <b>새로</b> 만들고(빈 시트여야 첫 줄에 머리글이 생깁니다) <b>확장 프로그램 → Apps Script</b>를 엽니다.</li>
                     <li>아래 코드를 붙여넣고 저장합니다.</li>
                     <li><b>배포 → 새 배포 → 유형: 웹 앱</b>, 실행 사용자 <b>나</b>, 액세스 권한 <b>모든 사용자</b>로 배포하고 권한을 승인합니다.</li>
                     <li>나온 <b>웹 앱 URL</b>을 위 칸에 붙여넣습니다.</li>

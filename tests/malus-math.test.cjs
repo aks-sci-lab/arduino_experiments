@@ -140,3 +140,30 @@ test('flagSuspicious follows only the criteria the student chose', () => {
     assert.deepEqual(M.flagSuspicious(two, { repeat: true, repeatPct: 10 }).map(w => w.length), [1, 1, 0]);
     assert.deepEqual(M.flagSuspicious(two, { repeat: true, repeatPct: 20 }).map(w => w.length), [0, 0, 0]);
 });
+
+test('a correct prediction lines up with normalized data even when θ₀ is not 0', () => {
+    // 학생은 "가장 밝은 위치에서 돌린 각도" φ 로 cos²φ 를 예측했다
+    const sketch = Array.from({ length: 37 }, (_, i) => Math.cos(i * 5 * M.RAD) ** 2);
+    const curve = M.sketchCurve(sketch);
+    assert.equal(curve[0].phi, 0);
+    assert.equal(curve[36].phi, 180);
+    // 회차마다 가장 밝은 각도 θ₀ 가 30°, 75° 로 다른 측정
+    const pts = [];
+    for (let t = 0; t <= 180; t += 10) pts.push({ run: 1, theta: t, y: 0.6 * Math.cos((t - 30) * M.RAD) ** 2 + 0.05 });
+    for (let t = 0; t <= 180; t += 10) pts.push({ run: 2, theta: t, y: 0.3 * Math.cos((t - 75) * M.RAD) ** 2 + 0.02 });
+    const an = M.analyzeRuns(pts, 'cos2');
+    assert.ok(Math.abs(an.runs[0].fit.theta0 - 30) < 1e-6 && Math.abs(an.runs[1].fit.theta0 - 75) < 1e-6);
+    for (const q of an.norm) {
+        const pred = M.sketchAt(sketch, q.phi);
+        assert.ok(Math.abs(pred - q.n) < 0.01, 'φ=' + q.phi + ' 예측 ' + pred + ' 측정 ' + q.n);
+    }
+    // 원래 각도 θ 를 그대로 가로축으로 쓰면 어긋난다 (θ = 30° 에서 예측 0.75, 측정 1)
+    assert.ok(Math.abs(M.sketchAt(sketch, 30) - 1) > 0.2);
+});
+
+test('sketchAt returns null where nothing was drawn', () => {
+    const sketch = new Array(37).fill(null);
+    sketch[0] = 1; sketch[1] = 0.9;
+    assert.ok(Math.abs(M.sketchAt(sketch, 2.5) - 0.95) < 1e-9);
+    assert.equal(M.sketchAt(sketch, 90), null);
+});

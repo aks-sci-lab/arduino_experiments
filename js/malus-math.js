@@ -237,6 +237,23 @@
         return { key, runs, norm, pooled, r2, rms, used: ok.length, raw };
     }
 
+    // ---------- 예측 그래프 ----------
+    // 접해보기의 예측 그래프는 "가장 밝은 위치에서 돌린 각도" φ (0~180°, 5° 간격 37칸)로 그린다.
+    // 측정값도 회차마다 φ = (θ − θ₀) mod 180 으로 바꾸므로 θ₀ 와 관계없이 같은 가로축에서 비교된다.
+    const SKETCH_STEP = 5;
+    function sketchCurve(sketch) {
+        const out = [];
+        (sketch || []).forEach((v, i) => { if (v != null) out.push({ phi: i * SKETCH_STEP, y: v, gap: i > 0 && sketch[i - 1] == null }); });
+        return out;
+    }
+    // φ 에서의 예측값 (이웃 칸 사이는 직선으로 잇는다). 그리지 않은 구간이면 null
+    function sketchAt(sketch, phi) {
+        const r = ((phi % 180) + 180) % 180, k = r / SKETCH_STEP, i = Math.floor(k);
+        const a = sketch[i], b = sketch[Math.min(i + 1, sketch.length - 1)];
+        if (a == null || b == null) return k === i && a != null ? a : null;
+        return a + (b - a) * (k - i);
+    }
+
     // ---------- 측정 계획 ----------
     // plan: { start, end, step, repeats, custom }  custom = "0, 10, 45" 처럼 직접 적은 각도 목록
     function planAngles(plan) {
@@ -302,6 +319,6 @@
 
     return {
         RAD, linearTable, mean, std, fitMalus, linearRegression, spotCentroid, edgeRatio,
-        MODELS, fitModel, analyzeRuns, planAngles, planProgress, nextPlannedAngle, flagSuspicious
+        MODELS, fitModel, analyzeRuns, sketchCurve, sketchAt, planAngles, planProgress, nextPlannedAngle, flagSuspicious
     };
 });

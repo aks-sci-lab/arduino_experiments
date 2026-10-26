@@ -36,7 +36,7 @@
         { key: 'autoAdvance', label: '다음 각도 자동 진행', learn: false, fast: true,
           desc: '같은 각도를 계획한 횟수만큼 재면 계획의 다음 각도로 넘어갑니다. 끄면 학생이 각도를 직접 고릅니다.' },
         { key: 'track', label: '빛 위치 자동 추적', learn: true, fast: true,
-          desc: '측정 직전에 초록 사각형을 빛 번짐 중심으로 옮깁니다. 학습과 관계없는 흔들림만 줄여 주므로 학습 모드에서도 켭니다.' },
+          desc: '측정 직전에 초록 사각형을 화면 속 빛 번짐 중심으로 옮깁니다. 학습과 관계없는 흔들림만 줄여 주므로 학습 모드에서도 켭니다. 단, 편광판이나 폰이 돌아간 것(각도 변화)은 보정하지 못합니다.' },
         { key: 'delay', label: '측정 전 대기 (초)', type: 'number', learn: 2, fast: 2,
           desc: '버튼을 누른 손의 흔들림이 가라앉을 때까지 기다립니다.' },
         { key: 'autoExclude', label: '의심 값 자동 결측', learn: false, fast: true,
@@ -500,6 +500,15 @@
         save(); render();
     }
 
+    // 삭제는 결측 처리와 달리 기록에 남지 않으므로 어느 화면에서든 확인을 받는다
+    function deletePoint(p) {
+        const i = state.points.indexOf(p);
+        if (i < 0) return;
+        if (!confirm(p.run + '회차 ' + p.theta + '° 측정값을 삭제할까요?\n(결측 처리와 달리 기록에 남지 않습니다. 잘못 누른 기록만 삭제하세요)')) return;
+        state.points.splice(i, 1);
+        save(); render();
+    }
+
     function setExcluded(p, on) {
         if (!on) { p.excluded = false; p.reason = ''; save(); render(); return; }
         const msg = settings.requireReason
@@ -559,7 +568,7 @@
             div.innerHTML = '<span>' + p.theta + '° → ' + intensity(p).toFixed(4) + f + (p.excluded ? ' (결측)' : '') + '</span>';
             const del = document.createElement('button');
             del.className = 'danger'; del.textContent = '삭제'; del.style.padding = '3px 8px'; del.style.fontSize = '.8em';
-            del.onclick = () => { state.points.splice(i, 1); save(); render(); };
+            del.onclick = () => deletePoint(p);
             div.appendChild(del);
             $('recent').appendChild(div);
         });
@@ -591,7 +600,7 @@
                 escapeHtml(p.reason || '') + '</td><td class="acts"><button class="secondary">' + (p.excluded ? '복원' : '결측') + '</button> <button class="danger">삭제</button></td>';
             const [bEx, bDel] = tr.querySelectorAll('button');
             bEx.onclick = () => setExcluded(p, !p.excluded);
-            bDel.onclick = () => { if (confirm(p.theta + '° 측정값을 삭제할까요? (결측 처리와 달리 기록에 남지 않습니다)')) { state.points.splice(i, 1); save(); render(); } };
+            bDel.onclick = () => deletePoint(p);
             $('tbody').appendChild(tr);
         });
         const nEx = state.points.filter(p => p.excluded).length;
@@ -691,11 +700,11 @@
         const curves = [theory];
         const t = tut();
         if ($('show-pred').checked && t && t.sketch.some(v => v != null)) {
-            const pred = [];
-            t.sketch.forEach((v, i) => { if (v != null) pred.push({ x: i * 5, y: v, gap: i > 0 && t.sketch[i - 1] == null }); });
+            // 예측과 측정 모두 "가장 밝은 위치에서 돌린 각도" φ 를 가로축으로 쓴다 (MalusMath.sketchCurve 참고)
+            const pred = M.sketchCurve(t.sketch).map(q => ({ x: q.phi, y: q.y, gap: q.gap }));
             curves.push({ pts: pred, color: '#7048e8', dash: [6, 4], width: 2.5 });
         }
-        if (showA) drawChart($('chart-after'), { series: normSeries, curves, xl: 'θ − θ₀ (°)  [θ₀: 회차마다 가장 밝은 각도]', yl: '정규화 후: (I − B) / A', xmin: 0, xmax: 180, ymin: -0.15, ymax: 1.15, legend: '검은 선: ' + M.MODELS[km].label + ' 모양' + (curves.length > 1 ? ' · 보라 점선: 내 예측' : '') });
+        if (showA) drawChart($('chart-after'), { series: normSeries, curves, xl: '가장 밝은 위치에서 돌린 각도 θ − θ₀ (°)', yl: '정규화 후: (I − B) / A', xmin: 0, xmax: 180, ymin: -0.15, ymax: 1.15, legend: '회차마다 가장 밝은 위치를 0°로 맞춤 · 검은 선: ' + M.MODELS[km].label + (curves.length > 1 ? ' · 보라 점선: 내 예측' : '') });
         drawChart($('chart-line'), {
             series: runs.map(run => ({ color: runColor(run), pts: pts.map((p, i) => p.run === run ? an.norm[i] : null).filter(Boolean).map(q => ({ x: q.x, y: q.n, e: q.e })) })),
             curves: [{ pts: [{ x: 0, y: 0 }, { x: 1, y: 1 }], color: '#999', dash: [6, 4] }],
