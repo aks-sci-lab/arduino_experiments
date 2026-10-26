@@ -1,0 +1,40 @@
+/* 말루스 법칙 실험 페이지 */
+* { box-sizing: border-box; }
+body { display: block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f8; margin: 0; padding: 12px; color: #222; }
+.wrap { max-width: 860px; margin: 0 auto; }
+h1 { font-size: 1.35em; margin: 4px 0 8px; }
+h2 { font-size: 1.05em; margin: 0 0 10px; }
+.card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.note { font-size: .88em; color: #555; line-height: 1.5; }
+.warn { background: #fff3cd; color: #7a5b00; padding: 8px 10px; border-radius: 6px; font-size: .88em; margin: 8px 0; }
+.warn[hidden], .ok[hidden] { display: none; }
+.ok { background: #e6f4ea; color: #1e6b34; padding: 8px 10px; border-radius: 6px; font-size: .88em; margin: 8px 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.row label { font-size: .9em; display: flex; align-items: center; gap: 6px; }
+button { padding: 10px 14px; border: none; border-radius: 6px; background: #007bff; color: #fff; font-size: .95em; cursor: pointer; }
+button.secondary { background: #6c757d; }
+button.good { background: #28a745; }
+button.danger { background: #dc3545; }
+button:disabled { opacity: .45; cursor: default; }
+input[type=number], select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 1em; }
+input[type=number] { width: 90px; }
+input[type=range] { flex: 1; min-width: 140px; }
+.stage { position: relative; background: #000; border-radius: 8px; overflow: hidden; min-height: 120px; }
+#view { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+#video { position: absolute; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+.live { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.live div { background: #f1f3f5; border-radius: 6px; padding: 6px 10px; font-size: .9em; }
+.live b { font-variant-numeric: tabular-nums; }
+.angle-row input[type=number] { width: 100px; font-size: 1.2em; }
+table { width: 100%; border-collapse: collapse; font-size: .9em; }
+th, td { padding: 6px 4px; border-bottom: 1px solid #eee; text-align: right; }
+th:first-child, td:first-child { text-align: left; }
+td button { padding: 4px 8px; font-size: .8em; }
+.tbl-wrap { max-height: 260px; overflow-y: auto; }
+.results { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 10px 0; }
+.results div { background: #f1f3f5; border-radius: 6px; padding: 8px 10px; font-size: .85em; }
+.results b { display: block; font-size: 1.2em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+canvas.chart { width: 100%; height: 280px; display: block; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; margin-top: 8px; }
+details summary { cursor: pointer; font-weight: 600; }
+details ol, details ul { padding-left: 20px; line-height: 1.6; font-size: .9em; }
+.back { display: inline-block; margin-bottom: 6px; font-size: .9em; }

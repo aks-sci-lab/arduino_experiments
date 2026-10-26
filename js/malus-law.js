@@ -1,0 +1,455 @@
+// 말루스 법칙 실험: 스마트폰 카메라(또는 촬영한 사진)로 각도별 밝기를 측정하고 cos² 법칙을 검증한다.
+(function () {
+    'use strict';
+    const M = window.MalusMath;
+    const $ = id => document.getElementById(id);
+    const STORE_KEY = 'malus-law-v1';
+
+    const state = {
+        kind: null,          // 'video' | 'photo'
+        stream: null,
+        track: null,
+        caps: {},
+        photo: null,         // HTMLImageElement
+        cx: 0.5, cy: 0.5,    // 측정 영역 중심 (0~1)
+        size: 100,           // 측정 영역 한 변 (원본 픽셀)
+        dark: null,          // { value, ch, gamma }
+        points: [],
+        busy: false
+    };
+
+    const video = $('video');
+    const view = $('view');
+    const vctx = view.getContext('2d');
+    const mcv = document.createElement('canvas');
+    const mctx = mcv.getContext('2d', { willReadFrequently: true });
+    let table = M.linearTable($('sel-gamma').value);
+
+    // ---------- 저장 ----------
+    function save() {
+        try {
+            localStorage.setItem(STORE_KEY, JSON.stringify({
+                points: state.points, dark: state.dark,
+                ch: $('sel-channel').value, gamma: $('sel-gamma').value,
+                angle: $('angle').value, step: $('step').value
+            }));
+        } catch (e) { /* 저장소를 쓸 수 없어도 동작에는 영향 없음 */ }
+    }
+    function load() {
+        try {
+            const d = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+            if (!d) return;
+            state.points = Array.isArray(d.points) ? d.points : [];
+            state.dark = d.dark || null;
+            if (d.ch) $('sel-channel').value = d.ch;
+            if (d.gamma) $('sel-gamma').value = d.gamma;
+            if (d.angle != null) $('angle').value = d.angle;
+            if (d.step != null) $('step').value = d.step;
+            table = M.linearTable($('sel-gamma').value);
+        } catch (e) { /* 무시 */ }
+    }
+
+    // ---------- 소스(카메라/사진) ----------
+    function srcEl() { return state.kind === 'video' ? video : state.kind === 'photo' ? state.photo : null; }
+    function srcDims() {
+        if (state.kind === 'video') return { w: video.videoWidth, h: video.videoHeight };
+        if (state.kind === 'photo') return { w: state.photo.naturalWidth, h: state.photo.naturalHeight };
+        return { w: 0, h: 0 };
+    }
+
+    function showMsg(text, ok) {
+        const el = $('cam-msg');
+        el.textContent = text || '';
+        el.className = ok ? 'ok' : 'warn';
+        el.hidden = !text;
+    }
+
+    async function startCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showMsg('이 브라우저/주소에서는 카메라를 쓸 수 없습니다. https 주소로 접속했는지 확인하세요. (사진 불러오기는 사용 가능)');
+            return;
+        }
+        try {
+            if (state.stream) state.stream.getTracks().forEach(t => t.stop());
+            state.stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+                audio: false
+            });
+            video.srcObject = state.stream;
+            await video.play();
+            state.track = state.stream.getVideoTracks()[0];
+            state.caps = (state.track.getCapabilities && state.track.getCapabilities()) || {};
+            state.kind = 'video';
+            showMsg('');
+            setupManualControls();
+            updateSizeRange();
+            $('btn-cam').textContent = '📷 카메라 다시 켜기';
+            refreshButtons();
+        } catch (e) {
+            showMsg('카메라를 켤 수 없습니다: ' + (e && e.message ? e.message : e) + ' — 권한을 허용했는지, https 주소인지 확인하세요.');
+        }
+    }
+
+    // 수동 노출 지원 여부 확인 및 슬라이더 구성 (Chrome Android 등)
+    function setupManualControls() {
+        const c = state.caps, s = state.track.getSettings ? state.track.getSettings() : {};
+        const canLock = !!((c.exposureMode && c.exposureMode.includes('manual')) || c.exposureTime || c.iso);
+        $('btn-lock').disabled = !canLock;
+        $('manual-box').hidden = !(c.exposureTime || c.iso);
+        const bind = (rowId, slId, txtId, cap, cur, unit, key) => {
+            const row = $(rowId);
+            row.hidden = !cap;
+            if (!cap) return;
+            const sl = $(slId);
+            sl.min = cap.min; sl.max = cap.max; sl.step = cap.step || 1;
+            sl.value = cur != null ? cur : cap.min;
+            const upd = () => { $(txtId).textContent = unit(parseFloat(sl.value)); };
+            upd();
+            sl.oninput = async () => {
+                upd();
+                try { await state.track.applyConstraints({ advanced: [{ exposureMode: 'manual', [key]: parseFloat(sl.value) }] }); }
+                catch (e) { showMsg('노출 설정을 적용하지 못했습니다: ' + e.message); }
+            };
+        };
+        bind('row-exp', 'sl-exp', 'txt-exp', c.exposureTime, s.exposureTime, v => (v / 10).toFixed(1) + ' ms', 'exposureTime');
+        bind('row-iso', 'sl-iso', 'txt-iso', c.iso, s.iso, v => String(Math.round(v)), 'iso');
+        if (!canLock) {
+            showMsg('이 기기/브라우저는 웹에서 노출 고정을 지원하지 않습니다. 기본 카메라 앱에서 노출을 고정(AE/AF 잠금 또는 프로 모드)해 각도별로 사진을 찍은 뒤 "사진 불러오기"로 측정하세요.');
+        }
+    }
+
+    async function lockExposure() {
+        const c = state.caps, s = state.track.getSettings();
+        const adv = {};
+        if (c.exposureMode && c.exposureMode.includes('manual')) {
+            adv.exposureMode = 'manual';
+            if (s.exposureTime != null) adv.exposureTime = s.exposureTime;
+        }
+        if (c.iso && s.iso != null) adv.iso = s.iso;
+        if (c.whiteBalanceMode && c.whiteBalanceMode.includes('manual')) {
+            adv.whiteBalanceMode = 'manual';
+            if (s.colorTemperature != null) adv.colorTemperature = s.colorTemperature;
+        }
+        if (c.focusMode && c.focusMode.includes('manual')) {
+            adv.focusMode = 'manual';
+            if (s.focusDistance != null) adv.focusDistance = s.focusDistance;
+        }
+        try {
+            await state.track.applyConstraints({ advanced: [adv] });
+            const n = state.track.getSettings();
+            const bits = [];
+            if (n.exposureMode) bits.push('노출: ' + n.exposureMode);
+            if (n.whiteBalanceMode) bits.push('화이트밸런스: ' + n.whiteBalanceMode);
+            if (n.focusMode) bits.push('초점: ' + n.focusMode);
+            showMsg('고정 적용됨 — ' + (bits.join(', ') || '설정 완료') + '. 값이 "manual"이 아니면 기기가 일부 고정을 지원하지 않는 것입니다.', true);
+        } catch (e) {
+            showMsg('노출 고정 실패: ' + e.message);
+        }
+    }
+
+    function loadPhoto(file) {
+        if (!file) return;
+        const img = new Image();
+        img.onload = () => {
+            state.photo = img;
+            state.kind = 'photo';
+            updateSizeRange();
+            refreshButtons();
+            showMsg('');
+        };
+        img.onerror = () => showMsg('사진을 열 수 없습니다.');
+        img.src = URL.createObjectURL(file);
+    }
+
+    // ---------- 측정 영역 ----------
+    function updateSizeRange() {
+        const d = srcDims();
+        if (!d.w) return;
+        const sl = $('roi-size');
+        sl.max = Math.min(d.w, d.h);
+        if (state.size > +sl.max) state.size = +sl.max;
+        sl.value = state.size;
+        $('roi-size-txt').textContent = state.size + ' px';
+    }
+
+    function roiRect() {
+        const d = srcDims();
+        const s = Math.max(4, Math.min(Math.round(state.size), d.w, d.h));
+        let x = Math.round(state.cx * d.w - s / 2), y = Math.round(state.cy * d.h - s / 2);
+        x = Math.max(0, Math.min(d.w - s, x));
+        y = Math.max(0, Math.min(d.h - s, y));
+        return { x, y, s };
+    }
+
+    // 현재 프레임에서 ROI의 평균 선형 밝기를 구한다.
+    function measure() {
+        const el = srcEl();
+        if (!el) return null;
+        const { x, y, s } = roiRect();
+        if (mcv.width !== s) { mcv.width = s; mcv.height = s; }
+        mctx.drawImage(el, x, y, s, s, 0, 0, s, s);
+        const data = mctx.getImageData(0, 0, s, s).data;
+        const ch = $('sel-channel').value;
+        let sum = 0, sat = 0, max = 0;
+        const n = s * s;
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            let v;
+            if (ch === 'r') v = table[r];
+            else if (ch === 'g') v = table[g];
+            else if (ch === 'b') v = table[b];
+            else if (ch === 'y') v = 0.2126 * table[r] + 0.7152 * table[g] + 0.0722 * table[b];
+            else v = Math.max(table[r], table[g], table[b]);
+            sum += v;
+            const pm = ch === 'r' ? r : ch === 'g' ? g : ch === 'b' ? b : Math.max(r, g, b);
+            if (pm > max) max = pm;
+            if (pm >= 250) sat++;
+        }
+        return { mean: sum / n, sat: sat / n, max };
+    }
+
+    // ---------- 화면 그리기 ----------
+    let lastLive = 0;
+    function frame(ts) {
+        requestAnimationFrame(frame);
+        const d = srcDims();
+        if (!d.w) return;
+        const el = srcEl();
+        const W = Math.min(d.w, 960), H = Math.round(W * d.h / d.w);
+        if (view.width !== W || view.height !== H) { view.width = W; view.height = H; }
+        vctx.drawImage(el, 0, 0, W, H);
+        const r = roiRect(), k = W / d.w;
+        vctx.lineWidth = 2;
+        vctx.strokeStyle = '#2ee66b';
+        vctx.strokeRect(r.x * k, r.y * k, r.s * k, r.s * k);
+        if (ts - lastLive > 150) {
+            lastLive = ts;
+            const m = measure();
+            if (m) {
+                const dv = state.dark && state.dark.ch === $('sel-channel').value && state.dark.gamma === $('sel-gamma').value ? state.dark.value : 0;
+                $('live-val').textContent = (m.mean - dv).toFixed(4);
+                $('live-sat').textContent = (m.sat * 100).toFixed(1) + ' %';
+                $('live-max').textContent = m.max;
+                $('sat-warn').hidden = !(m.sat > 0.01);
+            }
+        }
+    }
+
+    function pointerMove(ev) {
+        if (!srcEl()) return;
+        const b = view.getBoundingClientRect();
+        state.cx = Math.max(0, Math.min(1, (ev.clientX - b.left) / b.width));
+        state.cy = Math.max(0, Math.min(1, (ev.clientY - b.top) / b.height));
+    }
+    let dragging = false;
+    view.addEventListener('pointerdown', e => { dragging = true; view.setPointerCapture(e.pointerId); pointerMove(e); });
+    view.addEventListener('pointermove', e => { if (dragging) pointerMove(e); });
+    view.addEventListener('pointerup', () => { dragging = false; });
+    view.addEventListener('pointercancel', () => { dragging = false; });
+
+    // ---------- 측정 기록 ----------
+    function nextFrame() {
+        if (state.kind === 'video' && video.requestVideoFrameCallback) {
+            return new Promise(res => video.requestVideoFrameCallback(() => res()));
+        }
+        return new Promise(res => requestAnimationFrame(() => res()));
+    }
+
+    async function sample(n, label) {
+        const means = [], sats = [];
+        const count = state.kind === 'video' ? n : 1;
+        for (let i = 0; i < count; i++) {
+            if (state.kind === 'video') await nextFrame();
+            const m = measure();
+            means.push(m.mean); sats.push(m.sat);
+            $('rec-status').textContent = label + ' ' + (i + 1) + '/' + count;
+        }
+        return { mean: M.mean(means), sd: M.std(means), sat: M.mean(sats) };
+    }
+
+    function currentFrames() {
+        return Math.max(1, Math.min(300, parseInt($('frames').value, 10) || 30));
+    }
+
+    async function recordDark() {
+        if (state.busy || !srcEl()) return;
+        state.busy = true; refreshButtons();
+        const r = await sample(currentFrames(), '배경 측정');
+        state.dark = { value: r.mean, ch: $('sel-channel').value, gamma: $('sel-gamma').value };
+        $('rec-status').textContent = '배경 ' + r.mean.toFixed(5) + ' 저장됨';
+        state.busy = false;
+        save(); render();
+    }
+
+    async function recordPoint() {
+        if (state.busy || !srcEl()) return;
+        const theta = parseFloat($('angle').value);
+        if (!isFinite(theta)) { $('rec-status').textContent = '각도를 입력하세요.'; return; }
+        state.busy = true; refreshButtons();
+        const r = await sample(currentFrames(), '측정 중');
+        state.points.push({ theta, raw: r.mean, sd: r.sd, sat: r.sat, ch: $('sel-channel').value, gamma: $('sel-gamma').value });
+        if ($('auto-step').checked) $('angle').value = theta + (parseFloat($('step').value) || 10);
+        $('rec-status').textContent = theta + '° 기록 완료' + (r.sat > 0.01 ? ' (⚠ 포화)' : '');
+        state.busy = false;
+        save(); render();
+    }
+
+    // ---------- 데이터/결과 ----------
+    function darkValue() {
+        const ch = $('sel-channel').value, g = $('sel-gamma').value;
+        return state.dark && state.dark.ch === ch && state.dark.gamma === g ? state.dark.value : 0;
+    }
+    function intensity(p) {
+        return p.raw - (state.dark && state.dark.ch === p.ch && state.dark.gamma === p.gamma ? state.dark.value : 0);
+    }
+
+    function render() {
+        const ptsI = state.points.map(p => ({ theta: p.theta, y: intensity(p), sd: p.sd, sat: p.sat }));
+        $('tbody').innerHTML = '';
+        state.points.forEach((p, i) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + p.theta + '</td><td>' + ptsI[i].y.toFixed(4) + '</td><td>' + p.sd.toFixed(4) +
+                '</td><td>' + (p.sat > 0.01 ? '⚠ ' : '') + (p.sat * 100).toFixed(1) + '%</td><td><button class="danger">삭제</button></td>';
+            tr.querySelector('button').onclick = () => { state.points.splice(i, 1); save(); render(); };
+            $('tbody').appendChild(tr);
+        });
+        $('cnt').textContent = '(' + state.points.length + '개)';
+        $('btn-csv').disabled = $('btn-clear').disabled = state.points.length === 0;
+        const locked = state.points.length > 0;
+        $('sel-channel').disabled = $('sel-gamma').disabled = locked;
+        $('chan-warn').hidden = !locked;
+        $('dark-txt').textContent = state.dark ? '배경 = ' + state.dark.value.toFixed(5) + ' (' + state.dark.ch.toUpperCase() + ', ' + state.dark.gamma + ')' : '배경 미측정';
+        $('btn-dark-clear').hidden = !state.dark;
+        refreshButtons();
+        renderResults(ptsI);
+    }
+
+    function refreshButtons() {
+        const has = !!srcEl();
+        $('btn-record').disabled = !has || state.busy;
+        $('btn-dark').disabled = !has || state.busy;
+    }
+
+    function renderResults(pts) {
+        const res = $('results'), verdict = $('verdict');
+        const fit = M.fitMalus(pts);
+        const c1 = $('chart1'), c2 = $('chart2');
+        if (!fit || fit.A <= 0) {
+            res.innerHTML = '';
+            verdict.hidden = true;
+            drawChart(c1, { pts: pts.map(p => ({ x: p.theta, y: p.y, e: p.sd })), xl: '각도 θ (°)', yl: '밝기 I' });
+            drawChart(c2, { pts: [], xl: 'cos²(θ − θ₀)', yl: '(I − B) / A', line: [{ x: 0, y: 0 }, { x: 1, y: 1 }], xmin: 0, xmax: 1, ymin: 0, ymax: 1 });
+            return;
+        }
+        const xs = pts.map(p => Math.pow(Math.cos((p.theta - fit.theta0) * M.RAD), 2));
+        const ys = pts.map(p => (p.y - fit.B) / fit.A);
+        const reg = M.linearRegression(xs, ys);
+        const cell = (t, v) => '<div>' + t + '<b>' + v + '</b></div>';
+        res.innerHTML =
+            cell('진폭 A (= I₀)', fit.A.toFixed(4)) + cell('배경 B (최소 밝기)', fit.B.toFixed(4)) +
+            cell('편광축 θ₀', fit.theta0.toFixed(1) + '°') + cell('결정계수 R²', fit.r2.toFixed(4)) +
+            cell('소광비 Imin/Imax', (fit.extinction * 100).toFixed(1) + ' %') +
+            (reg ? cell('cos² 대비 기울기', reg.slope.toFixed(3)) : '');
+        const good = fit.r2 >= 0.98;
+        verdict.hidden = false;
+        verdict.className = good ? 'ok' : 'warn';
+        verdict.textContent = good
+            ? '✅ R² = ' + fit.r2.toFixed(4) + ' — 측정값이 I = I₀cos²θ 형태(말루스 법칙)와 잘 일치합니다.'
+            : '⚠️ R² = ' + fit.r2.toFixed(4) + ' — 오차가 큽니다. 포화, 자동 노출, 빔/스크린 움직임, 레이저 출력 변동, 각도 측정 오차를 점검하세요.';
+        const curve = [];
+        for (let t = 0; t <= 180; t += 2) curve.push({ x: t, y: fit.model(t) });
+        const maxTheta = Math.max(180, ...pts.map(p => p.theta));
+        const minTheta = Math.min(0, ...pts.map(p => p.theta));
+        const wide = [];
+        for (let t = minTheta; t <= maxTheta; t += 2) wide.push({ x: t, y: fit.model(t) });
+        drawChart(c1, { pts: pts.map(p => ({ x: p.theta, y: p.y, e: p.sd })), curve: wide, xl: '각도 θ (°)', yl: '밝기 I', xmin: minTheta, xmax: maxTheta });
+        drawChart(c2, {
+            pts: xs.map((x, i) => ({ x, y: ys[i], e: pts[i].sd / fit.A })),
+            line: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+            xl: 'cos²(θ − θ₀)', yl: '(I − B) / A', xmin: 0, xmax: 1, ymin: 0, ymax: 1
+        });
+    }
+
+    // ---------- 그래프 (Canvas) ----------
+    function drawChart(cv, o) {
+        const dpr = window.devicePixelRatio || 1;
+        const W = cv.clientWidth || 600, H = cv.clientHeight || 280;
+        cv.width = W * dpr; cv.height = H * dpr;
+        const g = cv.getContext('2d');
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.clearRect(0, 0, W, H);
+        const L = 54, R = 12, T = 12, B = 40;
+        const all = (o.pts || []).concat(o.curve || []).concat(o.line || []);
+        let xmin = o.xmin, xmax = o.xmax, ymin = o.ymin, ymax = o.ymax;
+        if (xmin == null) xmin = all.length ? Math.min(...all.map(p => p.x)) : 0;
+        if (xmax == null) xmax = all.length ? Math.max(...all.map(p => p.x)) : 1;
+        if (ymin == null) ymin = all.length ? Math.min(0, ...all.map(p => p.y - (p.e || 0))) : 0;
+        if (ymax == null) ymax = all.length ? Math.max(...all.map(p => p.y + (p.e || 0))) * 1.05 : 1;
+        if (xmax === xmin) xmax = xmin + 1;
+        if (ymax === ymin) ymax = ymin + 1;
+        const X = x => L + (x - xmin) / (xmax - xmin) * (W - L - R);
+        const Y = y => H - B - (y - ymin) / (ymax - ymin) * (H - T - B);
+        g.font = '12px sans-serif'; g.fillStyle = '#555'; g.strokeStyle = '#e5e5e5'; g.lineWidth = 1;
+        const ticks = (a, b, n) => { const out = []; for (let i = 0; i <= n; i++) out.push(a + (b - a) * i / n); return out; };
+        g.textAlign = 'center';
+        for (const t of ticks(xmin, xmax, 6)) {
+            g.beginPath(); g.moveTo(X(t), T); g.lineTo(X(t), H - B); g.stroke();
+            g.fillText(Math.abs(t) >= 10 ? t.toFixed(0) : t.toFixed(2), X(t), H - B + 15);
+        }
+        g.textAlign = 'right';
+        for (const t of ticks(ymin, ymax, 5)) {
+            g.beginPath(); g.moveTo(L, Y(t)); g.lineTo(W - R, Y(t)); g.stroke();
+            g.fillText(t.toFixed(2), L - 6, Y(t) + 4);
+        }
+        g.strokeStyle = '#999'; g.strokeRect(L, T, W - L - R, H - T - B);
+        g.fillStyle = '#333'; g.textAlign = 'center';
+        g.fillText(o.xl || '', L + (W - L - R) / 2, H - 6);
+        g.save(); g.translate(13, T + (H - T - B) / 2); g.rotate(-Math.PI / 2); g.fillText(o.yl || '', 0, 0); g.restore();
+        g.save(); g.beginPath(); g.rect(L, T, W - L - R, H - T - B); g.clip();
+        if (o.line) {
+            g.setLineDash([6, 4]); g.strokeStyle = '#999'; g.lineWidth = 1.5; g.beginPath();
+            o.line.forEach((p, i) => i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y))); g.stroke(); g.setLineDash([]);
+        }
+        if (o.curve) {
+            g.strokeStyle = '#e8590c'; g.lineWidth = 2; g.beginPath();
+            o.curve.forEach((p, i) => i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y))); g.stroke();
+        }
+        for (const p of o.pts || []) {
+            if (p.e) { g.strokeStyle = '#74a9ff'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(p.x), Y(p.y - p.e)); g.lineTo(X(p.x), Y(p.y + p.e)); g.stroke(); }
+            g.fillStyle = '#1c64f2'; g.beginPath(); g.arc(X(p.x), Y(p.y), 4, 0, 2 * Math.PI); g.fill();
+        }
+        g.restore();
+    }
+
+    function downloadCsv() {
+        const rows = ['theta_deg,intensity,std,raw_mean,dark,saturated_fraction,channel,gamma'];
+        state.points.forEach(p => rows.push([p.theta, intensity(p), p.sd, p.raw, p.raw - intensity(p), p.sat, p.ch, p.gamma].join(',')));
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\n')], { type: 'text/csv' }));
+        a.download = 'malus-law.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    // ---------- 이벤트 ----------
+    $('btn-cam').onclick = startCamera;
+    $('btn-lock').onclick = lockExposure;
+    $('btn-photo').onclick = () => $('file-photo').click();
+    $('file-photo').onchange = e => { loadPhoto(e.target.files[0]); e.target.value = ''; };
+    $('roi-size').oninput = e => { state.size = +e.target.value; $('roi-size-txt').textContent = state.size + ' px'; };
+    $('sel-channel').onchange = () => { save(); render(); };
+    $('sel-gamma').onchange = () => { table = M.linearTable($('sel-gamma').value); save(); render(); };
+    $('btn-record').onclick = recordPoint;
+    $('btn-dark').onclick = recordDark;
+    $('btn-dark-clear').onclick = () => { state.dark = null; save(); render(); };
+    const stepAngle = d => { $('angle').value = (parseFloat($('angle').value) || 0) + d * (parseFloat($('step').value) || 10); save(); };
+    $('btn-step-up').onclick = () => stepAngle(1);
+    $('btn-step-dn').onclick = () => stepAngle(-1);
+    $('angle').onchange = $('step').onchange = save;
+    $('btn-csv').onclick = downloadCsv;
+    $('btn-clear').onclick = () => { if (confirm('측정 데이터를 모두 지울까요?')) { state.points = []; save(); render(); } };
+    window.addEventListener('resize', render);
+
+    load();
+    render();
+    requestAnimationFrame(frame);
+})();
