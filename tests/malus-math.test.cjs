@@ -78,3 +78,65 @@ test('analyzeRuns leaves runs with fewer than three valid points unfitted', () =
     assert.ok(an.norm.every(q => q === null));
     assert.equal(an.r2, null);
 });
+
+test('fitModel recovers each candidate model and cos² data favors cos²', () => {
+    for (const key of Object.keys(M.MODELS)) {
+        const pts = [];
+        for (let t = 0; t <= 180; t += 10) pts.push({ theta: t, y: 0.5 * M.MODELS[key].f(t - 25) + 0.04 });
+        const f = M.fitModel(pts, key);
+        assert.ok(Math.abs(f.A - 0.5) < 1e-3 && Math.abs(f.B - 0.04) < 1e-3 && Math.abs(f.theta0 - 25) < 0.05, key + ' ' + JSON.stringify(f));
+        assert.ok(f.r2 > 0.9999, key);
+    }
+    const pts = [];
+    for (let t = 0; t <= 180; t += 10) pts.push({ theta: t, y: 0.5 * Math.cos((t - 25) * M.RAD) ** 2 + 0.04 });
+    const r = k => M.fitModel(pts, k).rmse;
+    assert.ok(r('cos2') < r('cos') && r('cos2') < r('linear'));
+});
+
+test('analyzeRuns compares pooled raw fit with per-run normalization', () => {
+    const pts = [];
+    for (let t = 0; t <= 180; t += 20) pts.push({ run: 1, theta: t, y: 0.7 * Math.cos(t * M.RAD) ** 2 + 0.03 });
+    for (let t = 0; t <= 180; t += 20) pts.push({ run: 2, theta: t, y: 0.3 * Math.cos(t * M.RAD) ** 2 + 0.03 });
+    const an = M.analyzeRuns(pts, 'cos2');
+    assert.ok(an.r2 > 0.999999);
+    assert.ok(an.raw.r2 < 0.9, 'raw ' + an.raw.r2);
+    assert.ok(an.rms < 1e-9);
+});
+
+test('planAngles builds ranges and accepts a custom list', () => {
+    assert.deepEqual(M.planAngles({ start: 0, end: 90, step: 30 }), [0, 30, 60, 90]);
+    assert.deepEqual(M.planAngles({ start: 0, end: 50, step: 20 }), [0, 20, 40]);
+    assert.deepEqual(M.planAngles({ start: 90, end: 0, step: 45 }), [90, 45, 0]);
+    assert.deepEqual(M.planAngles({ custom: '0, 10 45;45, 90', start: 0, end: 180, step: 15 }), [0, 10, 45, 90]);
+    assert.deepEqual(M.planAngles({ start: 0, end: 90, step: 0 }), []);
+    assert.deepEqual(M.planAngles({ custom: ', 30, 60, ', start: 0, end: 180, step: 15 }), [30, 60]);
+});
+
+test('nextPlannedAngle stays until repeats are done, then moves to the next unfinished angle', () => {
+    const angles = [0, 30, 60];
+    const pts = [{ run: 1, theta: 0 }, { run: 1, theta: 0 }, { run: 1, theta: 60 }, { run: 2, theta: 30 }];
+    const prog = M.planProgress(angles, pts, 1);
+    assert.deepEqual(prog.map(p => p.count), [2, 0, 1]);
+    assert.equal(M.nextPlannedAngle(prog, 2, 0), 30);
+    assert.equal(M.nextPlannedAngle(prog, 2, 60), 60);
+    assert.equal(M.nextPlannedAngle(M.planProgress(angles, pts, 1), 1, 60), 30);
+    assert.equal(M.nextPlannedAngle([{ angle: 0, count: 2 }], 2, 0), null);
+});
+
+test('flagSuspicious follows only the criteria the student chose', () => {
+    const pts = [
+        { run: 1, theta: 0, y: 0.60, moved: false, sat: 0 },
+        { run: 1, theta: 0, y: 0.61, moved: false, sat: 0 },
+        { run: 1, theta: 0, y: 0.40, moved: false, sat: 0 },
+        { run: 1, theta: 30, y: 0.45, moved: true, sat: 0.05 }
+    ];
+    assert.deepEqual(M.flagSuspicious(pts, {}), [[], [], [], []]);
+    const f = M.flagSuspicious(pts, { move: true, sat: true, repeat: true, repeatPct: 10 });
+    assert.deepEqual(f[0], []);
+    assert.deepEqual(f[2], ['반복 차이']);
+    assert.deepEqual(f[3], ['이동', '포화']);
+    // 두 번만 잰 경우: 서로 기준보다 많이 다르면 둘 다 의심
+    const two = [{ run: 1, theta: 60, y: 0.28 }, { run: 1, theta: 60, y: 0.18 }, { run: 1, theta: 0, y: 0.63 }];
+    assert.deepEqual(M.flagSuspicious(two, { repeat: true, repeatPct: 10 }).map(w => w.length), [1, 1, 0]);
+    assert.deepEqual(M.flagSuspicious(two, { repeat: true, repeatPct: 20 }).map(w => w.length), [0, 0, 0]);
+});
