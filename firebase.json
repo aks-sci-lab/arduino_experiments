@@ -1,5 +1,20 @@
 {
   "firestore": {
     "rules": "firestore.rules"
+  },
+  "hosting": {
+    "site": "aks-sci-lab",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "**/.*",
+      "**/node_modules/**",
+      "app.py",
+      "run.bat",
+      "run.command",
+      "README.md",
+      "**/*.txt"
+    ]
   }
 }
