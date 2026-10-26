@@ -38,3 +38,8 @@ canvas.chart { width: 100%; height: 280px; display: block; background: #fff; bor
 details summary { cursor: pointer; font-weight: 600; }
 details ol, details ul { padding-left: 20px; line-height: 1.6; font-size: .9em; }
 .back { display: inline-block; margin-bottom: 6px; font-size: .9em; }
+tr.excluded td { color: #aaa; text-decoration: line-through; }
+tr.excluded td.acts { text-decoration: none; }
+td.acts { white-space: nowrap; }
+.run-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.run-row b { font-size: 1.05em; }
