@@ -46,3 +46,35 @@ test('mean over a ROI that contains the whole spot barely changes when the spot 
     const a = roiMean(50, 50), b = roiMean(58, 44);
     assert.ok(Math.abs(a - b) / a < 0.01, a + ' vs ' + b);
 });
+
+test('analyzeRuns normalizes each run by its own fit', () => {
+    const pts = [];
+    // 1회차: 밝기 0.7, 2회차: 카메라를 다시 맞춰 밝기가 0.4 로 바뀐 상황
+    for (let t = 0; t <= 180; t += 20) pts.push({ run: 1, theta: t, y: 0.7 * Math.cos((t - 10) * M.RAD) ** 2 + 0.03, sd: 0 });
+    for (let t = 0; t <= 180; t += 20) pts.push({ run: 2, theta: t, y: 0.4 * Math.cos((t - 10) * M.RAD) ** 2 + 0.06, sd: 0 });
+    const an = M.analyzeRuns(pts);
+    assert.equal(an.runs.length, 2);
+    assert.ok(Math.abs(an.runs[0].fit.A - 0.7) < 1e-9 && Math.abs(an.runs[1].fit.A - 0.4) < 1e-9);
+    for (const q of an.norm) assert.ok(Math.abs(q.n - q.x) < 1e-9);
+    assert.ok(an.r2 > 0.999999);
+    assert.ok(Math.abs(an.pooled.slope - 1) < 1e-9);
+});
+
+test('analyzeRuns treats excluded points as missing and does not let them bend the fit', () => {
+    const pts = [];
+    for (let t = 0; t <= 180; t += 20) pts.push({ run: 1, theta: t, y: 0.5 * Math.cos(t * M.RAD) ** 2 + 0.02, sd: 0 });
+    pts[3].y *= 0.6; pts[3].excluded = true;   // 카메라가 밀려 어두워진 점
+    const an = M.analyzeRuns(pts);
+    assert.equal(an.norm[3], null);
+    assert.equal(an.used, pts.length - 1);
+    assert.ok(Math.abs(an.runs[0].fit.A - 0.5) < 1e-9);
+    assert.ok(an.r2 > 0.999999);
+});
+
+test('analyzeRuns leaves runs with fewer than three valid points unfitted', () => {
+    const pts = [{ run: 1, theta: 0, y: 1 }, { run: 1, theta: 90, y: 0 }, { run: 1, theta: 45, y: 0.5, excluded: true }];
+    const an = M.analyzeRuns(pts);
+    assert.equal(an.runs[0].fit, null);
+    assert.ok(an.norm.every(q => q === null));
+    assert.equal(an.r2, null);
+});

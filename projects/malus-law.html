@@ -73,6 +73,11 @@
 
     <div class="card">
         <h2>2. 측정</h2>
+        <div class="row run-row">
+            <b id="run-label">1회차</b> <span id="run-count" class="note"></span>
+            <button id="btn-new-run" class="secondary" disabled>🆕 새 회차 시작</button>
+        </div>
+        <p class="note" style="margin:4px 0">0°~180° 한 바퀴를 한 회차로 측정합니다. 카메라·스크린을 다시 맞췄다면 <b>새 회차</b>를 시작하세요. 회차마다 따로 정규화하므로 회차 사이에 밝기가 달라져도 괜찮습니다.</p>
         <div class="row">
             <button id="btn-dark" class="secondary">🌑 배경 측정 (레이저 OFF)</button>
             <span id="dark-txt" class="note">배경 미측정</span>
@@ -93,14 +98,14 @@
             <label><input type="checkbox" id="track" checked> 빛 위치 자동 추적</label>
         </div>
         <p class="note" style="margin:4px 0">버튼을 누른 뒤 대기 시간 동안 폰에서 손을 떼세요. 블루투스 키보드가 있으면 <b>Enter</b> 키로도 기록됩니다.</p>
-        <div id="move-warn" class="warn" hidden>⚠️ 첫 측정 때보다 빛 위치가 많이 옮겨졌습니다. 폰이나 스크린이 움직였을 수 있습니다. 0° 를 다시 측정해 값이 처음과 같은지 확인하세요.</div>
+        <div id="move-warn" class="warn" hidden>⚠️ 이번 회차 첫 측정 때보다 빛 위치가 많이 옮겨져서 이 점을 <b>결측</b>으로 표시했습니다. 폰이나 스크린이 움직였다면 다시 맞춘 뒤 <b>새 회차</b>를 시작하세요. 잘못 판정됐다면 표에서 <b>복원</b>을 누르세요.</div>
         <div class="row"><button id="btn-record" class="good" disabled>✅ 측정 기록</button><span id="rec-status" class="note"></span></div>
     </div>
 
     <div class="card">
         <h2>3. 측정 데이터 <span id="cnt" class="note"></span></h2>
         <div class="tbl-wrap"><table>
-            <thead><tr><th>각도 (°)</th><th>밝기 I</th><th>± 표준편차</th><th>포화</th><th></th></tr></thead>
+            <thead><tr><th>회차</th><th>각도 (°)</th><th>밝기 I</th><th>정규화</th><th>포화</th><th></th></tr></thead>
             <tbody id="tbody"></tbody>
         </table></div>
         <div class="row">
@@ -111,12 +116,16 @@
 
     <div class="card">
         <h2>4. 말루스 법칙 검증</h2>
-        <p class="note">I(θ) = A·cos²(θ − θ₀) + B 로 최소제곱 적합합니다. (측정 3개 이상, 서로 다른 각도 필요)</p>
+        <p class="note">회차마다 따로 I(θ) = A·cos²(θ − θ₀) + B 로 적합하고, 그 회차의 A, B 로 <b>정규화 밝기 (I − B)/A</b> 를 구합니다. 결측 처리한 점은 계산에서 빠집니다. (회차마다 유효한 점 3개 이상, 서로 다른 각도 필요)</p>
+        <div id="run-table-wrap" class="tbl-wrap" hidden><table>
+            <thead><tr><th>회차</th><th>점</th><th>A</th><th>B</th><th>θ₀</th><th>R²</th></tr></thead>
+            <tbody id="run-table"></tbody>
+        </table></div>
         <div id="verdict" hidden></div>
         <div class="results" id="results"></div>
         <canvas id="chart1" class="chart"></canvas>
         <canvas id="chart2" class="chart"></canvas>
-        <p class="note">위 그래프: 각도별 밝기와 적합 곡선. 아래 그래프: 정규화한 밝기 (I−B)/A 를 cos²(θ−θ₀) 에 대해 그린 것으로, 말루스 법칙이 맞으면 점들이 기울기 1인 점선 위에 놓입니다.</p>
+        <p class="note">위 그래프: 회차별(색) 밝기와 적합 곡선, 속이 빈 원은 결측 처리한 점. 아래 그래프: 모든 회차의 정규화 밝기를 cos²(θ−θ₀) 에 대해 모은 것으로, 말루스 법칙이 맞으면 점들이 기울기 1인 점선 위에 놓입니다.</p>
     </div>
 
     <div class="card">

@@ -18,7 +18,8 @@
         busy: false,
         zoom: false,         // 측정 영역 근처만 확대해서 보기
         frozenView: null,    // 끄는 동안 화면이 따라 움직이지 않도록 고정한 보기 영역
-        refPos: null         // 첫 측정 때 빛 번짐 위치 (카메라 움직임 감지용)
+        refPos: null,        // 이번 회차 첫 측정 때 빛 번짐 위치 (카메라 움직임 감지용)
+        run: 1               // 현재 측정 회차
     };
 
     const video = $('video');
@@ -35,7 +36,7 @@
                 points: state.points, dark: state.dark,
                 ch: $('sel-channel').value, gamma: $('sel-gamma').value,
                 angle: $('angle').value, step: $('step').value,
-                zoom: state.zoom, delay: $('delay').value, track: $('track').checked, refPos: state.refPos
+                zoom: state.zoom, delay: $('delay').value, track: $('track').checked, refPos: state.refPos, run: state.run
             }));
         } catch (e) { /* 저장소를 쓸 수 없어도 동작에는 영향 없음 */ }
     }
@@ -53,6 +54,9 @@
             if (d.delay != null) $('delay').value = d.delay;
             if (d.track != null) $('track').checked = !!d.track;
             state.refPos = d.refPos || null;
+            // 회차 기능 이전에 저장된 점은 1회차로 본다
+            state.points.forEach(p => { if (p.run == null) p.run = 1; });
+            state.run = Math.max(d.run || 1, ...state.points.map(p => p.run), 1);
             table = M.linearTable($('sel-gamma').value);
         } catch (e) { /* 무시 */ }
     }
@@ -381,14 +385,16 @@
         }
         const m0 = measure(true);
         const r = await sample(currentFrames(), '측정 중');
-        // 카메라 움직임 감지: 첫 측정 때의 빛 위치에서 영역 크기의 30% 넘게 벗어나면 경고
+        // 카메라 움직임 감지: 이번 회차 첫 측정 때의 빛 위치에서 영역 크기의 30% 넘게 벗어나면 경고
         const d = srcDims();
-        if (!state.refPos || state.points.length === 0) state.refPos = { cx: state.cx, cy: state.cy };
+        if (!state.refPos || !state.points.some(p => p.run === state.run)) state.refPos = { cx: state.cx, cy: state.cy };
         const drift = Math.hypot((state.cx - state.refPos.cx) * d.w, (state.cy - state.refPos.cy) * d.h);
         const shifted = drift > roiRect().s * 0.3;
         $('move-warn').hidden = !shifted;
-        state.points.push({ theta, raw: r.mean, sd: r.sd, sat: r.sat, ch: $('sel-channel').value, gamma: $('sel-gamma').value,
-            edge: m0 ? m0.edge : 0, drift: Math.round(drift) });
+        // 카메라가 움직인 것으로 보이는 점은 자동으로 결측치로 표시한다 (표에서 되돌릴 수 있음)
+        state.points.push({ run: state.run, theta, raw: r.mean, sd: r.sd, sat: r.sat, ch: $('sel-channel').value, gamma: $('sel-gamma').value,
+            edge: m0 ? m0.edge : 0, drift: Math.round(drift), excluded: shifted });
+        if (shifted) note += ' · 결측 처리됨';
         if ($('auto-step').checked) $('angle').value = theta + (parseFloat($('step').value) || 10);
         $('rec-status').textContent = theta + '° 기록 완료' + (r.sat > 0.01 ? ' (⚠ 포화)' : '') + note;
         state.busy = false;
@@ -404,17 +410,47 @@
         return p.raw - (state.dark && state.dark.ch === p.ch && state.dark.gamma === p.gamma ? state.dark.value : 0);
     }
 
+    const RUN_COLORS = ['#1c64f2', '#e8590c', '#2f9e44', '#ae3ec9', '#f08c00', '#0c8599', '#c92a2a', '#5c940d'];
+    const runColor = run => RUN_COLORS[(run - 1) % RUN_COLORS.length];
+
+    // 표·그래프·내보내기에 공통으로 쓰는 분석 결과
+    function analysis() {
+        const pts = state.points.map(p => ({ run: p.run, theta: p.theta, y: intensity(p), sd: p.sd, excluded: !!p.excluded }));
+        return { pts, an: M.analyzeRuns(pts) };
+    }
+
+    function newRun() {
+        if (state.busy) return;
+        if (!state.points.some(p => p.run === state.run)) return;   // 빈 회차는 새로 만들지 않는다
+        state.run += 1;
+        state.refPos = null;
+        $('move-warn').hidden = true;
+        $('angle').value = 0;
+        $('rec-status').textContent = state.run + '회차를 시작합니다. 카메라·스크린 정렬을 다시 확인하세요.';
+        save(); render();
+    }
+
     function render() {
-        const ptsI = state.points.map(p => ({ theta: p.theta, y: intensity(p), sd: p.sd, sat: p.sat }));
+        const { pts, an } = analysis();
         $('tbody').innerHTML = '';
         state.points.forEach((p, i) => {
+            const q = an.norm[i];
             const tr = document.createElement('tr');
-            tr.innerHTML = '<td>' + p.theta + '</td><td>' + ptsI[i].y.toFixed(4) + '</td><td>' + p.sd.toFixed(4) +
-                '</td><td>' + (p.sat > 0.01 ? '⚠ ' : '') + (p.sat * 100).toFixed(1) + '%</td><td><button class="danger">삭제</button></td>';
-            tr.querySelector('button').onclick = () => { state.points.splice(i, 1); save(); render(); };
+            if (p.excluded) tr.className = 'excluded';
+            tr.innerHTML = '<td><span class="run-dot" style="background:' + runColor(p.run) + '"></span>' + p.run + '</td><td>' + p.theta +
+                '</td><td>' + pts[i].y.toFixed(4) + '</td><td>' + (q ? q.n.toFixed(3) : (p.excluded ? '결측' : '–')) +
+                '</td><td>' + (p.sat > 0.01 ? '⚠ ' : '') + (p.sat * 100).toFixed(1) + '%</td>' +
+                '<td class="acts"><button class="secondary">' + (p.excluded ? '복원' : '결측') + '</button> <button class="danger">삭제</button></td>';
+            const [bEx, bDel] = tr.querySelectorAll('button');
+            bEx.onclick = () => { p.excluded = !p.excluded; save(); render(); };
+            bDel.onclick = () => { state.points.splice(i, 1); save(); render(); };
             $('tbody').appendChild(tr);
         });
-        $('cnt').textContent = '(' + state.points.length + '개)';
+        const nEx = state.points.filter(p => p.excluded).length;
+        $('cnt').textContent = '(' + state.points.length + '개' + (nEx ? ', 결측 ' + nEx + '개' : '') + ')';
+        $('run-label').textContent = state.run + '회차';
+        $('run-count').textContent = state.points.filter(p => p.run === state.run).length + '점 측정됨';
+        $('btn-new-run').disabled = state.busy || !state.points.some(p => p.run === state.run);
         $('btn-csv').disabled = $('btn-clear').disabled = $('btn-copy').disabled = $('btn-gs').disabled = $('btn-gs-oauth').disabled = state.points.length === 0;
         const locked = state.points.length > 0;
         $('sel-channel').disabled = $('sel-gamma').disabled = locked;
@@ -422,7 +458,7 @@
         $('dark-txt').textContent = state.dark ? '배경 = ' + state.dark.value.toFixed(5) + ' (' + state.dark.ch.toUpperCase() + ', ' + state.dark.gamma + ')' : '배경 미측정';
         $('btn-dark-clear').hidden = !state.dark;
         refreshButtons();
-        renderResults(ptsI);
+        renderResults(pts, an);
     }
 
     function refreshButtons() {
@@ -431,47 +467,62 @@
         $('btn-dark').disabled = !has || state.busy;
     }
 
-    function renderResults(pts) {
-        const res = $('results'), verdict = $('verdict');
-        const fit = M.fitMalus(pts);
+    function renderResults(pts, an) {
+        const verdict = $('verdict');
         const c1 = $('chart1'), c2 = $('chart2');
-        if (!fit || fit.A <= 0) {
-            res.innerHTML = '';
+        // 회차별 결과 표
+        const rows = an.runs.map(r => {
+            const f = r.fit;
+            const dot = '<span class="run-dot" style="background:' + runColor(r.run) + '"></span>';
+            return '<tr><td>' + dot + r.run + '</td><td>' + r.n + (r.total > r.n ? ' / ' + r.total : '') + '</td>' +
+                (f ? '<td>' + f.A.toFixed(4) + '</td><td>' + f.B.toFixed(4) + '</td><td>' + f.theta0.toFixed(1) + '°</td><td>' + f.r2.toFixed(4) + '</td>'
+                   : '<td colspan="4">유효한 점 3개 이상 필요</td>') + '</tr>';
+        }).join('');
+        $('run-table').innerHTML = rows;
+        $('run-table-wrap').hidden = an.runs.length === 0;
+
+        // 그래프 1: 회차별 원래 밝기와 그 회차의 적합 곡선
+        const minTheta = Math.min(0, ...pts.map(p => p.theta)), maxTheta = Math.max(180, ...pts.map(p => p.theta));
+        const series1 = an.runs.map(r => {
+            const curve = [];
+            if (r.fit) for (let t = minTheta; t <= maxTheta; t += 2) curve.push({ x: t, y: r.fit.model(t) });
+            return {
+                color: runColor(r.run), curve,
+                pts: pts.filter(p => p.run === r.run).map(p => ({ x: p.theta, y: p.y, e: p.sd, hollow: p.excluded }))
+            };
+        });
+        drawChart(c1, { series: series1, xl: '각도 θ (°)', yl: '밝기 I', xmin: minTheta, xmax: maxTheta });
+
+        // 그래프 2: 회차마다 정규화한 값을 모두 모아 이론선 n = x 와 비교
+        const series2 = an.runs.map(r => ({
+            color: runColor(r.run),
+            pts: pts.map((p, i) => p.run === r.run ? an.norm[i] : null).filter(Boolean).map(q => ({ x: q.x, y: q.n, e: q.e }))
+        }));
+        drawChart(c2, { series: series2, line: [{ x: 0, y: 0 }, { x: 1, y: 1 }], xl: 'cos²(θ − θ₀)', yl: '정규화 밝기 (I − B) / A', xmin: 0, xmax: 1, ymin: -0.1, ymax: 1.1 });
+
+        const cell = (t, v) => '<div>' + t + '<b>' + v + '</b></div>';
+        const fitted = an.runs.filter(r => r.fit);
+        if (an.r2 == null || !fitted.length) {
+            $('results').innerHTML = '';
             verdict.hidden = true;
-            drawChart(c1, { pts: pts.map(p => ({ x: p.theta, y: p.y, e: p.sd })), xl: '각도 θ (°)', yl: '밝기 I' });
-            drawChart(c2, { pts: [], xl: 'cos²(θ − θ₀)', yl: '(I − B) / A', line: [{ x: 0, y: 0 }, { x: 1, y: 1 }], xmin: 0, xmax: 1, ymin: 0, ymax: 1 });
             return;
         }
-        const xs = pts.map(p => Math.pow(Math.cos((p.theta - fit.theta0) * M.RAD), 2));
-        const ys = pts.map(p => (p.y - fit.B) / fit.A);
-        const reg = M.linearRegression(xs, ys);
-        const cell = (t, v) => '<div>' + t + '<b>' + v + '</b></div>';
-        res.innerHTML =
-            cell('진폭 A (= I₀)', fit.A.toFixed(4)) + cell('배경 B (최소 밝기)', fit.B.toFixed(4)) +
-            cell('편광축 θ₀', fit.theta0.toFixed(1) + '°') + cell('결정계수 R²', fit.r2.toFixed(4)) +
-            cell('소광비 Imin/Imax', (fit.extinction * 100).toFixed(1) + ' %') +
-            (reg ? cell('cos² 대비 기울기', reg.slope.toFixed(3)) : '');
-        const good = fit.r2 >= 0.98;
+        $('results').innerHTML =
+            cell('분석에 쓴 회차', fitted.length + ' / ' + an.runs.length) +
+            cell('사용한 점 (결측 제외)', an.used + '개') +
+            cell('전체 결정계수 R²', an.r2.toFixed(4)) +
+            (an.pooled ? cell('정규화 기울기 (이론값 1)', an.pooled.slope.toFixed(3)) : '') +
+            cell('평균 소광비 Imin/Imax', (M.mean(fitted.map(r => r.fit.extinction)) * 100).toFixed(1) + ' %');
+        const good = an.r2 >= 0.98;
         verdict.hidden = false;
         verdict.className = good ? 'ok' : 'warn';
         verdict.textContent = good
-            ? '✅ R² = ' + fit.r2.toFixed(4) + ' — 측정값이 I = I₀cos²θ 형태(말루스 법칙)와 잘 일치합니다.'
-            : '⚠️ R² = ' + fit.r2.toFixed(4) + ' — 오차가 큽니다. 포화, 자동 노출, 빔/스크린 움직임, 레이저 출력 변동, 각도 측정 오차를 점검하세요.';
-        const curve = [];
-        for (let t = 0; t <= 180; t += 2) curve.push({ x: t, y: fit.model(t) });
-        const maxTheta = Math.max(180, ...pts.map(p => p.theta));
-        const minTheta = Math.min(0, ...pts.map(p => p.theta));
-        const wide = [];
-        for (let t = minTheta; t <= maxTheta; t += 2) wide.push({ x: t, y: fit.model(t) });
-        drawChart(c1, { pts: pts.map(p => ({ x: p.theta, y: p.y, e: p.sd })), curve: wide, xl: '각도 θ (°)', yl: '밝기 I', xmin: minTheta, xmax: maxTheta });
-        drawChart(c2, {
-            pts: xs.map((x, i) => ({ x, y: ys[i], e: pts[i].sd / fit.A })),
-            line: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-            xl: 'cos²(θ − θ₀)', yl: '(I − B) / A', xmin: 0, xmax: 1, ymin: 0, ymax: 1
-        });
+            ? '✅ 회차별로 정규화한 R² = ' + an.r2.toFixed(4) + ' — 측정값이 I = I₀cos²θ 형태(말루스 법칙)와 잘 일치합니다.'
+            : '⚠️ 회차별로 정규화한 R² = ' + an.r2.toFixed(4) + ' — 오차가 큽니다. 회차 안에서 카메라가 움직인 점은 결측 처리하고, 포화·자동 노출·레이저 출력 변동·각도 오차를 점검하세요.';
     }
 
     // ---------- 그래프 (Canvas) ----------
+    // o.series: [{ color, pts: [{x, y, e, hollow}], curve: [{x, y}] }], o.line: 점선 기준선
     function drawChart(cv, o) {
         const dpr = window.devicePixelRatio || 1;
         const W = cv.clientWidth || 600, H = cv.clientHeight || 280;
@@ -480,7 +531,8 @@
         g.setTransform(dpr, 0, 0, dpr, 0, 0);
         g.clearRect(0, 0, W, H);
         const L = 54, R = 12, T = 12, B = 40;
-        const all = (o.pts || []).concat(o.curve || []).concat(o.line || []);
+        const series = o.series || [];
+        const all = series.flatMap(s => (s.pts || []).concat(s.curve || [])).concat(o.line || []);
         let xmin = o.xmin, xmax = o.xmax, ymin = o.ymin, ymax = o.ymax;
         if (xmin == null) xmin = all.length ? Math.min(...all.map(p => p.x)) : 0;
         if (xmax == null) xmax = all.length ? Math.max(...all.map(p => p.x)) : 1;
@@ -511,20 +563,32 @@
             g.setLineDash([6, 4]); g.strokeStyle = '#999'; g.lineWidth = 1.5; g.beginPath();
             o.line.forEach((p, i) => i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y))); g.stroke(); g.setLineDash([]);
         }
-        if (o.curve) {
-            g.strokeStyle = '#e8590c'; g.lineWidth = 2; g.beginPath();
-            o.curve.forEach((p, i) => i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y))); g.stroke();
-        }
-        for (const p of o.pts || []) {
-            if (p.e) { g.strokeStyle = '#74a9ff'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(p.x), Y(p.y - p.e)); g.lineTo(X(p.x), Y(p.y + p.e)); g.stroke(); }
-            g.fillStyle = '#1c64f2'; g.beginPath(); g.arc(X(p.x), Y(p.y), 4, 0, 2 * Math.PI); g.fill();
+        for (const s of series) {
+            if (s.curve && s.curve.length) {
+                g.strokeStyle = s.color; g.globalAlpha = 0.7; g.lineWidth = 2; g.beginPath();
+                s.curve.forEach((p, i) => i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y))); g.stroke();
+                g.globalAlpha = 1;
+            }
+            for (const p of s.pts || []) {
+                if (p.e) { g.strokeStyle = s.color; g.globalAlpha = 0.5; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(p.x), Y(p.y - p.e)); g.lineTo(X(p.x), Y(p.y + p.e)); g.stroke(); g.globalAlpha = 1; }
+                g.beginPath(); g.arc(X(p.x), Y(p.y), 4, 0, 2 * Math.PI);
+                // 결측 처리한 점은 속이 빈 원으로 표시
+                if (p.hollow) { g.strokeStyle = s.color; g.lineWidth = 1.5; g.stroke(); }
+                else { g.fillStyle = s.color; g.fill(); }
+            }
         }
         g.restore();
     }
 
     function downloadCsv() {
-        const rows = ['theta_deg,intensity,std,raw_mean,dark,saturated_fraction,channel,gamma,edge_ratio,drift_px'];
-        state.points.forEach(p => rows.push([p.theta, intensity(p), p.sd, p.raw, p.raw - intensity(p), p.sat, p.ch, p.gamma, p.edge != null ? p.edge.toFixed(3) : '', p.drift != null ? p.drift : ''].join(',')));
+        // 결측치는 정규화 칸을 비워 둔다 (스프레드시트·분석 프로그램에서 빈 칸 = 결측)
+        const { an } = analysis();
+        const rows = ['run,theta_deg,intensity,normalized,cos2,excluded,std,raw_mean,dark,saturated_fraction,channel,gamma,edge_ratio,drift_px'];
+        state.points.forEach((p, i) => {
+            const q = an.norm[i];
+            rows.push([p.run, p.theta, intensity(p), q ? q.n : '', q ? q.x : '', p.excluded ? 1 : 0, p.sd, p.raw, p.raw - intensity(p), p.sat, p.ch, p.gamma,
+                p.edge != null ? p.edge.toFixed(3) : '', p.drift != null ? p.drift : ''].join(','));
+        });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\n')], { type: 'text/csv' }));
         a.download = 'malus-law.csv';
@@ -532,10 +596,14 @@
     }
 
     // ---------- 구글 스프레드시트 ----------
-    const GS_HEADER = ['시각', '이름/조', '각도(°)', '밝기 I', '표준편차', '원값', '배경', '포화비율', '채널', '감마'];
+    const GS_HEADER = ['시각', '이름/조', '회차', '각도(°)', '밝기 I', '정규화 (I−B)/A', 'cos²(θ−θ₀)', '결측', '표준편차', '원값', '배경', '포화비율', '채널', '감마'];
     function sheetRows() {
         const t = new Date().toLocaleString('ko-KR'), name = $('gs-name').value.trim();
-        return state.points.map(p => [t, name, p.theta, intensity(p), p.sd, p.raw, p.raw - intensity(p), p.sat, p.ch, p.gamma]);
+        const { an } = analysis();
+        return state.points.map((p, i) => {
+            const q = an.norm[i];
+            return [t, name, p.run, p.theta, intensity(p), q ? q.n : '', q ? q.x : '', p.excluded ? '결측' : '', p.sd, p.raw, p.raw - intensity(p), p.sat, p.ch, p.gamma];
+        });
     }
     window.__malus = { header: GS_HEADER, rows: sheetRows };
     async function copyText(text, okMsg, el) {
@@ -586,8 +654,9 @@
     $('btn-step-dn').onclick = () => stepAngle(-1);
     $('angle').onchange = $('step').onchange = save;
     $('btn-csv').onclick = downloadCsv;
-    $('btn-clear').onclick = () => { if (confirm('측정 데이터를 모두 지울까요?')) { state.points = []; state.refPos = null; $('move-warn').hidden = true; save(); render(); } };
+    $('btn-clear').onclick = () => { if (confirm('측정 데이터를 모두 지울까요?')) { state.points = []; state.refPos = null; state.run = 1; $('move-warn').hidden = true; save(); render(); } };
     $('btn-zoom').onclick = () => setZoom(!state.zoom);
+    $('btn-new-run').onclick = newRun;
     $('delay').onchange = $('track').onchange = save;
     // 블루투스 키보드·리모컨의 Enter/Space 로도 기록. 각도 칸에서 Enter 를 눌러도 기록한다.
     // (다른 입력칸·선택 상자에서는 원래 동작을 그대로 둔다)
