@@ -35,23 +35,17 @@
 - Firebase 설정값은 기존 파일(`js/phone-accel-cloud.js` 등)의 것을 그대로 쓴다. 로그인 세션은 같은 사이트 안에서 공유된다.
 - 비밀값(API 키 파일 `key.txt`, 서비스 계정 JSON)은 커밋하지 않는다.
 
-## ⚠️ 현재 주의 사항 (2026-10-26)
+## 배포 상태 (2026-10-26)
 
-- 라이브 사이트(aks-sci-lab.web.app)는 2026-10-06 에 PC 의 Firebase CLI 로 배포된 상태이며,
-  **그 배포에 포함된 센서 작업이 `main` 에 없다** (Copilot 확인): Pico 환경·가속도 펌웨어와 Bluetooth 연결,
-  ±16g·재연결 개선, 200Hz 측정·10개 묶음 전송·측정 품질 표시, 조도·자외선·VOC Index 환경 화면, 관련 테스트·캐시 방지 설정.
-- 그래서 **복구가 끝날 때까지 `main` 을 Hosting 에 배포하지 않는다** (자동 배포 꺼 둠, CLI 배포도 금지).
-- 복구 방법: 이전 작업(Copilot 자동 저장본)을 새 브랜치로 가져와 `main` 의 새 기능(말루스 법칙, 걷기·뛰기 판정기)을
-  지우지 않도록 **필요한 변경만 합쳐** PR 로 올린다. 머지 후 `deploy-hosting.yml` 의 push 트리거를 되살리고 배포한다.
+- 10월 6일 라이브 사이트에만 있던 센서 작업은 PR #30 으로 `main` 에 복구했다. 이제 `main` 이 라이브 사이트의 내용을 모두 포함한다.
+- 자동 배포(push 트리거)를 다시 켰다. 단, 저장소 Secret `FIREBASE_SERVICE_ACCOUNT` 가 등록되기 전까지는 배포 단계를 건너뛴다.
+- **PC 에서 `firebase deploy` 로 직접 배포하지 않는다.** `main` 에 없는 내용이 다시 라이브에만 남는 문제가 생긴다. 배포는 항상 `main` 에서 한다.
 - 확인된 값: Hosting site `aks-sci-lab`, Firebase 프로젝트 `web-experiment-f9b24`.
-- 센서 복구 브랜치에서는 자동 저장본 `07c3ac3`의 변경 44개 파일을 합치고 라이브 배포 전체 36개 파일과 대조했다.
-  Firebase 자동 제공 파일 2개를 제외한 34개 중 33개는 줄바꿈 차이 외에 같으며, `index.html`은 새 실험 링크를 유지해 합쳤다.
-  **복구 PR이 머지되기 전까지 위 배포 금지를 유지한다.** 이번 복구에서는 배포 트리거와 Firestore 규칙을 바꾸지 않았다.
 
 ## 작업 흐름과 배포
 
 1. `main` 에 직접 커밋하지 않고 브랜치에서 작업한 뒤 PR 을 만든다.
-2. PR 이 `main` 에 머지되면 `.github/workflows/deploy-hosting.yml` 이 aks-sci-lab.web.app 에 자동 배포한다. (현재는 위 주의 사항 때문에 꺼져 있음)
+2. PR 이 `main` 에 머지되면 `.github/workflows/deploy-hosting.yml` 이 aks-sci-lab.web.app 에 자동 배포한다.
 3. `firestore.rules` 를 바꾸면 PR 설명과 커밋 메시지에 "(규칙 배포 필요)"를 적는다. 규칙은 자동 배포되지 않는다.
 
 자세한 배포 설정: `docs/DEPLOY.md`
@@ -65,3 +59,4 @@
 - 2026-10-26: 말루스 법칙 실험(`projects/malus-law.html`, 카메라 밝기 측정·cos² 적합·내 구글 시트 내보내기), Firebase Hosting 자동 배포 설정 — Claude Code
   - 확인 필요: 내 시트 내보내기는 Google Sheets API 가 Firebase 프로젝트에서 켜져 있어야 동작
 - 2026-10-26: 10월 6일 라이브 센서 작업(Pico 펌웨어·BLE·±16g·200Hz 묶음 전송·환경/VOC·조도·자외선·테스트·캐시 설정)을 최신 main과 합쳐 복구 PR 준비, 말루스·걷기/뛰기 유지 및 라이브 파일 대조 완료, 배포하지 않음 — Copilot
+- 2026-10-26: PR #30 검토(테스트 73+23개 통과, 보호 파일 무변경, 전체 페이지 로드 확인) 후 머지, Hosting 자동 배포 재개 — Claude Code
