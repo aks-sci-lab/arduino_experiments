@@ -51,6 +51,7 @@
       "README.md",
       "tests/**",
       "tools/**",
+      "teacher-desk/**",
       "vendor/**/*.c",
       "vendor/**/*.h",
       "**/__pycache__/**",

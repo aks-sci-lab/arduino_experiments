@@ -2,3 +2,6 @@
 vendor/sensirion/*.c text eol=lf
 vendor/sensirion/*.h text eol=lf
 vendor/sensirion/LICENSE text eol=lf
+
+# 업무 데스크 실행 파일: 한국어 윈도우 명령 창용 CP949·CRLF 그대로 보관
+teacher-desk/*.bat -text
