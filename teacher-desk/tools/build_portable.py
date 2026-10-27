@@ -39,6 +39,8 @@ START_HERE = """교사 업무 데스크 (설치 없이 쓰는 윈도우용)
    - 윈도우가 "PC 보호" 경고를 띄우면 [추가 정보] → [실행] 을 누르세요.
    - 검은 창을 닫으면 업무 데스크가 꺼집니다.
 3. 바탕화면에 바로 가기를 만들려면 teacher-desk 폴더의 make-desktop-shortcut.bat 을 두 번 누르세요.
+4. 새 버전으로 바꾸려면 업무 데스크 창을 닫고 teacher-desk 폴더의 update-desk.bat 을 두 번 누르세요.
+   (학생 명단·기록·설정은 그대로 남습니다)
 
 자세한 사용법: teacher-desk\\README.md
 Python {python} · PDF 읽기 {pypdf}

@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import VERSION, extract, queries
+from . import VERSION, coolmsg, extract, queries
 from .collect import SOURCES, add_text_item, diagnose
 from .config import APP_DIR
 from .db import now_str
@@ -519,6 +519,21 @@ def get_diagnose(app, q, body):
     folder = app.config[SOURCES[source]]
     need(folder, "폴더가 설정되지 않았습니다")
     return diagnose(folder)
+
+
+@api("GET", "/api/cool")
+def get_cool(app, q, body):
+    """이 PC 에서 찾은 쿨메신저 이름들 (Memo 폴더의 *.udb)."""
+    return {"dir": str(coolmsg.memo_dir()), "names": coolmsg.candidates(), "name": app.config["coolmessenger_name"]}
+
+
+@api("POST", "/api/cool/check")
+def post_cool_check(app, q, body):
+    name = text_field(body.get("name"), "쿨메신저 이름", 60, True)
+    try:
+        return coolmsg.check(coolmsg.memo_path(name))
+    except coolmsg.CoolError as e:
+        raise ApiError(400, str(e))
 
 
 @api("POST", "/api/telegram")

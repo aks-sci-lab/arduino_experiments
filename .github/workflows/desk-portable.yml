@@ -86,6 +86,23 @@ jobs:
           Write-Host "바로 가기 → $t"
           if ($t -notlike '*start-desk.bat') { throw '바로 가기 대상이 잘못되었습니다' }
 
+      - name: 업데이트 도구 확인 (프로그램만 바뀌고 자료·설정은 그대로)
+        working-directory: check/TeacherDesk/teacher-desk
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force data | Out-Null
+          Set-Content data\keep.txt 'keep'
+          Set-Content config.json '{"school_name": "keep"}'
+          Remove-Item desk\coolmsg.py
+          $zip = Resolve-Path ../../../dist/teacher-desk-windows.zip
+          $env:DESK_UPDATE_URL = ([uri]$zip.Path).AbsoluteUri
+          cmd /c "update-desk.bat /y"
+          if ($LASTEXITCODE -ne 0) { throw '업데이트 실패' }
+          if (-not (Test-Path desk\coolmsg.py)) { throw '프로그램 파일이 바뀌지 않았습니다' }
+          if ((Get-Content data\keep.txt) -ne 'keep') { throw '자료가 지워졌습니다' }
+          if (-not ((Get-Content config.json -Raw) -match 'keep')) { throw '설정이 지워졌습니다' }
+          Write-Host '업데이트 확인'
+
       - name: PR 시험용으로 올리기 (Artifacts)
         uses: actions/upload-artifact@v4
         with:
