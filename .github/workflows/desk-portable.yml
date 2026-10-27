@@ -25,6 +25,8 @@ permissions:
 jobs:
   windows-zip:
     runs-on: windows-latest
+    env:
+      PYTHONUTF8: '1'  # 로그에 한글을 찍을 수 있게
     steps:
       - uses: actions/checkout@v4
 
@@ -42,7 +44,7 @@ jobs:
 
       - name: 들어 있는 Python 으로 시험 전체 실행
         working-directory: check/TeacherDesk/teacher-desk
-        run: python\python.exe -m unittest discover -s tests -t . -v
+        run: python\python.exe -X utf8 -m unittest discover -s tests -t . -v
 
       - name: start-desk.bat 이 들어 있는 Python 을 찾는지 확인
         working-directory: check/TeacherDesk/teacher-desk

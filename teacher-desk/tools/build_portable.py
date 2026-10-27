@@ -115,6 +115,8 @@ def build(out, embed_zip=None):
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):  # 윈도우에서 출력이 파일·파이프일 때도 한글이 깨지지 않게
+        stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", default=str(DESK / "dist"))
     ap.add_argument("--embed-zip", help="미리 받은 python-*-embed-amd64.zip")

@@ -21,8 +21,9 @@ from desk.telegram import Bot
 
 
 def main(argv=None):
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # 윈도우 명령 창 한글 깨짐 방지
+    for stream in (sys.stdout, sys.stderr):  # 윈도우 명령 창·파일 출력에서 한글 깨짐 방지
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     p = argparse.ArgumentParser(description="교사 업무 데스크")
     p.add_argument("--config", help="설정 파일 경로 (기본: config.json)")
     p.add_argument("--no-browser", action="store_true")
