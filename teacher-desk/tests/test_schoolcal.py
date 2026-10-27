@@ -6,6 +6,7 @@ import threading
 import unittest
 import zipfile
 from datetime import date
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
@@ -233,8 +234,9 @@ class SearchTests(unittest.TestCase):
 class CoolPathTests(unittest.TestCase):
     def test_resolve_prefers_direct_path(self):
         with patch.dict(os.environ, {"LOCALAPPDATA": "/x/Local"}):
-            self.assertEqual(str(coolmsg.resolve("홍길동", "")).replace("\\", "/"), "/x/Local/CoolMessenger/Memo/홍길동.udb")
-            self.assertEqual(str(coolmsg.resolve("홍길동", '"/d/memo/kim.udb"')), "/d/memo/kim.udb")
+            # 경로 구분 기호(/ 와 \\)는 윈도우·리눅스가 달라 Path 로 비교
+            self.assertEqual(coolmsg.resolve("홍길동", ""), Path("/x/Local") / "CoolMessenger" / "Memo" / "홍길동.udb")
+            self.assertEqual(coolmsg.resolve("홍길동", '"/d/memo/kim.udb"'), Path("/d/memo/kim.udb"))
         with self.assertRaises(coolmsg.CoolError):
             coolmsg.resolve("", "")
         with self.assertRaises(coolmsg.CoolError):
