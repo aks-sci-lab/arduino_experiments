@@ -79,7 +79,10 @@ jobs:
           cmd /c "echo.| make-desktop-shortcut.bat"
           $lnk = Join-Path ([Environment]::GetFolderPath('Desktop')) '업무 데스크.lnk'
           if (-not (Test-Path $lnk)) { throw '바로 가기가 만들어지지 않았습니다' }
-          $t = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk).TargetPath
+          # WScript.Shell 은 영어판 윈도우에서 한글 이름 파일을 못 열어 영문 이름 복사본으로 확인
+          $copy = Join-Path $env:RUNNER_TEMP 'shortcut-check.lnk'
+          Copy-Item -LiteralPath $lnk -Destination $copy -Force
+          $t = (New-Object -ComObject WScript.Shell).CreateShortcut($copy).TargetPath
           Write-Host "바로 가기 → $t"
           if ($t -notlike '*start-desk.bat') { throw '바로 가기 대상이 잘못되었습니다' }
 
