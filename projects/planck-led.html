@@ -40,7 +40,7 @@
             <li>색이 다른 LED 3~5개 (빨강·주황·노랑·초록·파랑 등) — 파장은 제품 설명서에서 확인</li>
             <li>가변저항(포텐셜미터) <b>1개: 10 kΩ 또는 1 kΩ</b> — 다리 3개를 모두 써서 전압 조절기(분압기)로 씁니다</li>
             <li><b>고정 저항 1개 (추천)</b>: 330 Ω 정도. 세라믹·탄소 피막 등 종류는 상관없고 1/4 W 면 충분합니다</li>
-            <li>건전지와 건전지 홀더, 브레드보드, 점퍼선</li>
+            <li>건전지와 건전지 홀더, <b>미니 브레드보드</b>(전원 줄 없는 것), 점퍼선</li>
             <li>멀티미터 (2대면 전압·전류를 동시에 잴 수 있어 편합니다)</li>
         </ul>
         <svg class="circuit" viewBox="0 0 380 230" role="img" aria-label="회로도: 건전지 양 끝에 가변저항의 양 끝 다리를 연결하고, 가운데 다리에서 전류계와 LED 를 거쳐 건전지 음극으로 연결. LED 양 끝에 전압계 연결">
@@ -154,13 +154,242 @@
                 <li>어느 쪽이든 측정 방법과 계산은 같습니다. 두 가지로 각각 측정해 결과를 비교해 보는 것도 좋은 탐구입니다.</li>
             </ul>
         </details>
-        <details>
-            <summary>🔌 멀티미터 연결 방법</summary>
+        <details open>
+            <summary>🧩 미니 브레드보드 배치 (전원 줄 없는 것)</summary>
+            <p class="note">미니 브레드보드는 <b>같은 번호 세로줄의 a~e 다섯 구멍</b>이 서로 이어져 있습니다 (f~j 도 따로 다섯 구멍씩). 아래처럼 위쪽 a~e 만 쓰고, 색칠한 4개 줄이 회로의 네 연결점입니다. 번호는 예시이니 부품 다리 간격에 맞게 옮겨도 되지만, <b>같은 줄에 꽂을 것끼리</b>는 꼭 같은 줄에 꽂습니다.</p>
+            <svg class="circuit" viewBox="0 0 348 280" role="img" aria-label="미니 브레드보드 배치도: 3번 줄에 건전지 플러스와 가변저항 한쪽 끝, 4번 줄에 가변저항 가운데 다리와 고정 저항, 9번 줄에 고정 저항 다른 쪽과 LED 긴 다리, 10번 줄에 LED 짧은 다리와 가변저항 다른 끝(점퍼선)과 건전지 마이너스">
+            <rect x="14" y="30" width="322" height="206" rx="8" fill="#f5f5f0" stroke="#bbb"/>
+            <rect x="14" y="128" width="322" height="10" fill="#e4e4dc"/>
+            <rect x="59" y="36" width="14" height="88" rx="3" fill="#ffd6d6"/>
+            <rect x="77" y="36" width="14" height="88" rx="3" fill="#d6e8ff"/>
+            <rect x="167" y="36" width="14" height="88" rx="3" fill="#ffe7c2"/>
+            <rect x="185" y="36" width="14" height="88" rx="3" fill="#e0e0e0"/>
+            <rect x="27" y="41" width="6" height="6" fill="#999"/>
+            <rect x="27" y="59" width="6" height="6" fill="#999"/>
+            <rect x="27" y="77" width="6" height="6" fill="#999"/>
+            <rect x="27" y="95" width="6" height="6" fill="#999"/>
+            <rect x="27" y="113" width="6" height="6" fill="#999"/>
+            <rect x="27" y="147" width="6" height="6" fill="#999"/>
+            <rect x="27" y="165" width="6" height="6" fill="#999"/>
+            <rect x="27" y="183" width="6" height="6" fill="#999"/>
+            <rect x="27" y="201" width="6" height="6" fill="#999"/>
+            <rect x="27" y="219" width="6" height="6" fill="#999"/>
+            <text x="30" y="26" font-size="9" text-anchor="middle" fill="#555">1</text>
+            <rect x="45" y="41" width="6" height="6" fill="#999"/>
+            <rect x="45" y="59" width="6" height="6" fill="#999"/>
+            <rect x="45" y="77" width="6" height="6" fill="#999"/>
+            <rect x="45" y="95" width="6" height="6" fill="#999"/>
+            <rect x="45" y="113" width="6" height="6" fill="#999"/>
+            <rect x="45" y="147" width="6" height="6" fill="#999"/>
+            <rect x="45" y="165" width="6" height="6" fill="#999"/>
+            <rect x="45" y="183" width="6" height="6" fill="#999"/>
+            <rect x="45" y="201" width="6" height="6" fill="#999"/>
+            <rect x="45" y="219" width="6" height="6" fill="#999"/>
+            <rect x="63" y="41" width="6" height="6" fill="#999"/>
+            <rect x="63" y="59" width="6" height="6" fill="#999"/>
+            <rect x="63" y="77" width="6" height="6" fill="#999"/>
+            <rect x="63" y="95" width="6" height="6" fill="#999"/>
+            <rect x="63" y="113" width="6" height="6" fill="#999"/>
+            <rect x="63" y="147" width="6" height="6" fill="#999"/>
+            <rect x="63" y="165" width="6" height="6" fill="#999"/>
+            <rect x="63" y="183" width="6" height="6" fill="#999"/>
+            <rect x="63" y="201" width="6" height="6" fill="#999"/>
+            <rect x="63" y="219" width="6" height="6" fill="#999"/>
+            <text x="66" y="26" font-size="9" text-anchor="middle" fill="#555">3</text>
+            <rect x="81" y="41" width="6" height="6" fill="#999"/>
+            <rect x="81" y="59" width="6" height="6" fill="#999"/>
+            <rect x="81" y="77" width="6" height="6" fill="#999"/>
+            <rect x="81" y="95" width="6" height="6" fill="#999"/>
+            <rect x="81" y="113" width="6" height="6" fill="#999"/>
+            <rect x="81" y="147" width="6" height="6" fill="#999"/>
+            <rect x="81" y="165" width="6" height="6" fill="#999"/>
+            <rect x="81" y="183" width="6" height="6" fill="#999"/>
+            <rect x="81" y="201" width="6" height="6" fill="#999"/>
+            <rect x="81" y="219" width="6" height="6" fill="#999"/>
+            <text x="84" y="26" font-size="9" text-anchor="middle" fill="#555">4</text>
+            <rect x="99" y="41" width="6" height="6" fill="#999"/>
+            <rect x="99" y="59" width="6" height="6" fill="#999"/>
+            <rect x="99" y="77" width="6" height="6" fill="#999"/>
+            <rect x="99" y="95" width="6" height="6" fill="#999"/>
+            <rect x="99" y="113" width="6" height="6" fill="#999"/>
+            <rect x="99" y="147" width="6" height="6" fill="#999"/>
+            <rect x="99" y="165" width="6" height="6" fill="#999"/>
+            <rect x="99" y="183" width="6" height="6" fill="#999"/>
+            <rect x="99" y="201" width="6" height="6" fill="#999"/>
+            <rect x="99" y="219" width="6" height="6" fill="#999"/>
+            <text x="102" y="26" font-size="9" text-anchor="middle" fill="#555">5</text>
+            <rect x="117" y="41" width="6" height="6" fill="#999"/>
+            <rect x="117" y="59" width="6" height="6" fill="#999"/>
+            <rect x="117" y="77" width="6" height="6" fill="#999"/>
+            <rect x="117" y="95" width="6" height="6" fill="#999"/>
+            <rect x="117" y="113" width="6" height="6" fill="#999"/>
+            <rect x="117" y="147" width="6" height="6" fill="#999"/>
+            <rect x="117" y="165" width="6" height="6" fill="#999"/>
+            <rect x="117" y="183" width="6" height="6" fill="#999"/>
+            <rect x="117" y="201" width="6" height="6" fill="#999"/>
+            <rect x="117" y="219" width="6" height="6" fill="#999"/>
+            <rect x="135" y="41" width="6" height="6" fill="#999"/>
+            <rect x="135" y="59" width="6" height="6" fill="#999"/>
+            <rect x="135" y="77" width="6" height="6" fill="#999"/>
+            <rect x="135" y="95" width="6" height="6" fill="#999"/>
+            <rect x="135" y="113" width="6" height="6" fill="#999"/>
+            <rect x="135" y="147" width="6" height="6" fill="#999"/>
+            <rect x="135" y="165" width="6" height="6" fill="#999"/>
+            <rect x="135" y="183" width="6" height="6" fill="#999"/>
+            <rect x="135" y="201" width="6" height="6" fill="#999"/>
+            <rect x="135" y="219" width="6" height="6" fill="#999"/>
+            <rect x="153" y="41" width="6" height="6" fill="#999"/>
+            <rect x="153" y="59" width="6" height="6" fill="#999"/>
+            <rect x="153" y="77" width="6" height="6" fill="#999"/>
+            <rect x="153" y="95" width="6" height="6" fill="#999"/>
+            <rect x="153" y="113" width="6" height="6" fill="#999"/>
+            <rect x="153" y="147" width="6" height="6" fill="#999"/>
+            <rect x="153" y="165" width="6" height="6" fill="#999"/>
+            <rect x="153" y="183" width="6" height="6" fill="#999"/>
+            <rect x="153" y="201" width="6" height="6" fill="#999"/>
+            <rect x="153" y="219" width="6" height="6" fill="#999"/>
+            <rect x="171" y="41" width="6" height="6" fill="#999"/>
+            <rect x="171" y="59" width="6" height="6" fill="#999"/>
+            <rect x="171" y="77" width="6" height="6" fill="#999"/>
+            <rect x="171" y="95" width="6" height="6" fill="#999"/>
+            <rect x="171" y="113" width="6" height="6" fill="#999"/>
+            <rect x="171" y="147" width="6" height="6" fill="#999"/>
+            <rect x="171" y="165" width="6" height="6" fill="#999"/>
+            <rect x="171" y="183" width="6" height="6" fill="#999"/>
+            <rect x="171" y="201" width="6" height="6" fill="#999"/>
+            <rect x="171" y="219" width="6" height="6" fill="#999"/>
+            <text x="174" y="26" font-size="9" text-anchor="middle" fill="#555">9</text>
+            <rect x="189" y="41" width="6" height="6" fill="#999"/>
+            <rect x="189" y="59" width="6" height="6" fill="#999"/>
+            <rect x="189" y="77" width="6" height="6" fill="#999"/>
+            <rect x="189" y="95" width="6" height="6" fill="#999"/>
+            <rect x="189" y="113" width="6" height="6" fill="#999"/>
+            <rect x="189" y="147" width="6" height="6" fill="#999"/>
+            <rect x="189" y="165" width="6" height="6" fill="#999"/>
+            <rect x="189" y="183" width="6" height="6" fill="#999"/>
+            <rect x="189" y="201" width="6" height="6" fill="#999"/>
+            <rect x="189" y="219" width="6" height="6" fill="#999"/>
+            <text x="192" y="26" font-size="9" text-anchor="middle" fill="#555">10</text>
+            <rect x="207" y="41" width="6" height="6" fill="#999"/>
+            <rect x="207" y="59" width="6" height="6" fill="#999"/>
+            <rect x="207" y="77" width="6" height="6" fill="#999"/>
+            <rect x="207" y="95" width="6" height="6" fill="#999"/>
+            <rect x="207" y="113" width="6" height="6" fill="#999"/>
+            <rect x="207" y="147" width="6" height="6" fill="#999"/>
+            <rect x="207" y="165" width="6" height="6" fill="#999"/>
+            <rect x="207" y="183" width="6" height="6" fill="#999"/>
+            <rect x="207" y="201" width="6" height="6" fill="#999"/>
+            <rect x="207" y="219" width="6" height="6" fill="#999"/>
+            <rect x="225" y="41" width="6" height="6" fill="#999"/>
+            <rect x="225" y="59" width="6" height="6" fill="#999"/>
+            <rect x="225" y="77" width="6" height="6" fill="#999"/>
+            <rect x="225" y="95" width="6" height="6" fill="#999"/>
+            <rect x="225" y="113" width="6" height="6" fill="#999"/>
+            <rect x="225" y="147" width="6" height="6" fill="#999"/>
+            <rect x="225" y="165" width="6" height="6" fill="#999"/>
+            <rect x="225" y="183" width="6" height="6" fill="#999"/>
+            <rect x="225" y="201" width="6" height="6" fill="#999"/>
+            <rect x="225" y="219" width="6" height="6" fill="#999"/>
+            <rect x="243" y="41" width="6" height="6" fill="#999"/>
+            <rect x="243" y="59" width="6" height="6" fill="#999"/>
+            <rect x="243" y="77" width="6" height="6" fill="#999"/>
+            <rect x="243" y="95" width="6" height="6" fill="#999"/>
+            <rect x="243" y="113" width="6" height="6" fill="#999"/>
+            <rect x="243" y="147" width="6" height="6" fill="#999"/>
+            <rect x="243" y="165" width="6" height="6" fill="#999"/>
+            <rect x="243" y="183" width="6" height="6" fill="#999"/>
+            <rect x="243" y="201" width="6" height="6" fill="#999"/>
+            <rect x="243" y="219" width="6" height="6" fill="#999"/>
+            <rect x="261" y="41" width="6" height="6" fill="#999"/>
+            <rect x="261" y="59" width="6" height="6" fill="#999"/>
+            <rect x="261" y="77" width="6" height="6" fill="#999"/>
+            <rect x="261" y="95" width="6" height="6" fill="#999"/>
+            <rect x="261" y="113" width="6" height="6" fill="#999"/>
+            <rect x="261" y="147" width="6" height="6" fill="#999"/>
+            <rect x="261" y="165" width="6" height="6" fill="#999"/>
+            <rect x="261" y="183" width="6" height="6" fill="#999"/>
+            <rect x="261" y="201" width="6" height="6" fill="#999"/>
+            <rect x="261" y="219" width="6" height="6" fill="#999"/>
+            <rect x="279" y="41" width="6" height="6" fill="#999"/>
+            <rect x="279" y="59" width="6" height="6" fill="#999"/>
+            <rect x="279" y="77" width="6" height="6" fill="#999"/>
+            <rect x="279" y="95" width="6" height="6" fill="#999"/>
+            <rect x="279" y="113" width="6" height="6" fill="#999"/>
+            <rect x="279" y="147" width="6" height="6" fill="#999"/>
+            <rect x="279" y="165" width="6" height="6" fill="#999"/>
+            <rect x="279" y="183" width="6" height="6" fill="#999"/>
+            <rect x="279" y="201" width="6" height="6" fill="#999"/>
+            <rect x="279" y="219" width="6" height="6" fill="#999"/>
+            <rect x="297" y="41" width="6" height="6" fill="#999"/>
+            <rect x="297" y="59" width="6" height="6" fill="#999"/>
+            <rect x="297" y="77" width="6" height="6" fill="#999"/>
+            <rect x="297" y="95" width="6" height="6" fill="#999"/>
+            <rect x="297" y="113" width="6" height="6" fill="#999"/>
+            <rect x="297" y="147" width="6" height="6" fill="#999"/>
+            <rect x="297" y="165" width="6" height="6" fill="#999"/>
+            <rect x="297" y="183" width="6" height="6" fill="#999"/>
+            <rect x="297" y="201" width="6" height="6" fill="#999"/>
+            <rect x="297" y="219" width="6" height="6" fill="#999"/>
+            <rect x="315" y="41" width="6" height="6" fill="#999"/>
+            <rect x="315" y="59" width="6" height="6" fill="#999"/>
+            <rect x="315" y="77" width="6" height="6" fill="#999"/>
+            <rect x="315" y="95" width="6" height="6" fill="#999"/>
+            <rect x="315" y="113" width="6" height="6" fill="#999"/>
+            <rect x="315" y="147" width="6" height="6" fill="#999"/>
+            <rect x="315" y="165" width="6" height="6" fill="#999"/>
+            <rect x="315" y="183" width="6" height="6" fill="#999"/>
+            <rect x="315" y="201" width="6" height="6" fill="#999"/>
+            <rect x="315" y="219" width="6" height="6" fill="#999"/>
+            <text x="318" y="26" font-size="9" text-anchor="middle" fill="#555">17</text>
+            <text x="8" y="47" font-size="8" fill="#888" text-anchor="middle">a</text>
+            <text x="8" y="65" font-size="8" fill="#888" text-anchor="middle">b</text>
+            <text x="8" y="83" font-size="8" fill="#888" text-anchor="middle">c</text>
+            <text x="8" y="101" font-size="8" fill="#888" text-anchor="middle">d</text>
+            <text x="8" y="119" font-size="8" fill="#888" text-anchor="middle">e</text>
+            <text x="8" y="153" font-size="8" fill="#888" text-anchor="middle">f</text>
+            <text x="8" y="171" font-size="8" fill="#888" text-anchor="middle">g</text>
+            <text x="8" y="189" font-size="8" fill="#888" text-anchor="middle">h</text>
+            <text x="8" y="207" font-size="8" fill="#888" text-anchor="middle">i</text>
+            <text x="8" y="225" font-size="8" fill="#888" text-anchor="middle">j</text>
+            <path d="M66 116 V262" stroke="#d32f2f" stroke-width="3" fill="none"/>
+            <path d="M192 116 V262" stroke="#222" stroke-width="3" fill="none"/>
+            <text x="66" y="274" font-size="10" text-anchor="middle" fill="#d32f2f">건전지 +</text>
+            <text x="192" y="274" font-size="10" text-anchor="middle" fill="#222">건전지 −</text>
+            <rect x="59" y="34" width="50" height="22" rx="4" fill="#1e5aa8"/>
+            <circle cx="84" cy="45" r="7" fill="#fff" stroke="#1e5aa8"/>
+            <path d="M81 45 h6" stroke="#1e5aa8" stroke-width="2"/>
+            <path d="M66 56 V62" stroke="#555" stroke-width="2"/>
+            <path d="M84 56 V62" stroke="#555" stroke-width="2"/>
+            <path d="M102 56 V62" stroke="#555" stroke-width="2"/>
+            <path d="M102 98 C 120 120, 174 120, 192 98" stroke="#f2b800" stroke-width="3" fill="none"/>
+            <path d="M84 80 H174" stroke="#555" stroke-width="2"/>
+            <rect x="105" y="74" width="48" height="12" rx="5" fill="#e9d3a8" stroke="#8a6d3b"/>
+            <text x="129" y="83" font-size="9" text-anchor="middle" fill="#5a4320" class="bb-rs">330 Ω</text>
+            <path d="M174 54 V62 M192 52 V62" stroke="#555" stroke-width="2"/>
+            <circle cx="183" cy="44" r="10" fill="#ff8a80" stroke="#c62828"/>
+            <text x="183" y="47" font-size="8" text-anchor="middle" fill="#7f0000">LED</text>
+            <text x="167" y="60" font-size="9" fill="#c62828">+</text>
+            </svg>
             <ul>
-                <li><b>전압계 (V)</b>: 다이얼을 <b>직류 전압(V⎓), 20 V</b> 범위로. 두 탐침을 <b>LED 두 다리에 바로</b> 댑니다(병렬). 빨간 탐침은 긴 다리 쪽. 가변저항 출력이나 전류계까지 함께 재면 LED 전압과 달라집니다.</li>
-                <li><b>전류계 (A)</b>: 다이얼을 <b>직류 전류(mA⎓), 20 mA 또는 200 mA</b> 범위로 하고 빨간 탐침을 <b>mA 단자</b>로 옮깁니다. 회로를 끊고 그 사이에 끼웁니다(직렬). 문턱 근처의 아주 작은 전류는 2 mA 범위로 바꾸면 더 잘 보입니다.</li>
-                <li>⚠️ 전류계 상태(mA 단자)로 건전지나 LED 양 끝을 바로 재면 멀티미터 퓨즈가 끊어집니다. 전압을 잴 때는 반드시 탐침을 V 단자로 되돌리세요.</li>
-                <li>멀티미터가 1대뿐이면: <b>빛 기준 방법</b>은 전압만 재면 됩니다. <b>전류 기준 방법</b>은 전압과 전류를 함께 봐야 하므로 2대가 좋습니다. 1대뿐이고 고정 저항이 있다면, 고정 저항 양 끝 전압 V<sub>R</sub> 을 재서 <b>I = V<sub>R</sub> ÷ R</b> 로 전류를 계산할 수 있습니다 (R 은 Ω 모드로 미리 잰 값). 예: 250 Ω 양 끝이 0.50 V → 2 mA.</li>
+                <li><b>3번 줄</b> (빨강): 건전지 +, 가변저항 한쪽 끝 다리</li>
+                <li><b>4번 줄</b> (파랑): 가변저항 가운데 다리, 고정 저항 한쪽</li>
+                <li><b>9번 줄</b> (주황): 고정 저항 다른 쪽, LED <b>긴 다리(+)</b></li>
+                <li><b>10번 줄</b> (회색, −): LED 짧은 다리, 가변저항 다른 끝 다리(노란 점퍼선으로), 건전지 −</li>
+                <li>가변저항 다리 간격이 넓으면 3·5·7번처럼 한 칸씩 띄워 꽂고, 노란 점퍼선을 가운데 다리가 아닌 쪽 끝 다리 줄에서 10번 줄로 연결합니다.</li>
+            </ul>
+        </details>
+        <details open>
+            <summary>🔌 멀티미터 연결 방법 (악어클립이 없을 때)</summary>
+            <p class="note">전류계를 회로 중간에 끼우려면 두 탐침을 계속 붙잡고 있어야 해서 악어클립 없이는 불편합니다. 그래서 <b>전류도 전압으로 잽니다</b>: 고정 저항 양 끝 전압 V<sub>R</sub> 을 재면 <b>I = V<sub>R</sub> ÷ R</b> 로 전류를 알 수 있습니다 (옴의 법칙). 앱이 자동으로 계산합니다.</p>
+            <ul>
+                <li><b>준비</b>: 꽂기 전에 고정 저항을 멀티미터 <b>저항(Ω) 모드</b>로 재서 실제 값(예: 327 Ω)을 📏 측정 탭에 넣습니다. 저항은 ±5 % 정도 차이가 납니다.</li>
+                <li><b>LED 전압</b>: 다이얼 <b>직류 전압(V⎓)</b>. 빨간 탐침 → <b>9번 줄</b>, 검은 탐침 → <b>10번 줄</b>.</li>
+                <li><b>저항 전압 V<sub>R</sub></b>: 다이얼 <b>직류 전압(V⎓)</b> 그대로. 빨간 탐침 → <b>4번 줄</b>, 검은 탐침 → <b>9번 줄</b>. 문턱 근처에서는 아주 작으므로 <b>200 mV 범위</b>(자동 범위면 그대로)로 보면 더 정확합니다.</li>
+                <li><b>탐침 대는 법</b>: 탐침 끝은 브레드보드 구멍에 들어가지 않으므로, 그 줄의 <b>빈 구멍에 점퍼선을 꽂아 세워 두고</b> 점퍼선 금속 끝에 탐침을 댑니다(측정용 기둥). 부품 다리 윗부분에 바로 대도 됩니다.</li>
+                <li><b>멀티미터 2대</b>: 한 대는 LED 전압, 한 대는 저항 전압. 둘 다 전압 모드라 단자를 바꿀 필요가 없습니다. 2인 1조로 한 명은 손잡이, 한 명은 탐침을 맡으면 편합니다.</li>
+                <li><b>멀티미터 1대</b>: 손잡이를 그대로 둔 채 LED 전압 → 저항 전압 순서로 번갈아 잽니다. 단자를 옮길 필요가 없어 빠릅니다.</li>
+                <li>손을 자유롭게 하려면 <b>양쪽 악어클립 케이블</b>(문구점·다이소)로 탐침 끝과 측정용 점퍼선을 집어 두면 됩니다.</li>
+                <li>전류계로 직접 재고 싶다면: LED 긴 다리를 12번 줄로 옮기고, 다이얼 <b>mA⎓</b>·빨간 탐침 <b>mA 단자</b>로 바꾼 뒤 9번 줄(빨강)과 12번 줄(검정)에 탐침을 대고 있는 동안만 전류가 흐릅니다. ⚠️ 이 상태로 전압을 재면 퓨즈가 끊어집니다.</li>
             </ul>
         </details>
         <div class="row next"><button class="good" data-go="leds">다음: 💡 LED 고르기 →</button></div>
@@ -207,16 +436,28 @@
             <div class="row" id="row-imin"><label>직선 구간: 전류 <input type="number" id="i-min" value="1" min="0" step="0.1" inputmode="decimal"> mA 이상인 점</label></div>
             <div class="row" id="row-iref" hidden><label>기준 전류 <input type="number" id="i-ref" value="0.1" min="0" step="0.01" inputmode="decimal"> mA</label></div>
             <p class="note" style="margin:2px 0">0 V 부터 시작해 <b>0.1 V</b> 씩, 전류가 흐르기 시작하면 <b>0.02~0.05 V</b> 씩 올리며 기록하세요. 전류가 최대 전류(<span class="imax-txt">10</span> mA) 근처가 되면 멈춥니다. 직선 연장법은 전류가 뚜렷이 늘어나는 구간의 점이 4개 이상 있으면 좋습니다.</p>
+            <div class="row">
+                <label class="stack">전류 재는 방법
+                    <select id="sel-imode">
+                        <option value="resistor">고정 저항 전압으로 계산 (악어클립 없어도 됨)</option>
+                        <option value="meter">전류계(mA)로 직접</option>
+                    </select>
+                </label>
+            </div>
+            <div class="row" id="row-rmeas"><label>고정 저항 실제 값 <input type="number" id="r-meas" min="1" step="1" inputmode="numeric"> Ω</label><span class="note">(멀티미터 저항 모드로 잰 값)</span></div>
             <div class="row entry">
-                <label>전압 V <input type="number" id="in-v" step="0.01" min="0" inputmode="decimal"> V</label>
-                <label>전류 I <input type="number" id="in-i" step="0.001" min="0" inputmode="decimal"> mA</label>
+                <label>LED 전압 V <input type="number" id="in-v" step="0.01" min="0" inputmode="decimal"> V</label>
+                <label id="lbl-vr">저항 전압 V<sub>R</sub> <input type="number" id="in-vr" step="0.001" min="0" inputmode="decimal">
+                    <select id="sel-vr-unit"><option value="V">V</option><option value="mV">mV</option></select></label>
+                <label id="lbl-i" hidden>전류 I <input type="number" id="in-i" step="0.001" min="0" inputmode="decimal"> mA</label>
                 <button id="btn-add-iv" class="good">✅ 기록</button>
             </div>
+            <div id="i-calc" class="note"></div>
             <div id="iv-warn" class="warn" hidden></div>
         </div>
 
         <div id="box-glow" hidden>
-            <p class="note" style="margin:2px 0">방을 어둡게 하거나 LED 에 검은 종이 통을 씌우고, LED 윗부분을 바로 내려다봅니다. 10 kΩ 손잡이를 <b>아주 천천히</b> 올리다가 처음 희미한 빛이 보이는 순간 손을 멈추고 전압을 기록합니다. 0 V 로 되돌려 <b>3번 이상</b> 반복하면 평균을 냅니다. 모둠원이 번갈아 관찰하면 사람에 따른 차이도 알 수 있습니다.</p>
+            <p class="note" style="margin:2px 0">방을 어둡게 하거나 LED 에 검은 종이 통을 씌우고, LED 윗부분을 바로 내려다봅니다. 가변저항 손잡이를 <b>아주 천천히</b> 올리다가 처음 희미한 빛이 보이는 순간 손을 멈추고 전압을 기록합니다. 0 V 로 되돌려 <b>3번 이상</b> 반복하면 평균을 냅니다. 모둠원이 번갈아 관찰하면 사람에 따른 차이도 알 수 있습니다.</p>
             <div class="row entry">
                 <label>빛이 보인 전압 <input type="number" id="in-gv" step="0.01" min="0" inputmode="decimal"> V</label>
                 <button id="btn-add-glow" class="good">✅ 기록</button>

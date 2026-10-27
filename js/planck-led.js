@@ -12,9 +12,12 @@
         iMin: 1, iRef: 0.1,    // mA
         origin: false,
         sel: null,             // 측정 중인 LED id
-        pot: '10000', rs: '330', rsCustom: '', bat: '4.5', batReal: '', iMax: '10',
+        pot: '10000', rs: '330', rsCustom: '',
+        iMode: 'resistor',     // 전류 재는 법: 'resistor' (고정 저항 전압 ÷ 저항) | 'meter' (전류계)
+        rMeas: '', vrUnit: 'V', // 고정 저항 실제 값 (비우면 회로 탭 값), 저항 전압 단위
+        bat: '4.5', batReal: '', iMax: '10',
         tab: 'theory',         // 보고 있는 탭
-        draft: { v: '', i: '', gv: '' } // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
+        draft: { v: '', i: '', vr: '', gv: '' } // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
     };
 
     function defaultLeds() {
@@ -35,7 +38,10 @@
             if (state.pot !== '1000') state.pot = '10000';
             if (state.rs == null) state.rs = '330';
             if (state.rsCustom == null) state.rsCustom = '';
-            state.draft = Object.assign({ v: '', i: '', gv: '' }, d.draft);
+            state.draft = Object.assign({ v: '', i: '', vr: '', gv: '' }, d.draft);
+            if (state.iMode !== 'meter') state.iMode = 'resistor';
+            if (state.vrUnit !== 'mV') state.vrUnit = 'V';
+            if (state.rMeas == null) state.rMeas = '';
             state.leds.forEach(l => { l.iv = Array.isArray(l.iv) ? l.iv : []; l.glow = Array.isArray(l.glow) ? l.glow : []; if (l.fit == null) l.fit = true; });
         } else {
             state.leds = defaultLeds();
@@ -88,6 +94,7 @@
         $('svg-rs').setAttribute('stroke', rs ? '#333' : '#999');
         $('svg-rs').setAttribute('stroke-dasharray', rs ? '' : '4 3');
         $('svg-rs-txt').textContent = rs ? '고정 저항 ' + ohm(rs) : '(선택) 고정 저항';
+        document.querySelectorAll('.bb-rs').forEach(e => { e.textContent = rs ? ohm(rs) : '점퍼선'; });
         $('svg-bat').textContent = '건전지 ' + vb.toFixed(1) + ' V';
         $('svg-pot').textContent = ohm(rPot);
         $('row-rs-custom').hidden = state.rs !== 'custom';
@@ -182,12 +189,20 @@
         $('row-iref').hidden = state.curMode !== 'current';
         $('i-min').value = state.iMin;
         $('i-ref').value = state.iRef;
+        const byR = state.iMode === 'resistor';
+        $('sel-imode').value = state.iMode;
+        $('row-rmeas').hidden = !byR;
+        $('lbl-vr').hidden = !byR;
+        $('lbl-i').hidden = byR;
+        $('r-meas').placeholder = seriesOhm() ? String(seriesOhm()) : '예: 330';
+        $('sel-vr-unit').value = state.vrUnit;
+        showCalc();
 
         const led = current();
         $('led-lambda').innerHTML = led ? '<span class="dot" style="background:' + color(led) + '"></span>광자 에너지 hc/λ = ' + P.photonVolt(led.lambda).toFixed(2) + ' eV' : '';
-        ['in-v', 'in-i', 'btn-add-iv', 'in-gv', 'btn-add-glow', 'btn-clear-led'].forEach(id => { $(id).disabled = !led; });
+        ['in-v', 'in-i', 'in-vr', 'btn-add-iv', 'in-gv', 'btn-add-glow', 'btn-clear-led'].forEach(id => { $(id).disabled = !led; });
         if (!led) {
-            $('thr-out').textContent = '2번에서 사용할 LED 를 하나 이상 고르세요.';
+            $('thr-out').textContent = '💡 LED 탭에서 사용할 LED 를 하나 이상 고르세요.';
             $('meas-head').innerHTML = ''; $('meas-body').innerHTML = '';
             drawIV(null, null);
             return;
@@ -208,30 +223,62 @@
             $('meas-body').innerHTML = led.glow.map((v, k) =>
                 '<tr><td>' + (k + 1) + '</td><td>' + v.toFixed(3) + '</td><td><button class="secondary" data-del-glow="' + k + '">삭제</button></td></tr>').join('');
         } else {
-            $('meas-head').innerHTML = '<tr><th>번호</th><th>전압 V (V)</th><th>전류 I (mA)</th><th></th></tr>';
+            const hasVr = led.iv.some(p => p.vr != null);
+            $('meas-head').innerHTML = '<tr><th>번호</th><th>LED 전압 (V)</th>' + (hasVr ? '<th>V<sub>R</sub> (mV)</th>' : '') + '<th>전류 I (mA)</th><th></th></tr>';
             // 기록 순서와 상관없이 전압 순으로 보여 준다
             const rows = led.iv.map((p, k) => ({ p, k })).sort((a, b) => a.p.v - b.p.v);
             const usedMark = state.curMode === 'extrapolate' ? (p => p.i >= state.iMin) : (() => false);
             $('meas-body').innerHTML = rows.map(({ p, k }, n) =>
-                '<tr><td>' + (n + 1) + (usedMark(p) ? ' ●' : '') + '</td><td>' + p.v.toFixed(3) + '</td><td>' + p.i.toFixed(3) + '</td><td><button class="secondary" data-del-iv="' + k + '">삭제</button></td></tr>').join('');
+                '<tr><td>' + (n + 1) + (usedMark(p) ? ' ●' : '') + '</td><td>' + p.v.toFixed(3) + '</td>' + (hasVr ? '<td>' + (p.vr != null ? (p.vr * 1000).toFixed(2) : '–') + '</td>' : '') + '<td>' + p.i.toFixed(4) + '</td><td><button class="secondary" data-del-iv="' + k + '">삭제</button></td></tr>').join('');
         }
         $('chart-iv').hidden = glow;
         $('iv-note').hidden = glow;
         drawIV(glow ? null : led, t);
     }
 
+    // 고정 저항 값 (Ω): 측정 탭에 잰 값이 있으면 그것, 없으면 회로 탭에서 고른 값
+    function rUsed() {
+        const r = num(state.rMeas);
+        return r && r > 0 ? r : seriesOhm();
+    }
+    // 입력한 저항 전압 (V 단위로)
+    function vrInput() {
+        const x = num($('in-vr').value);
+        return x == null ? null : (state.vrUnit === 'mV' ? x / 1000 : x);
+    }
+    // 저항 전압을 넣는 동안 계산된 전류를 바로 보여 준다
+    function showCalc() {
+        const out = $('i-calc');
+        if (state.iMode !== 'resistor') { out.textContent = ''; return; }
+        const r = rUsed(), vr = vrInput();
+        if (!r) out.innerHTML = '⚠️ 고정 저항 값을 넣으세요. 회로 탭에서 고정 저항을 "없음"으로 골랐다면 저항을 넣거나 "전류계로 직접"을 고르세요.';
+        else if (vr == null) out.textContent = 'I = V_R ÷ ' + r + ' Ω 로 계산합니다.';
+        else out.innerHTML = '→ 전류 I = ' + vr.toFixed(4) + ' V ÷ ' + r + ' Ω = <b>' + (vr / r * 1000).toFixed(4) + ' mA</b>';
+    }
+
     function addIV() {
         const led = current(); if (!led) return;
-        const v = num($('in-v').value), i = num($('in-i').value);
-        if (v == null || i == null || v < 0 || i < 0) { alert('전압(V)과 전류(mA)를 모두 0 이상의 숫자로 넣으세요.'); return; }
-        led.iv.push({ v, i });
+        const v = num($('in-v').value);
+        let i, rec;
+        if (state.iMode === 'resistor') {
+            const r = rUsed(), vr = vrInput();
+            if (!r) { alert('고정 저항 값(Ω)을 넣으세요.'); return; }
+            if (v == null || vr == null || v < 0 || vr < 0) { alert('LED 전압과 저항 전압을 모두 0 이상의 숫자로 넣으세요.'); return; }
+            i = vr / r * 1000;
+            rec = { v, i, vr, r };
+        } else {
+            i = num($('in-i').value);
+            if (v == null || i == null || v < 0 || i < 0) { alert('전압(V)과 전류(mA)를 모두 0 이상의 숫자로 넣으세요.'); return; }
+            rec = { v, i };
+        }
+        led.iv.push(rec);
         const warns = [];
         if (i > parseFloat(state.iMax)) warns.push('⚠️ 전류가 ' + state.iMax + ' mA 를 넘었습니다. LED 가 뜨거워지면 문턱 전압이 바뀝니다. 전압을 더 올리지 마세요.');
-        if (i > 30) warns.push('⚠️ 30 mA 이상은 LED 가 망가질 수 있습니다. 단위가 mA 인지 확인하세요 (A 로 읽었다면 1000 을 곱합니다).');
+        if (i > 30) warns.push('⚠️ 30 mA 이상은 LED 가 망가질 수 있습니다. 단위(mA, V/mV)를 확인하세요.');
         $('iv-warn').innerHTML = warns.join('<br>'); $('iv-warn').hidden = !warns.length;
         save(); renderAll();
-        $('in-i').value = '';
-        saveDraft();
+        $('in-i').value = ''; $('in-vr').value = '';
+        saveDraft(); showCalc();
         $('in-v').focus(); $('in-v').select();
     }
     function addGlow() {
@@ -247,8 +294,13 @@
     $('btn-add-iv').addEventListener('click', addIV);
     $('btn-add-glow').addEventListener('click', addGlow);
     // Enter: 전압 → 전류 칸으로, 전류 칸에서 Enter 면 기록
-    $('in-v').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('in-i').focus(); } });
+    $('in-v').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $(state.iMode === 'resistor' ? 'in-vr' : 'in-i').focus(); } });
     $('in-i').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addIV(); } });
+    $('in-vr').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addIV(); } });
+    $('in-vr').addEventListener('input', showCalc);
+    $('sel-imode').addEventListener('change', e => { state.iMode = e.target.value; save(); renderMeasure(); });
+    $('sel-vr-unit').addEventListener('change', e => { state.vrUnit = e.target.value; save(); showCalc(); });
+    $('r-meas').addEventListener('input', e => { state.rMeas = e.target.value; save(); showCalc(); });
     $('in-gv').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addGlow(); } });
 
     $('meas-body').addEventListener('click', e => {
@@ -459,12 +511,12 @@
         document.body.appendChild(a); a.click(); a.remove();
     }
     $('btn-csv').addEventListener('click', () => {
-        const rows = ['led,wavelength_nm,frequency_1e14Hz,method,voltage_V,current_mA'];
+        const rows = ['led,wavelength_nm,frequency_1e14Hz,method,voltage_V,current_mA,resistor_voltage_V,resistor_ohm'];
         const q = s => '"' + String(s).replace(/"/g, '""') + '"';
         for (const l of state.leds) {
             const f = (P.freqOf(l.lambda) / 1e14).toFixed(4);
-            for (const p of l.iv) rows.push([q(l.name), l.lambda, f, 'current', p.v, p.i].join(','));
-            for (const v of l.glow) rows.push([q(l.name), l.lambda, f, 'glow', v, ''].join(','));
+            for (const p of l.iv) rows.push([q(l.name), l.lambda, f, 'current', p.v, p.i, p.vr != null ? p.vr : '', p.r != null ? p.r : ''].join(','));
+            for (const v of l.glow) rows.push([q(l.name), l.lambda, f, 'glow', v, '', '', ''].join(','));
         }
         download('planck-led.csv', rows.join('\n'), 'text/csv');
     });
@@ -509,10 +561,10 @@
 
     // ---------- 입력 중인 값 ----------
     function saveDraft() {
-        state.draft = { v: $('in-v').value, i: $('in-i').value, gv: $('in-gv').value };
+        state.draft = { v: $('in-v').value, i: $('in-i').value, vr: $('in-vr').value, gv: $('in-gv').value };
         save();
     }
-    ['in-v', 'in-i', 'in-gv'].forEach(id => $(id).addEventListener('input', saveDraft));
+    ['in-v', 'in-i', 'in-vr', 'in-gv'].forEach(id => $(id).addEventListener('input', saveDraft));
 
     // ---------- 탭 ----------
     const TABS = ['theory', 'setup', 'leds', 'measure', 'result'];
@@ -537,6 +589,8 @@
         $('sel-imax').value = state.iMax;
         $('in-v').value = state.draft.v;
         $('in-i').value = state.draft.i;
+        $('in-vr').value = state.draft.vr;
+        $('r-meas').value = state.rMeas;
         $('in-gv').value = state.draft.gv;
     }
 
