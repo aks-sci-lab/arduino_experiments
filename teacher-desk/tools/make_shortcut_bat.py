@@ -8,14 +8,19 @@ PowerShell 명령을 UTF-16 base64(-EncodedCommand)로 넣습니다. 안내 문�
 import base64
 from pathlib import Path
 
+# WScript.Shell 은 윈도우 기본 문자표에 없는 글자(영어판 윈도우의 한글 등)로는 저장하지 못하므로
+# 영문 이름으로 만든 뒤 한글 이름으로 바꿉니다.
 PS = (
+    "$ErrorActionPreference = 'Stop'; "
     "$d = [Environment]::GetFolderPath('Desktop'); "
     "$dir = $env:DESK_DIR; "
-    "$s = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d '업무 데스크.lnk')); "
+    "$tmp = Join-Path $d 'teacher-desk-shortcut.lnk'; "
+    "$s = (New-Object -ComObject WScript.Shell).CreateShortcut($tmp); "
     "$s.TargetPath = (Join-Path $dir 'start-desk.bat'); "
     "$s.WorkingDirectory = $dir; "
     "$s.IconLocation = (Join-Path $env:SystemRoot 'System32\\imageres.dll') + ',109'; "
-    "$s.Save()"
+    "$s.Save(); "
+    "Move-Item -LiteralPath $tmp -Destination (Join-Path $d '업무 데스크.lnk') -Force"
 )
 
 BAT = r'''@echo off
