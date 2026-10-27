@@ -12,7 +12,7 @@
         iMin: 1, iRef: 0.1,    // mA
         origin: false,
         sel: null,             // 측정 중인 LED id
-        bat: '4.5', batReal: '', iMax: '10'
+        pot: '10000', bat: '4.5', batReal: '', iMax: '10'
     };
 
     function defaultLeds() {
@@ -28,6 +28,7 @@
         try { d = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { d = null; }
         if (d && Array.isArray(d.leds) && d.leds.length) {
             Object.assign(state, d);
+            if (state.pot !== '1000') state.pot = '10000';
             state.leds.forEach(l => { l.iv = Array.isArray(l.iv) ? l.iv : []; l.glow = Array.isArray(l.glow) ? l.glow : []; if (l.fit == null) l.fit = true; });
         } else {
             state.leds = defaultLeds();
@@ -45,7 +46,7 @@
     const color = led => P.wavelengthColor(led.lambda);
     const methodName = m => m === 'glow' ? '빛 기준' : (state.curMode === 'current' ? '전류 기준·기준 전류' : '전류 기준·직선 연장');
 
-    // 순방향 전압 추정 (보호 저항 계산용): 미리 넣은 LED 는 표의 값, 직접 추가한 LED 는 파장으로 짐작
+    // 순방향 전압 추정 (가변저항 안전 한계 계산용): 미리 넣은 LED 는 표의 값, 직접 추가한 LED 는 파장으로 짐작
     function vfOf(led) {
         const p = P.LED_PRESETS.find(q => q.key === led.key);
         if (p && Math.abs(p.lambda - led.lambda) < 40) return p.vf;
@@ -59,26 +60,36 @@
         const real = num(state.batReal);
         return real && real > 0 ? real : parseFloat(state.bat);
     }
+    const ohm = r => r >= 1000 ? Number((r / 1000).toFixed(2)) + ' kΩ' : Math.round(r) + ' Ω';
     function renderSetup() {
-        const vb = batteryVolt(), iMax = parseFloat(state.iMax);
+        const vb = batteryVolt(), iMax = parseFloat(state.iMax), rPot = parseFloat(state.pot);
         const leds = usedLeds().length ? usedLeds() : state.leds;
         const vfs = leds.map(vfOf);
         const vfLow = Math.min(...vfs), vfHigh = Math.max(...vfs);
-        const r = P.protectiveResistor(vb, iMax, vfLow, vfHigh);
+        const g = P.potGuide(vb, rPot, iMax, vfs);
+        const pct = x => Math.round(x * 100) + ' %';
+        // 회로도: 가변저항 사각형은 y = 55 (+ 쪽 끝) ~ 165 (− 쪽 끝)
+        const yLim = 165 - 110 * g.xMax;
+        $('svg-limit').setAttribute('y1', yLim); $('svg-limit').setAttribute('y2', yLim);
+        $('svg-limit-txt').setAttribute('y', Math.max(72, yLim + 4));
         $('svg-bat').textContent = '건전지 ' + vb.toFixed(1) + ' V';
-        $('svg-r').textContent = '보호 저항 ' + r.r + ' Ω';
-        $('r-step').textContent = r.r + ' Ω';
+        $('svg-pot').textContent = ohm(rPot);
         document.querySelectorAll('.imax-txt').forEach(e => { e.textContent = iMax; });
+        document.querySelectorAll('.r-limit').forEach(e => { e.textContent = '약 ' + ohm(g.rLower); });
+        document.querySelectorAll('.series-r').forEach(e => { e.textContent = g.seriesR + ' Ω'; });
+        document.querySelectorAll('.pot-range').forEach(e => { e.textContent = rPot > 2000 ? '20 kΩ' : '2 kΩ'; });
         $('setup-out').innerHTML =
-            '🔴 <b>1 kΩ 가변저항 (보호 저항)</b>: 멀티미터로 <b class="big">' + r.r + ' Ω</b> 에 맞춤' +
-            ' <span class="note">(최소 ' + Math.ceil(r.rMin) + ' Ω = (' + vb.toFixed(2) + ' V − ' + vfLow.toFixed(1) + ' V) ÷ ' + iMax + ' mA)</span><br>' +
-            '🔵 <b>10 kΩ 가변저항 (전압 조절)</b>: 양 끝을 건전지에, 처음에는 <b>0 V 쪽 끝</b>으로. 늘 흐르는 전류 약 ' + r.dividerMa.toFixed(2) + ' mA<br>' +
-            '💡 10 kΩ 를 끝까지 올렸을 때 최대 전류: 순방향 전압이 낮은 LED(약 ' + vfLow.toFixed(1) + ' V) 약 <b>' + r.iLowLed.toFixed(1) + ' mA</b>, ' +
-            '높은 LED(파랑 등, 약 ' + vfHigh.toFixed(1) + ' V) 약 <b>' + r.iHighLed.toFixed(1) + ' mA</b>';
+            '🔧 <b>' + ohm(rPot) + ' 가변저항</b>: 양 끝 다리 → 건전지 +, −  /  가운데 다리 → 전류계 → LED<br>' +
+            '▶️ 시작: 손잡이를 <b>− 쪽 끝</b>까지 (가운데 다리 ~ − 쪽 다리 0 Ω, LED 전압 0 V)<br>' +
+            '🛑 <b>안전 한계</b>: 가운데 다리 ~ − 쪽 다리 저항 <b class="big">' + ohm(g.rLower) + '</b> (손잡이 약 ' + pct(g.xMax) + ' 위치)' +
+            ' <span class="note">— 이보다 더 돌리면 순방향 전압이 낮은 LED(약 ' + vfLow.toFixed(1) + ' V)에 ' + iMax + ' mA 넘게 흐릅니다</span><br>' +
+            '💡 LED 가 켜지기 시작하는 위치: 손잡이 약 ' + pct(g.xOnLow * 0.85) + ' ~ ' + pct(Math.min(1, g.xOnHigh * 0.95)) + ' 부근 (색마다 다름)<br>' +
+            '🔵 안전 한계에서 순방향 전압이 높은 LED(파랑 등, 약 ' + vfHigh.toFixed(1) + ' V) 전류: 약 <b>' + g.iHighAtLimit.toFixed(1) + ' mA</b><br>' +
+            '🔋 가변저항에 늘 흐르는 전류: 약 ' + g.drainMa.toFixed(2) + ' mA';
         const warns = [];
-        if (r.iHighLed < 2) warns.push('⚠️ 건전지 전압이 낮아 순방향 전압이 높은 LED(파랑·초록·보라, 약 ' + vfHigh.toFixed(1) + ' V)에 전류가 거의 흐르지 않습니다. <b>4.5 V (건전지 3개)</b> 이상을 쓰세요.');
-        if (r.overRange) warns.push('⚠️ 필요한 보호 저항(' + Math.ceil(r.rMin) + ' Ω)이 1 kΩ 보다 큽니다. 1 kΩ 끝까지(1000 Ω) 맞추면 최대 전류는 약 ' + r.iLowLed.toFixed(1) + ' mA 입니다. 건전지 전압을 낮추는 것이 좋습니다.');
-        if (vb > 6 && !r.overRange) warns.push('ℹ️ 9 V 도 쓸 수 있지만 손잡이를 조금만 돌려도 전압이 크게 바뀌어 문턱 근처를 맞추기 어렵습니다. 4.5 V 를 추천합니다.');
+        if (g.iHighAtLimit < 2) warns.push('⚠️ 건전지 전압이 낮아 순방향 전압이 높은 LED(파랑·초록·보라, 약 ' + vfHigh.toFixed(1) + ' V)에 전류가 충분히 흐르지 않습니다. <b>4.5 V (건전지 3개)</b> 이상을 쓰세요.');
+        if (g.xMax < 0.7) warns.push('⚠️ 안전 한계가 손잡이 ' + pct(g.xMax) + ' 로 낮아 조절할 수 있는 범위가 좁습니다. 건전지 전압을 낮추거나 10 kΩ 가변저항을 쓰세요.');
+        if (g.drainMa > 5) warns.push('ℹ️ 가변저항에 늘 ' + g.drainMa.toFixed(1) + ' mA 가 흘러 건전지가 빨리 닳습니다. 측정하지 않을 때는 건전지를 빼 두세요.');
         $('setup-warn').innerHTML = warns.join('<br>');
         $('setup-warn').hidden = !warns.length;
     }
@@ -449,6 +460,7 @@
     $('sel-bat').addEventListener('change', e => { state.bat = e.target.value; state.batReal = ''; $('bat-real').value = ''; save(); renderSetup(); });
     $('bat-real').addEventListener('input', e => { state.batReal = e.target.value; save(); renderSetup(); });
     $('sel-imax').addEventListener('change', e => { state.iMax = e.target.value; save(); renderSetup(); });
+    $('sel-pot').addEventListener('change', e => { state.pot = e.target.value; save(); renderSetup(); });
 
     function renderAll() {
         renderSetup();
@@ -458,6 +470,7 @@
     }
 
     load();
+    $('sel-pot').value = state.pot;
     $('sel-bat').value = state.bat;
     $('bat-real').value = state.batReal;
     $('sel-imax').value = state.iMax;

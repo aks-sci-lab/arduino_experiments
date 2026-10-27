@@ -9,7 +9,7 @@
     const H_TRUE = 6.62607015e-34;     // 플랑크 상수 h (J·s)
 
     // 많이 쓰는 5mm LED 의 대표 파장 (nm). 실제 값은 제품 설명서(데이터시트)마다 다르므로 화면에서 고칠 수 있다.
-    // vf: 10 mA 근처에서의 대략적인 순방향 전압 (V) — 보호 저항 계산에만 쓴다.
+    // vf: 10 mA 근처에서의 대략적인 순방향 전압 (V) — 가변저항 안전 한계 계산에만 쓴다.
     const LED_PRESETS = [
         { key: 'ir', name: '적외선', lambda: 940, vf: 1.3, on: false },
         { key: 'red', name: '빨강', lambda: 625, vf: 2.0, on: true },
@@ -145,20 +145,34 @@
         };
     }
 
-    // 보호 저항(1 kΩ 가변저항) 설정값 안내
-    // vBat: 건전지 전압 (V), iMaxmA: 허용할 최대 전류 (mA), vfLow/vfHigh: 쓰는 LED 중 가장 낮은/높은 순방향 전압 (V)
-    // 가변저항 손잡이를 끝까지 올려도 (10 kΩ 쪽 저항이 0 이 되어도) 전류가 iMax 를 넘지 않도록 R = (V − Vf,low) / I 로 정한다.
-    function protectiveResistor(vBat, iMaxmA, vfLow, vfHigh) {
-        const iMax = iMaxmA / 1000;
-        const rMin = (vBat - vfLow) / iMax;
-        const rSet = Math.max(10, Math.ceil(rMin / 10) * 10);   // 10 Ω 단위로 올림
-        const r = Math.min(rSet, 1000);
+    // 가변저항 하나를 전압 분배기로 쓸 때의 설정값 안내.
+    // 양 끝 다리를 건전지에, 가운데 다리를 LED 에 연결한다. 손잡이 위치 x (0 = − 쪽 끝, 1 = + 쪽 끝) 에서
+    //   열린 전압 = V·x,  가운데 다리에서 본 내부 저항 = R·x(1−x)
+    // 이므로 LED 전류는 I(x) = (V·x − Vf) / (R·x(1−x)). + 쪽 끝 (x → 1) 에서는 내부 저항이 0 이 되어 전류가 지나치게 커진다.
+    function currentAt(vBat, rPot, x, vf) {
+        const rIn = rPot * x * (1 - x);
+        const top = vBat * x - vf;
+        if (top <= 0) return 0;
+        return rIn > 0 ? top / rIn * 1000 : Infinity;   // mA
+    }
+    // 전류가 iMaxmA 가 되는 손잡이 위치: R·I·x² + (V − R·I)·x − Vf = 0 의 양의 근
+    function safeLimit(vBat, rPot, iMaxmA, vf) {
+        const ri = rPot * iMaxmA / 1000;
+        const b = vBat - ri;
+        const x = (-b + Math.sqrt(b * b + 4 * ri * vf)) / (2 * ri);
+        return Math.min(1, x);
+    }
+    // 화면 안내용 묶음.  vfs: 쓰는 LED 들의 순방향 전압 (V)
+    function potGuide(vBat, rPot, iMaxmA, vfs) {
+        const vfLow = Math.min(...vfs), vfHigh = Math.max(...vfs);
+        const xMax = safeLimit(vBat, rPot, iMaxmA, vfLow);   // 순방향 전압이 가장 낮은 LED 기준 (가장 엄격)
         return {
-            rMin, r,
-            overRange: rSet > 1000,                                   // 1 kΩ 가변저항으로 부족
-            iLowLed: Math.max(0, (vBat - vfLow) / r * 1000),          // 순방향 전압이 가장 낮은 LED 최대 전류 (mA)
-            iHighLed: Math.max(0, (vBat - vfHigh) / r * 1000),        // 순방향 전압이 가장 높은 LED 최대 전류 (mA)
-            dividerMa: vBat / 10000 * 1000                            // 10 kΩ 가변저항에 늘 흐르는 전류 (mA)
+            drainMa: vBat / rPot * 1000,                     // 가변저항에 늘 흐르는 전류 (mA)
+            xMax,                                            // 손잡이를 이 위치 넘게 돌리지 않는다
+            rLower: xMax * rPot,                             // 그 위치에서 가운데 다리 ~ − 쪽 다리 저항 (Ω)
+            xOnLow: vfLow / vBat, xOnHigh: Math.min(1, vfHigh / vBat), // LED 가 켜지기 시작하는 대략적인 위치
+            iHighAtLimit: currentAt(vBat, rPot, xMax, vfHigh), // 안전 한계에서 순방향 전압이 높은 LED 의 전류 (mA)
+            seriesR: Math.ceil((vBat - vfLow) / (iMaxmA / 1000) / 10) * 10  // 고정 저항을 따로 넣을 때 권장값 (Ω)
         };
     }
 
@@ -184,6 +198,6 @@
         E_CHARGE, C_LIGHT, H_TRUE, LED_PRESETS,
         mean, std, freqOf, photonVolt, leastSquares,
         thresholdByExtrapolation, thresholdAtCurrent, thresholdByGlow, thresholdOf,
-        planckFit, protectiveResistor, wavelengthColor
+        planckFit, currentAt, safeLimit, potGuide, wavelengthColor
     };
 });

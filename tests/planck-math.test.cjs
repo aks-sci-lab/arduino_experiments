@@ -66,14 +66,24 @@ test('planckFit recovers h from ideal LEDs, with or without an offset', () => {
     assert.equal(P.planckFit([{ lambda: 600, v0: 2 }]), null);
 });
 
-test('protective resistor keeps the lowest-voltage LED under the current limit', () => {
-    const r = P.protectiveResistor(4.5, 10, 1.8, 3.3);
-    assert.equal(r.r, 270); assert.equal(r.overRange, false);
-    assert.ok(r.iLowLed <= 10);
-    near(r.iHighLed, 1.2 / 270 * 1000, 1e-9);
-    near(r.dividerMa, 0.45, 1e-12);
-    assert.equal(P.protectiveResistor(9, 5, 1.8, 3.3).overRange, true);
-    assert.equal(P.protectiveResistor(3, 10, 1.8, 3.3).iHighLed, 0);
+test('potentiometer divider: safe knob limit for 10 kΩ and 1 kΩ', () => {
+    // 4.5 V, 10 mA, 빨강 2.0 V: 10 kΩ 는 약 97.5 %, 1 kΩ 는 80 % 까지 안전
+    near(P.safeLimit(4.5, 10000, 10, 2.0), 0.9755, 1e-3);
+    near(P.safeLimit(4.5, 1000, 10, 2.0), 0.80, 1e-9);
+    for (const R of [1000, 10000]) {
+        const x = P.safeLimit(4.5, R, 10, 2.0);
+        near(P.currentAt(4.5, R, x, 2.0), 10, 1e-9, 'I at limit');
+        assert.ok(P.currentAt(4.5, R, x - 0.02, 2.0) < 10);
+    }
+    assert.equal(P.currentAt(4.5, 10000, 0.3, 2.0), 0);
+    assert.equal(P.currentAt(4.5, 10000, 1, 2.0), Infinity);
+    const g = P.potGuide(4.5, 10000, 10, [2.0, 3.1]);
+    near(g.drainMa, 0.45, 1e-12);
+    near(g.rLower, g.xMax * 10000, 1e-9);
+    assert.ok(g.iHighAtLimit > 2 && g.iHighAtLimit < 10, String(g.iHighAtLimit));
+    assert.equal(g.seriesR, 250);
+    // 3 V 건전지로는 파랑 LED 에 전류가 흐르지 않는다
+    assert.equal(P.potGuide(3, 10000, 10, [2.0, 3.1]).iHighAtLimit, 0);
 });
 
 test('every preset has a wavelength and a display color', () => {

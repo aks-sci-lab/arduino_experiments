@@ -26,11 +26,11 @@
         <h2>1. 준비물과 회로 연결</h2>
         <ul class="note" style="padding-left:20px;margin:4px 0">
             <li>색이 다른 LED 3~5개 (빨강·주황·노랑·초록·파랑 등) — 파장은 제품 설명서에서 확인</li>
-            <li>가변저항(포텐셜미터) <b>10 kΩ 1개</b> (전압 조절용), <b>1 kΩ 1개</b> (보호 저항용)</li>
+            <li>가변저항(포텐셜미터) <b>1개: 10 kΩ 또는 1 kΩ</b> — 다리 3개를 모두 써서 전압 조절기(분압기)로 씁니다</li>
             <li>건전지와 건전지 홀더, 브레드보드, 점퍼선</li>
             <li>멀티미터 (2대면 전압·전류를 동시에 잴 수 있어 편합니다)</li>
         </ul>
-        <svg class="circuit" viewBox="0 0 380 230" role="img" aria-label="회로도: 건전지 양 끝에 10 킬로옴 가변저항, 가운데 다리에서 1 킬로옴 보호 저항, 전류계, LED 순서로 연결하고 LED 양 끝에 전압계를 연결">
+        <svg class="circuit" viewBox="0 0 380 230" role="img" aria-label="회로도: 건전지 양 끝에 가변저항의 양 끝 다리를 연결하고, 가운데 다리에서 전류계와 LED 를 거쳐 건전지 음극으로 연결. LED 양 끝에 전압계 연결">
             <g fill="none" stroke="#333" stroke-width="2">
                 <!-- 건전지 -->
                 <path d="M30 30 V95 M30 107 V200"/>
@@ -38,19 +38,16 @@
                 <path d="M22 107 H38" stroke-width="5"/>
                 <!-- 위·아래 전선 -->
                 <path d="M30 30 H110 V55 M110 165 V200 M30 200 H320"/>
-                <!-- 10 kΩ 가변저항 (분압기) -->
+                <!-- 가변저항 (분압기): 위 = + 쪽 끝, 아래 = − 쪽 끝, 화살표 = 가운데 다리 -->
                 <rect x="100" y="55" width="20" height="110" fill="#fff"/>
-                <path d="M160 110 H126"/>
+                <path d="M165 110 H126"/>
                 <path d="M126 110 l9 -5 v10 z" fill="#333"/>
-                <!-- 1 kΩ 보호 저항 (가변저항기) -->
-                <path d="M160 110 H172"/>
-                <rect x="172" y="101" width="48" height="18" fill="#fff"/>
-                <path d="M168 128 L222 92"/>
-                <path d="M222 92 l-9 1 l5 7 z" fill="#333"/>
-                <path d="M220 110 H238"/>
                 <!-- 전류계 -->
-                <circle cx="254" cy="110" r="16" fill="#fff"/>
-                <path d="M270 110 H320 V138 M320 156 V200"/>
+                <path d="M165 110 H184"/>
+                <circle cx="200" cy="110" r="16" fill="#fff"/>
+                <!-- (선택) 고정 저항 -->
+                <path d="M216 110 H320 V138 M320 156 V200"/>
+                <rect x="238" y="102" width="44" height="16" fill="#fff" stroke="#999" stroke-dasharray="4 3"/>
                 <!-- LED -->
                 <path d="M306 138 H334 L320 156 Z" fill="#ffd54f"/>
                 <path d="M306 156 H334"/>
@@ -59,21 +56,33 @@
                 <path d="M320 124 H360 V131 M360 163 V184 H320"/>
                 <circle cx="360" cy="147" r="16" fill="#fff"/>
             </g>
+            <!-- 안전 한계 표시 (손잡이를 이 위치 넘게 돌리지 않음) -->
+            <line id="svg-limit" x1="94" x2="126" y1="62" y2="62" stroke="#dc3545" stroke-width="2.5"/>
             <circle cx="320" cy="124" r="3" fill="#333"/><circle cx="320" cy="184" r="3" fill="#333"/>
             <g font-size="12" font-family="sans-serif" fill="#222">
                 <text x="40" y="92">+</text><text x="40" y="122">−</text>
                 <text x="6" y="222" id="svg-bat">건전지 4.5 V</text>
-                <text x="56" y="150">10 kΩ</text><text x="48" y="164" font-size="10" fill="#555">전압 조절</text>
-                <text x="172" y="96">1 kΩ</text><text x="168" y="142" font-size="10" fill="#555" id="svg-r">보호 저항 270 Ω</text>
-                <text x="248" y="115" font-weight="bold">A</text>
+                <text x="124" y="52" font-size="10" fill="#555">+ 쪽 끝</text>
+                <text x="124" y="182" font-size="10" fill="#555">− 쪽 끝</text>
+                <text x="58" y="150" font-size="11" id="svg-pot">10 kΩ</text>
+                <text x="132" y="98" font-size="10" fill="#555">가운데 다리</text>
+                <text x="132" y="78" font-size="10" fill="#dc3545" id="svg-limit-txt">안전 한계</text>
+                <text x="194" y="115" font-weight="bold">A</text>
+                <text x="232" y="136" font-size="9" fill="#888">(선택) 고정 저항</text>
                 <text x="355" y="152" font-weight="bold">V</text>
-                <text x="270" y="134" font-size="10" fill="#555">긴 다리</text>
+                <text x="276" y="96" font-size="10" fill="#555">긴 다리</text>
                 <text x="232" y="222" font-size="10" fill="#555">전압계는 LED 다리에 바로</text>
             </g>
         </svg>
 
-        <h3 style="font-size:1em;margin:12px 0 4px">⚙️ 건전지 전압과 가변저항 설정값 계산</h3>
+        <h3 style="font-size:1em;margin:12px 0 4px">⚙️ 가변저항·건전지 설정값 계산</h3>
         <div class="row">
+            <label>가변저항
+                <select id="sel-pot">
+                    <option value="10000" selected>10 kΩ (추천)</option>
+                    <option value="1000">1 kΩ</option>
+                </select>
+            </label>
             <label>건전지
                 <select id="sel-bat">
                     <option value="3">1.5 V × 2개 = 3 V</option>
@@ -82,9 +91,9 @@
                     <option value="9">9 V 사각 건전지</option>
                 </select>
             </label>
-            <label>실제 전압 <input type="number" id="bat-real" step="0.01" min="0" inputmode="decimal" placeholder="자동"> V</label>
         </div>
         <div class="row">
+            <label>실제 전압 <input type="number" id="bat-real" step="0.01" min="0" inputmode="decimal" placeholder="자동"> V</label>
             <label>LED 최대 전류
                 <select id="sel-imax">
                     <option value="5">5 mA (아주 안전)</option>
@@ -99,23 +108,31 @@
         <div id="setup-warn" class="warn" hidden></div>
 
         <details>
-            <summary>🔧 가변저항 맞추는 순서</summary>
+            <summary>🔧 가변저항 맞추는 순서 (안전 한계 표시)</summary>
             <ol>
-                <li><b>1 kΩ 가변저항 (보호 저항)</b>: 회로에 꽂기 <b>전에</b> 멀티미터를 <b>저항(Ω) 모드, 2 kΩ 범위</b>로 놓고 <b>가운데 다리와 한쪽 끝 다리</b> 사이를 잽니다. 손잡이를 돌려 위에 계산된 값(<b id="r-step">270 Ω</b>)에 맞춘 뒤, 실험이 끝날 때까지 돌리지 않습니다 (테이프로 붙여 두면 좋습니다). 회로에는 잴 때 쓴 그 두 다리만 연결합니다.</li>
-                <li><b>10 kΩ 가변저항 (전압 조절)</b>: <b>양 끝 다리</b>를 건전지 +, − 에, <b>가운데 다리</b>를 보호 저항 쪽에 연결합니다. 건전지를 연결하기 전에 손잡이를 <b>− 쪽 끝까지</b> 돌려 0 V 에서 시작합니다.</li>
-                <li>멀티미터로 10 kΩ 가운데 다리와 건전지 − 사이 전압을 재면서 손잡이를 돌려 0 V 부터 건전지 전압까지 바뀌는지 확인합니다.</li>
-                <li>LED 는 <b>긴 다리(+)</b>가 보호 저항 쪽, <b>짧은 다리(−)</b>가 건전지 − 쪽입니다. 반대로 꽂으면 켜지지 않습니다.</li>
-                <li>측정할 때는 10 kΩ 손잡이만 아주 천천히 돌립니다. 문턱 전압 근처에서는 조금만 돌려도 전류가 크게 바뀝니다.</li>
+                <li>건전지와 LED 를 꽂기 <b>전에</b>, 멀티미터를 <b>저항(Ω) 모드</b>(<span class="pot-range">20 kΩ</span> 범위)로 놓고 가변저항의 <b>가운데 다리와 한쪽 끝 다리</b> 사이를 잽니다. 이 끝 다리를 건전지 <b>−</b> 쪽으로 씁니다.</li>
+                <li>손잡이를 돌려 저항이 <b class="r-limit">–</b> 가 되는 위치를 찾고, 손잡이와 몸체에 <b>유성펜이나 테이프로 표시</b>합니다. 이것이 <b>안전 한계</b>입니다. 실험 중 이 표시를 넘겨 돌리지 않습니다.</li>
+                <li>손잡이를 <b>0 Ω 쪽 끝까지</b> 돌려 둡니다. 이 상태에서 LED 에 걸리는 전압은 0 V 입니다.</li>
+                <li>잰 끝 다리 → 건전지 <b>−</b>, 반대쪽 끝 다리 → 건전지 <b>+</b>, 가운데 다리 → 전류계 → LED <b>긴 다리(+)</b>, LED <b>짧은 다리(−)</b> → 건전지 −. LED 를 반대로 꽂으면 켜지지 않습니다.</li>
+                <li>LED 양 끝 전압을 보면서 손잡이를 아주 천천히 돌립니다. 전류가 최대 전류(<span class="imax-txt">10</span> mA)에 이르거나 안전 한계 표시에 닿으면 더 돌리지 않습니다.</li>
             </ol>
-            <p class="note">왜 이렇게 나누어 쓰나요? 10 kΩ 를 전압 조절에 쓰면 건전지에서 늘 흐르는 전류가 아주 작고(약 0.5 mA) 손잡이를 돌릴 때 전압이 부드럽게 바뀝니다. 1 kΩ 를 보호 저항으로 쓰면 손잡이를 끝까지 돌려도 LED 에 지나친 전류가 흐르지 않습니다. 반대로 쓰면 1 kΩ 에 전류가 10배 흐르고, 10 kΩ 를 수백 Ω 에 맞추기가 어렵습니다.</p>
+            <p class="note">⚠️ 가변저항 하나만 쓰면 손잡이를 <b>+ 쪽 끝까지</b> 돌렸을 때 LED 가 건전지에 바로 연결되어 큰 전류가 흘러 망가질 수 있습니다. 그래서 안전 한계를 표시해 둡니다. <b>고정 저항</b>(약 <b class="series-r">250 Ω</b>, 220~330 Ω 정도)이 있다면 가운데 다리와 LED 사이에 넣으세요. 끝까지 돌려도 안전하고, 전압은 LED 다리에서 바로 재므로 결과에는 영향이 없습니다.</p>
+        </details>
+        <details>
+            <summary>⚖️ 10 kΩ 와 1 kΩ 중 무엇을 쓸까?</summary>
+            <ul>
+                <li><b>10 kΩ (추천)</b>: 건전지에서 늘 흐르는 전류가 작아(4.5 V 에서 약 0.45 mA) 건전지가 오래갑니다. LED 가 켜지는 구간이 손잡이의 넓은 범위에 퍼져 있어 문턱 근처를 <b>아주 세밀하게</b> 조절할 수 있습니다. 대신 가변저항 자체의 저항 때문에 LED 에 걸리는 전압이 출력보다 작아지므로, 전압은 꼭 LED 다리에서 잽니다.</li>
+                <li><b>1 kΩ</b>: 전압이 덜 출렁여 값이 안정적이지만, 늘 흐르는 전류가 10배(4.5 V 에서 약 4.5 mA)라 건전지가 빨리 닳습니다. 안전 한계까지 손잡이 범위가 좁아(약 80 %) 문턱 근처에서는 더 천천히 돌려야 합니다.</li>
+                <li>어느 쪽이든 측정 방법과 계산은 같습니다. 두 가지로 각각 측정해 결과를 비교해 보는 것도 좋은 탐구입니다.</li>
+            </ul>
         </details>
         <details>
             <summary>🔌 멀티미터 연결 방법</summary>
             <ul>
-                <li><b>전압계 (V)</b>: 다이얼을 <b>직류 전압(V⎓), 20 V</b> 범위로. 두 탐침을 <b>LED 두 다리에 바로</b> 댑니다(병렬). 빨간 탐침은 긴 다리 쪽. 보호 저항이나 전류계까지 함께 재면 LED 전압보다 크게 나옵니다.</li>
+                <li><b>전압계 (V)</b>: 다이얼을 <b>직류 전압(V⎓), 20 V</b> 범위로. 두 탐침을 <b>LED 두 다리에 바로</b> 댑니다(병렬). 빨간 탐침은 긴 다리 쪽. 가변저항 출력이나 전류계까지 함께 재면 LED 전압과 달라집니다.</li>
                 <li><b>전류계 (A)</b>: 다이얼을 <b>직류 전류(mA⎓), 20 mA 또는 200 mA</b> 범위로 하고 빨간 탐침을 <b>mA 단자</b>로 옮깁니다. 회로를 끊고 그 사이에 끼웁니다(직렬). 문턱 근처의 아주 작은 전류는 2 mA 범위로 바꾸면 더 잘 보입니다.</li>
                 <li>⚠️ 전류계 상태(mA 단자)로 건전지나 LED 양 끝을 바로 재면 멀티미터 퓨즈가 끊어집니다. 전압을 잴 때는 반드시 탐침을 V 단자로 되돌리세요.</li>
-                <li>멀티미터가 1대뿐이면: <b>빛 기준 방법</b>은 전압만 재면 됩니다. <b>전류 기준 방법</b>은 보호 저항 양 끝 전압 V<sub>R</sub> 을 재서 <b>I = V<sub>R</sub> ÷ R</b> (R: 맞춰 둔 보호 저항값)로 전류를 계산할 수 있습니다. 예: 270 Ω 양 끝이 0.54 V → 2 mA.</li>
+                <li>멀티미터가 1대뿐이면: <b>빛 기준 방법</b>은 전압만 재면 됩니다. <b>전류 기준 방법</b>은 전압과 전류를 함께 봐야 하므로 2대가 좋습니다. 1대뿐이고 고정 저항이 있다면, 고정 저항 양 끝 전압 V<sub>R</sub> 을 재서 <b>I = V<sub>R</sub> ÷ R</b> 로 전류를 계산할 수 있습니다 (R 은 Ω 모드로 미리 잰 값). 예: 250 Ω 양 끝이 0.50 V → 2 mA.</li>
             </ul>
         </details>
     </div>
