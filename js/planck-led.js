@@ -12,7 +12,9 @@
         iMin: 1, iRef: 0.1,    // mA
         origin: false,
         sel: null,             // 측정 중인 LED id
-        pot: '10000', bat: '4.5', batReal: '', iMax: '10'
+        pot: '10000', bat: '4.5', batReal: '', iMax: '10',
+        tab: 'theory',         // 보고 있는 탭
+        draft: { v: '', i: '', gv: '' } // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
     };
 
     function defaultLeds() {
@@ -20,8 +22,10 @@
     }
 
     // ---------- 저장 ----------
+    // 사생활 보호 모드 등으로 저장할 수 없으면 알림을 띄운다 (측정은 계속 할 수 있음)
     function save() {
-        try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* 저장소를 쓸 수 없어도 동작에는 영향 없음 */ }
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); $('store-warn').hidden = true; }
+        catch (e) { $('store-warn').hidden = false; }
     }
     function load() {
         let d = null;
@@ -29,6 +33,7 @@
         if (d && Array.isArray(d.leds) && d.leds.length) {
             Object.assign(state, d);
             if (state.pot !== '1000') state.pot = '10000';
+            state.draft = Object.assign({ v: '', i: '', gv: '' }, d.draft);
             state.leds.forEach(l => { l.iv = Array.isArray(l.iv) ? l.iv : []; l.glow = Array.isArray(l.glow) ? l.glow : []; if (l.fit == null) l.fit = true; });
         } else {
             state.leds = defaultLeds();
@@ -103,6 +108,16 @@
             '<td><input type="number" data-k="lambda" min="200" max="1100" step="1" inputmode="numeric" value="' + l.lambda + '"></td>' +
             '<td><button class="secondary" data-del="1" title="이 LED 와 측정값 삭제">삭제</button></td></tr>').join('');
     }
+    // 글자를 치는 동안에도 저장 (다시 그리면 입력 칸 포커스가 사라지므로 저장만 한다)
+    $('led-body').addEventListener('input', e => {
+        const tr = e.target.closest('tr'); if (!tr) return;
+        const led = state.leds.find(l => l.id === tr.dataset.id); if (!led) return;
+        const k = e.target.dataset.k;
+        if (k === 'name' && e.target.value.trim()) led.name = e.target.value.trim();
+        else if (k === 'lambda') { const v = num(e.target.value); if (v && v >= 200 && v <= 1100) led.lambda = v; else return; }
+        else return;
+        save();
+    });
     $('led-body').addEventListener('change', e => {
         const tr = e.target.closest('tr'); if (!tr) return;
         const led = state.leds.find(l => l.id === tr.dataset.id); if (!led) return;
@@ -197,6 +212,7 @@
         $('iv-warn').innerHTML = warns.join('<br>'); $('iv-warn').hidden = !warns.length;
         save(); renderAll();
         $('in-i').value = '';
+        saveDraft();
         $('in-v').focus(); $('in-v').select();
     }
     function addGlow() {
@@ -205,6 +221,7 @@
         if (v == null || v <= 0) { alert('빛이 보인 전압(V)을 숫자로 넣으세요.'); return; }
         led.glow.push(v);
         $('in-gv').value = '';
+        saveDraft();
         save(); renderAll();
         $('in-gv').focus();
     }
@@ -469,12 +486,47 @@
         renderResults();
     }
 
+    // ---------- 입력 중인 값 ----------
+    function saveDraft() {
+        state.draft = { v: $('in-v').value, i: $('in-i').value, gv: $('in-gv').value };
+        save();
+    }
+    ['in-v', 'in-i', 'in-gv'].forEach(id => $(id).addEventListener('input', saveDraft));
+
+    // ---------- 탭 ----------
+    const TABS = ['theory', 'setup', 'leds', 'measure', 'result'];
+    function showTab(t, scroll) {
+        if (!TABS.includes(t)) t = 'theory';
+        state.tab = t;
+        document.querySelectorAll('.panel').forEach(p => { p.hidden = p.dataset.tab !== t; });
+        document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t ? 'true' : 'false'));
+        save();
+        renderAll();   // 숨겨져 있던 그래프는 보일 때 크기에 맞춰 다시 그린다
+        if (scroll) window.scrollTo(0, 0);
+    }
+    document.querySelectorAll('.tabs button, [data-go]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab || b.dataset.go, true)));
+
+    // 저장된 값을 화면 입력 칸에 넣기
+    function applyControls() {
+        $('sel-pot').value = state.pot;
+        $('sel-bat').value = state.bat;
+        $('bat-real').value = state.batReal;
+        $('sel-imax').value = state.iMax;
+        $('in-v').value = state.draft.v;
+        $('in-i').value = state.draft.i;
+        $('in-gv').value = state.draft.gv;
+    }
+
     load();
-    $('sel-pot').value = state.pot;
-    $('sel-bat').value = state.bat;
-    $('bat-real').value = state.batReal;
-    $('sel-imax').value = state.iMax;
-    renderAll();
+    applyControls();
+    showTab(state.tab);
+    // 같은 브라우저의 다른 창(탭)에서 바꾼 내용을 따라간다. 그렇지 않으면 이 창이 저장할 때 다른 창의 기록을 덮어쓴다.
+    window.addEventListener('storage', e => {
+        if (e.key !== STORE_KEY) return;
+        load();
+        applyControls();
+        showTab(state.tab);
+    });
     let resizeTimer = null;
     window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { renderMeasure(); renderResults(); }, 150); });
 })();
