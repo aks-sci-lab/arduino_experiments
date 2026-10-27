@@ -1,9 +1,8 @@
 """폴더에서 새 자료를 모아 수신함에 넣습니다 (하루 3회 + '지금 수집').
 
 - 에듀파인: 선생님이 저장한 공문 파일(.hwp .hwpx .pdf .txt)이 모이는 폴더
-- 쿨메신저: 쿨메신저가 메시지·받은 파일을 저장하는 폴더
-  쿨메신저의 메시지 저장 형식은 공개 자료가 없어, 우선 폴더 안의 문서·글 파일을 읽습니다.
-  메시지 기록이 데이터베이스 파일이라면 '진단'(diagnose) 결과를 보고 전용 읽기 코드를 추가합니다.
+- 쿨메신저 쪽지: 설정한 이름의  %LOCALAPPDATA%\\CoolMessenger\\Memo\\<이름>.udb  (coolmsg.py)
+- 쿨메신저 받은 파일(선택): 쿨메신저가 받은 파일을 저장하는 폴더의 문서·글 파일
 """
 
 import hashlib
@@ -14,7 +13,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from . import extract
+from . import coolmsg, extract
 from .db import now_str
 from .docs import SUPPORTED, DocError, read_document
 
@@ -90,6 +89,30 @@ def scan_folder(db, source, folder, stats):
                    (key, st.st_mtime, st.st_size, item_id))
 
 
+def scan_cool_memo(db, name, stats):
+    """쿨메신저 쪽지 기록에서 지난번 이후 새 쪽지만 가져옴."""
+    try:
+        path = coolmsg.memo_path(name)
+        key = f"cool_last_rowid:{path}"
+        _, memos, top = coolmsg.read_new(path, db.get_meta(key))
+    except coolmsg.CoolError as e:
+        stats["errors"].append(f"쿨메신저: {e}")
+        return
+    for m in memos:
+        text = m["body"]
+        if m["sender"]:
+            text += f"\n\n(보낸 사람: {m['sender']})"
+        received = (m["when"] or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+        res = add_text_item(db, "cool", text, title=m["title"] or None, received_at=received,
+                            file_path=f"{path}#{m['rowid']}")
+        if res:
+            stats["items"] += 1
+            stats["events"] += res["events"]
+            stats["deadlines"] += res["deadlines"]
+            stats["new_ids"].append(res["id"])
+    db.set_meta(key, top)
+
+
 class Collector:
     """수집 실행기. 동시에 두 번 돌지 않게 잠금."""
 
@@ -104,6 +127,9 @@ class Collector:
             run_id = self.db.execute("INSERT INTO runs(started_at, reason, slot_keys) VALUES(?,?,?)",
                                      (now_str(), reason, json.dumps(list(slot_keys))))
             stats = {"items": 0, "events": 0, "deadlines": 0, "errors": [], "new_ids": [], "sources": []}
+            if self.config["coolmessenger_name"]:
+                stats["sources"].append("cool")
+                scan_cool_memo(self.db, self.config["coolmessenger_name"], stats)
             for source, key in SOURCES.items():
                 folder = self.config[key]
                 if folder:

@@ -1,5 +1,5 @@
 @echo off
-rem 이 파일은 tools/make_shortcut_bat.py 가 만듭니다 (직접 고치지 말고 스크립트를 고치세요).
+rem 이 파일은 tools/make_bats.py 가 만듭니다 (직접 고치지 말고 스크립트를 고치세요).
 rem 한국어 윈도우에서 한글 안내가 깨지지 않도록 ANSI(CP949)로 저장되어 있습니다.
 title 바탕화면 바로 가기 만들기
 cd /d "%~dp0"

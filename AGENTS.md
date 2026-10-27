@@ -70,7 +70,8 @@
 - 분석은 AI 없이 규칙 기반(`desk/extract.py`). AI 요약은 학교 정보보안 지침 확인 후에만 추가한다.
 - 텔레그램은 롱 폴링(학교 PC 를 외부에 공개하지 않음), 연결 코드를 보낸 계정 하나만. 학생 이름·사유는 보내지 않는다.
 - 학생 공유는 `pass/` 정적 페이지 + 주소 `#` 데이터 (서버 저장 없음). 이 저장소에 둔 이유: 기존 Hosting 자동 배포를 그대로 쓰기 위함. `teacher-desk/` 는 `firebase.json` ignore 로 배포 제외.
-- 쿨메신저 메시지 저장 형식은 미확인. 지금은 폴더 안 글·문서 파일만 읽는다. 사용자가 ⚙ 설정의 "쿨메신저 폴더 진단" 결과(구조만, 내용 없음)를 주면 전용 읽기 코드를 `desk/collect.py` 에 추가한다.
+- 쿨메신저 쪽지: `%LOCALAPPDATA%\CoolMessenger\Memo\<이름>.udb` (사용자 확인, 2026-10-27). 설정에는 이름만 넣는다. `.udb` 내부 구조는 미확인이라 `desk/coolmsg.py` 가 SQLite 로 보고 표·열을 자동 인식한다 (복사본을 읽기 전용으로 열고, rowid 로 새 쪽지만). 실제 구조가 다르면 사용자가 보내 주는 '연결 확인 → 파일 구조'로 규칙을 고친다.
+- 업데이트: `teacher-desk/update-desk.bat` 이 Releases `desk-latest` 를 받아 `data/`·`config.json` 을 빼고 덮어쓴다. `.bat` 두 개는 `tools/make_bats.py` 로 만든다.
 - 화면은 VS Code 형태(① 활동 막대 ② 목록 패널 ③ 탭 ④ 작업 영역 ⑤ 하단 패널 ⑥ 상태 표시줄). 사용자가 🧩 화면 배치 모드에서 "배치 설명 복사"로 보내 주는 번호를 기준으로 레이아웃을 고친다.
 - 시험: `cd teacher-desk && python -m unittest discover -s tests -t .`, `node --test tests/pass-codec.test.cjs`
 - **배포 형태 (사용자 지정, 2026-10-27)**: Python 으로 개발하고, 선생님에게는 Python 이 들어 있는 윈도우용 ZIP(설치 불필요)을 배포한다. `teacher-desk/tools/build_portable.py` 가 python.org embeddable Python 3.12 + pypdf 를 넣어 묶고, `.github/workflows/desk-portable.yml` 이 윈도우에서 만들고 시험한 뒤 `main` 반영 시 Releases `desk-latest` 에 올린다. `.bat` 는 CP949.
@@ -90,3 +91,5 @@
 - 2026-10-26: 교사 업무 데스크(`teacher-desk/`, `pass/`) — 조퇴증·외출증(인쇄·QR 공유), 업무 수신함(쿨메신저·에듀파인 hwp/hwpx/pdf, 날짜·마감 추출·분류·요약·문서번호 연결), 9·12·15시 예약 수집, 달력·.ics, 오늘 대시보드·검색, 텔레그램 알림·명령, 화면 배치 모드 PR — Claude Code
   - 확인 필요: 쿨메신저 저장 형식(진단 결과 대기), 학교 조퇴증 실제 양식과 차이, 학교 PC 에서 Python 설치·실행 가능 여부
 - 2026-10-27: 업무 데스크 윈도우용 ZIP(Python 설치 불필요, embeddable 3.12 + pypdf, 바탕화면 바로 가기), 윈도우 자동 시험(들어 있는 Python 으로 시험 38개·start-desk.bat·화면 열림·바로 가기), `.bat` CP949 한글 깨짐 수정. 사용자의 직접 지시로 Claude Code 가 PR #34 머지·배포 — Claude Code
+- 2026-10-27: 쿨메신저 이름 입력 연동(`desk/coolmsg.py`, 연결 확인 화면), 업데이트 도구(`update-desk.bat`), 윈도우 시험에 업데이트 확인 추가 — Claude Code
+  - 확인 필요: 실제 쿨메신저 `.udb` 구조 (SQLite 가 아니거나 암호화되어 있으면 연결 확인 결과로 다시 구현)

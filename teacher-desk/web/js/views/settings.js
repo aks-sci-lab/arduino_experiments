@@ -31,6 +31,44 @@ function renderSettings(pane, tab) {
             .map(([v, l]) => el('option', { value: v, selected: s.telegram_detail === v }, l)));
     const token = el('input', { type: 'password', placeholder: s.telegram_token_set ? '설정됨 (바꿀 때만 입력)' : 'BotFather 가 준 토큰', autocomplete: 'off' });
     const diagBox = el('div');
+    const coolBox = el('div');
+    const coolList = el('datalist#cool-names');
+    const coolName = el('input', { type: 'text', value: s.coolmessenger_name || '', placeholder: '쿨메신저에 로그인하는 이름 (예: 홍길동)',
+        list: 'cool-names', dataset: { key: 'coolmessenger_name' } });
+    // 이 PC 의 쿨메신저 Memo 폴더에서 찾은 이름을 보기로 보여 줌
+    guarded(async () => {
+        const r = await api.get('/api/cool');
+        clear(coolList, r.names.map(n => el('option', { value: n })));
+        coolBox.dataset.dir = r.dir;
+        if (!coolBox.childElementCount) {
+            clear(coolBox, el('p.small.muted', r.names.length
+                ? `이 PC 에서 찾은 이름: ${r.names.join(', ')}`
+                : `쿨메신저 쪽지 폴더를 찾지 못했습니다: ${r.dir}`));
+        }
+    })();
+    const coolCheck = guarded(async () => {
+        clear(coolBox, el('p.small.muted', '확인 중…'));
+        let r;
+        try {
+            r = await api.post('/api/cool/check', { name: coolName.value });
+        } catch (e) {
+            clear(coolBox, el('p', { style: 'color: var(--danger)' }, e.message));
+            return;
+        }
+        const d = r.detected;
+        clear(coolBox,
+            el('p.small', `파일: ${r.path}`),
+            d ? el('div',
+                el('p', { style: 'color: var(--ok); font-weight: 700' }, `✅ 연결됨 — 쪽지 ${d.rows.toLocaleString()}개`),
+                el('p.small.muted', `읽는 곳: 표 ${d.table} · 내용 ${d.body}${d.title ? ' · 제목 ' + d.title : ''}${d.date ? ' · 날짜 ' + d.date : ' · 날짜 열 없음'}${d.sender ? ' · 보낸 사람 ' + d.sender : ''}`),
+                el('p.small', '최근 쪽지:'),
+                el('ul.small', r.recent.map(m => el('li', `${m.when || ''} ${m.sender ? '[' + m.sender + '] ' : ''}${m.title}`))),
+                el('p.small.muted', '맞으면 아래 "설정 저장"을 누르세요. 처음 수집 때 최근 30일 쪽지를 가져옵니다.'))
+              : el('p', { style: 'color: var(--danger)' }, '쪽지 표를 찾지 못했습니다. 아래 구조를 복사해 개발 담당에게 보내 주세요.'),
+            el('details', el('summary.small', '파일 구조 (내용 없음)'),
+                el('button.btn.small', { onclick: guarded(async () => { await navigator.clipboard.writeText(JSON.stringify(r.tables, null, 2)); toast('구조를 복사했습니다'); }) }, '📋 복사'),
+                el('pre.text', JSON.stringify(r.tables, null, 2))));
+    });
 
     const save = guarded(async () => {
         const change = collectForm(pane);
@@ -64,11 +102,16 @@ function renderSettings(pane, tab) {
                 textField('teacher_name', '담임 이름'),
                 textField('grade', '학년', null, { placeholder: '2' }),
                 textField('class_no', '반', null, { placeholder: '3' }))),
+        section('💬 쿨메신저 연동',
+            el('label.field', el('span', '쿨메신저 이름'), coolName, coolList,
+                el('span.hint', '쿨메신저는 쪽지를 C:\\Users\\(윈도우 사용자)\\AppData\\Local\\CoolMessenger\\Memo\\(이름).udb 에 저장합니다. 윈도우 사용자 폴더는 자동으로 찾습니다.')),
+            el('div.row', el('button.btn.small', { onclick: coolCheck }, '🔌 연결 확인')),
+            coolBox),
         section('🔄 자동 수집',
             textField('edufine_folder', '에듀파인 공문 저장 폴더', '에듀파인에서 공문을 저장하는 폴더. 예: C:\\Users\\선생님\\Documents\\공문'),
             el('div.row', el('button.btn.small', { onclick: diagnose('edufine') }, '폴더 확인')),
-            textField('coolmessenger_folder', '쿨메신저 저장 폴더', '쿨메신저가 메시지·받은 파일을 저장하는 폴더'),
-            el('div.row', el('button.btn.small', { onclick: diagnose('cool') }, '🩺 쿨메신저 폴더 진단')),
+            textField('coolmessenger_folder', '(선택) 쿨메신저 받은 파일 폴더', '쿨메신저로 받은 한글·PDF 파일이 저장되는 폴더. 비워 두면 쪽지만 읽습니다.'),
+            el('div.row', el('button.btn.small', { onclick: diagnose('cool') }, '폴더 확인')),
             diagBox,
             el('label.field', el('span', '수집 시각'),
                 el('input', { type: 'text', value: (s.collect_times || []).join(', '), dataset: { key: 'collect_times' } }),

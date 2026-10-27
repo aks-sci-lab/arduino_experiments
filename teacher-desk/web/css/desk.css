@@ -139,6 +139,7 @@ a { color: var(--accent); }
     line-height: 17px;
 }
 #app.hide-labels .act .lbl { display: none; }
+.act .badge[hidden] { display: none; }
 
 #side {
     width: var(--side-w);

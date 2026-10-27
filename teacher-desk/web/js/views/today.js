@@ -54,7 +54,7 @@ function renderToday(pane) {
                     el('div', `수집 시각: ${(store.settings.collect_times || []).join(', ') || '없음'}`),
                     el('div', `다음 수집: ${st?.next_collect || '-'}`),
                     el('div', `마지막 수집: ${s.last_run ? s.last_run.finished_at.slice(5, 16) : '아직 없음'}`),
-                    el('div', `쿨메신저 폴더: ${store.settings.coolmessenger_folder || '미설정'}`),
+                    el('div', `쿨메신저: ${store.settings.coolmessenger_name || '미설정'}${store.settings.coolmessenger_folder ? ' (+ 받은 파일 폴더)' : ''}`),
                     el('div', `에듀파인 폴더: ${store.settings.edufine_folder || '미설정'}`),
                     el('div', `텔레그램: ${st?.telegram.linked ? '연결됨' : '연결 안 됨'}`)))));
     })();

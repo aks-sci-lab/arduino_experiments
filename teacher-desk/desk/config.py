@@ -19,7 +19,8 @@ DEFAULTS = {
     "class_no": "",
     "teacher_name": "",
     # 수집할 폴더
-    "coolmessenger_folder": "",
+    "coolmessenger_name": "",      # 쿨메신저 쪽지 기록: %LOCALAPPDATA%\\CoolMessenger\\Memo\\<이름>.udb
+    "coolmessenger_folder": "",    # (선택) 쿨메신저가 받은 파일을 저장하는 폴더
     "edufine_folder": "",
     # 하루 수집 시각
     "collect_times": ["09:00", "12:00", "15:00"],
@@ -38,7 +39,7 @@ SECRET_KEYS = {"telegram_token"}
 # 화면에서 바꿀 수 있는 값 (port, data_dir, api_base 는 파일에서만)
 EDITABLE_KEYS = {
     "school_name", "grade", "class_no", "teacher_name",
-    "coolmessenger_folder", "edufine_folder", "collect_times",
+    "coolmessenger_name", "coolmessenger_folder", "edufine_folder", "collect_times",
     "pass_page_url", "telegram_token", "telegram_detail", "layout",
 }
 
