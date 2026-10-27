@@ -288,7 +288,7 @@ export function openPass(p, refresh = false) {
 }
 
 // ---------------------------------------------------------------- 학생 명단
-function openRoster() {
+export function openRoster() {
     openTab({
         id: 'roster', title: '👥 학생 명단',
         render(pane, tab) {

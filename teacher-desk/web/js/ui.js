@@ -101,11 +101,11 @@ export function nowHm() {
     return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export const SOURCE_NAMES = { cool: '쿨메신저', edufine: '에듀파인', paste: '직접 입력' };
-export const CATEGORIES = ['제출·마감', '회의', '연수', '행사', '수업·평가', '참고'];
+export const SOURCE_NAMES = { cool: '쿨메신저', edufine: '에듀파인', paste: '직접 입력', school: '학사일정' };
+export const CATEGORIES = ['제출·마감', '회의', '연수', '행사', '수업·평가', '학사', '참고'];
 export const CAT_VARS = {
     '제출·마감': '--c-deadline', '회의': '--c-meeting', '연수': '--c-training',
-    '행사': '--c-event', '수업·평가': '--c-class', '참고': '--c-ref',
+    '행사': '--c-event', '수업·평가': '--c-class', '학사': '--c-school', '참고': '--c-ref',
 };
 
 export function catBadge(cat) {

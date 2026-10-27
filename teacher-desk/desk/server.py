@@ -13,7 +13,10 @@ from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import VERSION, coolmsg, extract, queries
+import base64
+import binascii
+
+from . import VERSION, coolmsg, extract, neis, picker, queries, schoolcal
 from .collect import SOURCES, add_text_item, diagnose
 from .config import APP_DIR
 from .db import now_str
@@ -25,7 +28,7 @@ PASS_DIR = APP_DIR.parent / "pass"
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 CATEGORIES = set(extract.CATEGORIES)
-MAX_BODY = 5 * 1024 * 1024
+MAX_BODY = 20 * 1024 * 1024  # 학사일정 파일 올리기(base64) 때문에 넉넉히
 
 CSP = ("default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; "
        "img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
@@ -486,6 +489,69 @@ def delete_event(app, q, body, eid):
     return {"ok": True}
 
 
+# ---- 학사일정 ----
+def school_year_of(body):
+    y = body.get("school_year")
+    need(isinstance(y, int) and 2000 <= y <= 2100, "학년도가 잘못되었습니다")
+    return y
+
+
+@api("POST", "/api/schoolcal/preview")
+def schoolcal_preview(app, q, body):
+    """파일(base64) 또는 붙여넣은 글 → 미리보기 일정 (저장하지 않음)."""
+    year = school_year_of(body)
+    try:
+        if body.get("text") is not None:
+            return schoolcal.parse(year, text=text_field(body["text"], "내용", 500000, True))
+        name = text_field(body.get("filename"), "파일 이름", 200, True)
+        try:
+            data = base64.b64decode(body.get("data") or "", validate=True)
+        except (binascii.Error, ValueError):
+            raise ApiError(400, "파일을 읽을 수 없습니다")
+        need(data, "빈 파일입니다")
+        return schoolcal.parse(year, filename=name, data=data)
+    except schoolcal.CalError as e:
+        raise ApiError(400, str(e))
+
+
+@api("GET", "/api/neis/schools")
+def neis_schools(app, q, body):
+    name = text_field(q.get("q"), "학교 이름", 50, True)
+    try:
+        return neis.search_schools(name, app.config["neis_key"], app.config["neis_api_base"])
+    except neis.NeisError as e:
+        raise ApiError(502, str(e))
+
+
+@api("POST", "/api/schoolcal/neis")
+def schoolcal_neis(app, q, body):
+    year = school_year_of(body)
+    sch = app.config["neis_school"] or {}
+    need(sch.get("atpt") and sch.get("code"), "먼저 학교를 찾아 고르세요")
+    try:
+        return neis.schedule(sch["atpt"], sch["code"], year, app.config["neis_key"], app.config["neis_api_base"])
+    except neis.NeisError as e:
+        raise ApiError(502, str(e))
+
+
+@api("POST", "/api/schoolcal/save")
+def schoolcal_save(app, q, body):
+    year = school_year_of(body)
+    evs = body.get("events")
+    need(isinstance(evs, list) and 0 < len(evs) <= 2000, "넣을 일정을 고르세요")
+    clean = []
+    for e in evs:
+        need(isinstance(e, dict), "일정 형식이 잘못되었습니다")
+        f = event_fields({**e, "kind": "event"})
+        f.setdefault("end_date", None)
+        f.setdefault("time", None)
+        clean.append(f)
+    origin = text_field(body.get("origin"), "출처", 120) or "직접 입력"
+    res = schoolcal.save(app.db, year, clean, origin, replace=bool(body.get("replace", True)))
+    app.db.log(f"{year}학년도 학사일정 {res['count']}건 가져옴" + (" (이전 것 바꿈)" if res["replaced"] else ""))
+    return res
+
+
 @api("GET", "/api/calendar.ics")
 def calendar_ics(app, q, body):
     today = date.today()
@@ -524,15 +590,37 @@ def get_diagnose(app, q, body):
 @api("GET", "/api/cool")
 def get_cool(app, q, body):
     """이 PC 에서 찾은 쿨메신저 이름들 (Memo 폴더의 *.udb)."""
-    return {"dir": str(coolmsg.memo_dir()), "names": coolmsg.candidates(), "name": app.config["coolmessenger_name"]}
+    return {"dir": str(coolmsg.memo_dir()), "names": coolmsg.candidates(), "name": app.config["coolmessenger_name"],
+            "path": app.config["coolmessenger_path"]}
 
 
 @api("POST", "/api/cool/check")
 def post_cool_check(app, q, body):
-    name = text_field(body.get("name"), "쿨메신저 이름", 60, True)
+    name = text_field(body.get("name"), "쿨메신저 이름", 60)
+    path = text_field(body.get("path"), "쿨메신저 파일 경로", 400)
     try:
-        return coolmsg.check(coolmsg.memo_path(name))
+        return coolmsg.check(coolmsg.resolve(name, path))
     except coolmsg.CoolError as e:
+        raise ApiError(400, str(e))
+
+
+PICK_PURPOSES = {
+    # 용도: (종류, 창 제목, 파일 거르개, 처음 열 곳)
+    "cool": ("file", "쿨메신저 쪽지 파일(.udb) 고르기", "쿨메신저 쪽지 (*.udb)|*.udb|모든 파일 (*.*)|*.*",
+             lambda: str(coolmsg.memo_dir())),
+    "coolfolder": ("folder", "쿨메신저 받은 파일 폴더 고르기", "", lambda: ""),
+    "edufine": ("folder", "에듀파인 공문 저장 폴더 고르기", "", lambda: ""),
+}
+
+
+@api("POST", "/api/pick")
+def post_pick(app, q, body):
+    """윈도우 찾아보기 창을 띄워 고른 경로를 돌려줌 (취소하면 빈 값)."""
+    need(body.get("purpose") in PICK_PURPOSES, "무엇을 고를지 알 수 없습니다")
+    kind, title, filt, initial = PICK_PURPOSES[body["purpose"]]
+    try:
+        return {"path": picker.pick(kind, title, initial(), filt)}
+    except picker.PickerError as e:
         raise ApiError(400, str(e))
 
 

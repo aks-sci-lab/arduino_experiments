@@ -18,7 +18,7 @@ from .db import now_str
 from .docs import SUPPORTED, DocError, read_document
 
 SOURCES = {"edufine": "edufine_folder", "cool": "coolmessenger_folder"}
-SOURCE_NAMES = {"edufine": "에듀파인", "cool": "쿨메신저", "paste": "직접 입력"}
+SOURCE_NAMES = {"edufine": "에듀파인", "cool": "쿨메신저", "paste": "직접 입력", "school": "학사일정"}
 MAX_FILES_PER_RUN = 500
 
 
@@ -89,10 +89,10 @@ def scan_folder(db, source, folder, stats):
                    (key, st.st_mtime, st.st_size, item_id))
 
 
-def scan_cool_memo(db, name, stats):
-    """쿨메신저 쪽지 기록에서 지난번 이후 새 쪽지만 가져옴."""
+def scan_cool_memo(db, name, stats, path=""):
+    """쿨메신저 쪽지 기록에서 지난번 이후 새 쪽지만 가져옴 (경로를 직접 지정했으면 그 파일)."""
     try:
-        path = coolmsg.memo_path(name)
+        path = coolmsg.resolve(name, path)
         key = f"cool_last_rowid:{path}"
         _, memos, top = coolmsg.read_new(path, db.get_meta(key))
     except coolmsg.CoolError as e:
@@ -127,9 +127,9 @@ class Collector:
             run_id = self.db.execute("INSERT INTO runs(started_at, reason, slot_keys) VALUES(?,?,?)",
                                      (now_str(), reason, json.dumps(list(slot_keys))))
             stats = {"items": 0, "events": 0, "deadlines": 0, "errors": [], "new_ids": [], "sources": []}
-            if self.config["coolmessenger_name"]:
+            if self.config["coolmessenger_name"] or self.config["coolmessenger_path"]:
                 stats["sources"].append("cool")
-                scan_cool_memo(self.db, self.config["coolmessenger_name"], stats)
+                scan_cool_memo(self.db, self.config["coolmessenger_name"], stats, self.config["coolmessenger_path"])
             for source, key in SOURCES.items():
                 folder = self.config[key]
                 if folder:

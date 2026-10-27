@@ -10,6 +10,26 @@ function textField(key, label, hint, attrs = {}) {
     return el('label.field', el('span', label), input, hint && el('span.hint', hint));
 }
 
+// 경로 칸 + 📂 찾아보기 (윈도우 찾아보기 창으로 고르면 칸에 채워짐)
+function pathField(key, label, hint, purpose, placeholder = '') {
+    const input = el('input', { type: 'text', value: store.settings[key] ?? '', placeholder, style: 'flex: 1' });
+    input.dataset.key = key;
+    const browse = el('button.btn.small', { type: 'button', onclick: guarded(async () => {
+        browse.disabled = true;
+        toast('찾아보기 창을 열었습니다. 작업 표시줄에서 창을 확인하세요.');
+        try {
+            const r = await api.post('/api/pick', { purpose });
+            if (r.path) {
+                input.value = r.path;
+                input.dispatchEvent(new Event('change'));
+            }
+        } finally {
+            browse.disabled = false;
+        }
+    }) }, '📂 찾아보기');
+    return el('div.field', el('span', label), el('div.row', input, browse), hint && el('span.hint', hint));
+}
+
 function section(title, ...children) {
     return el('section.card', { style: 'margin-bottom: 16px' }, el('h3', title), children);
 }
@@ -29,10 +49,15 @@ function renderSettings(pane, tab) {
     const detail = el('select', { dataset: { key: 'telegram_detail' } },
         [['counts', '개수만 (가장 안전)'], ['titles', '제목까지 (기본)'], ['summary', '요약까지']]
             .map(([v, l]) => el('option', { value: v, selected: s.telegram_detail === v }, l)));
+    const neisKey = el('input', { type: 'password', placeholder: s.neis_key_set ? '설정됨 (바꿀 때만 입력)' : 'open.neis.go.kr 에서 받은 인증키', autocomplete: 'off' });
     const token = el('input', { type: 'password', placeholder: s.telegram_token_set ? '설정됨 (바꿀 때만 입력)' : 'BotFather 가 준 토큰', autocomplete: 'off' });
     const diagBox = el('div');
     const coolBox = el('div');
     const coolList = el('datalist#cool-names');
+    const coolPathField = pathField('coolmessenger_path', '(선택) 쪽지 파일 직접 지정',
+        '쿨메신저를 다른 곳에 설치했거나 이름으로 찾지 못할 때 .udb 파일을 직접 고르세요. 지정하면 이름보다 우선합니다.',
+        'cool', '예: D:\\CoolMessenger\\Memo\\홍길동.udb');
+    const coolPath = coolPathField.querySelector('input');
     const coolName = el('input', { type: 'text', value: s.coolmessenger_name || '', placeholder: '쿨메신저에 로그인하는 이름 (예: 홍길동)',
         list: 'cool-names', dataset: { key: 'coolmessenger_name' } });
     // 이 PC 의 쿨메신저 Memo 폴더에서 찾은 이름을 보기로 보여 줌
@@ -50,7 +75,7 @@ function renderSettings(pane, tab) {
         clear(coolBox, el('p.small.muted', '확인 중…'));
         let r;
         try {
-            r = await api.post('/api/cool/check', { name: coolName.value });
+            r = await api.post('/api/cool/check', { name: coolName.value, path: coolPath.value });
         } catch (e) {
             clear(coolBox, el('p', { style: 'color: var(--danger)' }, e.message));
             return;
@@ -74,6 +99,7 @@ function renderSettings(pane, tab) {
         const change = collectForm(pane);
         change.collect_times = change.collect_times.split(',').map(t => t.trim()).filter(Boolean);
         if (token.value.trim()) change.telegram_token = token.value.trim();
+        if (neisKey.value.trim()) change.neis_key = neisKey.value.trim();
         await saveSettings(change);
         await loadState();
         toast('설정을 저장했습니다');
@@ -105,12 +131,13 @@ function renderSettings(pane, tab) {
         section('💬 쿨메신저 연동',
             el('label.field', el('span', '쿨메신저 이름'), coolName, coolList,
                 el('span.hint', '쿨메신저는 쪽지를 C:\\Users\\(윈도우 사용자)\\AppData\\Local\\CoolMessenger\\Memo\\(이름).udb 에 저장합니다. 윈도우 사용자 폴더는 자동으로 찾습니다.')),
+            coolPathField,
             el('div.row', el('button.btn.small', { onclick: coolCheck }, '🔌 연결 확인')),
             coolBox),
         section('🔄 자동 수집',
-            textField('edufine_folder', '에듀파인 공문 저장 폴더', '에듀파인에서 공문을 저장하는 폴더. 예: C:\\Users\\선생님\\Documents\\공문'),
+            pathField('edufine_folder', '에듀파인 공문 저장 폴더', '에듀파인에서 공문을 저장하는 폴더', 'edufine', '예: C:\\Users\\선생님\\Documents\\공문'),
             el('div.row', el('button.btn.small', { onclick: diagnose('edufine') }, '폴더 확인')),
-            textField('coolmessenger_folder', '(선택) 쿨메신저 받은 파일 폴더', '쿨메신저로 받은 한글·PDF 파일이 저장되는 폴더. 비워 두면 쪽지만 읽습니다.'),
+            pathField('coolmessenger_folder', '(선택) 쿨메신저 받은 파일 폴더', '쿨메신저로 받은 한글·PDF 파일이 저장되는 폴더. 비워 두면 쪽지만 읽습니다.', 'coolfolder'),
             el('div.row', el('button.btn.small', { onclick: diagnose('cool') }, '폴더 확인')),
             diagBox,
             el('label.field', el('span', '수집 시각'),
@@ -132,6 +159,10 @@ function renderSettings(pane, tab) {
                 tg.linked && el('button.btn.small', { onclick: tgAction('test') }, '🔔 시험 알림'),
                 tg.linked && el('button.btn.small.danger', { onclick: tgAction('unpair') }, '연결 끊기'),
                 !tg.linked && s.telegram_token_set && el('button.btn.small', { onclick: tgAction('renew') }, '코드 새로 만들기'))),
+        section('📅 나이스 학사일정',
+            el('p.small', '달력 → 📥 학사일정 → 🏫 나이스 에서 학교를 골라 학사일정을 가져올 때 씁니다. 인증키는 교육정보 개방 포털(open.neis.go.kr)에 가입하면 무료로 받습니다.'),
+            el('label.field', el('span', '나이스 인증키'), neisKey),
+            s.neis_school && s.neis_school.name ? el('p.small', `고른 학교: ${s.neis_school.name}`) : null),
         section('🔗 학생 공유 페이지',
             textField('pass_page_url', '공유 페이지 주소', '조퇴증·외출증 QR 이 가리키는 주소 (저장소의 pass/ 폴더가 배포된 곳)')),
         section('🧩 화면 배치',

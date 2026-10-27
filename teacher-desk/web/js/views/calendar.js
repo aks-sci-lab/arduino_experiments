@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import { el, clear, toast, guarded, todayIso, isoDate, parseIso, addDays, dayLabel, download, eventLine, WD, CAT_VARS, CATEGORIES } from '../ui.js';
 import { registerView, openTab, findTab, refreshSide, emit, on } from '../shell.js';
 import { openItem } from './inbox.js';
+import { openSchoolCal } from './schoolcal.js';
 
 let month = todayIso().slice(0, 7);  // 'YYYY-MM'
 let upcoming = [];
@@ -94,6 +95,7 @@ function renderMonth(pane, tab) {
             el('button.btn.small', { onclick: move(1) }, '▶'),
             el('span.spacer'),
             el('button.btn.small', { onclick: () => openEventForm() }, '＋ 일정'),
+            el('button.btn.small', { onclick: openSchoolCal, title: '학교 학사일정을 한꺼번에 넣기' }, '📥 학사일정'),
             el('button.btn.small', { onclick: exportIcs, title: '구글 캘린더 가져오기용' }, '📤 .ics 내보내기')),
         grid,
         el('p.small.muted', '날짜 칸을 두 번 누르면 일정을 추가합니다. 일정을 누르면 원래 메시지·공문이 열립니다.'));
@@ -128,6 +130,7 @@ registerView({
     id: 'calendar', icon: '📅', label: '달력',
     renderSide(body, actions) {
         actions.append(el('button.icon-btn', { title: '새 일정', onclick: () => openEventForm() }, '＋'),
+            el('button.icon-btn', { title: '학사일정 가져오기', onclick: openSchoolCal }, '📥'),
             el('button.icon-btn', { title: '.ics 내보내기', onclick: exportIcs }, '📤'));
         const pending = upcoming.filter(e => !e.done);
         if (!pending.length) return body.append(el('div.empty', '30일 안에 일정이 없습니다'));

@@ -9,7 +9,11 @@ import base64
 from pathlib import Path
 
 DESK = Path(__file__).resolve().parents[1]
-RELEASE_ZIP = "https://github.com/aks-sci-lab/arduino_experiments/releases/download/desk-latest/teacher-desk-windows.zip"
+# 새 전용 저장소(aks-sci-lab/teacher-desk)를 먼저, 없으면 예전 저장소에서 받음 (저장소를 옮기는 동안 끊기지 않게)
+RELEASE_ZIPS = [
+    "https://github.com/aks-sci-lab/teacher-desk/releases/download/desk-latest/teacher-desk-windows.zip",
+    "https://github.com/aks-sci-lab/arduino_experiments/releases/download/desk-latest/teacher-desk-windows.zip",
+]
 
 # WScript.Shell 은 윈도우 기본 문자표에 없는 글자(영어판 윈도우의 한글 등)로는 저장하지 못하므로
 # 영문 이름으로 만든 뒤 한글 이름으로 바꿉니다.
@@ -32,12 +36,14 @@ UPDATE_PS = (
     "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "
     "$dir = $env:DESK_DIR.TrimEnd('\\'); "
     "$root = Split-Path $dir -Parent; "
-    "$url = if ($env:DESK_UPDATE_URL) { $env:DESK_UPDATE_URL } else { '" + RELEASE_ZIP + "' }; "
+    "$urls = if ($env:DESK_UPDATE_URL) { @($env:DESK_UPDATE_URL) } else { @(" + ", ".join(f"'{u}'" for u in RELEASE_ZIPS) + ") }; "
     "$tmp = Join-Path $env:TEMP ('desk-update-' + [guid]::NewGuid()); "
     "New-Item -ItemType Directory -Path $tmp | Out-Null; "
     "try { "
     "  Write-Host ' 최신 버전을 내려받는 중...'; "
-    "  Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile (Join-Path $tmp 'desk.zip'); "
+    "  $got = $false; "
+    "  foreach ($url in $urls) { try { Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile (Join-Path $tmp 'desk.zip'); $got = $true; break } catch { Write-Host (' 받지 못함: ' + $url) } }; "
+    "  if (-not $got) { throw '최신 버전을 내려받지 못했습니다' }; "
     "  Expand-Archive -LiteralPath (Join-Path $tmp 'desk.zip') -DestinationPath $tmp; "
     "  $new = Join-Path $tmp 'TeacherDesk'; "
     "  if (-not (Test-Path (Join-Path $new 'teacher-desk\\desk.py'))) { throw '받은 파일이 업무 데스크가 아닙니다' }; "
