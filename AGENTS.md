@@ -16,8 +16,8 @@
 | 경로 | 내용 |
 |---|---|
 | `index.html` | 메인 페이지: 구글 로그인, 교사/학생 역할, 실험 목록, 기록 조회 |
-| `projects/*.html` | 실험 페이지 (가속도계, 환경 센서, 자유낙하, 스마트폰 가속도, 말루스 법칙) |
-| `js/`, `css/` | 실험 페이지용 스크립트·스타일 (`malus-*.js`: 말루스 법칙 실험) |
+| `projects/*.html` | 실험 페이지 (가속도계, 환경 센서, 자유낙하, 스마트폰 가속도, 말루스 법칙, LED 플랑크 상수) |
+| `js/`, `css/` | 실험 페이지용 스크립트·스타일 (`malus-*.js`: 말루스 법칙 실험, `planck-*.js`: LED 플랑크 상수 실험) |
 | `firmware/pico2w-environment/` | Pico 센서 보드용 MicroPython 펌웨어와 Thonny 설치 안내 |
 | `tests/`, `tools/`, `vendor/sensirion/` | 센서 테스트, VOC 알고리즘 재빌드 도구, 제조사 원본·라이선스·WebAssembly |
 | `walk-run-detector/` | 걷기·뛰기 판정 머신러닝 수업 앱 (자체 README 참고) |
@@ -93,3 +93,5 @@
 - 2026-10-27: 업무 데스크 윈도우용 ZIP(Python 설치 불필요, embeddable 3.12 + pypdf, 바탕화면 바로 가기), 윈도우 자동 시험(들어 있는 Python 으로 시험 38개·start-desk.bat·화면 열림·바로 가기), `.bat` CP949 한글 깨짐 수정. 사용자의 직접 지시로 Claude Code 가 PR #34 머지·배포 — Claude Code
 - 2026-10-27: 쿨메신저 이름 입력 연동(`desk/coolmsg.py`, 연결 확인 화면), 업데이트 도구(`update-desk.bat`), 윈도우 시험에 업데이트 확인 추가 — Claude Code
   - 확인 필요: 실제 쿨메신저 `.udb` 구조 (SQLite 가 아니거나 암호화되어 있으면 연결 확인 결과로 다시 구현)
+- 2026-10-27: LED 플랑크 상수 실험(`projects/planck-led.html`) — 가변저항 1개(10 kΩ 또는 1 kΩ 중 선택, 사용자 지정)를 분압기로 쓰는 회로, 건전지·가변저항별 안전 한계(가운데~− 다리 저항) 계산, 멀티미터 연결 안내, 문턱 전압 기준 선택(전류: 직선 연장/기준 전류, 빛: 눈 관찰 평균), V₀–f 최소제곱법(원점 통과 선택, 계산 과정 표시)으로 h 계산, CSV·표 복사. 사용자의 직접 지시(Copilot 크레딧 소진)로 Claude Code 가 PR #37 머지·배포 — Claude Code
+  - 확인 필요: 실제 LED·멀티미터로 수업에서 측정해 본 결과(LED 파장 기본값이 학교 LED 와 맞는지)
