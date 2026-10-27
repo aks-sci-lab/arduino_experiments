@@ -1,18 +1,35 @@
 @echo off
-chcp 65001 > nul
-title êµì‚¬ ì—…ë¬´ ë°ìŠ¤í¬
-
+rem ÀÌ ÆÄÀÏÀº ÇÑ±¹¾î À©µµ¿ì¿¡¼­ ÇÑ±ÛÀÌ ±úÁöÁö ¾Êµµ·Ï ANSI(CP949)·Î ÀúÀåµÇ¾î ÀÖ½À´Ï´Ù.
+title ±³»ç ¾÷¹« µ¥½ºÅ©
 cd /d "%~dp0"
-rem python ì´ ì—†ìœ¼ë©´ py(íŒŒì´ì¬ ì‹¤í–‰ê¸°)ë¡œ ì‹œë„
-set PY=python
-where python > nul 2> nul
-if errorlevel 1 set PY=py
-where %PY% > nul 2> nul
-if errorlevel 1 (
-    echo Python ì´ ì„¤ì¹˜ë˜ì–´ ìžˆì§€ ì•ŠìŠµë‹ˆë‹¤. README.md ì˜ "1. ì„¤ì¹˜" ë¥¼ ë³´ì„¸ìš”.
+
+rem Python Ã£´Â ¼ø¼­: 1) ÀÌ Æú´õ ¾ÈÀÇ python\python.exe  2) PC ¿¡ ¼³Ä¡µÈ python  3) py ½ÇÇà±â
+set "PY="
+if exist "%~dp0python\python.exe" set "PY=%~dp0python\python.exe"
+if not defined PY (
+    python --version > nul 2> nul && set "PY=python"
+)
+if not defined PY (
+    py -3 --version > nul 2> nul && set "PY=py"
+)
+
+if not defined PY (
+    echo.
+    echo  [¾È³»] ÀÌ PC ¿¡ Python ÀÌ ¼³Ä¡µÇ¾î ÀÖÁö ¾Ê½À´Ï´Ù.
+    echo.
+    echo  1. Àá½Ã µÚ Python ³»·Á¹Þ±â ÆäÀÌÁö°¡ ¿­¸³´Ï´Ù.
+    echo  2. ¼³Ä¡ Ã¹ È­¸é ¾Æ·¡ÂÊ "Add python.exe to PATH" ¿¡ ²À Ã¼Å©ÇÏ°í ¼³Ä¡ÇÏ¼¼¿ä.
+    echo  3. ¼³Ä¡°¡ ³¡³ª¸é ÀÌ ÆÄÀÏÀ» ´Ù½Ã µÎ ¹ø ´©¸£¼¼¿ä.
+    echo.
+    start "" "https://www.python.org/downloads/windows/"
     pause
     exit /b 1
 )
-%PY% desk.py
 
+echo  ¾÷¹« µ¥½ºÅ©¸¦ ÄÕ´Ï´Ù. ÀÌ Ã¢À» ´ÝÀ¸¸é ¾÷¹« µ¥½ºÅ©°¡ ²¨Áý´Ï´Ù.
+"%PY%" desk.py
+if errorlevel 1 (
+    echo.
+    echo  [¿À·ù] ¾÷¹« µ¥½ºÅ©°¡ ¸ØÃè½À´Ï´Ù. ÀÌ Ã¢ÀÇ ±ÛÀ» »çÁøÀ¸·Î Âï¾î º¸³» ÁÖ¼¼¿ä.
+)
 pause
