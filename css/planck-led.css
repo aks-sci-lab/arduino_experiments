@@ -54,3 +54,9 @@ canvas.chart.small { height: 220px; }
 .sum-table th { font-size: .85em; }
 .stack { flex-direction: column; align-items: flex-start !important; }
 .stack select { max-width: 100%; }
+.tabs { position: sticky; top: 0; z-index: 10; display: flex; gap: 4px; background: #f4f6f8; padding: 6px 0; margin-bottom: 8px; }
+.tabs button { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; background: #fff; color: #333; border: 1px solid #dee2e6; border-radius: 8px; font-size: .95em; }
+.tabs button span { font-size: .8em; white-space: nowrap; }
+.tabs button[aria-selected=true] { background: #007bff; color: #fff; border-color: #007bff; }
+.card > ul { padding-left: 20px; line-height: 1.6; font-size: .92em; }
+.next { justify-content: flex-end; margin-top: 14px; }
