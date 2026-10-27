@@ -51,6 +51,7 @@ UPDATE_PS = (
     "} finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }"
 )
 
+# 주의: if ( ... ) 묶음 안의 echo 문구에 괄호를 쓰면 명령 창이 묶음의 끝으로 읽음 (tests/test_bats.py 가 검사)
 HEADER = r'''@echo off
 rem 이 파일은 tools/make_bats.py 가 만듭니다 (직접 고치지 말고 스크립트를 고치세요).
 rem 한국어 윈도우에서 한글 안내가 깨지지 않도록 ANSI(CP949)로 저장되어 있습니다.
@@ -80,7 +81,7 @@ set "DESK_DIR=%~dp0"
 if /i not "%~1"=="/y" (
     echo.
     echo  업무 데스크를 최신 버전으로 바꿉니다.
-    echo  - 학생 명단·발급 기록·수신함(data 폴더)과 설정(config.json)은 그대로 남습니다.
+    echo  - 학생 명단·발급 기록·수신함 자료와 설정은 그대로 남습니다.
     echo  - 먼저 업무 데스크 검은 창을 닫아 주세요.
     echo.
     pause

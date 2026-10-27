@@ -9,7 +9,7 @@ set "DESK_DIR=%~dp0"
 if /i not "%~1"=="/y" (
     echo.
     echo  업무 데스크를 최신 버전으로 바꿉니다.
-    echo  - 학생 명단·발급 기록·수신함(data 폴더)과 설정(config.json)은 그대로 남습니다.
+    echo  - 학생 명단·발급 기록·수신함 자료와 설정은 그대로 남습니다.
     echo  - 먼저 업무 데스크 검은 창을 닫아 주세요.
     echo.
     pause
