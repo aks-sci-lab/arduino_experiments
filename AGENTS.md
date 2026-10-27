@@ -21,8 +21,7 @@
 | `firmware/pico2w-environment/` | Pico 센서 보드용 MicroPython 펌웨어와 Thonny 설치 안내 |
 | `tests/`, `tools/`, `vendor/sensirion/` | 센서 테스트, VOC 알고리즘 재빌드 도구, 제조사 원본·라이선스·WebAssembly |
 | `walk-run-detector/` | 걷기·뛰기 판정 머신러닝 수업 앱 (자체 README 참고) |
-| `teacher-desk/` | 교사 업무 데스크: 학교 PC 에서 도는 로컬 업무 앱 (조퇴증·외출증, 쿨메신저·에듀파인 수신함, 텔레그램). Hosting 에 배포되지 않음 (자체 README 참고) |
-| `pass/` | 조퇴증·외출증 학생 공유 페이지 (공개 배포, 내용은 주소 `#` 뒤에만 있음) |
+| `pass/` | 예전 조퇴증·외출증 공유 링크를 새 주소(aks-sci-lab.github.io/teacher-desk/)로 넘기는 페이지만 남김 |
 | `uploader.html` | 아두이노 펌웨어 업로더 |
 | `app.py` | 날씨 API 로컬 서버 (Firebase Hosting 에는 배포되지 않음) |
 | `firestore.rules` | Firestore 보안 규칙 |
@@ -63,21 +62,10 @@
 
 자세한 배포 설정: `docs/DEPLOY.md`
 
-## 교사 업무 데스크 설계 결정 (2026-10-26)
+## 교사 업무 데스크 (2026-10-27 독립)
 
-- **로컬 우선**: 학생 이름·조퇴 사유·공문은 클라우드(Firestore)에 두지 않고 학교 PC 의 SQLite(`teacher-desk/data/desk.db`)에만 저장한다. 서버는 `127.0.0.1` 전용, 토큰·Host·Origin 검사.
-- 브라우저는 PC 파일(쿨메신저 폴더, 에듀파인 저장 폴더)을 읽을 수 없으므로 Python 로컬 서버가 읽는다. 표준 라이브러리만 쓰고, PDF 만 선택 설치(`pypdf`). hwp 는 `desk/cfb.py` 로 직접 읽는다.
-- 분석은 AI 없이 규칙 기반(`desk/extract.py`). AI 요약은 학교 정보보안 지침 확인 후에만 추가한다.
-- 텔레그램은 롱 폴링(학교 PC 를 외부에 공개하지 않음), 연결 코드를 보낸 계정 하나만. 학생 이름·사유는 보내지 않는다.
-- 학생 공유는 `pass/` 정적 페이지 + 주소 `#` 데이터 (서버 저장 없음). 이 저장소에 둔 이유: 기존 Hosting 자동 배포를 그대로 쓰기 위함. `teacher-desk/` 는 `firebase.json` ignore 로 배포 제외.
-- 쿨메신저 쪽지: `%LOCALAPPDATA%\CoolMessenger\Memo\<이름>.udb` (사용자 확인, 2026-10-27). 설정에는 이름만 넣는다. `.udb` 내부 구조는 미확인이라 `desk/coolmsg.py` 가 SQLite 로 보고 표·열을 자동 인식한다 (복사본을 읽기 전용으로 열고, rowid 로 새 쪽지만). 실제 구조가 다르면 사용자가 보내 주는 '연결 확인 → 파일 구조'로 규칙을 고친다.
-- 쿨메신저 `.udb` 경로를 직접 지정(`coolmessenger_path`)하면 이름보다 우선. 경로 칸의 📂 찾아보기는 `desk/picker.py` 가 PowerShell 윈도우 대화 상자로 띄운다 (설치 없는 Python 에는 tkinter 없음).
-- 학사일정(`desk/schoolcal.py`): 학교마다 양식이 달라 양식을 고정하지 않고 **읽기 → 미리보기에서 고치기 → 저장**. 엑셀은 달력표(월×일, 전치·병합 칸=기간)/목록(날짜 열+행사 열)/글 순서로 자동 판별, 연도 없는 날짜는 학년도 규칙(3~12월=학년도, 1~2월=다음 해). 가장 범용적인 길은 나이스 Open API(`desk/neis.py`, 인증키 필요). 저장은 source='school' 항목 하나 + 일정, 같은 학년도는 바꿔치기. 분류 '학사' 추가.
-- 메뉴 이름: '오늘' → '브리핑' (사용자 지정, 2026-10-27). 뷰 id 는 `today` 그대로.
-- 업데이트: `teacher-desk/update-desk.bat` 이 Releases `desk-latest` 를 받아 `data/`·`config.json` 을 빼고 덮어쓴다. `.bat` 두 개는 `tools/make_bats.py` 로 만든다.
-- 화면은 VS Code 형태(① 활동 막대 ② 목록 패널 ③ 탭 ④ 작업 영역 ⑤ 하단 패널 ⑥ 상태 표시줄). 사용자가 🧩 화면 배치 모드에서 "배치 설명 복사"로 보내 주는 번호를 기준으로 레이아웃을 고친다.
-- 시험: `cd teacher-desk && python -m unittest discover -s tests -t .`, `node --test tests/pass-codec.test.cjs`
-- **배포 형태 (사용자 지정, 2026-10-27)**: Python 으로 개발하고, 선생님에게는 Python 이 들어 있는 윈도우용 ZIP(설치 불필요)을 배포한다. `teacher-desk/tools/build_portable.py` 가 python.org embeddable Python 3.12 + pypdf 를 넣어 묶고, `.github/workflows/desk-portable.yml` 이 윈도우에서 만들고 시험한 뒤 `main` 반영 시 Releases `desk-latest` 에 올린다. `.bat` 는 CP949.
+- 교사 업무 데스크는 **이 저장소와 별개의 프로젝트**다 (사용자 지정). 코드·시험·윈도우 ZIP 배포·공유 페이지는 모두 **`aks-sci-lab/teacher-desk`** 에서 관리한다. 이 저장소에서 업무 데스크 일을 하지 않는다.
+- 이 저장소에 남긴 것: `pass/` 넘김 페이지(예전 QR 링크용), Releases `desk-latest`(0.3.0 — 설치된 `update-desk.bat` 은 새 저장소를 먼저, 없으면 여기를 받음). 둘 다 지우지 않는다.
 
 ## 진행 기록
 
@@ -102,4 +90,5 @@
 - 2026-10-27: 0.3.0 — 검색 범위 확대(본문·요약·문서번호·분류·메모·학생 명단, 여러 낱말 AND), 브리핑 이름, 쿨메신저 파일 경로 직접 지정·📂 찾아보기, 학사일정 가져오기(파일·붙여넣기·나이스). 사용자의 직접 지시로 Claude Code 가 PR #36 머지·배포 — Claude Code
   - 확인 필요: 나이스 Open API 실제 응답(가짜 서버로만 시험), 실제 학교 학사일정 파일 양식, 윈도우 찾아보기 창(자동 시험 불가)
 - 2026-10-27: 플랑크 상수 실험에 LED 앞 고정 저항(기본 330 Ω, 사용자 제안) 추가 — 끝까지 돌려도 안전한지 계산, 저항이 없거나 작을 때만 안전 한계 표시 안내, 직류 전원 장치는 쓰지 않기로 함(사용자 결정). 사용자의 직접 지시로 Claude Code 가 머지·배포 — Claude Code
+- 2026-10-27: 교사 업무 데스크를 `aks-sci-lab/teacher-desk` 로 독립(사용자 지정, 예전 커밋 기록은 옮기지 않음). 이 저장소에서 `teacher-desk/`·업무 데스크 워크플로 제거, `pass/` 는 새 주소로 넘기는 페이지만 — Claude Code
 - 2026-10-27: 플랑크 상수 실험 — 멀티미터에 악어클립이 없어 전류를 고정 저항 전압으로 계산(I = V_R ÷ R, 기본값, 전류계 직접 입력도 선택 가능), 미니 브레드보드(전원 줄 없음, 사용자 지정) 배치도와 탐침 대는 법 안내. 사용자의 직접 지시로 Claude Code 가 머지·배포 — Claude Code
