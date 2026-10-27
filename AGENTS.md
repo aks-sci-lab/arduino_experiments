@@ -73,6 +73,7 @@
 - 쿨메신저 메시지 저장 형식은 미확인. 지금은 폴더 안 글·문서 파일만 읽는다. 사용자가 ⚙ 설정의 "쿨메신저 폴더 진단" 결과(구조만, 내용 없음)를 주면 전용 읽기 코드를 `desk/collect.py` 에 추가한다.
 - 화면은 VS Code 형태(① 활동 막대 ② 목록 패널 ③ 탭 ④ 작업 영역 ⑤ 하단 패널 ⑥ 상태 표시줄). 사용자가 🧩 화면 배치 모드에서 "배치 설명 복사"로 보내 주는 번호를 기준으로 레이아웃을 고친다.
 - 시험: `cd teacher-desk && python -m unittest discover -s tests -t .`, `node --test tests/pass-codec.test.cjs`
+- **배포 형태 (사용자 지정, 2026-10-27)**: Python 으로 개발하고, 선생님에게는 Python 이 들어 있는 윈도우용 ZIP(설치 불필요)을 배포한다. `teacher-desk/tools/build_portable.py` 가 python.org embeddable Python 3.12 + pypdf 를 넣어 묶고, `.github/workflows/desk-portable.yml` 이 윈도우에서 만들고 시험한 뒤 `main` 반영 시 Releases `desk-latest` 에 올린다. `.bat` 는 CP949.
 
 ## 진행 기록
 

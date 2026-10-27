@@ -4,9 +4,11 @@
   python desk.py --no-browser    브라우저를 열지 않고 켜기
   python desk.py --collect       지금 한 번 수집하고 끝내기
   python desk.py --diagnose cool 쿨메신저 폴더 구조 진단 (결과는 data/diagnose-cool.json)
+  python desk.py --check         실행 환경 확인만 하고 끝내기 (윈도우용 ZIP 시험에 씀)
 """
 
 import argparse
+import importlib.util
 import json
 import sys
 
@@ -26,7 +28,15 @@ def main(argv=None):
     p.add_argument("--no-browser", action="store_true")
     p.add_argument("--collect", action="store_true", help="한 번 수집하고 끝내기")
     p.add_argument("--diagnose", choices=sorted(SOURCES), help="폴더 구조 진단")
+    p.add_argument("--check", action="store_true", help="실행 환경 확인만 하고 끝내기")
     args = p.parse_args(argv)
+
+    if args.check:
+        from desk import VERSION
+        pdf = importlib.util.find_spec("pypdf") is not None
+        print(f"업무 데스크 {VERSION} · Python {sys.version.split()[0]} ({sys.executable})")
+        print(f"PDF 읽기(pypdf): {'준비됨' if pdf else '없음'}")
+        return 0
 
     config = Config(args.config)
     db = DB(config.data_dir / "desk.db")

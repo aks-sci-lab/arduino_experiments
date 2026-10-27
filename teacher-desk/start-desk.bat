@@ -27,7 +27,7 @@ if not defined PY (
 )
 
 echo  업무 데스크를 켭니다. 이 창을 닫으면 업무 데스크가 꺼집니다.
-"%PY%" desk.py
+"%PY%" desk.py %*
 if errorlevel 1 (
     echo.
     echo  [오류] 업무 데스크가 멈췄습니다. 이 창의 글을 사진으로 찍어 보내 주세요.

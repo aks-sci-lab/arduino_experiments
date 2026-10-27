@@ -14,21 +14,24 @@
 
 ---
 
-## 1. 설치 (처음 한 번)
+## 1. 내려받기 (처음 한 번, Python 설치 필요 없음)
 
-1. **Python 설치**: https://www.python.org/downloads/ 에서 내려받아 설치합니다.
-   설치 첫 화면에서 **"Add python.exe to PATH" 에 반드시 체크**하세요.
-2. **프로그램 내려받기**: GitHub 저장소 화면의 초록색 **Code → Download ZIP** 으로 받아 원하는 곳(예: `C:\업무데스크`)에 압축을 풉니다.
-   - 안의 `teacher-desk` 폴더가 업무 데스크입니다. 옆의 `pass` 폴더(학생 공유 링크 도구)도 **같은 자리에 그대로** 두세요.
-3. (선택) PDF 공문도 읽으려면: 시작 메뉴에서 "명령 프롬프트"를 열고 아래를 입력합니다.
-   ```
-   pip install pypdf
-   ```
-   한글 파일(.hwp, .hwpx)은 설치 없이 읽습니다.
+1. 아래 주소에서 **teacher-desk-windows.zip** 을 내려받습니다.
+   https://github.com/aks-sci-lab/arduino_experiments/releases/download/desk-latest/teacher-desk-windows.zip
+2. 바탕화면 등 원하는 곳에 **압축을 풉니다.** `TeacherDesk` 폴더가 생깁니다.
+   - 안에 Python(`teacher-desk\python`)과 PDF 읽기 도구(`teacher-desk\lib`)가 들어 있어 따로 설치할 것이 없습니다.
+   - `teacher-desk` 와 `pass` 폴더는 **같은 자리에 그대로** 두세요.
+3. 바탕화면 바로 가기가 필요하면 `teacher-desk\make-desktop-shortcut.bat` 을 두 번 누릅니다.
+
+새 버전이 나오면 같은 주소에서 다시 받아, 새 폴더의 `teacher-desk` 안에 예전 폴더의 `data` 폴더와 `config.json` 을 옮기면 자료와 설정이 그대로 이어집니다.
+
+> 개발용: Python 이 설치된 PC 에서는 저장소의 `teacher-desk` 폴더를 그대로 실행해도 됩니다 (PDF 는 `pip install pypdf`).
 
 ## 2. 켜기
 
 `start-desk.bat` 을 두 번 누르면 검은 창이 뜨고 브라우저가 자동으로 열립니다 (http://127.0.0.1:8770).
+
+- 윈도우가 "PC 보호" 경고를 띄우면 **추가 정보 → 실행**을 누르세요.
 
 - **검은 창을 닫으면 업무 데스크가 꺼집니다.** 예약 수집과 텔레그램도 함께 멈춥니다.
 - PC 를 켤 때마다 자동으로 켜려면: `Win + R` → `shell:startup` 입력 → 열린 폴더에 `start-desk.bat` 의 **바로 가기**를 넣습니다.
@@ -107,7 +110,11 @@ python desk.py --no-browser     # 브라우저 없이
 python desk.py --collect        # 한 번 수집하고 끝
 python desk.py --diagnose cool  # 쿨메신저 폴더 진단 → data/diagnose-cool.json
 python -m unittest discover -s tests -t .   # 시험 (teacher-desk 폴더에서)
+python tools/build_portable.py              # 윈도우용 ZIP 만들기 (dist/)
 ```
+
+- 윈도우용 ZIP 은 `.github/workflows/desk-portable.yml` 이 윈도우에서 만들고 시험(들어 있는 Python 으로 시험 전체, 화면 열림, 바로 가기)한 뒤, `main` 에 반영되면 Releases 의 `desk-latest` 에 올립니다.
+- `.bat` 파일은 한국어 윈도우 명령 창에서 한글이 깨지지 않게 CP949 로 저장합니다 (`.gitattributes`).
 
 | 파일 | 내용 |
 |---|---|

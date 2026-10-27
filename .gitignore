@@ -58,3 +58,6 @@ Thumbs.db
 # 교사 업무 데스크: 이 PC 의 설정(텔레그램 토큰)과 자료(학생 명단·공문)
 teacher-desk/config.json
 teacher-desk/data/
+teacher-desk/dist/
+teacher-desk/python/
+teacher-desk/lib/
