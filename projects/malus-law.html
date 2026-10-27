@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>말루스 법칙 실험 (스마트폰 카메라)</title>
+    <link rel="stylesheet" href="../css/malus-law.css">
+</head>
+<body>
+<div class="wrap">
+    <a class="back" href="../index.html">← 메인 페이지</a>
+    <h1>🔦 말루스 법칙 실험 (스마트폰 카메라)</h1>
+    <p class="note">레이저 → 편광판(회전) → 종이/휴지 스크린 → 카메라 순으로 놓고, 편광판 각도별 스크린의 밝기를 측정해 <b>I = I₀·cos²θ</b> 를 검증합니다. 카메라 접근은 <b>https</b> 주소에서만 동작합니다.</p>
+
+    <details class="card">
+        <summary>📖 실험 방법 / 정확하게 측정하는 요령</summary>
+        <ol>
+            <li>스크린(종이/휴지) 뒤에서 카메라가 스크린 한가운데의 레이저 번짐을 찍도록 고정합니다. 이후 폰·스크린은 건드리지 않습니다. 폰은 거치대나 테이프로 고정하는 것이 좋습니다.</li>
+            <li><b>카메라 켜기</b> 후 화면을 눌러 측정 영역(ROI, 초록 사각형)을 빛 번짐 중앙에 맞추고, <b>번짐 전체가 사각형 안에 들어가도록</b> 영역 크기를 키웁니다. 이렇게 하면 폰이 조금 흔들려도 밝기 합이 거의 변하지 않습니다. 맞춘 뒤 <b>확대 보기</b>로 바꾸면 편합니다.</li>
+            <li><b>노출 고정</b>을 누르세요(안드로이드 크롬). 자동 노출이 켜져 있으면 밝기를 폰이 마음대로 보정해 측정이 틀어집니다. 지원이 안 되는 기기(아이폰 등)는 기본 카메라 앱에서 노출을 고정해 촬영한 뒤 <b>사진 불러오기</b>를 이용하세요.</li>
+            <li>가장 밝은 각도에서 <b>포화 비율</b>이 거의 0%가 되도록 종이를 겹치거나 노출을 낮춥니다.</li>
+            <li>레이저를 끈 상태에서 <b>배경 측정</b>을 한 번 합니다(주변광 제거).</li>
+            <li>편광판을 돌린 뒤 <b>측정 기록</b>을 누르고 대기 시간 동안 손을 뗍니다. <b>각도 자동 증가</b>를 켜 두면 각도를 매번 입력할 필요가 없습니다. 0°~180°를 10~15° 간격으로 측정하고, 마지막에 0°를 한 번 더 측정해 처음 값과 비교하면 측정 중 흔들림이 있었는지 알 수 있습니다.</li>
+        </ol>
+    </details>
+
+    <div class="card">
+        <h2>1. 카메라 / 측정 영역</h2>
+        <div class="row">
+            <button id="btn-cam">📷 카메라 켜기</button>
+            <button id="btn-lock" class="secondary" disabled>🔒 노출 고정</button>
+            <button id="btn-photo" class="secondary">🖼️ 사진 불러오기</button>
+            <input type="file" id="file-photo" accept="image/*" hidden>
+        </div>
+        <div id="cam-msg" class="warn" hidden></div>
+        <div class="stage"><canvas id="view" width="640" height="360"></canvas><video id="video" playsinline muted autoplay></video></div>
+        <div class="row">
+            <button id="btn-zoom" class="secondary">🔍 측정 영역 확대 보기</button>
+            <span class="note">화면을 누르거나 끌어서 측정 영역을 옮기세요.</span>
+        </div>
+        <div class="row"><label style="flex:1">영역 크기 <input type="range" id="roi-size" min="10" max="400" value="100"></label><span id="roi-size-txt" class="note"></span></div>
+        <div id="manual-box" hidden>
+            <div class="row" id="row-exp" hidden><label style="flex:1">노출 시간 <input type="range" id="sl-exp"></label><span id="txt-exp" class="note"></span></div>
+            <div class="row" id="row-iso" hidden><label style="flex:1">ISO <input type="range" id="sl-iso"></label><span id="txt-iso" class="note"></span></div>
+        </div>
+        <div class="row">
+            <label>채널
+                <select id="sel-channel">
+                    <option value="r">R (빨간 레이저)</option>
+                    <option value="g">G (초록 레이저)</option>
+                    <option value="b">B (파란 레이저)</option>
+                    <option value="y">밝기(휘도)</option>
+                    <option value="max">최대 채널</option>
+                </select>
+            </label>
+            <label>감마 보정
+                <select id="sel-gamma">
+                    <option value="srgb">sRGB (기본)</option>
+                    <option value="2.2">γ = 2.2</option>
+                    <option value="none">없음</option>
+                </select>
+            </label>
+        </div>
+        <div class="live">
+            <div>현재 밝기 <b id="live-val">–</b></div>
+            <div>포화 픽셀 <b id="live-sat">–</b></div>
+            <div>영역 최대 <b id="live-max">–</b></div>
+        </div>
+        <div id="edge-warn" class="warn" hidden>⚠️ 빛 번짐이 측정 영역 밖으로 넘칩니다. <b>영역 크기</b>를 키워 번짐 전체가 초록 사각형 안에 들어가게 하세요. 그래야 폰이 조금 움직여도 값이 변하지 않습니다.</div>
+        <div id="sat-warn" class="warn" hidden>⚠️ 포화된 픽셀이 있습니다. 밝기가 255에서 잘려 cos² 곡선이 눌립니다. 종이를 겹치거나 노출·ISO를 낮추세요.</div>
+        <div id="chan-warn" class="warn" hidden>ℹ️ 데이터가 있으면 채널/감마를 바꿀 수 없습니다. 바꾸려면 데이터를 지우세요.</div>
+    </div>
+
+    <div class="card">
+        <h2>2. 측정</h2>
+        <div class="row run-row">
+            <b id="run-label">1회차</b> <span id="run-count" class="note"></span>
+            <button id="btn-new-run" class="secondary" disabled>🆕 새 회차 시작</button>
+        </div>
+        <p class="note" style="margin:4px 0">0°~180° 한 바퀴를 한 회차로 측정합니다. 카메라·스크린을 다시 맞췄다면 <b>새 회차</b>를 시작하세요. 회차마다 따로 정규화하므로 회차 사이에 밝기가 달라져도 괜찮습니다.</p>
+        <div class="row">
+            <button id="btn-dark" class="secondary">🌑 배경 측정 (레이저 OFF)</button>
+            <span id="dark-txt" class="note">배경 미측정</span>
+            <button id="btn-dark-clear" class="secondary" hidden>배경 지우기</button>
+        </div>
+        <div class="row angle-row">
+            <label>편광판 각도 <input type="number" id="angle" value="0" step="1"> °</label>
+            <button id="btn-step-dn" class="secondary">−</button>
+            <button id="btn-step-up" class="secondary">+</button>
+            <label>간격 <input type="number" id="step" value="10" min="1" max="90" style="width:64px"> °</label>
+        </div>
+        <div class="row">
+            <label>평균 프레임 수 <input type="number" id="frames" value="30" min="1" max="300" style="width:70px"></label>
+            <label><input type="checkbox" id="auto-step" checked> 기록 후 각도 자동 증가</label>
+        </div>
+        <div class="row">
+            <label>측정 전 대기 <input type="number" id="delay" value="2" min="0" max="10" step="0.5" style="width:64px"> 초</label>
+            <label><input type="checkbox" id="track" checked> 빛 위치 자동 추적</label>
+        </div>
+        <p class="note" style="margin:4px 0">버튼을 누른 뒤 대기 시간 동안 폰에서 손을 떼세요. 블루투스 키보드가 있으면 <b>Enter</b> 키로도 기록됩니다.</p>
+        <div id="move-warn" class="warn" hidden>⚠️ 이번 회차 첫 측정 때보다 빛 위치가 많이 옮겨져서 이 점을 <b>결측</b>으로 표시했습니다. 폰이나 스크린이 움직였다면 다시 맞춘 뒤 <b>새 회차</b>를 시작하세요. 잘못 판정됐다면 표에서 <b>복원</b>을 누르세요.</div>
+        <div class="row"><button id="btn-record" class="good" disabled>✅ 측정 기록</button><span id="rec-status" class="note"></span></div>
+    </div>
+
+    <div class="card">
+        <h2>3. 측정 데이터 <span id="cnt" class="note"></span></h2>
+        <div class="tbl-wrap"><table>
+            <thead><tr><th>회차</th><th>각도 (°)</th><th>밝기 I</th><th>정규화</th><th>포화</th><th></th></tr></thead>
+            <tbody id="tbody"></tbody>
+        </table></div>
+        <div class="row">
+            <button id="btn-csv" class="secondary" disabled>CSV 다운로드</button>
+            <button id="btn-clear" class="danger" disabled>데이터 모두 지우기</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>4. 말루스 법칙 검증</h2>
+        <p class="note">회차마다 따로 I(θ) = A·cos²(θ − θ₀) + B 로 적합하고, 그 회차의 A, B 로 <b>정규화 밝기 (I − B)/A</b> 를 구합니다. 결측 처리한 점은 계산에서 빠집니다. (회차마다 유효한 점 3개 이상, 서로 다른 각도 필요)</p>
+        <div id="run-table-wrap" class="tbl-wrap" hidden><table>
+            <thead><tr><th>회차</th><th>점</th><th>A</th><th>B</th><th>θ₀</th><th>R²</th></tr></thead>
+            <tbody id="run-table"></tbody>
+        </table></div>
+        <div id="verdict" hidden></div>
+        <div class="results" id="results"></div>
+        <canvas id="chart1" class="chart"></canvas>
+        <canvas id="chart2" class="chart"></canvas>
+        <p class="note">위 그래프: 회차별(색) 밝기와 적합 곡선, 속이 빈 원은 결측 처리한 점. 아래 그래프: 모든 회차의 정규화 밝기를 cos²(θ−θ₀) 에 대해 모은 것으로, 말루스 법칙이 맞으면 점들이 기울기 1인 점선 위에 놓입니다.</p>
+    </div>
+
+    <div class="card">
+        <h2>5. 내 구글 스프레드시트로 내보내기</h2>
+        <div class="row">
+            <button id="btn-gs-oauth" class="good" disabled>🟢 구글 로그인 후 내 드라이브에 새 시트 만들기</button>
+        </div>
+        <div class="row"><span id="gs-oauth-status" class="note"></span> <a id="gs-oauth-link" href="#" target="_blank" rel="noopener" hidden>📄 시트 열기</a></div>
+        <p class="note">로그인한 본인 계정의 드라이브에 새 스프레드시트가 만들어지고, 이 앱이 만든 파일에만 접근합니다. 아래는 로그인 없이 쓰는 다른 방법입니다.</p>
+        <hr style="border:none;border-top:1px solid #eee;margin:12px 0">
+        <div class="row">
+            <button id="btn-copy" class="secondary" disabled>📋 표 복사 (시트에 붙여넣기)</button>
+            <span class="note">복사 후 시트에서 A1 셀을 선택하고 붙여넣기(Ctrl+V)</span>
+        </div>
+        <div class="row">
+            <label style="flex:1">이름/조 <input type="text" id="gs-name" placeholder="예: 3조" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;width:100%"></label>
+        </div>
+        <div class="row">
+            <label style="flex:1">웹 앱 URL <input type="url" id="gs-url" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;width:100%"></label>
+        </div>
+        <div class="row"><button id="btn-gs" class="good" disabled>📤 내 시트로 전송</button><span id="gs-status" class="note"></span></div>
+        <details>
+            <summary>🔧 내 시트 연결 방법 (1회만)</summary>
+            <ol>
+                <li>구글 스프레드시트를 새로 만들고 <b>확장 프로그램 → Apps Script</b>를 엽니다.</li>
+                <li>아래 코드를 붙여넣고 저장합니다.</li>
+                <li><b>배포 → 새 배포 → 유형: 웹 앱</b>, 실행 사용자 <b>나</b>, 액세스 권한 <b>모든 사용자</b>로 배포하고 권한을 승인합니다.</li>
+                <li>나온 <b>웹 앱 URL</b>을 위 칸에 붙여넣습니다.</li>
+            </ol>
+            <pre id="gs-code" style="background:#f1f3f5;padding:10px;border-radius:6px;overflow-x:auto;font-size:.8em;white-space:pre-wrap">function doPost(e) {
+  var d = JSON.parse(e.postData.contents);
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sh.getLastRow() === 0) sh.appendRow(d.header);
+  d.rows.forEach(function (r) { sh.appendRow(r); });
+  return ContentService.createTextOutput('ok');
+}</pre>
+            <button id="btn-copy-code" class="secondary">코드 복사</button>
+            <p class="note">브라우저 보안상 전송 성공 여부는 앱에서 확인할 수 없으니 시트에 행이 생겼는지 확인하세요. URL을 아는 사람은 누구나 시트에 쓸 수 있으므로 URL을 공유하지 마세요.</p>
+        </details>
+    </div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="../js/malus-math.js"></script>
+<script src="../js/malus-law.js"></script>
+<script src="../js/malus-sheets.js"></script>
+</body>
+</html>
