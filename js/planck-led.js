@@ -16,7 +16,7 @@
         iMode: 'resistor',     // 전류 재는 법: 'resistor' (고정 저항 전압 ÷ 저항) | 'meter' (전류계)
         rMeas: '', vrUnit: 'V', // 고정 저항 실제 값 (비우면 회로 탭 값), 저항 전압 단위
         bat: '4.5', batReal: '', iMax: '10',
-        tab: 'theory',         // 보고 있는 탭
+        tab: 'purpose',        // 보고 있는 탭
         draft: { v: '', i: '', vr: '', gv: '' } // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
     };
 
@@ -36,6 +36,9 @@
         if (d && Array.isArray(d.leds) && d.leds.length) {
             Object.assign(state, d);
             if (state.pot !== '1000') state.pot = '10000';
+            state.origin = false;   // 원점 통과 직선은 결론·분석 탭에서 따로 보여 준다
+            // 예전 탭 이름 → 보고서 순서 탭 이름
+            state.tab = { setup: 'procedure', leds: 'materials', measure: 'data' }[state.tab] || state.tab;
             if (state.rs == null) state.rs = '330';
             if (state.rsCustom == null) state.rsCustom = '';
             state.draft = Object.assign({ v: '', i: '', vr: '', gv: '' }, d.draft);
@@ -57,7 +60,7 @@
     const methodKey = m => (m || state.method) === 'glow' ? 'glow' : state.curMode;
     const thr = (led, m) => P.thresholdOf(led, methodKey(m), { iMin: state.iMin, iRef: state.iRef });
     const color = led => P.wavelengthColor(led.lambda);
-    const methodName = m => m === 'glow' ? '빛 기준' : (state.curMode === 'current' ? '전류 기준·기준 전류' : '전류 기준·직선 연장');
+    const methodName = m => m === 'glow' ? '빛 기준' : (state.curMode === 'current' ? '전류 기준(기준 전류)' : '전류 기준');
 
     // 순방향 전압 추정 (가변저항 안전 한계 계산용): 미리 넣은 LED 는 표의 값, 직접 추가한 LED 는 파장으로 짐작
     function vfOf(led) {
@@ -202,7 +205,7 @@
         $('led-lambda').innerHTML = led ? '<span class="dot" style="background:' + color(led) + '"></span>광자 에너지 hc/λ = ' + P.photonVolt(led.lambda).toFixed(2) + ' eV' : '';
         ['in-v', 'in-i', 'in-vr', 'btn-add-iv', 'in-gv', 'btn-add-glow', 'btn-clear-led'].forEach(id => { $(id).disabled = !led; });
         if (!led) {
-            $('thr-out').textContent = '💡 LED 탭에서 사용할 LED 를 하나 이상 고르세요.';
+            $('thr-out').textContent = '3. 실험 준비물 탭에서 사용할 LED 를 하나 이상 고르세요.';
             $('meas-head').innerHTML = ''; $('meas-body').innerHTML = '';
             drawIV(null, null);
             return;
@@ -219,12 +222,12 @@
         }
 
         if (glow) {
-            $('meas-head').innerHTML = '<tr><th>회</th><th>빛이 보인 전압 (V)</th><th></th></tr>';
+            $('meas-head').innerHTML = '<tr><th>회</th><th>빛이 보인 V<sub>LED</sub> (V)</th><th></th></tr>';
             $('meas-body').innerHTML = led.glow.map((v, k) =>
                 '<tr><td>' + (k + 1) + '</td><td>' + v.toFixed(3) + '</td><td><button class="secondary" data-del-glow="' + k + '">삭제</button></td></tr>').join('');
         } else {
             const hasVr = led.iv.some(p => p.vr != null);
-            $('meas-head').innerHTML = '<tr><th>번호</th><th>LED 전압 (V)</th>' + (hasVr ? '<th>V<sub>R</sub> (mV)</th>' : '') + '<th>전류 I (mA)</th><th></th></tr>';
+            $('meas-head').innerHTML = '<tr><th>번호</th><th>V<sub>LED</sub> (V)</th>' + (hasVr ? '<th>V<sub>R</sub> (mV)</th>' : '') + '<th>전류 I (mA)</th><th></th></tr>';
             // 기록 순서와 상관없이 전압 순으로 보여 준다
             const rows = led.iv.map((p, k) => ({ p, k })).sort((a, b) => a.p.v - b.p.v);
             const usedMark = state.curMode === 'extrapolate' ? (p => p.i >= state.iMin) : (() => false);
@@ -347,7 +350,6 @@
             '<td>' + P.photonVolt(led.lambda).toFixed(3) + '</td>' +
             '<td><input type="checkbox" data-fit="1"' + (led.fit ? ' checked' : '') + (t.error ? ' disabled' : '') + '></td></tr>').join('')
             : '<tr><td colspan="7" class="note">사용할 LED 가 없습니다.</td></tr>';
-        $('chk-origin').checked = state.origin;
 
         const verdict = $('verdict');
         if (!res) {
@@ -381,7 +383,6 @@
         led.fit = e.target.checked;
         save(); renderResults();
     });
-    $('chk-origin').addEventListener('change', e => { state.origin = e.target.checked; save(); renderResults(); });
 
     // 최소제곱법 계산 과정 (x = f [10¹⁴ Hz], y = V₀ [V])
     function calcHtml(res) {
@@ -552,11 +553,48 @@
     $('sel-rs').addEventListener('change', e => { state.rs = e.target.value; save(); renderSetup(); });
     $('rs-custom').addEventListener('input', e => { state.rsCustom = e.target.value; save(); renderSetup(); });
 
+    // ---------- 7. 결론 및 분석: 기준별 결과 요약 ----------
+    function fitFor(m, origin) {
+        const items = usedLeds().filter(l => l.fit)
+            .map(l => ({ lambda: l.lambda, t: thr(l, m) }))
+            .filter(x => !x.t.error)
+            .map(x => ({ lambda: x.lambda, v0: x.t.v0 }));
+        return { n: items.length, res: P.planckFit(items, { origin }) };
+    }
+    function renderConclusion() {
+        const rows = [
+            { name: '⚡ 전류 기준 (본 실험)', ...fitFor('current', false), slopeInfo: true },
+            { name: '⚡ 전류 기준, 원점을 지나는 직선', ...fitFor('current', true) },
+            { name: '💡 빛 기준 (비교 실험)', ...fitFor('glow', false), slopeInfo: true }
+        ];
+        const cell = r => {
+            if (!r.res) return '<td colspan="4" class="note">' + (r.n ? 'LED ' + r.n + '개 — 2개 이상 필요' : '측정하지 않음') + '</td>';
+            const err = Math.abs(r.res.errorPct);
+            return '<td><b>' + (r.res.h / 1e-34).toFixed(2) + '</b></td><td>' + err.toFixed(1) + ' %</td>' +
+                '<td>' + (r.res.fit.r2 != null ? r.res.fit.r2.toFixed(3) : '–') + '</td>' +
+                '<td>' + (r.slopeInfo ? r.res.fit.intercept.toFixed(2) + ' V' : '0') + '</td>';
+        };
+        let html = '<div class="tbl-wrap" style="max-height:none"><table class="sum-table"><thead><tr><th>기준</th><th>h (×10⁻³⁴ J·s)</th><th>오차율</th><th>R²</th><th>절편</th></tr></thead><tbody>' +
+            rows.map(r => '<tr><td>' + r.name + (r.res ? ' <span class="note">(LED ' + r.n + '개)</span>' : '') + '</td>' + cell(r) + '</tr>').join('') +
+            '</tbody></table></div>';
+        const [cur, , glow] = rows;
+        const notes = [];
+        if (cur.res && glow.res) {
+            const better = Math.abs(cur.res.errorPct) <= Math.abs(glow.res.errorPct) ? '전류 기준' : '빛 기준';
+            notes.push('두 기준 중 참값에 더 가까운 것: <b>' + better + '</b>. 표 1 의 V₀ 와 \'비교\' 칸을 색깔별로 비교해 보세요. 어느 색에서 차이가 큰가요?');
+        }
+        if (cur.res) notes.push('참값 h = 6.626 × 10⁻³⁴ J·s. 이론대로라면 절편은 0 V 입니다. 우리 결과의 절편은 ' + cur.res.fit.intercept.toFixed(2) + ' V 입니다.');
+        else notes.push('5. 데이터 수집에서 LED 2개 이상(3개 이상 추천)을 측정하면 결과가 여기에 요약됩니다.');
+        html += '<p class="note">' + notes.join('<br>') + '</p>';
+        $('concl-sum').innerHTML = html;
+    }
+
     function renderAll() {
         renderSetup();
         renderLeds();
         renderMeasure();
         renderResults();
+        renderConclusion();
     }
 
     // ---------- 입력 중인 값 ----------
@@ -567,9 +605,9 @@
     ['in-v', 'in-i', 'in-vr', 'in-gv'].forEach(id => $(id).addEventListener('input', saveDraft));
 
     // ---------- 탭 ----------
-    const TABS = ['theory', 'setup', 'leds', 'measure', 'result'];
+    const TABS = ['purpose', 'theory', 'materials', 'procedure', 'data', 'result', 'conclusion'];
     function showTab(t, scroll) {
-        if (!TABS.includes(t)) t = 'theory';
+        if (!TABS.includes(t)) t = 'purpose';
         state.tab = t;
         document.querySelectorAll('.panel').forEach(p => { p.hidden = p.dataset.tab !== t; });
         document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t ? 'true' : 'false'));
