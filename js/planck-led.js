@@ -12,7 +12,7 @@
         iMin: 1, iRef: 0.1,    // mA
         origin: false,
         sel: null,             // 측정 중인 LED id
-        pot: '10000', bat: '4.5', batReal: '', iMax: '10',
+        pot: '10000', rs: '330', rsCustom: '', bat: '4.5', batReal: '', iMax: '10',
         tab: 'theory',         // 보고 있는 탭
         draft: { v: '', i: '', gv: '' } // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
     };
@@ -33,6 +33,8 @@
         if (d && Array.isArray(d.leds) && d.leds.length) {
             Object.assign(state, d);
             if (state.pot !== '1000') state.pot = '10000';
+            if (state.rs == null) state.rs = '330';
+            if (state.rsCustom == null) state.rsCustom = '';
             state.draft = Object.assign({ v: '', i: '', gv: '' }, d.draft);
             state.leds.forEach(l => { l.iv = Array.isArray(l.iv) ? l.iv : []; l.glow = Array.isArray(l.glow) ? l.glow : []; if (l.fit == null) l.fit = true; });
         } else {
@@ -66,34 +68,51 @@
         return real && real > 0 ? real : parseFloat(state.bat);
     }
     const ohm = r => r >= 1000 ? Number((r / 1000).toFixed(2)) + ' kΩ' : Math.round(r) + ' Ω';
+    // LED 앞 고정 저항 (Ω, 없으면 0)
+    function seriesOhm() {
+        if (state.rs === 'custom') { const v = num(state.rsCustom); return v && v > 0 ? v : 0; }
+        return parseFloat(state.rs) || 0;
+    }
     function renderSetup() {
-        const vb = batteryVolt(), iMax = parseFloat(state.iMax), rPot = parseFloat(state.pot);
+        const vb = batteryVolt(), iMax = parseFloat(state.iMax), rPot = parseFloat(state.pot), rs = seriesOhm();
         const leds = usedLeds().length ? usedLeds() : state.leds;
         const vfs = leds.map(vfOf);
         const vfLow = Math.min(...vfs), vfHigh = Math.max(...vfs);
-        const g = P.potGuide(vb, rPot, iMax, vfs);
+        const g = P.potGuide(vb, rPot, iMax, vfs, rs);
         const pct = x => Math.round(x * 100) + ' %';
-        // 회로도: 가변저항 사각형은 y = 55 (+ 쪽 끝) ~ 165 (− 쪽 끝)
+        // 회로도: 가변저항 사각형은 y = 55 (+ 쪽 끝) ~ 165 (− 쪽 끝). 끝까지 안전하면 안전 한계 선을 숨긴다
         const yLim = 165 - 110 * g.xMax;
         $('svg-limit').setAttribute('y1', yLim); $('svg-limit').setAttribute('y2', yLim);
         $('svg-limit-txt').setAttribute('y', Math.max(72, yLim + 4));
+        $('svg-limit').style.display = $('svg-limit-txt').style.display = g.safeToEnd ? 'none' : '';
+        $('svg-rs').setAttribute('stroke', rs ? '#333' : '#999');
+        $('svg-rs').setAttribute('stroke-dasharray', rs ? '' : '4 3');
+        $('svg-rs-txt').textContent = rs ? '고정 저항 ' + ohm(rs) : '(선택) 고정 저항';
         $('svg-bat').textContent = '건전지 ' + vb.toFixed(1) + ' V';
         $('svg-pot').textContent = ohm(rPot);
+        $('row-rs-custom').hidden = state.rs !== 'custom';
         document.querySelectorAll('.imax-txt').forEach(e => { e.textContent = iMax; });
         document.querySelectorAll('.r-limit').forEach(e => { e.textContent = '약 ' + ohm(g.rLower); });
         document.querySelectorAll('.series-r').forEach(e => { e.textContent = g.seriesR + ' Ω'; });
         document.querySelectorAll('.pot-range').forEach(e => { e.textContent = rPot > 2000 ? '20 kΩ' : '2 kΩ'; });
+        document.querySelectorAll('.need-limit').forEach(e => { e.hidden = g.safeToEnd; });
+        const limitLine = g.safeToEnd
+            ? '✅ <b>손잡이를 끝까지 돌려도 안전</b>: 고정 저항 ' + ohm(rs) + ' 덕분에 최대 약 <b>' + g.endLow.toFixed(1) + ' mA</b> (순방향 전압이 낮은 LED, 약 ' + vfLow.toFixed(1) + ' V). 안전 한계 표시는 필요 없습니다<br>'
+            : '🛑 <b>안전 한계</b>: 가운데 다리 ~ − 쪽 다리 저항 <b class="big">' + ohm(g.rLower) + '</b> (손잡이 약 ' + pct(g.xMax) + ' 위치)' +
+              ' <span class="note">— 이보다 더 돌리면 순방향 전압이 낮은 LED(약 ' + vfLow.toFixed(1) + ' V)에 ' + iMax + ' mA 넘게 흐릅니다' +
+              (rs ? '' : '. 고정 저항(' + g.seriesR + ' Ω 이상)을 넣으면 끝까지 돌려도 안전합니다') + '</span><br>';
         $('setup-out').innerHTML =
-            '🔧 <b>' + ohm(rPot) + ' 가변저항</b>: 양 끝 다리 → 건전지 +, −  /  가운데 다리 → 전류계 → LED<br>' +
+            '🔧 <b>' + ohm(rPot) + ' 가변저항</b>: 양 끝 다리 → 건전지 +, −  /  가운데 다리 → 전류계 → ' + (rs ? '고정 저항 ' + ohm(rs) + ' → ' : '') + 'LED<br>' +
             '▶️ 시작: 손잡이를 <b>− 쪽 끝</b>까지 (가운데 다리 ~ − 쪽 다리 0 Ω, LED 전압 0 V)<br>' +
-            '🛑 <b>안전 한계</b>: 가운데 다리 ~ − 쪽 다리 저항 <b class="big">' + ohm(g.rLower) + '</b> (손잡이 약 ' + pct(g.xMax) + ' 위치)' +
-            ' <span class="note">— 이보다 더 돌리면 순방향 전압이 낮은 LED(약 ' + vfLow.toFixed(1) + ' V)에 ' + iMax + ' mA 넘게 흐릅니다</span><br>' +
+            limitLine +
             '💡 LED 가 켜지기 시작하는 위치: 손잡이 약 ' + pct(g.xOnLow * 0.85) + ' ~ ' + pct(Math.min(1, g.xOnHigh * 0.95)) + ' 부근 (색마다 다름)<br>' +
-            '🔵 안전 한계에서 순방향 전압이 높은 LED(파랑 등, 약 ' + vfHigh.toFixed(1) + ' V) 전류: 약 <b>' + g.iHighAtLimit.toFixed(1) + ' mA</b><br>' +
+            '🔵 ' + (g.safeToEnd ? '끝까지 돌렸을 때' : '안전 한계에서') + ' 순방향 전압이 높은 LED(파랑 등, 약 ' + vfHigh.toFixed(1) + ' V) 전류: 약 <b>' + g.iHighAtLimit.toFixed(1) + ' mA</b><br>' +
             '🔋 가변저항에 늘 흐르는 전류: 약 ' + g.drainMa.toFixed(2) + ' mA';
         const warns = [];
-        if (g.iHighAtLimit < 2) warns.push('⚠️ 건전지 전압이 낮아 순방향 전압이 높은 LED(파랑·초록·보라, 약 ' + vfHigh.toFixed(1) + ' V)에 전류가 충분히 흐르지 않습니다. <b>4.5 V (건전지 3개)</b> 이상을 쓰세요.');
-        if (g.xMax < 0.7) warns.push('⚠️ 안전 한계가 손잡이 ' + pct(g.xMax) + ' 로 낮아 조절할 수 있는 범위가 좁습니다. 건전지 전압을 낮추거나 10 kΩ 가변저항을 쓰세요.');
+        if (g.iHighAtLimit < 2) warns.push(rs > g.seriesR * 1.3
+            ? '⚠️ 고정 저항(' + ohm(rs) + ')이 커서 순방향 전압이 높은 LED(파랑·초록·보라)에 전류가 충분히 흐르지 않습니다. ' + g.seriesR + '~' + Math.round(g.seriesR * 1.3 / 10) * 10 + ' Ω 정도로 바꾸세요.'
+            : '⚠️ 건전지 전압이 낮아 순방향 전압이 높은 LED(파랑·초록·보라, 약 ' + vfHigh.toFixed(1) + ' V)에 전류가 충분히 흐르지 않습니다. <b>4.5 V (건전지 3개)</b> 이상을 쓰세요.');
+        if (g.xMax < 0.7) warns.push('⚠️ 안전 한계가 손잡이 ' + pct(g.xMax) + ' 로 낮아 조절할 수 있는 범위가 좁습니다. 고정 저항을 넣거나, 건전지 전압을 낮추거나, 10 kΩ 가변저항을 쓰세요.');
         if (g.drainMa > 5) warns.push('ℹ️ 가변저항에 늘 ' + g.drainMa.toFixed(1) + ' mA 가 흘러 건전지가 빨리 닳습니다. 측정하지 않을 때는 건전지를 빼 두세요.');
         $('setup-warn').innerHTML = warns.join('<br>');
         $('setup-warn').hidden = !warns.length;
@@ -478,6 +497,8 @@
     $('bat-real').addEventListener('input', e => { state.batReal = e.target.value; save(); renderSetup(); });
     $('sel-imax').addEventListener('change', e => { state.iMax = e.target.value; save(); renderSetup(); });
     $('sel-pot').addEventListener('change', e => { state.pot = e.target.value; save(); renderSetup(); });
+    $('sel-rs').addEventListener('change', e => { state.rs = e.target.value; save(); renderSetup(); });
+    $('rs-custom').addEventListener('input', e => { state.rsCustom = e.target.value; save(); renderSetup(); });
 
     function renderAll() {
         renderSetup();
@@ -509,6 +530,8 @@
     // 저장된 값을 화면 입력 칸에 넣기
     function applyControls() {
         $('sel-pot').value = state.pot;
+        $('sel-rs').value = state.rs;
+        $('rs-custom').value = state.rsCustom;
         $('sel-bat').value = state.bat;
         $('bat-real').value = state.batReal;
         $('sel-imax').value = state.iMax;

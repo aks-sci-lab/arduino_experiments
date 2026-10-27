@@ -146,33 +146,37 @@
     }
 
     // 가변저항 하나를 전압 분배기로 쓸 때의 설정값 안내.
-    // 양 끝 다리를 건전지에, 가운데 다리를 LED 에 연결한다. 손잡이 위치 x (0 = − 쪽 끝, 1 = + 쪽 끝) 에서
+    // 양 끝 다리를 건전지에, 가운데 다리를 (고정 저항 rs 를 거쳐) LED 에 연결한다. 손잡이 위치 x (0 = − 쪽 끝, 1 = + 쪽 끝) 에서
     //   열린 전압 = V·x,  가운데 다리에서 본 내부 저항 = R·x(1−x)
-    // 이므로 LED 전류는 I(x) = (V·x − Vf) / (R·x(1−x)). + 쪽 끝 (x → 1) 에서는 내부 저항이 0 이 되어 전류가 지나치게 커진다.
-    function currentAt(vBat, rPot, x, vf) {
-        const rIn = rPot * x * (1 - x);
+    // 이므로 LED 전류는 I(x) = (V·x − Vf) / (R·x(1−x) + rs).
+    // 고정 저항이 없으면 + 쪽 끝 (x → 1) 에서 내부 저항이 0 이 되어 전류가 지나치게 커진다.
+    function currentAt(vBat, rPot, x, vf, rs) {
+        const rIn = rPot * x * (1 - x) + (rs || 0);
         const top = vBat * x - vf;
         if (top <= 0) return 0;
         return rIn > 0 ? top / rIn * 1000 : Infinity;   // mA
     }
-    // 전류가 iMaxmA 가 되는 손잡이 위치: R·I·x² + (V − R·I)·x − Vf = 0 의 양의 근
-    function safeLimit(vBat, rPot, iMaxmA, vf) {
-        const ri = rPot * iMaxmA / 1000;
+    // 전류가 iMaxmA 가 되는 손잡이 위치: R·I·x² + (V − R·I)·x − (Vf + I·rs) = 0 의 양의 근 (끝까지 돌려도 안전하면 1)
+    function safeLimit(vBat, rPot, iMaxmA, vf, rs) {
+        if (currentAt(vBat, rPot, 1, vf, rs) <= iMaxmA) return 1;
+        const i = iMaxmA / 1000, ri = rPot * i;
         const b = vBat - ri;
-        const x = (-b + Math.sqrt(b * b + 4 * ri * vf)) / (2 * ri);
+        const x = (-b + Math.sqrt(b * b + 4 * ri * (vf + i * (rs || 0)))) / (2 * ri);
         return Math.min(1, x);
     }
-    // 화면 안내용 묶음.  vfs: 쓰는 LED 들의 순방향 전압 (V)
-    function potGuide(vBat, rPot, iMaxmA, vfs) {
+    // 화면 안내용 묶음.  vfs: 쓰는 LED 들의 순방향 전압 (V), rs: LED 앞 고정 저항 (Ω, 없으면 0)
+    function potGuide(vBat, rPot, iMaxmA, vfs, rs) {
         const vfLow = Math.min(...vfs), vfHigh = Math.max(...vfs);
-        const xMax = safeLimit(vBat, rPot, iMaxmA, vfLow);   // 순방향 전압이 가장 낮은 LED 기준 (가장 엄격)
+        const xMax = safeLimit(vBat, rPot, iMaxmA, vfLow, rs);   // 순방향 전압이 가장 낮은 LED 기준 (가장 엄격)
         return {
             drainMa: vBat / rPot * 1000,                     // 가변저항에 늘 흐르는 전류 (mA)
             xMax,                                            // 손잡이를 이 위치 넘게 돌리지 않는다
+            safeToEnd: xMax >= 1,                            // 끝까지 돌려도 최대 전류를 넘지 않음
             rLower: xMax * rPot,                             // 그 위치에서 가운데 다리 ~ − 쪽 다리 저항 (Ω)
+            endLow: currentAt(vBat, rPot, 1, vfLow, rs),     // 끝까지 돌렸을 때 순방향 전압이 낮은 LED 전류 (mA)
             xOnLow: vfLow / vBat, xOnHigh: Math.min(1, vfHigh / vBat), // LED 가 켜지기 시작하는 대략적인 위치
-            iHighAtLimit: currentAt(vBat, rPot, xMax, vfHigh), // 안전 한계에서 순방향 전압이 높은 LED 의 전류 (mA)
-            seriesR: Math.ceil((vBat - vfLow) / (iMaxmA / 1000) / 10) * 10  // 고정 저항을 따로 넣을 때 권장값 (Ω)
+            iHighAtLimit: currentAt(vBat, rPot, xMax, vfHigh, rs), // 안전 한계에서 순방향 전압이 높은 LED 의 전류 (mA)
+            seriesR: Math.ceil((vBat - vfLow) / (iMaxmA / 1000) / 10) * 10  // 끝까지 돌려도 안전한 고정 저항 최솟값 (Ω)
         };
     }
 

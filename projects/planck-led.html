@@ -39,6 +39,7 @@
         <ul class="note" style="padding-left:20px;margin:4px 0">
             <li>색이 다른 LED 3~5개 (빨강·주황·노랑·초록·파랑 등) — 파장은 제품 설명서에서 확인</li>
             <li>가변저항(포텐셜미터) <b>1개: 10 kΩ 또는 1 kΩ</b> — 다리 3개를 모두 써서 전압 조절기(분압기)로 씁니다</li>
+            <li><b>고정 저항 1개 (추천)</b>: 330 Ω 정도. 세라믹·탄소 피막 등 종류는 상관없고 1/4 W 면 충분합니다</li>
             <li>건전지와 건전지 홀더, 브레드보드, 점퍼선</li>
             <li>멀티미터 (2대면 전압·전류를 동시에 잴 수 있어 편합니다)</li>
         </ul>
@@ -57,9 +58,9 @@
                 <!-- 전류계 -->
                 <path d="M165 110 H184"/>
                 <circle cx="200" cy="110" r="16" fill="#fff"/>
-                <!-- (선택) 고정 저항 -->
+                <!-- 고정 저항 (없으면 점선) -->
                 <path d="M216 110 H320 V138 M320 156 V200"/>
-                <rect x="238" y="102" width="44" height="16" fill="#fff" stroke="#999" stroke-dasharray="4 3"/>
+                <rect id="svg-rs" x="238" y="102" width="44" height="16" fill="#fff"/>
                 <!-- LED -->
                 <path d="M306 138 H334 L320 156 Z" fill="#ffd54f"/>
                 <path d="M306 156 H334"/>
@@ -80,7 +81,7 @@
                 <text x="132" y="98" font-size="10" fill="#555">가운데 다리</text>
                 <text x="132" y="78" font-size="10" fill="#dc3545" id="svg-limit-txt">안전 한계</text>
                 <text x="194" y="115" font-weight="bold">A</text>
-                <text x="232" y="136" font-size="9" fill="#888">(선택) 고정 저항</text>
+                <text x="232" y="136" font-size="9" fill="#555" id="svg-rs-txt">고정 저항 330 Ω</text>
                 <text x="355" y="152" font-weight="bold">V</text>
                 <text x="276" y="96" font-size="10" fill="#555">긴 다리</text>
                 <text x="232" y="222" font-size="10" fill="#555">전압계는 LED 다리에 바로</text>
@@ -115,26 +116,41 @@
                 </select>
             </label>
         </div>
+        <div class="row">
+            <label>LED 앞 고정 저항
+                <select id="sel-rs">
+                    <option value="0">없음</option>
+                    <option value="220">220 Ω</option>
+                    <option value="270">270 Ω</option>
+                    <option value="330" selected>330 Ω (추천)</option>
+                    <option value="470">470 Ω</option>
+                    <option value="680">680 Ω</option>
+                    <option value="custom">직접 입력</option>
+                </select>
+            </label>
+            <label id="row-rs-custom" hidden><input type="number" id="rs-custom" min="0" step="1" inputmode="numeric"> Ω</label>
+        </div>
         <p class="note" style="margin:2px 0">새 건전지는 1개에 1.5~1.6 V 입니다. 멀티미터로 잰 전압을 <b>실제 전압</b> 칸에 넣으면 더 정확하게 계산합니다.</p>
         <div class="setbox" id="setup-out"></div>
         <div id="setup-warn" class="warn" hidden></div>
 
         <details>
-            <summary>🔧 가변저항 맞추는 순서 (안전 한계 표시)</summary>
+            <summary>🔧 가변저항 맞추는 순서</summary>
             <ol>
-                <li>건전지와 LED 를 꽂기 <b>전에</b>, 멀티미터를 <b>저항(Ω) 모드</b>(<span class="pot-range">20 kΩ</span> 범위)로 놓고 가변저항의 <b>가운데 다리와 한쪽 끝 다리</b> 사이를 잽니다. 이 끝 다리를 건전지 <b>−</b> 쪽으로 씁니다.</li>
-                <li>손잡이를 돌려 저항이 <b class="r-limit">–</b> 가 되는 위치를 찾고, 손잡이와 몸체에 <b>유성펜이나 테이프로 표시</b>합니다. 이것이 <b>안전 한계</b>입니다. 실험 중 이 표시를 넘겨 돌리지 않습니다.</li>
-                <li>손잡이를 <b>0 Ω 쪽 끝까지</b> 돌려 둡니다. 이 상태에서 LED 에 걸리는 전압은 0 V 입니다.</li>
-                <li>잰 끝 다리 → 건전지 <b>−</b>, 반대쪽 끝 다리 → 건전지 <b>+</b>, 가운데 다리 → 전류계 → LED <b>긴 다리(+)</b>, LED <b>짧은 다리(−)</b> → 건전지 −. LED 를 반대로 꽂으면 켜지지 않습니다.</li>
-                <li>LED 양 끝 전압을 보면서 손잡이를 아주 천천히 돌립니다. 전류가 최대 전류(<span class="imax-txt">10</span> mA)에 이르거나 안전 한계 표시에 닿으면 더 돌리지 않습니다.</li>
+                <li class="need-limit">건전지와 LED 를 꽂기 <b>전에</b>, 멀티미터를 <b>저항(Ω) 모드</b>(<span class="pot-range">20 kΩ</span> 범위)로 놓고 가변저항의 <b>가운데 다리와 한쪽 끝 다리</b> 사이를 잽니다. 이 끝 다리를 건전지 <b>−</b> 쪽으로 씁니다.</li>
+                <li class="need-limit">손잡이를 돌려 저항이 <b class="r-limit">–</b> 가 되는 위치를 찾고, 손잡이와 몸체에 <b>유성펜이나 테이프로 표시</b>합니다. 이것이 <b>안전 한계</b>입니다. 실험 중 이 표시를 넘겨 돌리지 않습니다.</li>
+                <li>손잡이를 <b>− 쪽 끝까지</b> 돌려 둡니다. 이 상태에서 LED 에 걸리는 전압은 0 V 입니다.</li>
+                <li>잰 끝 다리 → 건전지 <b>−</b>, 반대쪽 끝 다리 → 건전지 <b>+</b>, 가운데 다리 → 전류계 → 고정 저항 → LED <b>긴 다리(+)</b>, LED <b>짧은 다리(−)</b> → 건전지 −. LED 를 반대로 꽂으면 켜지지 않습니다.</li>
+                <li>LED 양 끝 전압을 보면서 손잡이를 아주 천천히 돌립니다. 전류가 최대 전류(<span class="imax-txt">10</span> mA)에 이르면<span class="need-limit"> (또는 안전 한계 표시에 닿으면)</span> 더 돌리지 않습니다.</li>
             </ol>
-            <p class="note">⚠️ 가변저항 하나만 쓰면 손잡이를 <b>+ 쪽 끝까지</b> 돌렸을 때 LED 가 건전지에 바로 연결되어 큰 전류가 흘러 망가질 수 있습니다. 그래서 안전 한계를 표시해 둡니다. <b>고정 저항</b>(약 <b class="series-r">250 Ω</b>, 220~330 Ω 정도)이 있다면 가운데 다리와 LED 사이에 넣으세요. 끝까지 돌려도 안전하고, 전압은 LED 다리에서 바로 재므로 결과에는 영향이 없습니다.</p>
+            <p class="note">💡 <b>고정 저항을 넣는 까닭</b>: 고정 저항이 없으면 손잡이를 <b>+ 쪽 끝</b>에 가깝게 돌렸을 때 LED 가 건전지에 거의 바로 연결됩니다. 10 kΩ 는 마지막 몇 도 사이에 전류가 10 mA 에서 100 mA 넘게 뛰어 LED 가 망가질 수 있습니다. 고정 저항(<b class="series-r">250 Ω</b> 이상)을 가운데 다리와 LED 사이에 넣으면 끝까지 돌려도 안전하고, 손잡이를 끝까지 써서 mA 구간도 더 부드럽게 조절됩니다. 전압은 LED 다리에서 바로 재므로 문턱 전압 결과에는 영향이 없습니다. 고정 저항이 없으면 위 순서대로 <b>안전 한계</b>를 표시해 두세요.</p>
         </details>
         <details>
             <summary>⚖️ 10 kΩ 와 1 kΩ 중 무엇을 쓸까?</summary>
             <ul>
-                <li><b>10 kΩ (추천)</b>: 건전지에서 늘 흐르는 전류가 작아(4.5 V 에서 약 0.45 mA) 건전지가 오래갑니다. LED 가 켜지는 구간이 손잡이의 넓은 범위에 퍼져 있어 문턱 근처를 <b>아주 세밀하게</b> 조절할 수 있습니다. 대신 가변저항 자체의 저항 때문에 LED 에 걸리는 전압이 출력보다 작아지므로, 전압은 꼭 LED 다리에서 잽니다.</li>
-                <li><b>1 kΩ</b>: 전압이 덜 출렁여 값이 안정적이지만, 늘 흐르는 전류가 10배(4.5 V 에서 약 4.5 mA)라 건전지가 빨리 닳습니다. 안전 한계까지 손잡이 범위가 좁아(약 80 %) 문턱 근처에서는 더 천천히 돌려야 합니다.</li>
+                <li><b>10 kΩ (추천)</b>: 건전지에서 늘 흐르는 전류가 작아(4.5 V 에서 약 0.45 mA) 건전지가 오래갑니다. LED 가 켜지는 구간이 손잡이의 넓은 범위에 퍼져 있어 문턱 근처를 세밀하게 조절할 수 있습니다 (빨강 LED, 4.5 V 계산: 전류 0.01 mA → 1 mA 가 손잡이 약 120° 에 걸쳐 바뀜). 대신 가변저항 자체의 저항 때문에 LED 에 걸리는 전압이 출력보다 작아지므로, 전압은 꼭 LED 다리에서 잽니다.</li>
+                <li><b>1 kΩ</b>: 전압이 덜 출렁여 값이 안정적이지만, 늘 흐르는 전류가 10배(4.5 V 에서 약 4.5 mA)라 건전지가 빨리 닳습니다. 문턱 근처가 더 예민합니다 (같은 조건에서 0.01 mA → 1 mA 가 약 30° 안에서 바뀜).</li>
+                <li>그래도 손잡이가 예민하면: 손잡이에 긴 막대나 큰 노브를 붙여 돌리거나, 여러 바퀴 돌리는 <b>다회전 가변저항</b>(10회전)을 쓰면 훨씬 세밀해집니다.</li>
                 <li>어느 쪽이든 측정 방법과 계산은 같습니다. 두 가지로 각각 측정해 결과를 비교해 보는 것도 좋은 탐구입니다.</li>
             </ul>
         </details>

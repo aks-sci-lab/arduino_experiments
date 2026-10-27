@@ -82,6 +82,7 @@ test('potentiometer divider: safe knob limit for 10 kΩ and 1 kΩ', () => {
     near(g.rLower, g.xMax * 10000, 1e-9);
     assert.ok(g.iHighAtLimit > 2 && g.iHighAtLimit < 10, String(g.iHighAtLimit));
     assert.equal(g.seriesR, 250);
+    assert.equal(g.safeToEnd, false);
     // 3 V 건전지로는 파랑 LED 에 전류가 흐르지 않는다
     assert.equal(P.potGuide(3, 10000, 10, [2.0, 3.1]).iHighAtLimit, 0);
 });
@@ -102,4 +103,16 @@ test('메인 화면에 플랑크 상수 실험 링크가 있고 페이지의 로
     for (const m of html.matchAll(/\b(?:src|href)="([^"#:]+)"/g)) {
         assert.ok(fs.existsSync(path.resolve(root, 'projects', m[1])), m[1]);
     }
+});
+
+test('a series resistor makes the full knob turn safe', () => {
+    // 330 Ω 를 넣으면 끝까지 돌려도 (4.5 − 2.0) / 330 ≈ 7.6 mA
+    const g = P.potGuide(4.5, 10000, 10, [2.0, 3.1], 330);
+    assert.equal(g.safeToEnd, true); assert.equal(g.xMax, 1);
+    near(g.endLow, 2.5 / 330 * 1000, 1e-9);
+    near(g.iHighAtLimit, 1.4 / 330 * 1000, 1e-9);
+    // 너무 작은 저항이면 끝 근처에 여전히 한계가 있고, 그 위치에서 전류가 정확히 최대 전류
+    const x = P.safeLimit(4.5, 10000, 10, 2.0, 100);
+    assert.ok(x < 1);
+    near(P.currentAt(4.5, 10000, x, 2.0, 100), 10, 1e-9);
 });
