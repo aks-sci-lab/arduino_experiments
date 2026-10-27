@@ -196,7 +196,8 @@ class Bot:
                                    "ORDER BY received_at DESC LIMIT 5", ids):
                 lines.append(f"• [{SOURCE_NAMES.get(r['source'], r['source'])}] {r['title'][:50]}")
             evs = self.db.query(
-                f"SELECT e.*, i.title AS item_title FROM events e JOIN items i ON i.id = e.item_id "
+                f"SELECT e.*, CASE WHEN i.source = 'school' THEN NULL ELSE i.title END AS item_title "
+                f"FROM events e JOIN items i ON i.id = e.item_id "
                 f"WHERE e.item_id IN ({marks}) AND e.kind = 'deadline' AND e.date >= ? ORDER BY e.date LIMIT 3",
                 ids + [today.isoformat()])
             if evs:

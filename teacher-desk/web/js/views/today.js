@@ -1,4 +1,4 @@
-// 🏠 오늘: 지난 마감 · 오늘 일정 · 7일 안 마감 · 오늘 조퇴/외출 · 새로 받은 자료 · 수집 상태
+// 📋 브리핑: 지난 마감 · 오늘 일정 · 7일 안 마감 · 오늘 조퇴/외출 · 새로 받은 자료 · 수집 상태
 import { api } from '../api.js';
 import { el, clear, guarded, longDate, todayIso, eventLine, catBadge, srcBadge } from '../ui.js';
 import { registerView, openTab, findTab, on } from '../shell.js';
@@ -54,22 +54,22 @@ function renderToday(pane) {
                     el('div', `수집 시각: ${(store.settings.collect_times || []).join(', ') || '없음'}`),
                     el('div', `다음 수집: ${st?.next_collect || '-'}`),
                     el('div', `마지막 수집: ${s.last_run ? s.last_run.finished_at.slice(5, 16) : '아직 없음'}`),
-                    el('div', `쿨메신저: ${store.settings.coolmessenger_name || '미설정'}${store.settings.coolmessenger_folder ? ' (+ 받은 파일 폴더)' : ''}`),
+                    el('div', `쿨메신저: ${store.settings.coolmessenger_path || store.settings.coolmessenger_name || '미설정'}${store.settings.coolmessenger_folder ? ' (+ 받은 파일 폴더)' : ''}`),
                     el('div', `에듀파인 폴더: ${store.settings.edufine_folder || '미설정'}`),
                     el('div', `텔레그램: ${st?.telegram.linked ? '연결됨' : '연결 안 됨'}`)))));
     })();
 }
 
 export function openToday() {
-    openTab({ id: 'today', title: '🏠 오늘', refresh: true, render: renderToday });
+    openTab({ id: 'today', title: '📋 브리핑', refresh: true, render: renderToday });
 }
 
 registerView({
-    id: 'today', icon: '🏠', label: '오늘',
+    id: 'today', icon: '📋', label: '브리핑',
     renderSide(body) {
-        body.append(el('div.empty', '오른쪽에 오늘 할 일이 모여 있습니다.'),
+        body.append(el('div.empty', '오른쪽에 오늘의 업무 브리핑이 있습니다.'),
             el('ul.list',
-                el('li', { onclick: openToday }, el('span.ttl', '🏠 오늘 화면 새로 고침')),
+                el('li', { onclick: openToday }, el('span.ttl', '📋 브리핑 새로 고침')),
                 el('li', { onclick: openCalendar }, el('span.ttl', '📅 달력 열기')),
                 el('li', { onclick: openPaste }, el('span.ttl', '＋ 메시지·공문 붙여넣기'))));
     },

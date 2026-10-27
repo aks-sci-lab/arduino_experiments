@@ -52,6 +52,19 @@ def memo_path(name):
     return memo_dir() / f"{name}.udb"
 
 
+def resolve(name="", path=""):
+    """직접 지정한 파일 경로가 있으면 그것, 없으면 이름으로 찾은 경로."""
+    path = (path or "").strip().strip('"')
+    if path:
+        p = Path(os.path.expandvars(os.path.expanduser(path)))
+        if p.is_dir():
+            raise CoolError(f"파일이 아니라 폴더입니다: {p}\n.udb 파일까지 지정하세요.")
+        return p
+    if not (name or "").strip():
+        raise CoolError("쿨메신저 이름이나 파일 경로를 입력하세요")
+    return memo_path(name)
+
+
 def candidates():
     """이 PC 에서 찾은 쿨메신저 이름들 (Memo 폴더의 *.udb)."""
     d = memo_dir()

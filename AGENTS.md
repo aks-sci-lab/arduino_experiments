@@ -71,6 +71,9 @@
 - 텔레그램은 롱 폴링(학교 PC 를 외부에 공개하지 않음), 연결 코드를 보낸 계정 하나만. 학생 이름·사유는 보내지 않는다.
 - 학생 공유는 `pass/` 정적 페이지 + 주소 `#` 데이터 (서버 저장 없음). 이 저장소에 둔 이유: 기존 Hosting 자동 배포를 그대로 쓰기 위함. `teacher-desk/` 는 `firebase.json` ignore 로 배포 제외.
 - 쿨메신저 쪽지: `%LOCALAPPDATA%\CoolMessenger\Memo\<이름>.udb` (사용자 확인, 2026-10-27). 설정에는 이름만 넣는다. `.udb` 내부 구조는 미확인이라 `desk/coolmsg.py` 가 SQLite 로 보고 표·열을 자동 인식한다 (복사본을 읽기 전용으로 열고, rowid 로 새 쪽지만). 실제 구조가 다르면 사용자가 보내 주는 '연결 확인 → 파일 구조'로 규칙을 고친다.
+- 쿨메신저 `.udb` 경로를 직접 지정(`coolmessenger_path`)하면 이름보다 우선. 경로 칸의 📂 찾아보기는 `desk/picker.py` 가 PowerShell 윈도우 대화 상자로 띄운다 (설치 없는 Python 에는 tkinter 없음).
+- 학사일정(`desk/schoolcal.py`): 학교마다 양식이 달라 양식을 고정하지 않고 **읽기 → 미리보기에서 고치기 → 저장**. 엑셀은 달력표(월×일, 전치·병합 칸=기간)/목록(날짜 열+행사 열)/글 순서로 자동 판별, 연도 없는 날짜는 학년도 규칙(3~12월=학년도, 1~2월=다음 해). 가장 범용적인 길은 나이스 Open API(`desk/neis.py`, 인증키 필요). 저장은 source='school' 항목 하나 + 일정, 같은 학년도는 바꿔치기. 분류 '학사' 추가.
+- 메뉴 이름: '오늘' → '브리핑' (사용자 지정, 2026-10-27). 뷰 id 는 `today` 그대로.
 - 업데이트: `teacher-desk/update-desk.bat` 이 Releases `desk-latest` 를 받아 `data/`·`config.json` 을 빼고 덮어쓴다. `.bat` 두 개는 `tools/make_bats.py` 로 만든다.
 - 화면은 VS Code 형태(① 활동 막대 ② 목록 패널 ③ 탭 ④ 작업 영역 ⑤ 하단 패널 ⑥ 상태 표시줄). 사용자가 🧩 화면 배치 모드에서 "배치 설명 복사"로 보내 주는 번호를 기준으로 레이아웃을 고친다.
 - 시험: `cd teacher-desk && python -m unittest discover -s tests -t .`, `node --test tests/pass-codec.test.cjs`
@@ -93,3 +96,5 @@
 - 2026-10-27: 업무 데스크 윈도우용 ZIP(Python 설치 불필요, embeddable 3.12 + pypdf, 바탕화면 바로 가기), 윈도우 자동 시험(들어 있는 Python 으로 시험 38개·start-desk.bat·화면 열림·바로 가기), `.bat` CP949 한글 깨짐 수정. 사용자의 직접 지시로 Claude Code 가 PR #34 머지·배포 — Claude Code
 - 2026-10-27: 쿨메신저 이름 입력 연동(`desk/coolmsg.py`, 연결 확인 화면), 업데이트 도구(`update-desk.bat`), 윈도우 시험에 업데이트 확인 추가 — Claude Code
   - 확인 필요: 실제 쿨메신저 `.udb` 구조 (SQLite 가 아니거나 암호화되어 있으면 연결 확인 결과로 다시 구현)
+- 2026-10-27: 0.3.0 — 검색 범위 확대(본문·요약·문서번호·분류·메모·학생 명단, 여러 낱말 AND), 브리핑 이름, 쿨메신저 파일 경로 직접 지정·📂 찾아보기, 학사일정 가져오기(파일·붙여넣기·나이스) — Claude Code
+  - 확인 필요: 나이스 Open API 실제 응답(가짜 서버로만 시험), 실제 학교 학사일정 파일 양식, 윈도우 찾아보기 창(자동 시험 불가)

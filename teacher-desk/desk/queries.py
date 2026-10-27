@@ -5,7 +5,8 @@ from datetime import date, timedelta
 from .db import decode_item
 
 EVENT_COLS = ("e.id, e.item_id, e.date, e.end_date, e.time, e.kind, e.category, e.text, e.done, "
-              "i.title AS item_title, i.source AS item_source")
+              # 학사일정은 묶음 제목 대신 행사 이름(e.text)이 보이게
+              "CASE WHEN i.source = 'school' THEN NULL ELSE i.title END AS item_title, i.source AS item_source")
 
 
 def events_between(db, start, end, include_done=True):
@@ -40,16 +41,30 @@ def today_summary(db, today=None):
             "passes": passes, "new_items": new_items, "last_run": last_run}
 
 
+def _terms_where(fields, terms):
+    """검색어를 띄어쓰기로 나눠, 낱말마다 어느 칸에든 들어 있으면 (모든 낱말 AND)."""
+    parts, args = [], []
+    for t in terms:
+        like = "%" + t.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        parts.append("(" + " OR ".join(f"COALESCE({f}, '') LIKE ? ESCAPE '\\'" for f in fields) + ")")
+        args += [like] * len(fields)
+    return " AND ".join(parts), args
+
+
 def search(db, q, limit=30):
-    q = q.strip()
-    if not q:
-        return {"items": [], "events": [], "passes": []}
-    like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    """모든 자료에서 찾기: 수신 항목(제목·본문·요약·문서번호·분류·파일), 일정, 조퇴·외출, 학생 명단."""
+    terms = q.split()[:5]
+    if not terms:
+        return {"items": [], "events": [], "passes": [], "students": []}
+    w, a = _terms_where(["title", "body", "summary", "doc_numbers", "category", "file_path"], terms)
     items = db.query("SELECT id, source, title, received_at, category, status FROM items "
-                     "WHERE title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\' "
-                     "ORDER BY received_at DESC LIMIT ?", (like, like, limit))
+                     f"WHERE {w} ORDER BY received_at DESC LIMIT ?", (*a, limit))
+    w, a = _terms_where(["e.text", "e.category", "e.date", "i.title"], terms)
     events = db.query(f"SELECT {EVENT_COLS} FROM events e LEFT JOIN items i ON i.id = e.item_id "
-                      "WHERE e.text LIKE ? ESCAPE '\\' ORDER BY e.date DESC LIMIT ?", (like, limit))
-    passes = db.query("SELECT * FROM passes WHERE student_name LIKE ? ESCAPE '\\' OR reason LIKE ? ESCAPE '\\' "
-                      "ORDER BY date DESC, id DESC LIMIT ?", (like, like, limit))
-    return {"items": items, "events": events, "passes": passes}
+                      f"WHERE {w} ORDER BY e.date DESC LIMIT ?", (*a, limit))
+    w, a = _terms_where(["student_name", "CAST(student_number AS TEXT)", "reason", "note", "serial", "date",
+                         "CASE kind WHEN 'out' THEN '외출' ELSE '조퇴' END"], terms)
+    passes = db.query(f"SELECT * FROM passes WHERE {w} ORDER BY date DESC, id DESC LIMIT ?", (*a, limit))
+    w, a = _terms_where(["name", "CAST(number AS TEXT)"], terms)
+    students = db.query(f"SELECT * FROM students WHERE {w} ORDER BY number LIMIT ?", (*a, limit))
+    return {"items": items, "events": events, "passes": passes, "students": students}

@@ -20,12 +20,17 @@ DEFAULTS = {
     "teacher_name": "",
     # 수집할 폴더
     "coolmessenger_name": "",      # 쿨메신저 쪽지 기록: %LOCALAPPDATA%\\CoolMessenger\\Memo\\<이름>.udb
+    "coolmessenger_path": "",      # (선택) .udb 파일 경로를 직접 지정하면 이름보다 우선
     "coolmessenger_folder": "",    # (선택) 쿨메신저가 받은 파일을 저장하는 폴더
     "edufine_folder": "",
     # 하루 수집 시각
     "collect_times": ["09:00", "12:00", "15:00"],
     # 학생 공유용 공개 페이지 주소 (저장소의 pass/ 폴더가 배포된 곳)
     "pass_page_url": "https://aks-sci-lab.web.app/pass/",
+    # 나이스 학사일정 (open.neis.go.kr 인증키, 고른 학교 {name, atpt, code})
+    "neis_key": "",
+    "neis_school": {},
+    "neis_api_base": "https://open.neis.go.kr/hub",
     # 텔레그램
     "telegram_token": "",
     "telegram_detail": "titles",  # counts: 개수만 / titles: 제목까지 / summary: 요약까지
@@ -35,12 +40,12 @@ DEFAULTS = {
 }
 
 # 화면에 그대로 돌려주면 안 되는 값
-SECRET_KEYS = {"telegram_token"}
+SECRET_KEYS = {"telegram_token", "neis_key"}
 # 화면에서 바꿀 수 있는 값 (port, data_dir, api_base 는 파일에서만)
 EDITABLE_KEYS = {
     "school_name", "grade", "class_no", "teacher_name",
-    "coolmessenger_name", "coolmessenger_folder", "edufine_folder", "collect_times",
-    "pass_page_url", "telegram_token", "telegram_detail", "layout",
+    "coolmessenger_name", "coolmessenger_path", "coolmessenger_folder", "edufine_folder", "collect_times",
+    "pass_page_url", "telegram_token", "telegram_detail", "layout", "neis_key", "neis_school",
 }
 
 
@@ -89,6 +94,10 @@ class Config:
                 if v not in ("counts", "titles", "summary"):
                     raise ValueError("telegram_detail 값이 잘못되었습니다")
                 clean[k] = v
+            elif k == "neis_school":
+                if not (isinstance(v, dict) and all(isinstance(v.get(x, ""), str) for x in ("name", "atpt", "code"))):
+                    raise ValueError("학교 정보가 잘못되었습니다")
+                clean[k] = {x: v.get(x, "")[:80] for x in ("name", "atpt", "code", "office")}
             elif k == "layout":
                 if not isinstance(v, dict):
                     raise ValueError("layout 은 객체여야 합니다")

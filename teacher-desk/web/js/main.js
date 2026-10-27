@@ -47,7 +47,7 @@ guarded(async () => {
     lastRunId = s.last_run ? s.last_run.id : 0;
     await Promise.all([loadStudents(), initPasses(), initInbox(), initCalendar()]);
     showView('today');
-    if (!s.settings.school_name && !s.settings.edufine_folder && !s.settings.coolmessenger_name) {
+    if (!s.settings.school_name && !s.settings.edufine_folder && !s.settings.coolmessenger_name && !s.settings.coolmessenger_path) {
         toast('처음 오셨네요. ⚙ 설정에서 학교·학급과 수집 폴더를 입력하세요.', 'info', 8000);
     }
     pollLogs();

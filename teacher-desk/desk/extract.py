@@ -12,7 +12,7 @@ from datetime import date, timedelta
 
 WEEKDAYS = "월화수목금토일"
 
-CATEGORIES = ["제출·마감", "회의", "연수", "행사", "수업·평가", "참고"]
+CATEGORIES = ["제출·마감", "회의", "연수", "행사", "수업·평가", "학사", "참고"]
 
 DEADLINE_WORDS = ("마감", "기한", "제출", "회신", "까지", "보고", "신청", "등록")
 CATEGORY_WORDS = [

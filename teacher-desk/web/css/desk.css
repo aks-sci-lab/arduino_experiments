@@ -38,6 +38,7 @@
     --c-training: #0f8b8d;
     --c-event: #d97706;
     --c-class: #2563eb;
+    --c-school: #0d9488;
     --c-ref: #6b7280;
 }
 
@@ -66,6 +67,7 @@
     --c-training: #3cc6c8;
     --c-event: #f5a524;
     --c-class: #6aa1ff;
+    --c-school: #2dd4bf;
     --c-ref: #98a1b3;
 }
 
@@ -357,10 +359,12 @@ label.check .hint { font-size: 0.8em; color: var(--muted); }
 .cat-연수 { background: var(--c-training); }
 .cat-행사 { background: var(--c-event); }
 .cat-수업·평가 { background: var(--c-class); }
+.cat-학사 { background: var(--c-school); }
 .cat-참고 { background: var(--c-ref); }
 .src-cool { background: #e0f2fe; color: #0369a1; }
 .src-edufine { background: #ede9fe; color: #5b21b6; }
 .src-paste { background: var(--surface-2); color: var(--muted); }
+.src-school { background: #ccfbf1; color: #0f766e; }
 :root[data-theme="dark"] .src-cool { background: #0c2a3d; color: #7cc7f5; }
 :root[data-theme="dark"] .src-edufine { background: #2a2050; color: #c4b5fd; }
 
