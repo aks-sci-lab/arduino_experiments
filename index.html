@@ -149,6 +149,7 @@
             <li><a href="projects/phone-accelerometer.html">➡️ 스마트폰 가속도 센서 실험</a></li>
             <li><a href="projects/malus-law.html">➡️ 말루스 법칙 실험 (스마트폰 카메라)</a></li>
             <li><a href="projects/planck-led.html">➡️ LED 로 플랑크 상수 측정 (멀티미터)</a></li>
+            <li><a href="projects/ideal-gas.html">➡️ 이상기체 상태 방정식 검증 (감압 용기 + 환경 센서)</a></li>
         </ul>
 
         <!-- 학생 및 교사 실험 데이터 기록 영역 -->
@@ -337,7 +338,7 @@
             let html = '<ul class="experiment-list">';
             
             const docs = [];
-            snap.forEach(doc => docs.push(doc.data()));
+            snap.forEach(doc => docs.push(Object.assign({ docId: doc.id }, doc.data())));
             docs.sort((a, b) => {
                 const ta = a.timestamp && a.timestamp.toDate ? a.timestamp.toDate().getTime() : 0;
                 const tb = b.timestamp && b.timestamp.toDate ? b.timestamp.toDate().getTime() : 0;
@@ -369,6 +370,7 @@
                         </div>
                         <div class="exp-details">
                             ${detailSummary}
+                            ${data.tab === 'ideal-gas-law' && data.report ? `<br><a href="projects/ideal-gas.html?report=${encodeURIComponent(data.docId)}">📄 보고서 보기</a>` : ''}
                         </div>
                     </li>
                 `;

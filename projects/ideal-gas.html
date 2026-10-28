@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이상기체 상태 방정식 검증</title>
+    <link rel="stylesheet" href="../css/ideal-gas.css">
+</head>
+<body>
+<div class="wrap">
+    <a class="back" href="../index.html">← 메인 페이지</a>
+    <h1>🎈 이상기체 상태 방정식 검증 (감압 용기)</h1>
+    <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="purpose"><b>1</b><span>목표</span></button>
+        <button role="tab" data-tab="theory"><b>2</b><span>이론</span></button>
+        <button role="tab" data-tab="materials"><b>3</b><span>준비물</span></button>
+        <button role="tab" data-tab="procedure"><b>4</b><span>과정</span></button>
+        <button role="tab" data-tab="data"><b>5</b><span>데이터</span></button>
+        <button role="tab" data-tab="result"><b>6</b><span>결과</span></button>
+        <button role="tab" data-tab="conclusion"><b>7</b><span>결론·검토</span></button>
+    </nav>
+    <div id="store-warn" class="warn" hidden>⚠️ 이 브라우저에서는 측정값과 글을 저장할 수 없습니다(사생활 보호 모드 등). 새로고침하거나 창을 닫으면 사라지므로, 끝나면 <b>7. 결론 및 검토</b> 탭에서 바로 제출하세요.</div>
+
+    <!-- 1. 실험 목표 -->
+    <section class="panel" data-tab="purpose">
+    <div class="card">
+        <h2>1. 실험 목표</h2>
+        <ol class="big-list" id="goal-list">
+            <li>감압 용기 속에 넣은 주사기 공기의 <b>압력과 부피</b>를 측정하여, 온도가 일정할 때 <b>PV 가 일정</b>한지(보일 법칙) 확인한다.</li>
+            <li>밀폐한 감압 용기 속 공기의 <b>온도와 압력</b>을 측정하여, 부피가 일정할 때 압력이 <b>절대 온도에 비례</b>하는지(샤를·게이뤼삭 법칙) 확인하고 <b>절대 영도</b>를 추정한다.</li>
+            <li>두 결과를 종합하여 <b>PV / T 가 일정</b>한지, 즉 <b>이상기체 상태 방정식 PV = nRT</b> 가 성립하는지 검증하고 오차의 원인을 분석한다.</li>
+        </ol>
+        <div class="setbox">
+            <b>이 실험에서 하는 일</b><br>
+            피코 환경 센서 모듈을 감압 용기 안에 넣으면, 용기 속 공기의 <b>압력과 온도</b>가 블루투스로 이 페이지에 실시간으로 들어옵니다.
+            <b>실험 1</b>에서는 손 펌프로 공기를 빼면서 주사기 속 공기의 부피를 읽고, <b>실험 2</b>에서는 용기를 데우고 식히면서 압력 변화를 자동으로 기록합니다.
+        </div>
+        <p class="note">관련 개념: 기체 분자 운동, 압력, 절대 온도, 보일 법칙, 샤를 법칙, 몰과 아보가드로 수, 최소제곱법</p>
+        <p class="note">이 페이지의 탭 순서는 실험 보고서 순서와 같습니다. 각 탭에 쓴 글과 측정값은 이 브라우저에 자동 저장되고, 마지막 <b>7. 결론 및 검토</b> 탭에서 보고서로 제출합니다.</p>
+
+        <h3>실험 전 예상해 보기 (가설)</h3>
+        <div class="qa">
+            <span class="note">감압 용기의 공기를 빼면 주사기 속 공기의 부피는 어떻게 될까요? 그때 압력 × 부피 값은? 용기를 데우면 압력은 어떻게 될까요? 그렇게 생각한 까닭도 쓰세요.</span>
+            <textarea id="tx-hypo" data-text="hypo" placeholder="예) 공기를 빼면 용기 속 압력이 낮아져 주사기 피스톤이 밀려 나와 부피가 커질 것이다. ..."></textarea>
+        </div>
+        <div class="row next"><button class="good" data-go="theory">다음: 2. 실험 이론 →</button></div>
+    </div>
+    </section>
+
+    <!-- 2. 실험 이론 -->
+    <section class="panel" data-tab="theory" hidden>
+    <div class="card">
+        <h2>2. 실험 이론</h2>
+        <h3>① 기체의 압력과 온도</h3>
+        <p>기체 분자들은 쉬지 않고 제멋대로 움직이며 용기 벽에 부딪힙니다. 이 충돌로 벽의 단위 면적이 받는 힘이 <b>압력</b>입니다.
+            분자 수가 많을수록, 부피가 작을수록 충돌이 잦아 압력이 커지고, 온도가 높을수록 분자가 빠르게 움직여 압력이 커집니다.</p>
+        <p class="note">압력 단위: 1 kPa = 1000 Pa = 1000 N/m². 지표면의 대기압은 약 101 kPa 입니다.</p>
+
+        <h3>② 보일 법칙 (온도·기체의 양 일정)</h3>
+        <p>온도와 기체의 양이 일정하면 압력과 부피는 <b>반비례</b>합니다.</p>
+        <p class="formula">PV = 일정 &nbsp;⟺&nbsp; P₁V₁ = P₂V₂</p>
+
+        <h3>③ 샤를 법칙과 게이뤼삭 법칙 (절대 온도)</h3>
+        <p>압력이 일정하면 부피가(샤를 법칙), 부피가 일정하면 압력이(게이뤼삭 법칙) <b>절대 온도 T 에 비례</b>합니다. 절대 온도는 섭씨온도에 273.15 를 더한 값입니다.</p>
+        <p class="formula">P / T = 일정 &nbsp;&nbsp; (T(K) = t(°C) + 273.15)</p>
+        <p>압력–섭씨온도 그래프는 직선 P = a·t + b 가 됩니다. 이 직선을 압력이 0 인 곳까지 연장하면 <b>t ≈ −273 °C</b> 에서 만나는데, 이 온도가 <b>절대 영도(0 K)</b>입니다.</p>
+        <svg class="circuit" viewBox="0 0 340 170" role="img" aria-label="왼쪽: 압력-부피 그래프는 부피가 커질수록 압력이 작아지는 곡선. 오른쪽: 압력-섭씨온도 그래프는 직선이고, 연장하면 영하 273 도에서 압력이 0">
+            <g stroke="#333" stroke-width="1.5" fill="none">
+                <path d="M24 140 H160 M24 140 V14"/>
+                <path d="M36 20 Q 48 108 150 124" stroke="#007bff" stroke-width="2.5"/>
+                <path d="M188 140 H326 M296 140 V14"/>
+                <path d="M196 140 L 300 39" stroke="#dc3545" stroke-dasharray="6 4"/>
+                <path d="M300 39 L 320 20" stroke="#dc3545" stroke-width="2.5"/>
+            </g>
+            <circle cx="196" cy="140" r="4" fill="#dc3545"/>
+            <g font-size="11" font-family="sans-serif" fill="#222">
+                <text x="152" y="156">V</text><text x="8" y="20">P</text>
+                <text x="70" y="70" fill="#007bff">PV = 일정</text>
+                <text x="328" y="156">t</text><text x="302" y="20">P</text>
+                <text x="290" y="156" font-size="10">0 °C</text>
+                <text x="172" y="160" fill="#dc3545" font-size="10">−273 °C</text>
+                <text x="200" y="98" fill="#dc3545" font-size="10">연장</text>
+            </g>
+        </svg>
+
+        <h3>④ 이상기체 상태 방정식</h3>
+        <p>세 법칙을 합치면 PV / T 는 기체의 양(몰수 n)에만 비례하는 상수가 됩니다. 이것이 <b>이상기체 상태 방정식</b>입니다.</p>
+        <p class="formula">PV = nRT &nbsp;&nbsp; (R = 8.314 J/(mol·K))</p>
+        <p>단위를 맞추면 편리합니다: <b>kPa × mL = 10⁻³ J</b>, <b>kPa × L = 1 J</b>. 예) 20 °C, 101.3 kPa 에서 공기 20 mL 의 몰수는</p>
+        <p class="formula">n = PV / RT = (101.3 × 20 × 10⁻³ J) ÷ (8.314 × 293.15) ≈ 8.3 × 10⁻⁴ mol</p>
+        <p class="note">이상기체는 분자 자체의 크기와 분자 사이의 힘을 무시한 기체입니다. 실제 공기도 상온·대기압 이하에서는 거의 이상기체처럼 행동합니다.</p>
+
+        <h3>⑤ 감압 용기와 압력 센서</h3>
+        <ul>
+            <li><b>감압 용기</b>: 손 펌프로 공기를 빼면 용기 속 공기 분자 수가 줄어 압력이 낮아집니다. 밸브를 열면 공기가 들어가 원래 압력으로 돌아옵니다.</li>
+            <li><b>주사기 속 공기</b>: 끝을 막은 주사기의 피스톤은 안팎의 압력이 같아질 때까지 움직입니다. 그래서 <b>주사기 속 공기 압력 = 용기 속 압력 = 센서 값</b>으로 볼 수 있고, 주사기 속 공기 분자 수는 그대로입니다.</li>
+            <li><b>압력 센서(BME280)</b>: 얇은 막이 압력에 따라 휘는 정도를 전기 신호로 바꿔 압력(kPa)과 온도(°C)를 함께 잽니다. 잴 수 있는 압력은 <b>30~110 kPa</b> 입니다.</li>
+            <li><b>펌프질 직후 온도</b>: 공기가 갑자기 팽창하면 온도가 잠깐 내려갔다가 주변 열을 받아 돌아옵니다. 보일 법칙은 온도가 일정할 때의 법칙이므로 <b>온도가 돌아올 때까지 기다린 뒤</b> 기록합니다.</li>
+        </ul>
+
+        <h3>⑥ 그래프 분석과 최소제곱법</h3>
+        <ul>
+            <li><b>실험 1</b>: P–V 그래프는 곡선이라 비교하기 어렵습니다. 가로축을 <b>1/P</b>, 세로축을 <b>V</b> 로 바꾸면 <b>V = k·(1/P)</b> 인 직선이 되고, 기울기 k 가 PV 값입니다. 절편은 0 이어야 하며, 음수이면 눈금에 나타나지 않는 공기(주사기 끝 부분)가 있다는 뜻입니다.</li>
+            <li><b>실험 2</b>: P–t 그래프를 직선 <b>P = a·t + b</b> 로 나타내고, <b>P = 0 이 되는 온도 t₀ = −b / a</b> 를 절대 영도의 추정값으로 봅니다.</li>
+        </ul>
+        <p>측정점들과 직선 y = ax + b 사이의 <b>세로 거리 제곱의 합이 가장 작아지는</b> a, b 를 고르는 방법이 최소제곱법입니다. 점이 n 개일 때</p>
+        <p class="formula">a = (nΣxy − ΣxΣy) / (nΣx² − (Σx)²)<br>b = (Σy − aΣx) / n</p>
+        <div class="row next"><button class="good" data-go="materials">다음: 3. 실험 준비물 →</button></div>
+    </div>
+    </section>
+
+    <!-- 3. 실험 준비물 -->
+    <section class="panel" data-tab="materials" hidden>
+    <div class="card">
+        <h2>3. 실험 준비물 <span class="note">(2인 1조 기준)</span></h2>
+        <div class="tbl-wrap" style="max-height:none"><table class="mat-table" id="mat-table">
+            <thead><tr><th>준비물</th><th>규격</th><th>수량</th></tr></thead>
+            <tbody>
+                <tr><td>감압 용기</td><td>투명 플라스틱(아크릴), 손 펌프·공기 밸브 달린 것, 2 L 이상</td><td>1개</td></tr>
+                <tr><td>피코 환경 센서 모듈</td><td>Pico-Environment-Sensor + Bluetooth 지원 제어 보드 (펌웨어 설치)</td><td>1세트</td></tr>
+                <tr><td>휴대용 전원</td><td>용기에 들어가는 작은 USB 보조배터리와 케이블</td><td>1개</td></tr>
+                <tr><td>주사기</td><td>플라스틱 50~60 mL, 끝을 막는 마개(캡)</td><td>1개</td></tr>
+                <tr><td>따뜻한 물과 대야</td><td>40~50 °C, 용기가 절반쯤 잠기는 크기</td><td>1세트</td></tr>
+                <tr><td>얼음물 (선택)</td><td>온도 범위를 더 넓힐 때</td><td>1세트</td></tr>
+                <tr><td>수건</td><td>용기 물기 닦기</td><td>1장</td></tr>
+                <tr><td>스마트폰 또는 PC</td><td>Android 또는 PC 의 Chrome·Edge (블루투스 사용)</td><td>1대</td></tr>
+                <tr><td>계량컵 (선택)</td><td>감압 용기 부피 재기</td><td>1개</td></tr>
+            </tbody>
+        </table></div>
+        <p class="note">금속 용기는 블루투스 전파를 막으므로 쓰지 않습니다. iPhone·iPad 는 블루투스 연결이 되지 않으니 Android 휴대폰이나 PC 를 쓰세요. 연결할 수 없으면 센서 값을 보고 직접 입력해도 됩니다.</p>
+
+        <h3>우리 모둠 장치 값</h3>
+        <div class="row"><label>주사기 최대 눈금 <input type="number" id="in-vmax" min="1" step="1" inputmode="decimal"> mL</label></div>
+        <div class="row"><label>주사기 처음 부피 <input type="number" id="in-vstart" min="1" step="1" inputmode="decimal"> mL</label></div>
+        <div class="row"><label>주사기 끝 숨은 부피 <input type="number" id="in-dead" min="0" step="0.1" inputmode="decimal"> mL</label><span class="note">(모르면 0. 마개를 끼우는 끝 부분 안의 공기)</span></div>
+        <div class="row"><label>감압 용기 부피 <input type="number" id="in-vol" min="0" step="0.01" inputmode="decimal"> L</label><span class="note">(선택. 센서를 넣기 전에 물을 가득 채웠다 계량컵으로 잽니다)</span></div>
+        <div class="setbox" id="plan-out"></div>
+
+        <details>
+            <summary>🔧 센서 준비 (Thonny 로 펌웨어 넣기, 선생님용)</summary>
+            <p class="note">다른 센서 실험과 같은 펌웨어를 씁니다. 이미 환경 센서 실험을 해 봤다면 다시 넣을 필요가 없습니다.</p>
+            <ol>
+                <li><a href="https://micropython.org/download/RPI_PICO2_W/" target="_blank" rel="noopener">이 장치용 MicroPython UF2</a>를 설치합니다.</li>
+                <li>Thonny 에서 아래 네 파일을 장치 루트에 같은 이름으로 저장합니다.<br>
+                    <a href="../firmware/pico2w-environment/bme280.py" download>bme280.py</a> ·
+                    <a href="../firmware/pico2w-environment/main.py?v=env-voc-v2" download="main.py">main.py</a> ·
+                    <a href="../firmware/pico2w-environment/imu.py" download>imu.py</a> ·
+                    <a href="../firmware/pico2w-environment/extra_sensors.py?v=env-voc-v2" download="extra_sensors.py">extra_sensors.py</a> ·
+                    <a href="../firmware/pico2w-environment/README.md">상세 설치 안내</a></li>
+                <li>USB 보조배터리를 연결하면 <code>main.py</code> 가 자동으로 실행되어 <code>PicoEnv-XXXX</code> 라는 이름으로 블루투스 연결을 기다립니다.</li>
+                <li>이 페이지는 환경 센서 실험과 달리 VOC 센서(가열 히터가 있음)를 켜지 않고 온도·습도·기압만 읽습니다. 센서 판이 덜 데워져 온도 측정에 유리합니다.</li>
+            </ol>
+        </details>
+        <div class="row next"><button class="good" data-go="procedure">다음: 4. 실험 과정 →</button></div>
+    </div>
+    </section>
+
+    <!-- 4. 실험 과정 -->
+    <section class="panel" data-tab="procedure" hidden>
+    <div class="card">
+        <h2>4. 실험 과정</h2>
+
+        <h3>① 역할 나누기 (2인 1조)</h3>
+        <ul>
+            <li><b>학생 A</b>: 펌프와 밸브를 조작하고, 주사기 눈금을 읽어 줍니다.</li>
+            <li><b>학생 B</b>: 이 페이지에서 센서를 연결하고, 읽어 준 값을 입력해 기록합니다. 실험 2 에서는 역할을 바꿔도 좋습니다.</li>
+        </ul>
+
+        <h3>② 장치 꾸미기</h3>
+        <svg class="circuit" viewBox="0 0 360 250" role="img" aria-label="장치 그림: 감압 용기 뚜껑에 손 펌프와 공기 밸브가 있고, 용기 안에 끝을 막은 주사기, 센서 모듈과 보조배터리가 있으며, 용기 밖 휴대폰이 블루투스로 값을 받는다">
+            <rect x="146" y="14" width="28" height="40" rx="3" fill="#dee2e6" stroke="#555"/>
+            <path d="M160 14 V5 M146 5 H174" stroke="#555" stroke-width="3" fill="none"/>
+            <rect x="236" y="44" width="18" height="10" rx="2" fill="#e67e22" stroke="#555"/>
+            <rect x="36" y="54" width="248" height="14" rx="4" fill="#adb5bd" stroke="#555"/>
+            <path d="M42 68 V214 Q42 226 54 226 H266 Q278 226 278 214 V68" fill="#e7f5ff" stroke="#6c8ebf" stroke-width="2"/>
+            <rect x="121" y="113" width="60" height="20" fill="#cfe8ff"/>
+            <rect x="120" y="112" width="100" height="22" fill="none" stroke="#333"/>
+            <g stroke="#333" stroke-width="1"><path d="M130 112 v5 M140 112 v5 M150 112 v5 M160 112 v5 M170 112 v5 M180 112 v5 M190 112 v5 M200 112 v5 M210 112 v5"/></g>
+            <rect x="181" y="113" width="5" height="20" fill="#555"/>
+            <rect x="186" y="119" width="54" height="8" fill="#999"/>
+            <rect x="240" y="111" width="5" height="24" fill="#555"/>
+            <rect x="110" y="119" width="10" height="8" fill="#fff" stroke="#333"/>
+            <rect x="102" y="117" width="9" height="12" rx="2" fill="#dc3545"/>
+            <path d="M226 148 h22" stroke="#007bff" stroke-width="2"/><path d="M248 148 l-7 -4 v8 z" fill="#007bff"/>
+            <rect x="58" y="176" width="78" height="40" rx="4" fill="#2e7d32"/>
+            <rect x="70" y="181" width="44" height="18" fill="#1b5e20" stroke="#a5d6a7"/>
+            <rect x="160" y="186" width="62" height="30" rx="5" fill="#495057"/>
+            <path d="M136 196 C 148 196, 148 201, 160 201" stroke="#222" fill="none" stroke-width="2"/>
+            <rect x="304" y="110" width="42" height="74" rx="7" fill="#fff" stroke="#333" stroke-width="2"/>
+            <rect x="309" y="120" width="32" height="52" fill="#eef5ff"/>
+            <path d="M286 140 q6 7 0 14 M292 135 q10 12 0 24" stroke="#007bff" stroke-width="2" fill="none"/>
+            <g font-size="11" font-family="sans-serif" fill="#222">
+                <text x="180" y="30">손 펌프</text>
+                <text x="258" y="44" font-size="10">공기 밸브</text>
+                <text x="50" y="88" fill="#1e3a5f">감압 용기</text>
+                <text x="120" y="104" font-size="10">주사기 (끝을 마개로 막음)</text>
+                <text x="136" y="127" font-size="10" fill="#1e3a5f">공기</text>
+                <text x="80" y="140" font-size="10" fill="#dc3545">마개</text>
+                <text x="190" y="164" font-size="9" fill="#007bff">감압하면 밀려 나옴</text>
+                <text x="97" y="211" font-size="10" fill="#fff" text-anchor="middle">센서 모듈</text>
+                <text x="191" y="205" font-size="10" fill="#fff" text-anchor="middle">보조배터리</text>
+                <text x="325" y="150" font-size="10" text-anchor="middle">kPa</text>
+                <text x="300" y="200" font-size="10" fill="#007bff">블루투스</text>
+            </g>
+        </svg>
+        <ol>
+            <li>센서 모듈에 보조배터리를 연결하고, <b>5. 데이터 수집</b> 탭에서 <b>🔵 센서 연결</b>을 눌러 <code>PicoEnv-XXXX</code> 를 고릅니다. 압력이 약 100 kPa, 온도가 실내 온도인지 확인합니다.</li>
+            <li>주사기 피스톤을 몇 번 밀고 당겨 부드럽게 만든 뒤, <b>처음 부피</b>(3. 준비물 탭의 값, 예: 20 mL)에 맞추고 끝을 마개로 막습니다.</li>
+            <li>주사기를 <b>눕혀서</b> 눈금이 밖에서 보이게 넣고, 센서 모듈과 보조배터리도 넣은 다음 뚜껑을 닫습니다. 센서 구멍이 막히지 않게 합니다.</li>
+        </ol>
+
+        <h3>③ 실험 1: 압력과 부피 (보일 법칙)</h3>
+        <ol>
+            <li>5. 데이터 수집 탭에서 <b>실험 1</b>을 고릅니다. 1분쯤 기다려 '안정' 표시가 나오면, 주사기 눈금 V 를 읽어 입력하고 <b>✅ 기록</b>을 누릅니다 (펌프질 0회).</li>
+            <li>펌프질을 1~2회 합니다. 피스톤이 밀려 나오고 압력·온도가 다시 <b>안정</b>될 때까지 <b>20~30초</b> 기다린 뒤, 눈금을 읽어 기록합니다.</li>
+            <li>같은 방법으로 압력이 <b class="stop-p">약 45 kPa</b> 가 될 때까지 <b>6~8점</b>을 기록합니다. 피스톤이 끝 눈금에 가까워지면 멈춥니다.</li>
+            <li>(선택) '과정'을 <b>복귀</b>로 바꾸고, 밸브를 조금씩 열어 공기를 넣으면서 같은 방법으로 기록합니다. 감압할 때와 복귀할 때의 차이로 피스톤 마찰의 영향을 알 수 있습니다.</li>
+            <li>밸브를 열어 압력을 원래대로 되돌립니다.</li>
+        </ol>
+
+        <h3>④ 실험 2: 온도와 압력 (샤를·게이뤼삭 법칙)</h3>
+        <svg class="circuit" viewBox="0 0 360 200" role="img" aria-label="실험 2 그림: 감압 용기를 따뜻한 물이 담긴 대야에 넣는데, 물 높이는 용기 높이의 절반 이하로 하여 뚜껑 이음새에 물이 닿지 않게 한다">
+            <rect x="166" y="8" width="24" height="26" rx="3" fill="#dee2e6" stroke="#555"/>
+            <rect x="104" y="34" width="148" height="12" rx="4" fill="#adb5bd" stroke="#555"/>
+            <path d="M110 46 V176 Q110 184 118 184 H238 Q246 184 246 176 V46" fill="#e7f5ff" stroke="#6c8ebf" stroke-width="2"/>
+            <path d="M26 122 L38 190 H318 L330 122 Z" fill="#9ec5fe" opacity=".65"/>
+            <path d="M18 90 L38 190 H318 L338 90" fill="none" stroke="#555" stroke-width="2"/>
+            <path d="M26 122 H330" stroke="#1e5aa8" stroke-dasharray="5 4"/>
+            <rect x="124" y="150" width="60" height="26" rx="4" fill="#2e7d32"/>
+            <rect x="192" y="152" width="40" height="24" rx="4" fill="#495057"/>
+            <g font-size="11" font-family="sans-serif" fill="#222">
+                <text x="40" y="112" fill="#1e5aa8" font-size="10">물 높이: 용기 절반 이하</text>
+                <text x="260" y="40" font-size="10" fill="#dc3545">뚜껑 이음새에</text>
+                <text x="260" y="54" font-size="10" fill="#dc3545">물이 닿지 않게</text>
+                <text x="268" y="160" font-size="10" fill="#1e3a5f">따뜻한 물</text>
+                <text x="268" y="174" font-size="10" fill="#1e3a5f">40~50 °C</text>
+                <text x="154" y="167" font-size="9" fill="#fff" text-anchor="middle">센서</text>
+            </g>
+        </svg>
+        <ol>
+            <li>주사기는 꺼내도 되고 그대로 두어도 됩니다. 뚜껑을 닫고 펌프질하여 압력을 <b>약 70 kPa</b> 로 낮춥니다.
+                <span class="note">(데워서 압력이 대기압보다 커지면 뚜껑이 열려 공기가 새기 때문입니다.)</span></li>
+            <li>5. 데이터 수집 탭에서 <b>실험 2</b>를 고르고, 1~2분 동안 압력이 거의 변하지 않는지(공기가 새지 않는지) 확인합니다.</li>
+            <li><b>▶ 자동 기록 시작</b>을 누릅니다 (5초마다 압력·온도를 기록).</li>
+            <li>용기를 따뜻한 물 대야에 넣습니다. <b>물 높이는 용기 높이의 절반 이하</b>로 하여 뚜껑 이음새에 물이 닿지 않게 합니다. 온도가 오르는 동안 10분쯤 기록합니다.</li>
+            <li>용기를 꺼내 물기를 닦고, 식는 동안 계속 기록합니다. (선택) 얼음물에 잠깐 담그면 온도 범위가 넓어집니다.</li>
+            <li>온도 범위가 <b>15 °C 이상</b>이 되면 <b>⏹ 정지</b>를 누릅니다. 밸브를 열어 공기를 넣은 뒤 뚜껑을 엽니다.</li>
+        </ol>
+
+        <h3>⑤ 주의할 점</h3>
+        <ul>
+            <li>압력이 <b>30 kPa 아래</b>로 내려가면 센서가 잴 수 없어 측정이 멈춥니다. 펌프질은 <b>40 kPa</b> 근처에서 멈추세요. 멈췄다면 공기를 조금 넣고 다시 연결합니다.</li>
+            <li>용기에 금이 가거나 깨진 곳이 없는지 먼저 확인합니다. 감압한 채로 뚜껑을 억지로 열지 말고, 밸브를 열어 공기를 넣은 다음 엽니다.</li>
+            <li>뜨거운 물은 <b>50 °C 이하</b>로 하여 화상에 주의하고, 용기 안으로 물이 들어가지 않게 합니다.</li>
+            <li>부풀어 오르거나 손상된 보조배터리는 쓰지 않습니다.</li>
+            <li>센서 모듈을 손으로 오래 잡으면 온도가 올라갑니다. 용기 밖에서는 용기를 손으로 감싸지 않습니다.</li>
+        </ul>
+        <div class="row next"><button class="good" data-go="data">다음: 5. 데이터 수집 →</button></div>
+    </div>
+    </section>
+
+    <!-- 5. 데이터 수집 -->
+    <section class="panel" data-tab="data" hidden>
+    <div class="card">
+        <h2>5. 데이터 수집</h2>
+        <div class="row">
+            <button id="btn-connect">🔵 센서 연결</button>
+            <button id="btn-disconnect" class="secondary" hidden>연결 해제</button>
+            <span id="ble-status" class="note">연결 안 됨</span>
+        </div>
+        <div class="live">
+            <div class="main">압력<b id="live-p">–</b>kPa</div>
+            <div>온도<b id="live-t">–</b>°C</div>
+            <div>습도<b id="live-h">–</b>%</div>
+        </div>
+        <div class="row" style="margin:4px 0"><span id="live-stable" class="badge">센서 대기</span><span id="live-warn" class="note"></span></div>
+        <canvas id="chart-live" class="chart small"></canvas>
+        <p class="note">실시간 그래프: 파란 선 = 압력(왼쪽 눈금), 빨간 선 = 온도(오른쪽 눈금), 최근 5분. 센서를 연결할 수 없으면 아래 칸에 압력·온도를 직접 입력해도 됩니다.</p>
+    </div>
+
+    <div class="card">
+        <div class="methods">
+            <label><input type="radio" name="method" value="boyle" checked><b>🧪 실험 1: 압력과 부피 (보일 법칙)</b><br><span class="note">펌프질할 때마다 주사기 눈금 V 를 읽어 그때의 압력과 함께 기록합니다.</span></label>
+            <label><input type="radio" name="method" value="gay"><b>🔥 실험 2: 온도와 압력 (샤를·게이뤼삭 법칙)</b><br><span class="note">밀폐한 용기를 데우고 식히는 동안 압력과 온도를 자동으로 기록합니다.</span></label>
+        </div>
+
+        <div id="box-boyle">
+            <div class="row">
+                <label>과정
+                    <select id="sel-dir">
+                        <option value="down">감압 (펌프질)</option>
+                        <option value="up">복귀 (공기 넣기)</option>
+                    </select>
+                </label>
+            </div>
+            <div class="row entry">
+                <label>주사기 눈금 V <input type="number" id="in-v" step="0.5" min="0" inputmode="decimal"> mL</label>
+                <label>압력 P <input type="number" id="in-p" step="0.01" min="0" inputmode="decimal"> kPa</label>
+                <label>온도 t <input type="number" id="in-t" step="0.1" inputmode="decimal"> °C</label>
+                <button id="btn-add-boyle" class="good">✅ 기록</button>
+            </div>
+            <div id="boyle-msg" class="note"></div>
+            <div class="tbl-wrap"><table>
+                <thead><tr><th>#</th><th>과정</th><th>V (mL)</th><th>P (kPa)</th><th>t (°C)</th><th>PV (kPa·mL)</th><th></th></tr></thead>
+                <tbody id="boyle-body"></tbody>
+            </table></div>
+            <canvas id="chart-pv" class="chart small"></canvas>
+            <p class="note">P–V 그래프: 파란 점 = 감압, 주황 점 = 복귀, 회색 곡선 = 첫 점의 PV 값이 그대로일 때 (PV = 일정).</p>
+            <div class="row"><button id="btn-clear-boyle" class="danger">실험 1 기록 지우기</button></div>
+        </div>
+
+        <div id="box-gay" hidden>
+            <div class="row">
+                <label>기록 간격
+                    <select id="sel-gint">
+                        <option value="2">2초</option>
+                        <option value="5" selected>5초</option>
+                        <option value="10">10초</option>
+                        <option value="30">30초</option>
+                    </select>
+                </label>
+                <button id="btn-auto" class="good">▶ 자동 기록 시작</button>
+            </div>
+            <div class="row entry">
+                <label>압력 P <input type="number" id="in-gp" step="0.01" min="0" inputmode="decimal"> kPa</label>
+                <label>온도 t <input type="number" id="in-gt" step="0.1" inputmode="decimal"> °C</label>
+                <button id="btn-add-gay" class="secondary">✅ 지금 값 한 번 기록</button>
+            </div>
+            <div id="gay-msg" class="note"></div>
+            <div class="tbl-wrap"><table>
+                <thead><tr><th>#</th><th>시간 (s)</th><th>t (°C)</th><th>P (kPa)</th><th>P/T (kPa/K)</th><th></th></tr></thead>
+                <tbody id="gay-body"></tbody>
+            </table></div>
+            <canvas id="chart-pt" class="chart small"></canvas>
+            <p class="note">P–t 그래프: 빨간 점 = 기록한 값, 파란 선 = 최소제곱 직선.</p>
+            <div class="row"><button id="btn-clear-gay" class="danger">실험 2 기록 지우기</button></div>
+        </div>
+        <div class="row next"><button class="good" data-go="result">다음: 6. 실험 결과 →</button></div>
+    </div>
+    </section>
+
+    <!-- 6. 실험 결과 -->
+    <section class="panel" data-tab="result" hidden>
+    <div class="card">
+        <h2>6. 실험 결과</h2>
+        <h3>실험 1: 압력과 부피 (보일 법칙)</h3>
+        <div id="res-boyle-table"></div>
+        <canvas id="chart-pv2" class="chart small"></canvas>
+        <p class="note">그래프 1. P–V: 점 = 측정값, 파란 곡선 = 최소제곱 결과 PV = k.</p>
+        <canvas id="chart-vinv" class="chart small"></canvas>
+        <p class="note">그래프 2. V–1/P: 점들이 원점을 지나는 직선 위에 있으면 PV 가 일정합니다. 파란 선 = 최소제곱 직선, 회색 점선 = 원점.</p>
+        <div class="results" id="res-boyle"></div>
+
+        <h3>실험 2: 온도와 압력 (샤를·게이뤼삭 법칙)</h3>
+        <div id="res-gay-table"></div>
+        <canvas id="chart-pt2" class="chart"></canvas>
+        <div class="row"><label><input type="checkbox" id="chk-extend"> 압력 0 (절대 영도)까지 직선 연장해 보기</label></div>
+        <p class="note">그래프 3. P–t: 점 = 측정값, 파란 선 = 최소제곱 직선 P = a·t + b. 연장하면 P = 0 이 되는 온도 t₀ 가 절대 영도의 추정값입니다.</p>
+        <div class="results" id="res-gay"></div>
+
+        <h3>종합: 이상기체 상태 방정식</h3>
+        <div id="res-comb"></div>
+        <details class="calc">
+            <summary>🧮 최소제곱법 계산 과정</summary>
+            <div id="calc"></div>
+        </details>
+
+        <h3>결과 정리</h3>
+        <div class="qa">
+            <span class="note">그래프 1~3 과 위 값에서 알 수 있는 것을 정리하세요. (PV 값은 일정했는가? P 와 t 는 직선 관계였는가? 절대 영도 추정값은?)</span>
+            <textarea id="tx-result" data-text="result"></textarea>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>💾 저장 / 내보내기</h2>
+        <div class="row">
+            <button id="btn-csv" class="secondary">CSV 다운로드 (측정값 전체)</button>
+            <button id="btn-copy" class="secondary">📋 결과 표 복사</button>
+            <span id="copy-status" class="note"></span>
+        </div>
+        <div class="row"><button id="btn-clear-all" class="danger">모든 측정값 지우기</button></div>
+        <p class="note">측정값과 쓴 글은 이 브라우저에 자동 저장되어 페이지를 다시 열어도 남아 있습니다. 다른 기기와는 공유되지 않으니, 끝나면 7번 탭에서 제출하세요.</p>
+        <div class="row next"><button class="good" data-go="conclusion">다음: 7. 결론 및 검토 →</button></div>
+    </div>
+    </section>
+
+    <!-- 7. 결론 및 검토 -->
+    <section class="panel" data-tab="conclusion" hidden>
+    <div class="card">
+        <h2>7. 결론 및 검토</h2>
+        <h3>우리 모둠 결과 요약</h3>
+        <div id="concl-sum" class="concl"></div>
+
+        <h3>결론</h3>
+        <div class="qa">
+            <span class="note">실험 목표 1~3 에 대한 답을 측정값(숫자)을 들어 쓰세요. 이상기체 상태 방정식 PV = nRT 가 성립한다고 할 수 있나요?</span>
+            <textarea id="tx-concl" data-text="concl"></textarea>
+        </div>
+
+        <h3>검토 (분석 질문)</h3>
+        <div class="qa" id="q1">
+            <b>1. PV 는 일정했는가?</b>
+            <span class="note">실험 1 의 PV 값의 변동(%)과 그래프 2 의 직선·절편을 근거로 보일 법칙이 성립하는지 쓰시오.</span>
+            <textarea data-text="a1"></textarea>
+        </div>
+        <div class="qa" id="q2">
+            <b>2. 절대 영도 추정값</b>
+            <span class="note">실험 2 에서 구한 t₀ 와 −273.15 °C 를 비교해 오차율을 구하고, 측정한 온도 범위가 좁을수록 연장한 값의 오차가 커지는 까닭을 쓰시오.</span>
+            <textarea data-text="a2"></textarea>
+        </div>
+        <div class="qa" id="q3">
+            <b>3. 실제 공기와 이상기체</b>
+            <span class="note">공기는 질소·산소 분자로 된 실제 기체입니다. 이 실험 조건에서 공기를 이상기체로 보아도 되는 까닭을 분자의 크기와 분자 사이의 힘으로 설명하시오.</span>
+            <textarea data-text="a3"></textarea>
+        </div>
+        <div class="qa" id="q4">
+            <b>4. 오차의 원인</b>
+            <span class="note">아래를 참고해 우리 실험에서 가장 크게 영향을 준 원인을 고르고, 그 근거(데이터)를 쓰시오.</span>
+            <ul class="note" style="margin:2px 0 6px; padding-left:20px">
+                <li>피스톤 마찰: 안팎 압력이 조금 달라도 피스톤이 움직이지 않는다 (감압·복귀 값의 차이)</li>
+                <li>눈금에 나타나지 않는 주사기 끝 부분의 공기 (그래프 2 의 절편)</li>
+                <li>펌프질 직후 팽창으로 온도가 내려간 상태에서 기록함</li>
+                <li>센서 온도와 용기 속 공기 전체의 평균 온도 차이 (센서 판의 발열, 데울 때 온도가 늦게 따라감)</li>
+                <li>뚜껑·밸브·마개로 공기가 샘, 눈금 읽기 오차</li>
+            </ul>
+            <textarea data-text="a4"></textarea>
+        </div>
+        <div class="qa" id="q5">
+            <b>5. 개선 방법</b>
+            <span class="note">더 정확하게 측정하려면 실험을 어떻게 바꾸면 좋을지 한 가지 이상 제안하시오.</span>
+            <textarea data-text="a5"></textarea>
+        </div>
+
+        <h3>제출 전 점검</h3>
+        <ul class="check-list">
+            <li>가설(1번 탭)과 결과 정리(6번 탭)를 썼다.</li>
+            <li>PV 평균과 변동(%), 절대 영도 추정값과 오차율을 결론에 썼다.</li>
+            <li>실험 목표 1~3 에 대한 답을 각각 썼다.</li>
+            <li>오차의 주된 원인과 근거, 개선 방법을 썼다.</li>
+        </ul>
+    </div>
+
+    <div class="card" id="submit-card">
+        <h2>📤 보고서 제출</h2>
+        <div class="row"><label>학번 <input type="text" id="st-id" data-student="id" size="8" inputmode="numeric" placeholder="20105"></label>
+            <label>이름 <input type="text" id="st-name" data-student="name" size="8" placeholder="홍길동"></label></div>
+        <div class="row"><label>모둠원 <input type="text" id="st-members" data-student="members" size="22" placeholder="함께 실험한 친구 이름"></label></div>
+        <div class="row">
+            <span id="login-status" class="note">로그인 상태 확인 중…</span>
+            <button id="btn-login" class="secondary" hidden>구글 로그인</button>
+        </div>
+        <div class="row">
+            <button id="btn-submit" class="good">📤 보고서 제출</button>
+            <button id="btn-print" class="secondary">🖨️ 보고서 미리보기·인쇄</button>
+        </div>
+        <div id="submit-status" class="note"></div>
+        <p class="note">제출하면 측정값·그래프 계산 결과·쓴 글이 함께 저장되고, 선생님이 메인 페이지에서 보고서를 볼 수 있습니다. 고쳐서 다시 제출하면 새 보고서가 하나 더 저장됩니다 (가장 최근 것이 위에 보입니다). 인쇄 창에서 'PDF 로 저장'을 고르면 파일로도 받을 수 있습니다.</p>
+    </div>
+    </section>
+
+    <!-- 보고서 보기 (미리보기·인쇄, 선생님이 제출된 보고서 보기) -->
+    <div id="report-view">
+        <div class="row no-print">
+            <button id="rv-back" class="secondary">← 돌아가기</button>
+            <button id="rv-print">🖨️ 인쇄 / PDF 저장</button>
+        </div>
+        <div id="rv-body" class="report"></div>
+    </div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
+<script src="../js/pico-ble.js?v=setup-v3"></script>
+<script src="../js/ideal-gas-math.js"></script>
+<script src="../js/ideal-gas.js"></script>
+</body>
+</html>
