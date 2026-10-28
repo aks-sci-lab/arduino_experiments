@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>문항 출제용 그림·그래프</title>
+    <link rel="stylesheet" href="../css/figure-maker.css">
+</head>
+<body>
+<div class="app">
+    <header class="top">
+        <a class="back" href="../index.html">← 메인</a>
+        <h1>✏️ 문항 출제용 그림·그래프</h1>
+        <div class="acts">
+            <button id="btn-undo" title="실행 취소 (Ctrl+Z)">↶</button>
+            <button id="btn-redo" title="다시 실행 (Ctrl+Y)">↷</button>
+            <select id="sel-example" title="예시 그림 불러오기">
+                <option value="">📚 예시…</option>
+            </select>
+            <button id="btn-new" class="secondary" title="빈 그림으로 새로 시작">새 그림</button>
+            <button id="btn-save" class="secondary" title="나중에 고칠 수 있게 작업 파일(.json)로 저장">작업 저장</button>
+            <button id="btn-open" class="secondary" title="저장한 작업 파일(.json) 열기">열기</button>
+            <input id="file-open" type="file" accept=".json,application/json" hidden>
+        </div>
+    </header>
+
+    <nav class="tools" id="tools" aria-label="그리기 도구">
+        <div class="grp">
+            <button data-tool="select" title="선택·이동 (V)">↖ 선택</button>
+        </div>
+        <div class="grp">
+            <button data-tool="line" title="직선: 끌어서 그리기">╱ 선</button>
+            <button data-tool="arrow" title="화살표: 끌어서 그리기 (힘·속도)">→ 화살표</button>
+            <button data-tool="polyline" title="꺾은선: 점을 차례로 누르고 두 번 눌러 끝 (Enter)">⌇ 꺾은선</button>
+            <button data-tool="rect" title="사각형: 끌어서 그리기">▭ 사각형</button>
+            <button data-tool="ellipse" title="원·타원: 끌어서 그리기">◯ 원</button>
+            <button data-tool="text" title="글자: 누른 곳에 넣기">T 글자</button>
+            <button data-tool="dot" title="점: 누른 곳에 넣기">• 점</button>
+            <button data-tool="angle" title="각도 표시">∠ 각도</button>
+        </div>
+        <div class="grp">
+            <button data-tool="graph" title="좌표축과 그래프: 끌어서 크기 정하기">📈 그래프</button>
+        </div>
+        <div class="grp">
+            <button data-tool="ground" title="빗금 바닥·벽: 끌어서 그리기">▤ 바닥</button>
+            <button data-tool="spring" title="용수철: 끌어서 그리기">〰 용수철</button>
+        </div>
+        <div class="grp">
+            <select id="sel-comp" title="회로 소자 고르기">
+                <option value="resistor">저항</option>
+                <option value="battery">전지</option>
+                <option value="bulb">전구</option>
+                <option value="switch">스위치</option>
+                <option value="ammeter">전류계</option>
+                <option value="voltmeter">전압계</option>
+                <option value="galvanometer">검류계</option>
+                <option value="led">LED</option>
+                <option value="diode">다이오드</option>
+                <option value="capacitor">축전기</option>
+                <option value="varistor">가변 저항</option>
+                <option value="ac">교류 전원</option>
+                <option value="coil">코일</option>
+            </select>
+            <button data-tool="comp" title="회로 소자: 누른 곳에 넣기 (R 로 90° 돌리기)">⚡ 소자</button>
+            <button data-tool="wire" title="도선: 점을 차례로 누르고 두 번 눌러 끝 (가로·세로로 꺾임, 소자 끝에 붙음)">┐ 도선</button>
+        </div>
+        <div class="grp">
+            <button data-tool="lens" title="렌즈: 누른 곳에 넣기">⬮ 렌즈</button>
+            <button data-tool="mirror" title="거울: 누른 곳에 넣기">▕ 거울</button>
+            <button data-tool="wave" title="파동(사인 곡선): 끌어서 길이 정하기">∿ 파동</button>
+        </div>
+    </nav>
+
+    <main class="main">
+        <section class="stage-wrap">
+            <div class="stage-bar">
+                <label><input type="checkbox" id="chk-grid" checked> 격자</label>
+                <label><input type="checkbox" id="chk-snap" checked> 격자에 맞추기</label>
+                <span class="hint" id="hint">도구를 고르고 그림판에 그리세요.</span>
+            </div>
+            <div class="stage" id="stage">
+                <svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
+            </div>
+            <div class="stage-bar small">
+                <span>단축키: Delete 지우기 · Ctrl+D 복제 · 방향키 이동(Shift 10칸) · R 돌리기 · Esc 선택 해제 · Shift+누르기 여러 개 선택</span>
+            </div>
+        </section>
+
+        <aside class="side">
+            <div class="tabs" role="tablist">
+                <button role="tab" data-tab="props" class="on">속성</button>
+                <button role="tab" data-tab="export">내보내기</button>
+                <button role="tab" data-tab="ai">🤖 AI 그리기</button>
+            </div>
+
+            <section class="panel" data-tab="props">
+                <div id="props"></div>
+                <div class="symbols">
+                    <div class="sym-title">기호 넣기 <span class="note">(글자 칸을 누른 뒤)</span></div>
+                    <div id="symbols"></div>
+                    <details class="help">
+                        <summary>글자 쓰는 법</summary>
+                        <ul>
+                            <li>아래첨자: <code>v_0</code> → v₀, 여러 글자는 <code>R_{AB}</code></li>
+                            <li>위첨자: <code>x^2</code>, <code>10^{-3}</code></li>
+                            <li>기울임(물리량): <code>*v*</code> → <i>v</i>. 예) <code>*v*_0</code>, <code>*mg*</code></li>
+                            <li>줄 바꿈: 글자 칸에서 Enter</li>
+                        </ul>
+                    </details>
+                </div>
+            </section>
+
+            <section class="panel" data-tab="export" hidden>
+                <h2>그림 내보내기</h2>
+                <div class="field"><label>그림 범위</label>
+                    <select id="ex-crop">
+                        <option value="fit">그린 부분만 (여백 자동)</option>
+                        <option value="page">그림판 전체</option>
+                    </select>
+                </div>
+                <div class="field"><label>여백 (px)</label><input type="number" id="ex-margin" value="12" min="0" max="200"></div>
+                <div class="field"><label>PNG 선명도</label>
+                    <select id="ex-scale">
+                        <option value="2">보통 (2배)</option>
+                        <option value="3" selected>인쇄용 (3배)</option>
+                        <option value="4">아주 선명 (4배)</option>
+                    </select>
+                </div>
+                <div class="field"><label><input type="checkbox" id="ex-transparent"> 배경 투명</label></div>
+                <div class="btns">
+                    <button id="ex-copy" class="good">📋 PNG 복사</button>
+                    <button id="ex-png">PNG 저장</button>
+                    <button id="ex-svg" class="secondary">SVG 저장</button>
+                </div>
+                <div id="ex-msg" class="msg" hidden></div>
+                <p class="note">‘PNG 복사’ 뒤 한글(HWP)·워드·PPT 에서 <b>Ctrl+V</b> 로 붙여 넣으면 됩니다.
+                    SVG 는 확대해도 깨지지 않는 그림 파일입니다 (한글 2020 이후·PPT 에서 열림).</p>
+                <p class="note">파일 이름</p>
+                <input type="text" id="ex-name" value="문항그림" class="wide">
+            </section>
+
+            <section class="panel" data-tab="ai" hidden>
+                <h2>🤖 AI 로 그리기</h2>
+                <p class="note">원하는 그림을 글로 적거나, 손으로 그린 그림·기존 문항 사진을 붙이면 AI(Claude)가 그려 줍니다.
+                    결과는 보통 그림처럼 하나하나 고칠 수 있습니다.</p>
+                <div class="field"><label>할 일</label>
+                    <select id="ai-mode">
+                        <option value="new">새로 그리기 (지금 그림을 바꿈)</option>
+                        <option value="edit">지금 그림 고치기</option>
+                        <option value="add">지금 그림에 더하기</option>
+                    </select>
+                </div>
+                <textarea id="ai-prompt" rows="5" placeholder="예) 마찰 없는 빗면(30°) 위에 물체 A 가 있고, 중력·수직항력을 화살표로 그려 줘
+예) v–t 그래프: 0~2초 등가속도로 4 m/s, 2~6초 등속, 6~8초 감속해 정지. 눈금은 t₀, 2t₀ 처럼
+예) 전지 1개, 저항 R₁·R₂ 병렬, 전류계 직렬 연결 회로도"></textarea>
+                <div class="field"><label>참고 그림 (선택)</label>
+                    <input type="file" id="ai-image" accept="image/*">
+                </div>
+                <div id="ai-thumb" class="thumb" hidden><img alt="참고 그림"><button id="ai-image-clear" class="secondary small">빼기</button></div>
+                <div class="btns"><button id="ai-run" class="good">✨ 그리기</button><button id="ai-stop" class="secondary" hidden>멈추기</button></div>
+                <div id="ai-msg" class="msg" hidden></div>
+                <details class="ai-set" id="ai-set">
+                    <summary>AI 설정 (API 키)</summary>
+                    <div class="field"><label>Claude API 키</label>
+                        <input type="password" id="ai-key" placeholder="sk-ant-..." autocomplete="off" class="wide">
+                    </div>
+                    <div class="field"><label><input type="checkbox" id="ai-remember"> 이 브라우저에 키 기억하기</label></div>
+                    <div class="field"><label>모델</label>
+                        <select id="ai-model">
+                            <option value="claude-opus-5-5">Claude Opus 5.5 (가장 정확)</option>
+                            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (빠름·값 절반)</option>
+                            <option value="claude-haiku-5-5">Claude Haiku 5.5 (가장 빠름·저렴)</option>
+                        </select>
+                    </div>
+                    <p class="note">API 키는 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic 콘솔</a>에서 만듭니다 (사용한 만큼 요금).
+                        키와 요청 내용은 이 브라우저에서 Anthropic 으로 바로 보내지고, 이 사이트 서버에는 저장되지 않습니다.
+                        공용 PC 에서는 ‘기억하기’를 끄세요. 학생 개인정보는 적지 마세요.</p>
+                </details>
+            </section>
+        </aside>
+    </main>
+</div>
+
+<script src="../js/figure-model.js"></script>
+<script src="../js/figure-maker.js"></script>
+</body>
+</html>
