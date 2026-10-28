@@ -104,7 +104,7 @@
                 <tr><td>LED</td><td>5 mm, 빨강·주황·노랑·초록·파랑</td><td>각 1개</td></tr>
                 <tr><td>가변저항(포텐셜미터)</td><td>10 kΩ</td><td>1개</td></tr>
                 <tr><td>고정 저항</td><td>330 Ω, 1/4 W</td><td>1개</td></tr>
-                <tr><td>건전지와 홀더</td><td>1.5 V × 3개 = 4.5 V</td><td>1세트</td></tr>
+                <tr><td>건전지와 홀더</td><td class="bat-txt">1.5 V × 3개 = 4.5 V</td><td>1세트</td></tr>
                 <tr><td>미니 브레드보드</td><td>전원 줄 없는 것</td><td>1개</td></tr>
                 <tr><td>점퍼선</td><td>수–수</td><td>5개 이상</td></tr>
                 <tr><td>디지털 멀티미터</td><td>직류 전압·저항 측정</td><td>2대</td></tr>
@@ -112,6 +112,20 @@
                 <tr><td>스마트폰 또는 PC</td><td>이 페이지</td><td>1대</td></tr>
             </tbody>
         </table></div>
+
+        <h3>건전지 전압 정하기</h3>
+        <div class="row">
+            <label>건전지 전압 <input type="number" id="bat-v" min="1" max="24" step="0.1" inputmode="decimal"> V</label>
+            <span class="chips">
+                <button class="secondary chip" data-bat="3">3 V</button>
+                <button class="secondary chip" data-bat="4.5">4.5 V</button>
+                <button class="secondary chip" data-bat="6">6 V</button>
+                <button class="secondary chip" data-bat="9">9 V</button>
+            </span>
+        </div>
+        <p class="note" style="margin:2px 0">1.5 V 건전지 n 개를 직렬로 이으면 1.5 × n V 입니다. 새 건전지는 1개에 1.5~1.6 V 이므로 멀티미터로 잰 실제 값을 넣으면 더 정확합니다. 파랑·초록 LED 까지 켜려면 <b>4.5 V 정도</b>가 알맞습니다.</p>
+        <div class="setbox" id="bat-summary"></div>
+        <div id="setup-warn" class="warn" hidden></div>
 
         <h3>사용할 LED 와 파장</h3>
         <p class="note" style="margin:2px 0">파장은 많이 쓰는 값으로 미리 넣어 두었습니다. LED 제품 설명서(데이터시트)의 <b>피크 파장(λp)</b>을 알면 고치세요. 사용하지 않는 LED 는 체크를 끄세요.</p>
@@ -131,17 +145,8 @@
                         <option value="1000">1 kΩ</option>
                     </select>
                 </label>
-                <label>건전지
-                    <select id="sel-bat">
-                        <option value="3">1.5 V × 2개 = 3 V</option>
-                        <option value="4.5" selected>1.5 V × 3개 = 4.5 V (추천)</option>
-                        <option value="6">1.5 V × 4개 = 6 V</option>
-                        <option value="9">9 V 사각 건전지</option>
-                    </select>
-                </label>
             </div>
             <div class="row">
-                <label>실제 전압 <input type="number" id="bat-real" step="0.01" min="0" inputmode="decimal" placeholder="자동"> V</label>
                 <label>LED 최대 전류
                     <select id="sel-imax">
                         <option value="5">5 mA (아주 안전)</option>
@@ -166,13 +171,12 @@
                 <label id="row-rs-custom" hidden><input type="number" id="rs-custom" min="0" step="1" inputmode="numeric"> Ω</label>
             </div>
             <div class="setbox" id="setup-out"></div>
-            <div id="setup-warn" class="warn" hidden></div>
             <ul>
                 <li class="need-limit">고정 저항이 없거나 작으면 손잡이를 + 쪽 끝까지 돌렸을 때 LED 가 망가질 수 있습니다. 회로에 꽂기 전에 멀티미터 저항(Ω) 모드(<span class="pot-range">20 kΩ</span> 범위)로 가변저항 가운데 다리와 − 쪽 끝 다리 사이가 <b class="r-limit">–</b> 가 되는 위치를 찾아 손잡이에 <b>안전 한계</b>를 표시하고, 그 이상 돌리지 않습니다.</li>
                 <li><b>고정 저항을 넣는 까닭</b>: 끝까지 돌려도 전류가 최대 전류를 넘지 않게 합니다 (<b class="series-r">250 Ω</b> 이상). 전압은 LED 다리에서 바로 재므로 문턱 전압 결과에는 영향이 없습니다.</li>
                 <li><b>10 kΩ 와 1 kΩ</b>: 10 kΩ 는 건전지에서 늘 흐르는 전류가 작고(4.5 V 에서 약 0.45 mA), 문턱 근처가 손잡이의 넓은 범위에 퍼져 있어 조절이 쉽습니다. 1 kΩ 는 늘 흐르는 전류가 10배이고 문턱 근처가 더 예민합니다.</li>
                 <li>손잡이가 너무 예민하면 긴 막대나 큰 노브를 붙여 돌리거나 <b>다회전 가변저항</b>(10회전)을 씁니다.</li>
-                <li>3 V (건전지 2개)로는 파랑·초록 LED 에 전류가 충분히 흐르지 않으므로 4.5 V 를 씁니다.</li>
+                <li>건전지 전압은 위 '건전지 전압 정하기'에서 바꿉니다. 3 V 로는 파랑·초록 LED 에 전류가 충분히 흐르지 않고, 전압이 높을수록 손잡이가 예민해지고 고정 저항을 더 크게 해야 합니다.</li>
             </ul>
         </details>
         <div class="row next"><button class="good" data-go="procedure">다음: 4. 실험 과정 →</button></div>
