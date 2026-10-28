@@ -783,15 +783,56 @@
 
     // ───────────────────────── AI 그리기 ─────────────────────────
     const AI_KEY = 'figure-maker-ai-key', AI_MODEL = 'figure-maker-ai-model';
+    const AI_PROVIDER = 'figure-maker-ai-provider', AI_BASE = 'figure-maker-ai-base', AI_LOCAL_MODEL = 'figure-maker-ai-local-model';
     let aiImage = null;     // { media_type, data(base64), url }
     let aiAbort = null;
+    const aiModule = name => import(new URL('../js/' + name, location.href).href);
+    const isLocal = () => $('ai-provider').value === 'local';
+    function showProvider() {
+        $('ai-claude').hidden = isLocal();
+        $('ai-local').hidden = !isLocal();
+        $('ai-which').textContent = isLocal() ? 'LM Studio' : 'Claude';
+    }
+    // 모델 목록 칸 채우기 (기억해 둔 모델 → Gemma → 첫 번째 순으로 고름)
+    function fillLocalModels(ids) {
+        const sel = $('ai-local-model'), want = sel.value || load(AI_LOCAL_MODEL) || '';
+        sel.innerHTML = '';
+        for (const id of ids) sel.append(el('option', { value: id }, id));
+        sel.value = ids.includes(want) ? want : (ids.find(id => /gemma/i.test(id)) || ids[0] || '');
+        store(AI_LOCAL_MODEL, sel.value || null);
+    }
+    async function checkLocal() {
+        msg('ai-local-msg', '연결하는 중…');
+        try {
+            const ai = await aiModule('figure-ai-local.js');
+            const ids = await ai.listModels($('ai-base').value);
+            if (!ids.length) { msg('ai-local-msg', '연결은 되었지만 불러온 모델이 없습니다. LM Studio 에서 모델을 불러와(Load) 주세요.', 'bad'); return []; }
+            fillLocalModels(ids);
+            msg('ai-local-msg', `✅ 연결됨. 모델 ${ids.length}개`, 'ok');
+            return ids;
+        } catch (e) { msg('ai-local-msg', '❌ ' + e.message, 'bad'); return []; }
+    }
     (function initAi() {
         const k = load(AI_KEY);
         if (k) { $('ai-key').value = k; $('ai-remember').checked = true; }
-        else $('ai-set').open = true;
         const m = load(AI_MODEL);
         if (m && [...$('ai-model').options].some(o => o.value === m)) $('ai-model').value = m;
+        if (load(AI_PROVIDER) === 'local') $('ai-provider').value = 'local';
+        const b = load(AI_BASE);
+        if (b) $('ai-base').value = b;
+        const lm = load(AI_LOCAL_MODEL);
+        if (lm) fillLocalModels([lm]);
+        if (!k && !isLocal()) $('ai-set').open = true;
+        showProvider();
     })();
+    $('ai-provider').addEventListener('change', () => {
+        store(AI_PROVIDER, $('ai-provider').value);
+        showProvider();
+        if (isLocal() && !$('ai-local-model').value) checkLocal();
+    });
+    $('ai-base').addEventListener('change', () => store(AI_BASE, $('ai-base').value.trim()));
+    $('ai-local-model').addEventListener('change', () => store(AI_LOCAL_MODEL, $('ai-local-model').value));
+    $('ai-local-check').addEventListener('click', checkLocal);
     $('ai-remember').addEventListener('change', () => store(AI_KEY, $('ai-remember').checked ? $('ai-key').value.trim() : null));
     $('ai-key').addEventListener('change', () => { if ($('ai-remember').checked) store(AI_KEY, $('ai-key').value.trim()); });
     $('ai-model').addEventListener('change', () => store(AI_MODEL, $('ai-model').value));
@@ -821,23 +862,40 @@
     $('ai-image-clear').addEventListener('click', () => { aiImage = null; $('ai-image').value = ''; $('ai-thumb').hidden = true; });
 
     $('ai-run').addEventListener('click', async () => {
+        const local = isLocal();
         const apiKey = $('ai-key').value.trim();
         const prompt = $('ai-prompt').value.trim();
-        if (!apiKey) { $('ai-set').open = true; msg('ai-msg', 'AI 설정에 Claude API 키를 넣어 주세요.', 'bad'); return; }
+        if (!local && !apiKey) { $('ai-set').open = true; msg('ai-msg', 'AI 설정에 Claude API 키를 넣거나, 사용할 AI 를 LM Studio 로 바꿔 주세요.', 'bad'); return; }
         if (!prompt && !aiImage) { msg('ai-msg', '그릴 내용을 적거나 참고 그림을 붙여 주세요.', 'bad'); return; }
-        if ($('ai-remember').checked) store(AI_KEY, apiKey);
+        if (!local && $('ai-remember').checked) store(AI_KEY, apiKey);
         const mode = $('ai-mode').value;
         $('ai-run').disabled = true; $('ai-stop').hidden = false;
         aiAbort = new AbortController();
         const t0 = Date.now();
-        const tick = setInterval(() => msg('ai-msg', `🤖 그리는 중… ${Math.round((Date.now() - t0) / 1000)}초 (보통 20~60초)`), 1000);
+        let got0 = 0;   // 로컬 AI 가 지금까지 쓴 글자 수
+        const tick = setInterval(() => {
+            const sec = Math.round((Date.now() - t0) / 1000);
+            msg('ai-msg', local
+                ? `🖥️ 내 PC 의 AI 가 그리는 중… ${sec}초 (보통 2~5분)` + (got0 ? ` · ${got0}자 받음` : ' · 요청 읽는 중')
+                : `🤖 그리는 중… ${sec}초 (보통 20~60초)`);
+        }, 1000);
         msg('ai-msg', '🤖 AI 를 불러오는 중…');
         try {
-            const ai = await import(new URL('../js/figure-ai.js', location.href).href);
-            const res = await ai.drawWithAI({
-                apiKey, model: $('ai-model').value, prompt, mode, image: aiImage,
-                scene: state.scene, signal: aiAbort.signal
-            });
+            let res;
+            if (local) {
+                const ai = await aiModule('figure-ai-local.js');
+                res = await ai.drawWithLocal({
+                    base: $('ai-base').value, model: $('ai-local-model').value, prompt, mode, image: aiImage,
+                    scene: state.scene, signal: aiAbort.signal, onProgress: n => { got0 = n; }
+                });
+                if (res.model && res.model !== $('ai-local-model').value) fillLocalModels([res.model]);
+            } else {
+                const ai = await aiModule('figure-ai.js');
+                res = await ai.drawWithAI({
+                    apiKey, model: $('ai-model').value, prompt, mode, image: aiImage,
+                    scene: state.scene, signal: aiAbort.signal
+                });
+            }
             clearInterval(tick);
             const got = M.normalizeScene(res.scene);
             if (!got.objects.length) throw new Error('AI 가 그릴 물체를 주지 않았습니다.' + (res.note ? '\n' + res.note : ''));

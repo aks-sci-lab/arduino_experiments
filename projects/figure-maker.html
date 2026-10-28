@@ -141,7 +141,7 @@
 
             <section class="panel" data-tab="ai" hidden>
                 <h2>🤖 AI 로 그리기</h2>
-                <p class="note">원하는 그림을 글로 적거나, 손으로 그린 그림·기존 문항 사진을 붙이면 AI(Claude)가 그려 줍니다.
+                <p class="note">원하는 그림을 글로 적거나, 손으로 그린 그림·기존 문항 사진을 붙이면 AI 가 그려 줍니다. Claude(인터넷) 또는 내 PC 의 LM Studio 를 쓸 수 있습니다(아래 AI 설정).
                     결과는 보통 그림처럼 하나하나 고칠 수 있습니다.</p>
                 <div class="field"><label>할 일</label>
                     <select id="ai-mode">
@@ -160,21 +160,45 @@
                 <div class="btns"><button id="ai-run" class="good">✨ 그리기</button><button id="ai-stop" class="secondary" hidden>멈추기</button></div>
                 <div id="ai-msg" class="msg" hidden></div>
                 <details class="ai-set" id="ai-set">
-                    <summary>AI 설정 (API 키)</summary>
-                    <div class="field"><label>Claude API 키</label>
-                        <input type="password" id="ai-key" placeholder="sk-ant-..." autocomplete="off" class="wide">
-                    </div>
-                    <div class="field"><label><input type="checkbox" id="ai-remember"> 이 브라우저에 키 기억하기</label></div>
-                    <div class="field"><label>모델</label>
-                        <select id="ai-model">
-                            <option value="claude-opus-5-5">Claude Opus 5.5 (가장 정확)</option>
-                            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (빠름·값 절반)</option>
-                            <option value="claude-haiku-5-5">Claude Haiku 5.5 (가장 빠름·저렴)</option>
+                    <summary>AI 설정 (<span id="ai-which">Claude</span>)</summary>
+                    <div class="field"><label>사용할 AI</label>
+                        <select id="ai-provider" class="grow">
+                            <option value="claude">Claude (인터넷, API 키)</option>
+                            <option value="local">LM Studio (내 PC, 무료)</option>
                         </select>
                     </div>
-                    <p class="note">API 키는 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic 콘솔</a>에서 만듭니다 (사용한 만큼 요금).
-                        키와 요청 내용은 이 브라우저에서 Anthropic 으로 바로 보내지고, 이 사이트 서버에는 저장되지 않습니다.
-                        공용 PC 에서는 ‘기억하기’를 끄세요. 학생 개인정보는 적지 마세요.</p>
+                    <div id="ai-claude">
+                        <div class="field"><label>Claude API 키</label>
+                            <input type="password" id="ai-key" placeholder="sk-ant-..." autocomplete="off" class="wide">
+                        </div>
+                        <div class="field"><label><input type="checkbox" id="ai-remember"> 이 브라우저에 키 기억하기</label></div>
+                        <div class="field"><label>모델</label>
+                            <select id="ai-model">
+                                <option value="claude-opus-5-5">Claude Opus 5.5 (가장 정확)</option>
+                                <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (빠름·값 절반)</option>
+                                <option value="claude-haiku-5-5">Claude Haiku 5.5 (가장 빠름·저렴)</option>
+                            </select>
+                        </div>
+                        <p class="note">API 키는 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic 콘솔</a>에서 만듭니다 (사용한 만큼 요금).
+                            키와 요청 내용은 이 브라우저에서 Anthropic 으로 바로 보내지고, 이 사이트 서버에는 저장되지 않습니다.
+                            공용 PC 에서는 ‘기억하기’를 끄세요. 학생 개인정보는 적지 마세요.</p>
+                    </div>
+                    <div id="ai-local" hidden>
+                        <div class="field"><label>서버 주소</label>
+                            <input type="text" id="ai-base" value="http://127.0.0.1:1234" class="grow">
+                        </div>
+                        <div class="field"><label>모델</label>
+                            <select id="ai-local-model" class="grow"><option value="">(연결 확인을 누르세요)</option></select>
+                        </div>
+                        <div class="btns"><button id="ai-local-check" class="secondary small">🔌 연결 확인·모델 목록</button></div>
+                        <div id="ai-local-msg" class="msg" hidden></div>
+                        <p class="note">이 PC 에서 LM Studio 를 켜 두고 쓰는 방법입니다. 요청 내용이 PC 밖으로 나가지 않고 요금이 없습니다. 대신 한 번에 몇 분 걸리고, 복잡한 그림은 Claude 보다 덜 정확합니다.</p>
+                        <ol class="note steps">
+                            <li>LM Studio 에서 모델(예: Gemma)을 불러올 때 <b>Context Length 를 16384 이상</b>으로</li>
+                            <li>Developer(개발자) 화면에서 서버를 켜고(Running), 서버 설정의 <b>Enable CORS</b> 켜기</li>
+                            <li>위 ‘연결 확인’ → 모델 고르기. 브라우저가 ‘로컬 네트워크 접근’을 물으면 허용</li>
+                        </ol>
+                    </div>
                 </details>
             </section>
         </aside>

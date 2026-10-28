@@ -349,5 +349,6 @@ HI = T + (H - 60) × 0.05
 - 회로도: 저항·전지·전구·스위치·전류계·전압계·LED·축전기 등, 도선이 소자 끝에 자동으로 붙음
 - 광학·파동: 볼록·오목 렌즈, 평면·오목·볼록 거울, 사인 파동·정상파
 - AI 그리기: 글이나 손그림·문항 사진을 주면 Claude 가 그림 자료(JSON)를 만들어 넣음 → 보통 그림처럼 고칠 수 있음. 선생님 본인의 Claude API 키가 필요하고, 브라우저에서 Anthropic 으로 바로 보냄
+- AI 그리기 (내 PC): LM Studio 의 로컬 모델(예: Gemma)로도 그림. 요금 없고 내용이 PC 밖으로 나가지 않음. LM Studio 에서 Context Length 16384 이상, 서버의 Enable CORS 켜기 (`js/figure-ai-local.js`)
 - 내보내기: PNG 복사(한글·워드에 바로 붙여 넣기)·PNG 저장(2~4배)·SVG 저장, 작업 파일(.json) 저장·열기, 브라우저에 자동 저장
 - 계산·그리기: `js/figure-model.js` (Node 시험 `tests/figure-model.test.cjs`), 화면: `js/figure-maker.js`, AI: `js/figure-ai.js`

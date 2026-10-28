@@ -204,7 +204,9 @@ test('페이지 연결: 메인 목록 링크, 스크립트, AI 는 jsdelivr 의 
     for (const f of ['../js/figure-model.js', '../js/figure-maker.js', '../css/figure-maker.css']) assert.ok(html.includes(f), f);
     const ai = fs.readFileSync(path.join(root, 'js', 'figure-ai.js'), 'utf8');
     const imports = [...ai.matchAll(/^import .* from '([^']+)'/gm)].map(m => m[1]);
-    assert.deepEqual(imports, ['https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.133.0/+esm']);
+    assert.deepEqual(imports, ['https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.133.0/+esm', './figure-ai-prompt.js']);
+    const local = fs.readFileSync(path.join(root, 'js', 'figure-ai-local.js'), 'utf8');
+    assert.deepEqual([...local.matchAll(/^import .* from '([^']+)'/gm)].map(m => m[1]), ['./figure-ai-prompt.js']);
     assert.match(ai, /dangerouslyAllowBrowser: true/);
     assert.ok(!/sk-ant-[A-Za-z0-9]/.test(ai + html), 'API 키를 파일에 넣지 않음');
 });
