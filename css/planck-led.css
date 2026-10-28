@@ -75,3 +75,5 @@ canvas.chart.small { height: 220px; }
 .mat-table td, .mat-table th { text-align: left; }
 .concl .sum-table td { white-space: nowrap; }
 .concl .sum-table td:first-child { white-space: normal; }
+.chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+button.chip { padding: 6px 10px; font-size: .85em; }

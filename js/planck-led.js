@@ -15,7 +15,7 @@
         pot: '10000', rs: '330', rsCustom: '',
         iMode: 'resistor',     // 전류 재는 법: 'resistor' (고정 저항 전압 ÷ 저항) | 'meter' (전류계)
         rMeas: '', vrUnit: 'V', // 고정 저항 실제 값 (비우면 회로 탭 값), 저항 전압 단위
-        bat: '4.5', batReal: '', iMax: '10',
+        bat: '4.5', iMax: '10', // bat: 건전지 전압 (V, 사용자가 자유롭게 입력)
         tab: 'purpose',        // 보고 있는 탭
         draft: { v: '', i: '', vr: '', gv: '' } // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
     };
@@ -36,6 +36,9 @@
         if (d && Array.isArray(d.leds) && d.leds.length) {
             Object.assign(state, d);
             if (state.pot !== '1000') state.pot = '10000';
+            // 예전에는 '실제 전압' 칸이 따로 있었다 → 건전지 전압 하나로 합친다
+            if (num(d.batReal) > 0) state.bat = String(d.batReal);
+            delete state.batReal;
             state.origin = false;   // 원점 통과 직선은 결론·분석 탭에서 따로 보여 준다
             // 예전 탭 이름 → 보고서 순서 탭 이름
             state.tab = { setup: 'procedure', leds: 'materials', measure: 'data' }[state.tab] || state.tab;
@@ -72,9 +75,11 @@
     }
 
     // ---------- 1. 회로 설정 계산 ----------
+    const BAT_MIN = 1, BAT_MAX = 24;
+    // 건전지 전압 (V). 비었거나 범위를 벗어나면 4.5 V 로 계산한다
     function batteryVolt() {
-        const real = num(state.batReal);
-        return real && real > 0 ? real : parseFloat(state.bat);
+        const v = num(state.bat);
+        return v != null && v >= BAT_MIN && v <= BAT_MAX ? v : 4.5;
     }
     const ohm = r => r >= 1000 ? Number((r / 1000).toFixed(2)) + ' kΩ' : Math.round(r) + ' Ω';
     // LED 앞 고정 저항 (Ω, 없으면 0)
@@ -98,7 +103,13 @@
         $('svg-rs').setAttribute('stroke-dasharray', rs ? '' : '4 3');
         $('svg-rs-txt').textContent = rs ? '고정 저항 ' + ohm(rs) : '(선택) 고정 저항';
         document.querySelectorAll('.bb-rs').forEach(e => { e.textContent = rs ? ohm(rs) : '점퍼선'; });
-        $('svg-bat').textContent = '건전지 ' + vb.toFixed(1) + ' V';
+        $('svg-bat').textContent = '건전지 ' + Number(vb.toFixed(2)) + ' V';
+        const cells = vb / 1.5;
+        document.querySelectorAll('.bat-txt').forEach(e => {
+            e.textContent = Math.abs(cells - Math.round(cells)) < 1e-6 && cells >= 1 && cells <= 8
+                ? '1.5 V × ' + Math.round(cells) + '개 = ' + Number(vb.toFixed(2)) + ' V'
+                : Number(vb.toFixed(2)) + ' V';
+        });
         $('svg-pot').textContent = ohm(rPot);
         $('row-rs-custom').hidden = state.rs !== 'custom';
         document.querySelectorAll('.imax-txt').forEach(e => { e.textContent = iMax; });
@@ -112,14 +123,23 @@
               ' <span class="note">— 이보다 더 돌리면 순방향 전압이 낮은 LED(약 ' + vfLow.toFixed(1) + ' V)에 ' + iMax + ' mA 넘게 흐릅니다' +
               (rs ? '' : '. 고정 저항(' + g.seriesR + ' Ω 이상)을 넣으면 끝까지 돌려도 안전합니다') + '</span><br>';
         $('setup-out').innerHTML =
-            '🔧 <b>' + ohm(rPot) + ' 가변저항</b>: 양 끝 다리 → 건전지 +, −  /  가운데 다리 → 전류계 → ' + (rs ? '고정 저항 ' + ohm(rs) + ' → ' : '') + 'LED<br>' +
+            '🔧 <b>' + ohm(rPot) + ' 가변저항</b>: 양 끝 다리 → 건전지 +, −  /  가운데 다리 → ' + (rs ? '고정 저항 ' + ohm(rs) + ' → ' : '') + 'LED<br>' +
             '▶️ 시작: 손잡이를 <b>− 쪽 끝</b>까지 (가운데 다리 ~ − 쪽 다리 0 Ω, LED 전압 0 V)<br>' +
             limitLine +
             '💡 LED 가 켜지기 시작하는 위치: 손잡이 약 ' + pct(g.xOnLow * 0.85) + ' ~ ' + pct(Math.min(1, g.xOnHigh * 0.95)) + ' 부근 (색마다 다름)<br>' +
             '🔵 ' + (g.safeToEnd ? '끝까지 돌렸을 때' : '안전 한계에서') + ' 순방향 전압이 높은 LED(파랑 등, 약 ' + vfHigh.toFixed(1) + ' V) 전류: 약 <b>' + g.iHighAtLimit.toFixed(1) + ' mA</b><br>' +
             '🔋 가변저항에 늘 흐르는 전류: 약 ' + g.drainMa.toFixed(2) + ' mA';
+        // 준비물 탭에 보이는 짧은 요약
+        $('bat-summary').innerHTML = '건전지 <b>' + Number(vb.toFixed(2)) + ' V</b> · 가변저항 ' + ohm(rPot) + ' · 고정 저항 ' + (rs ? ohm(rs) : '없음') + '<br>' +
+            (g.safeToEnd
+                ? '✅ 손잡이를 끝까지 돌려도 LED 전류는 최대 약 <b>' + g.endLow.toFixed(1) + ' mA</b> 입니다.'
+                : '🛑 손잡이를 끝까지 돌리면 LED 에 ' + iMax + ' mA 넘게 흐릅니다. 고정 저항을 <b>' + ohm(g.seriesR) + ' 이상</b>으로 바꾸거나, 아래 \'선생님용\'의 안전 한계를 표시하세요.') +
+            '<br>파랑 LED 최대 전류: 약 ' + g.iHighAtLimit.toFixed(1) + ' mA';
         const warns = [];
-        if (g.iHighAtLimit < 2) warns.push(rs > g.seriesR * 1.3
+        const typed = num(state.bat);
+        if (state.bat !== '' && (typed == null || typed < BAT_MIN || typed > BAT_MAX)) warns.push('⚠️ 건전지 전압은 ' + BAT_MIN + '~' + BAT_MAX + ' V 사이로 넣으세요. 지금은 4.5 V 로 계산합니다.');
+        if (vb > 9) warns.push('⚠️ 9 V 보다 높은 전압은 권하지 않습니다. 손잡이가 매우 예민해지고, 실수로 연결을 잘못하면 LED·멀티미터가 망가질 수 있습니다.');
+        if (g.iHighAtLimit < 2) warns.push(vb > vfHigh + 0.3 && rs > g.seriesR * 1.3
             ? '⚠️ 고정 저항(' + ohm(rs) + ')이 커서 순방향 전압이 높은 LED(파랑·초록·보라)에 전류가 충분히 흐르지 않습니다. ' + g.seriesR + '~' + Math.round(g.seriesR * 1.3 / 10) * 10 + ' Ω 정도로 바꾸세요.'
             : '⚠️ 건전지 전압이 낮아 순방향 전압이 높은 LED(파랑·초록·보라, 약 ' + vfHigh.toFixed(1) + ' V)에 전류가 충분히 흐르지 않습니다. <b>4.5 V (건전지 3개)</b> 이상을 쓰세요.');
         if (g.xMax < 0.7) warns.push('⚠️ 안전 한계가 손잡이 ' + pct(g.xMax) + ' 로 낮아 조절할 수 있는 범위가 좁습니다. 고정 저항을 넣거나, 건전지 전압을 낮추거나, 10 kΩ 가변저항을 쓰세요.');
@@ -546,8 +566,10 @@
     });
 
     // ---------- 1. 설정 이벤트 ----------
-    $('sel-bat').addEventListener('change', e => { state.bat = e.target.value; state.batReal = ''; $('bat-real').value = ''; save(); renderSetup(); });
-    $('bat-real').addEventListener('input', e => { state.batReal = e.target.value; save(); renderSetup(); });
+    $('bat-v').addEventListener('input', e => { state.bat = e.target.value.trim(); save(); renderSetup(); });
+    document.querySelectorAll('[data-bat]').forEach(b => b.addEventListener('click', () => {
+        state.bat = b.dataset.bat; $('bat-v').value = state.bat; save(); renderSetup();
+    }));
     $('sel-imax').addEventListener('change', e => { state.iMax = e.target.value; save(); renderSetup(); });
     $('sel-pot').addEventListener('change', e => { state.pot = e.target.value; save(); renderSetup(); });
     $('sel-rs').addEventListener('change', e => { state.rs = e.target.value; save(); renderSetup(); });
@@ -622,8 +644,7 @@
         $('sel-pot').value = state.pot;
         $('sel-rs').value = state.rs;
         $('rs-custom').value = state.rsCustom;
-        $('sel-bat').value = state.bat;
-        $('bat-real').value = state.batReal;
+        $('bat-v').value = state.bat;
         $('sel-imax').value = state.iMax;
         $('in-v').value = state.draft.v;
         $('in-i').value = state.draft.i;
