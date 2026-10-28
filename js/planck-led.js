@@ -15,6 +15,7 @@
         pot: '10000', rs: '330', rsCustom: '',
         iMode: 'resistor',     // 전류 재는 법: 'resistor' (고정 저항 전압 ÷ 저항) | 'meter' (전류계)
         rMeas: '', vrUnit: 'V', // 고정 저항 실제 값 (비우면 회로 탭 값), 저항 전압 단위
+        ivY: 'auto', ivYmin: '', ivYmax: '', // I–V 그래프 세로축: 'auto' | 'manual' | 'log'
         bat: '4.5', iMax: '10', // bat: 건전지 전압 (V, 사용자가 자유롭게 입력)
         tab: 'purpose',        // 보고 있는 탭
         draft: { v: '', i: '', vr: '', gv: '' } // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
@@ -36,6 +37,7 @@
         if (d && Array.isArray(d.leds) && d.leds.length) {
             Object.assign(state, d);
             if (state.pot !== '1000') state.pot = '10000';
+            if (!['auto', 'manual', 'log'].includes(state.ivY)) state.ivY = 'auto';
             // 예전에는 '실제 전압' 칸이 따로 있었다 → 건전지 전압 하나로 합친다
             if (num(d.batReal) > 0) state.bat = String(d.batReal);
             delete state.batReal;
@@ -255,6 +257,10 @@
                 '<tr><td>' + (n + 1) + (usedMark(p) ? ' ●' : '') + '</td><td>' + p.v.toFixed(3) + '</td>' + (hasVr ? '<td>' + (p.vr != null ? (p.vr * 1000).toFixed(2) : '–') + '</td>' : '') + '<td>' + p.i.toFixed(4) + '</td><td><button class="secondary" data-del-iv="' + k + '">삭제</button></td></tr>').join('');
         }
         $('chart-iv').hidden = glow;
+        $('row-ivy').hidden = glow;
+        $('ivy-msg').hidden = glow;
+        $('sel-ivy').value = state.ivY;
+        $('ivy-manual').hidden = state.ivY !== 'manual';
         $('iv-note').hidden = glow;
         drawIV(glow ? null : led, t);
     }
@@ -321,6 +327,18 @@
     $('in-i').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addIV(); } });
     $('in-vr').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addIV(); } });
     $('in-vr').addEventListener('input', showCalc);
+    $('sel-ivy').addEventListener('change', e => {
+        state.ivY = e.target.value;
+        // 직접 정하기로 바꿀 때 빈 칸이면 지금 보이는 범위로 채워 준다
+        if (state.ivY === 'manual' && !state.ivYmax) {
+            const led = current(), top = led && led.iv.length ? Math.max(...led.iv.map(p => p.i)) : 0;
+            state.ivYmin = '0'; state.ivYmax = String(Number((top > 0 ? top * 1.15 : 0.1).toPrecision(2)));
+            $('ivy-min').value = state.ivYmin; $('ivy-max').value = state.ivYmax;
+        }
+        save(); renderMeasure();
+    });
+    $('ivy-min').addEventListener('input', e => { state.ivYmin = e.target.value; save(); renderMeasure(); });
+    $('ivy-max').addEventListener('input', e => { state.ivYmax = e.target.value; save(); renderMeasure(); });
     $('sel-imode').addEventListener('change', e => { state.iMode = e.target.value; save(); renderMeasure(); });
     $('sel-vr-unit').addEventListener('change', e => { state.vrUnit = e.target.value; save(); showCalc(); });
     $('r-meas').addEventListener('input', e => { state.rMeas = e.target.value; save(); showCalc(); });
@@ -455,9 +473,9 @@
             g.fillText(t.toFixed(o.xd != null ? o.xd : 2), X(t), H - B + 15);
         }
         g.textAlign = 'right';
-        for (const t of ticks(ymin, ymax, 5)) {
+        for (const t of o.yticks || ticks(ymin, ymax, 5)) {
             g.beginPath(); g.moveTo(L, Y(t)); g.lineTo(W - R, Y(t)); g.stroke();
-            g.fillText(t.toFixed(o.yd != null ? o.yd : 2), L - 6, Y(t) + 4);
+            g.fillText(o.yfmt ? o.yfmt(t) : t.toFixed(o.yd != null ? o.yd : 2), L - 6, Y(t) + 4);
         }
         g.strokeStyle = '#999'; g.strokeRect(L, T, W - L - R, H - T - B);
         g.fillStyle = '#333'; g.textAlign = 'center';
@@ -480,28 +498,64 @@
         g.restore();
     }
 
+    // 눈금 숫자 자릿수: 범위가 작을수록 소수 자리를 늘린다
+    const decimalsFor = span => span < 0.05 ? 4 : span < 0.5 ? 3 : span < 5 ? 2 : 1;
+    // 10^k 를 보기 좋게 (0.001, 0.01, … 1, 10)
+    const pow10Label = k => k >= 0 ? String(Math.pow(10, k)) : Math.pow(10, k).toFixed(-k);
+
     function drawIV(led, t) {
         const cv = $('chart-iv');
+        $('ivy-msg').textContent = '';
         if (!led) { drawChart(cv, { xmin: 0, xmax: 3.5, ymin: 0, ymax: 10, xl: '전압 V (V)', yl: '전류 I (mA)' }); return; }
-        const pts = led.iv.filter(p => isFinite(p.v) && isFinite(p.i));
+        const all = led.iv.filter(p => isFinite(p.v) && isFinite(p.i));
         const c = color(led);
-        const vmax = Math.max(1, ...pts.map(p => p.v)), imax = Math.max(1, ...pts.map(p => p.i));
-        const vmin = pts.length ? Math.max(0, Math.min(...pts.map(p => p.v)) - 0.1) : 0;
+        const vmax = Math.max(1, ...all.map(p => p.v));
+        const vmin = all.length ? Math.max(0, Math.min(...all.map(p => p.v)) - 0.1) : 0;
+        const iTop = all.length ? Math.max(...all.map(p => p.i)) : 0;
+        const msgs = [];
+
+        // 세로축 정하기
+        let mode = state.ivY, ymin = 0, ymax = iTop > 0 ? iTop * 1.15 : 0.1, yticks = null, yfmt = null, ty = y => y, pts = all;
+        if (mode === 'log') {
+            const pos = all.filter(p => p.i > 0);
+            if (!pos.length) { msgs.push('0 보다 큰 전류가 없어 로그 눈금으로 그릴 수 없습니다. 자동 눈금으로 보여 줍니다.'); mode = 'auto'; }
+            else {
+                const lo = Math.floor(Math.log10(Math.min(...pos.map(p => p.i))));
+                let hi = Math.ceil(Math.log10(Math.max(...pos.map(p => p.i))));
+                if (hi <= lo) hi = lo + 1;
+                ymin = lo; ymax = hi; ty = y => Math.log10(y);
+                yticks = []; for (let k = lo; k <= hi; k++) yticks.push(k);
+                yfmt = pow10Label;
+                pts = pos;
+                if (pos.length < all.length) msgs.push('전류가 0 인 점 ' + (all.length - pos.length) + '개는 로그 눈금에 나타나지 않습니다.');
+            }
+        } else if (mode === 'manual') {
+            const mn = num(state.ivYmin), mx = num(state.ivYmax);
+            if (mn != null && mx != null && mn < mx) {
+                ymin = mn; ymax = mx;
+                const out = all.filter(p => p.i < mn || p.i > mx).length;
+                if (out) msgs.push('정한 범위 밖에 있는 점 ' + out + '개는 보이지 않습니다.');
+            } else msgs.push('최소 < 최대가 되도록 두 값을 넣으세요. 지금은 자동 눈금으로 보여 줍니다.');
+        }
         const o = {
-            xmin: vmin, xmax: vmax + 0.05 * (vmax - vmin + 0.1), ymin: 0, ymax: imax * 1.1,
-            xl: '전압 V (V)', yl: '전류 I (mA)', yd: imax < 5 ? 2 : 1,
-            pts: pts.map(p => ({ x: p.v, y: p.i, color: c, hollow: state.curMode === 'extrapolate' && p.i < state.iMin })),
+            xmin: vmin, xmax: vmax + 0.05 * (vmax - vmin + 0.1), ymin, ymax, yticks, yfmt,
+            xl: '전압 V (V)', yl: '전류 I (mA)' + (yticks ? ', 로그' : ''), yd: decimalsFor(ymax - ymin),
+            pts: pts.map(p => ({ x: p.v, y: ty(p.i), color: c, hollow: state.curMode === 'extrapolate' && p.i < state.iMin })),
             lines: [], vlines: []
         };
         if (t && !t.error) {
             o.vlines.push({ x: t.v0, color: '#333' });
             if (state.curMode === 'extrapolate') {
-                const v2 = Math.max(...pts.map(p => p.v));
-                o.lines.push({ pts: [{ x: t.v0, y: 0 }, { x: v2, y: t.slope * v2 + t.intercept }], color: '#333', dash: [6, 4], width: 1.5 });
+                // 로그 눈금에서는 직선이 곡선이 되므로 연장선을 그리지 않는다
+                if (!yticks) {
+                    const v2 = Math.max(...all.map(p => p.v));
+                    o.lines.push({ pts: [{ x: t.v0, y: 0 }, { x: v2, y: t.slope * v2 + t.intercept }], color: '#333', dash: [6, 4], width: 1.5 });
+                }
             } else {
-                o.lines.push({ pts: [{ x: o.xmin, y: state.iRef }, { x: o.xmax, y: state.iRef }], color: '#999', dash: [2, 3], width: 1 });
+                o.lines.push({ pts: [{ x: o.xmin, y: ty(state.iRef) }, { x: o.xmax, y: ty(state.iRef) }], color: '#999', dash: [2, 3], width: 1 });
             }
         }
+        $('ivy-msg').textContent = msgs.join(' ');
         drawChart(cv, o);
     }
 
@@ -645,6 +699,8 @@
         $('sel-rs').value = state.rs;
         $('rs-custom').value = state.rsCustom;
         $('bat-v').value = state.bat;
+        $('ivy-min').value = state.ivYmin;
+        $('ivy-max').value = state.ivYmax;
         $('sel-imax').value = state.iMax;
         $('in-v').value = state.draft.v;
         $('in-i').value = state.draft.i;

@@ -563,6 +563,20 @@
             <tbody id="meas-body"></tbody>
         </table></div>
         <canvas id="chart-iv" class="chart small"></canvas>
+        <div class="row" id="row-ivy">
+            <label>세로축(전류)
+                <select id="sel-ivy">
+                    <option value="auto">자동: 측정값에 맞춤</option>
+                    <option value="manual">직접 정하기</option>
+                    <option value="log">로그 눈금: 작은 전류까지 보기</option>
+                </select>
+            </label>
+            <span id="ivy-manual" class="row" style="margin:0" hidden>
+                <label>최소 <input type="number" id="ivy-min" step="any" inputmode="decimal" style="width:80px"></label>
+                <label>최대 <input type="number" id="ivy-max" step="any" inputmode="decimal" style="width:80px"> mA</label>
+            </span>
+        </div>
+        <div id="ivy-msg" class="note"></div>
         <p class="note" id="iv-note">I–V 그래프: 채운 점은 직선 부분으로 쓴 점, 빈 점은 쓰지 않은 점입니다. 세로 점선이 문턱 전압 V₀ 입니다.</p>
         <div class="row"><button id="btn-clear-led" class="danger">이 LED 의 이 기준 기록 지우기</button></div>
         <div class="row next"><button class="good" data-go="result">다음: 6. 실험 결과 →</button></div>
