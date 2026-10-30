@@ -24,7 +24,6 @@
 | `walk-run-detector/` | 걷기·뛰기 판정 머신러닝 수업 앱 (자체 README 참고) |
 | `pass/` | 예전 조퇴증·외출증 공유 링크를 새 주소(aks-sci-lab.github.io/teacher-desk/)로 넘기는 페이지만 남김 |
 | `uploader.html` | 아두이노 펌웨어 업로더 |
-| `app.py` | 날씨 API 로컬 서버 (Firebase Hosting 에는 배포되지 않음) |
 | `firestore.rules` | Firestore 보안 규칙 |
 
 새 실험을 추가하면 `index.html` 의 `프로젝트 목록` 에 링크를 넣는다.
@@ -117,3 +116,4 @@
   - 확인 필요: 실제 API 키로 AI 그림 품질·시간(시험은 가짜 응답), jsdelivr `+esm` 로 SDK 불러오기(시험 환경에서 CDN 차단), 한글(HWP)에 PNG 붙여 넣기, 학교 PC 브라우저의 그림 복사 지원
 - 2026-10-28: 문항 그림 도구 AI 그리기에 LM Studio(내 PC 로컬 LLM) 추가 (사용자 요청: 8845HS·24GB 에서 Gemma 4 12B). 연결 확인·모델 목록(Gemma 자동 선택), 스트리밍으로 받은 글자 수 표시, 사진은 image_url, 대화 길이·CORS·사진 미지원 오류 안내. 그림 생성 모델(Stable Diffusion 등)은 시험 그림에 맞지 않아 쓰지 않기로 함. 사용자의 직접 지시로 Claude Code 가 PR #48 머지·배포 — Claude Code
   - 확인 필요: 실제 Gemma 4 12B 의 그림 자료 품질·시간, https 사이트에서 127.0.0.1 접속(브라우저의 로컬 네트워크 허용 창), LM Studio 의 json_schema 지원 여부
+- 2026-10-30: 저장소 정리(사용자 지정) — 날씨 데모(`app.py`·`run.bat`·`run.command`, README 날씨 설명)는 `aks-sci-lab/weather-app` 에 같은 내용이 있어 이 저장소에서 제거, 실수로 올라간 빈 파일 `projects/새 텍스트 문서.txt` 제거 — Claude Code
