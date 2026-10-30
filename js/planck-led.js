@@ -12,9 +12,13 @@
         iMin: 1, iRef: 0.1,    // mA
         origin: false,
         sel: null,             // 측정 중인 LED id
-        pot: '10000', rs: '330', rsCustom: '', bat: '4.5', batReal: '', iMax: '10',
-        tab: 'theory',         // 보고 있는 탭
-        draft: { v: '', i: '', gv: '' } // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
+        pot: '10000', rs: '330', rsCustom: '',
+        iMode: 'resistor',     // 전류 재는 법: 'resistor' (고정 저항 전압 ÷ 저항) | 'meter' (전류계)
+        rMeas: '', vrUnit: 'V', // 고정 저항 실제 값 (비우면 회로 탭 값), 저항 전압 단위
+        ivY: 'auto', ivYmin: '', ivYmax: '', // I–V 그래프 세로축: 'auto' | 'manual' | 'log'
+        bat: '4.5', iMax: '10', // bat: 건전지 전압 (V, 사용자가 자유롭게 입력)
+        tab: 'purpose',        // 보고 있는 탭
+        draft: { v: '', i: '', vr: '', gv: '' } // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
     };
 
     function defaultLeds() {
@@ -33,9 +37,19 @@
         if (d && Array.isArray(d.leds) && d.leds.length) {
             Object.assign(state, d);
             if (state.pot !== '1000') state.pot = '10000';
+            if (!['auto', 'manual', 'log'].includes(state.ivY)) state.ivY = 'auto';
+            // 예전에는 '실제 전압' 칸이 따로 있었다 → 건전지 전압 하나로 합친다
+            if (num(d.batReal) > 0) state.bat = String(d.batReal);
+            delete state.batReal;
+            state.origin = false;   // 원점 통과 직선은 결론·분석 탭에서 따로 보여 준다
+            // 예전 탭 이름 → 보고서 순서 탭 이름
+            state.tab = { setup: 'procedure', leds: 'materials', measure: 'data' }[state.tab] || state.tab;
             if (state.rs == null) state.rs = '330';
             if (state.rsCustom == null) state.rsCustom = '';
-            state.draft = Object.assign({ v: '', i: '', gv: '' }, d.draft);
+            state.draft = Object.assign({ v: '', i: '', vr: '', gv: '' }, d.draft);
+            if (state.iMode !== 'meter') state.iMode = 'resistor';
+            if (state.vrUnit !== 'mV') state.vrUnit = 'V';
+            if (state.rMeas == null) state.rMeas = '';
             state.leds.forEach(l => { l.iv = Array.isArray(l.iv) ? l.iv : []; l.glow = Array.isArray(l.glow) ? l.glow : []; if (l.fit == null) l.fit = true; });
         } else {
             state.leds = defaultLeds();
@@ -51,7 +65,7 @@
     const methodKey = m => (m || state.method) === 'glow' ? 'glow' : state.curMode;
     const thr = (led, m) => P.thresholdOf(led, methodKey(m), { iMin: state.iMin, iRef: state.iRef });
     const color = led => P.wavelengthColor(led.lambda);
-    const methodName = m => m === 'glow' ? '빛 기준' : (state.curMode === 'current' ? '전류 기준·기준 전류' : '전류 기준·직선 연장');
+    const methodName = m => m === 'glow' ? '빛 기준' : (state.curMode === 'current' ? '전류 기준(기준 전류)' : '전류 기준');
 
     // 순방향 전압 추정 (가변저항 안전 한계 계산용): 미리 넣은 LED 는 표의 값, 직접 추가한 LED 는 파장으로 짐작
     function vfOf(led) {
@@ -63,9 +77,11 @@
     }
 
     // ---------- 1. 회로 설정 계산 ----------
+    const BAT_MIN = 1, BAT_MAX = 24;
+    // 건전지 전압 (V). 비었거나 범위를 벗어나면 4.5 V 로 계산한다
     function batteryVolt() {
-        const real = num(state.batReal);
-        return real && real > 0 ? real : parseFloat(state.bat);
+        const v = num(state.bat);
+        return v != null && v >= BAT_MIN && v <= BAT_MAX ? v : 4.5;
     }
     const ohm = r => r >= 1000 ? Number((r / 1000).toFixed(2)) + ' kΩ' : Math.round(r) + ' Ω';
     // LED 앞 고정 저항 (Ω, 없으면 0)
@@ -88,7 +104,14 @@
         $('svg-rs').setAttribute('stroke', rs ? '#333' : '#999');
         $('svg-rs').setAttribute('stroke-dasharray', rs ? '' : '4 3');
         $('svg-rs-txt').textContent = rs ? '고정 저항 ' + ohm(rs) : '(선택) 고정 저항';
-        $('svg-bat').textContent = '건전지 ' + vb.toFixed(1) + ' V';
+        document.querySelectorAll('.bb-rs').forEach(e => { e.textContent = rs ? ohm(rs) : '점퍼선'; });
+        $('svg-bat').textContent = '건전지 ' + Number(vb.toFixed(2)) + ' V';
+        const cells = vb / 1.5;
+        document.querySelectorAll('.bat-txt').forEach(e => {
+            e.textContent = Math.abs(cells - Math.round(cells)) < 1e-6 && cells >= 1 && cells <= 8
+                ? '1.5 V × ' + Math.round(cells) + '개 = ' + Number(vb.toFixed(2)) + ' V'
+                : Number(vb.toFixed(2)) + ' V';
+        });
         $('svg-pot').textContent = ohm(rPot);
         $('row-rs-custom').hidden = state.rs !== 'custom';
         document.querySelectorAll('.imax-txt').forEach(e => { e.textContent = iMax; });
@@ -102,14 +125,23 @@
               ' <span class="note">— 이보다 더 돌리면 순방향 전압이 낮은 LED(약 ' + vfLow.toFixed(1) + ' V)에 ' + iMax + ' mA 넘게 흐릅니다' +
               (rs ? '' : '. 고정 저항(' + g.seriesR + ' Ω 이상)을 넣으면 끝까지 돌려도 안전합니다') + '</span><br>';
         $('setup-out').innerHTML =
-            '🔧 <b>' + ohm(rPot) + ' 가변저항</b>: 양 끝 다리 → 건전지 +, −  /  가운데 다리 → 전류계 → ' + (rs ? '고정 저항 ' + ohm(rs) + ' → ' : '') + 'LED<br>' +
+            '🔧 <b>' + ohm(rPot) + ' 가변저항</b>: 양 끝 다리 → 건전지 +, −  /  가운데 다리 → ' + (rs ? '고정 저항 ' + ohm(rs) + ' → ' : '') + 'LED<br>' +
             '▶️ 시작: 손잡이를 <b>− 쪽 끝</b>까지 (가운데 다리 ~ − 쪽 다리 0 Ω, LED 전압 0 V)<br>' +
             limitLine +
             '💡 LED 가 켜지기 시작하는 위치: 손잡이 약 ' + pct(g.xOnLow * 0.85) + ' ~ ' + pct(Math.min(1, g.xOnHigh * 0.95)) + ' 부근 (색마다 다름)<br>' +
             '🔵 ' + (g.safeToEnd ? '끝까지 돌렸을 때' : '안전 한계에서') + ' 순방향 전압이 높은 LED(파랑 등, 약 ' + vfHigh.toFixed(1) + ' V) 전류: 약 <b>' + g.iHighAtLimit.toFixed(1) + ' mA</b><br>' +
             '🔋 가변저항에 늘 흐르는 전류: 약 ' + g.drainMa.toFixed(2) + ' mA';
+        // 준비물 탭에 보이는 짧은 요약
+        $('bat-summary').innerHTML = '건전지 <b>' + Number(vb.toFixed(2)) + ' V</b> · 가변저항 ' + ohm(rPot) + ' · 고정 저항 ' + (rs ? ohm(rs) : '없음') + '<br>' +
+            (g.safeToEnd
+                ? '✅ 손잡이를 끝까지 돌려도 LED 전류는 최대 약 <b>' + g.endLow.toFixed(1) + ' mA</b> 입니다.'
+                : '🛑 손잡이를 끝까지 돌리면 LED 에 ' + iMax + ' mA 넘게 흐릅니다. 고정 저항을 <b>' + ohm(g.seriesR) + ' 이상</b>으로 바꾸거나, 아래 \'선생님용\'의 안전 한계를 표시하세요.') +
+            '<br>파랑 LED 최대 전류: 약 ' + g.iHighAtLimit.toFixed(1) + ' mA';
         const warns = [];
-        if (g.iHighAtLimit < 2) warns.push(rs > g.seriesR * 1.3
+        const typed = num(state.bat);
+        if (state.bat !== '' && (typed == null || typed < BAT_MIN || typed > BAT_MAX)) warns.push('⚠️ 건전지 전압은 ' + BAT_MIN + '~' + BAT_MAX + ' V 사이로 넣으세요. 지금은 4.5 V 로 계산합니다.');
+        if (vb > 9) warns.push('⚠️ 9 V 보다 높은 전압은 권하지 않습니다. 손잡이가 매우 예민해지고, 실수로 연결을 잘못하면 LED·멀티미터가 망가질 수 있습니다.');
+        if (g.iHighAtLimit < 2) warns.push(vb > vfHigh + 0.3 && rs > g.seriesR * 1.3
             ? '⚠️ 고정 저항(' + ohm(rs) + ')이 커서 순방향 전압이 높은 LED(파랑·초록·보라)에 전류가 충분히 흐르지 않습니다. ' + g.seriesR + '~' + Math.round(g.seriesR * 1.3 / 10) * 10 + ' Ω 정도로 바꾸세요.'
             : '⚠️ 건전지 전압이 낮아 순방향 전압이 높은 LED(파랑·초록·보라, 약 ' + vfHigh.toFixed(1) + ' V)에 전류가 충분히 흐르지 않습니다. <b>4.5 V (건전지 3개)</b> 이상을 쓰세요.');
         if (g.xMax < 0.7) warns.push('⚠️ 안전 한계가 손잡이 ' + pct(g.xMax) + ' 로 낮아 조절할 수 있는 범위가 좁습니다. 고정 저항을 넣거나, 건전지 전압을 낮추거나, 10 kΩ 가변저항을 쓰세요.');
@@ -182,12 +214,20 @@
         $('row-iref').hidden = state.curMode !== 'current';
         $('i-min').value = state.iMin;
         $('i-ref').value = state.iRef;
+        const byR = state.iMode === 'resistor';
+        $('sel-imode').value = state.iMode;
+        $('row-rmeas').hidden = !byR;
+        $('lbl-vr').hidden = !byR;
+        $('lbl-i').hidden = byR;
+        $('r-meas').placeholder = seriesOhm() ? String(seriesOhm()) : '예: 330';
+        $('sel-vr-unit').value = state.vrUnit;
+        showCalc();
 
         const led = current();
         $('led-lambda').innerHTML = led ? '<span class="dot" style="background:' + color(led) + '"></span>광자 에너지 hc/λ = ' + P.photonVolt(led.lambda).toFixed(2) + ' eV' : '';
-        ['in-v', 'in-i', 'btn-add-iv', 'in-gv', 'btn-add-glow', 'btn-clear-led'].forEach(id => { $(id).disabled = !led; });
+        ['in-v', 'in-i', 'in-vr', 'btn-add-iv', 'in-gv', 'btn-add-glow', 'btn-clear-led'].forEach(id => { $(id).disabled = !led; });
         if (!led) {
-            $('thr-out').textContent = '2번에서 사용할 LED 를 하나 이상 고르세요.';
+            $('thr-out').textContent = '3. 실험 준비물 탭에서 사용할 LED 를 하나 이상 고르세요.';
             $('meas-head').innerHTML = ''; $('meas-body').innerHTML = '';
             drawIV(null, null);
             return;
@@ -204,34 +244,70 @@
         }
 
         if (glow) {
-            $('meas-head').innerHTML = '<tr><th>회</th><th>빛이 보인 전압 (V)</th><th></th></tr>';
+            $('meas-head').innerHTML = '<tr><th>회</th><th>빛이 보인 V<sub>LED</sub> (V)</th><th></th></tr>';
             $('meas-body').innerHTML = led.glow.map((v, k) =>
                 '<tr><td>' + (k + 1) + '</td><td>' + v.toFixed(3) + '</td><td><button class="secondary" data-del-glow="' + k + '">삭제</button></td></tr>').join('');
         } else {
-            $('meas-head').innerHTML = '<tr><th>번호</th><th>전압 V (V)</th><th>전류 I (mA)</th><th></th></tr>';
+            const hasVr = led.iv.some(p => p.vr != null);
+            $('meas-head').innerHTML = '<tr><th>번호</th><th>V<sub>LED</sub> (V)</th>' + (hasVr ? '<th>V<sub>R</sub> (mV)</th>' : '') + '<th>전류 I (mA)</th><th></th></tr>';
             // 기록 순서와 상관없이 전압 순으로 보여 준다
             const rows = led.iv.map((p, k) => ({ p, k })).sort((a, b) => a.p.v - b.p.v);
             const usedMark = state.curMode === 'extrapolate' ? (p => p.i >= state.iMin) : (() => false);
             $('meas-body').innerHTML = rows.map(({ p, k }, n) =>
-                '<tr><td>' + (n + 1) + (usedMark(p) ? ' ●' : '') + '</td><td>' + p.v.toFixed(3) + '</td><td>' + p.i.toFixed(3) + '</td><td><button class="secondary" data-del-iv="' + k + '">삭제</button></td></tr>').join('');
+                '<tr><td>' + (n + 1) + (usedMark(p) ? ' ●' : '') + '</td><td>' + p.v.toFixed(3) + '</td>' + (hasVr ? '<td>' + (p.vr != null ? (p.vr * 1000).toFixed(2) : '–') + '</td>' : '') + '<td>' + p.i.toFixed(4) + '</td><td><button class="secondary" data-del-iv="' + k + '">삭제</button></td></tr>').join('');
         }
         $('chart-iv').hidden = glow;
+        $('row-ivy').hidden = glow;
+        $('ivy-msg').hidden = glow;
+        $('sel-ivy').value = state.ivY;
+        $('ivy-manual').hidden = state.ivY !== 'manual';
         $('iv-note').hidden = glow;
         drawIV(glow ? null : led, t);
     }
 
+    // 고정 저항 값 (Ω): 측정 탭에 잰 값이 있으면 그것, 없으면 회로 탭에서 고른 값
+    function rUsed() {
+        const r = num(state.rMeas);
+        return r && r > 0 ? r : seriesOhm();
+    }
+    // 입력한 저항 전압 (V 단위로)
+    function vrInput() {
+        const x = num($('in-vr').value);
+        return x == null ? null : (state.vrUnit === 'mV' ? x / 1000 : x);
+    }
+    // 저항 전압을 넣는 동안 계산된 전류를 바로 보여 준다
+    function showCalc() {
+        const out = $('i-calc');
+        if (state.iMode !== 'resistor') { out.textContent = ''; return; }
+        const r = rUsed(), vr = vrInput();
+        if (!r) out.innerHTML = '⚠️ 고정 저항 값을 넣으세요. 회로 탭에서 고정 저항을 "없음"으로 골랐다면 저항을 넣거나 "전류계로 직접"을 고르세요.';
+        else if (vr == null) out.textContent = 'I = V_R ÷ ' + r + ' Ω 로 계산합니다.';
+        else out.innerHTML = '→ 전류 I = ' + vr.toFixed(4) + ' V ÷ ' + r + ' Ω = <b>' + (vr / r * 1000).toFixed(4) + ' mA</b>';
+    }
+
     function addIV() {
         const led = current(); if (!led) return;
-        const v = num($('in-v').value), i = num($('in-i').value);
-        if (v == null || i == null || v < 0 || i < 0) { alert('전압(V)과 전류(mA)를 모두 0 이상의 숫자로 넣으세요.'); return; }
-        led.iv.push({ v, i });
+        const v = num($('in-v').value);
+        let i, rec;
+        if (state.iMode === 'resistor') {
+            const r = rUsed(), vr = vrInput();
+            if (!r) { alert('고정 저항 값(Ω)을 넣으세요.'); return; }
+            if (v == null || vr == null || v < 0 || vr < 0) { alert('LED 전압과 저항 전압을 모두 0 이상의 숫자로 넣으세요.'); return; }
+            i = vr / r * 1000;
+            rec = { v, i, vr, r };
+        } else {
+            i = num($('in-i').value);
+            if (v == null || i == null || v < 0 || i < 0) { alert('전압(V)과 전류(mA)를 모두 0 이상의 숫자로 넣으세요.'); return; }
+            rec = { v, i };
+        }
+        led.iv.push(rec);
         const warns = [];
         if (i > parseFloat(state.iMax)) warns.push('⚠️ 전류가 ' + state.iMax + ' mA 를 넘었습니다. LED 가 뜨거워지면 문턱 전압이 바뀝니다. 전압을 더 올리지 마세요.');
-        if (i > 30) warns.push('⚠️ 30 mA 이상은 LED 가 망가질 수 있습니다. 단위가 mA 인지 확인하세요 (A 로 읽었다면 1000 을 곱합니다).');
+        if (i > 30) warns.push('⚠️ 30 mA 이상은 LED 가 망가질 수 있습니다. 단위(mA, V/mV)를 확인하세요.');
         $('iv-warn').innerHTML = warns.join('<br>'); $('iv-warn').hidden = !warns.length;
         save(); renderAll();
-        $('in-i').value = '';
-        saveDraft();
+        $('in-i').value = ''; $('in-vr').value = '';
+        saveDraft(); showCalc();
         $('in-v').focus(); $('in-v').select();
     }
     function addGlow() {
@@ -247,8 +323,25 @@
     $('btn-add-iv').addEventListener('click', addIV);
     $('btn-add-glow').addEventListener('click', addGlow);
     // Enter: 전압 → 전류 칸으로, 전류 칸에서 Enter 면 기록
-    $('in-v').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('in-i').focus(); } });
+    $('in-v').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $(state.iMode === 'resistor' ? 'in-vr' : 'in-i').focus(); } });
     $('in-i').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addIV(); } });
+    $('in-vr').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addIV(); } });
+    $('in-vr').addEventListener('input', showCalc);
+    $('sel-ivy').addEventListener('change', e => {
+        state.ivY = e.target.value;
+        // 직접 정하기로 바꿀 때 빈 칸이면 지금 보이는 범위로 채워 준다
+        if (state.ivY === 'manual' && !state.ivYmax) {
+            const led = current(), top = led && led.iv.length ? Math.max(...led.iv.map(p => p.i)) : 0;
+            state.ivYmin = '0'; state.ivYmax = String(Number((top > 0 ? top * 1.15 : 0.1).toPrecision(2)));
+            $('ivy-min').value = state.ivYmin; $('ivy-max').value = state.ivYmax;
+        }
+        save(); renderMeasure();
+    });
+    $('ivy-min').addEventListener('input', e => { state.ivYmin = e.target.value; save(); renderMeasure(); });
+    $('ivy-max').addEventListener('input', e => { state.ivYmax = e.target.value; save(); renderMeasure(); });
+    $('sel-imode').addEventListener('change', e => { state.iMode = e.target.value; save(); renderMeasure(); });
+    $('sel-vr-unit').addEventListener('change', e => { state.vrUnit = e.target.value; save(); showCalc(); });
+    $('r-meas').addEventListener('input', e => { state.rMeas = e.target.value; save(); showCalc(); });
     $('in-gv').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addGlow(); } });
 
     $('meas-body').addEventListener('click', e => {
@@ -295,7 +388,6 @@
             '<td>' + P.photonVolt(led.lambda).toFixed(3) + '</td>' +
             '<td><input type="checkbox" data-fit="1"' + (led.fit ? ' checked' : '') + (t.error ? ' disabled' : '') + '></td></tr>').join('')
             : '<tr><td colspan="7" class="note">사용할 LED 가 없습니다.</td></tr>';
-        $('chk-origin').checked = state.origin;
 
         const verdict = $('verdict');
         if (!res) {
@@ -329,7 +421,6 @@
         led.fit = e.target.checked;
         save(); renderResults();
     });
-    $('chk-origin').addEventListener('change', e => { state.origin = e.target.checked; save(); renderResults(); });
 
     // 최소제곱법 계산 과정 (x = f [10¹⁴ Hz], y = V₀ [V])
     function calcHtml(res) {
@@ -382,9 +473,9 @@
             g.fillText(t.toFixed(o.xd != null ? o.xd : 2), X(t), H - B + 15);
         }
         g.textAlign = 'right';
-        for (const t of ticks(ymin, ymax, 5)) {
+        for (const t of o.yticks || ticks(ymin, ymax, 5)) {
             g.beginPath(); g.moveTo(L, Y(t)); g.lineTo(W - R, Y(t)); g.stroke();
-            g.fillText(t.toFixed(o.yd != null ? o.yd : 2), L - 6, Y(t) + 4);
+            g.fillText(o.yfmt ? o.yfmt(t) : t.toFixed(o.yd != null ? o.yd : 2), L - 6, Y(t) + 4);
         }
         g.strokeStyle = '#999'; g.strokeRect(L, T, W - L - R, H - T - B);
         g.fillStyle = '#333'; g.textAlign = 'center';
@@ -407,28 +498,64 @@
         g.restore();
     }
 
+    // 눈금 숫자 자릿수: 범위가 작을수록 소수 자리를 늘린다
+    const decimalsFor = span => span < 0.05 ? 4 : span < 0.5 ? 3 : span < 5 ? 2 : 1;
+    // 10^k 를 보기 좋게 (0.001, 0.01, … 1, 10)
+    const pow10Label = k => k >= 0 ? String(Math.pow(10, k)) : Math.pow(10, k).toFixed(-k);
+
     function drawIV(led, t) {
         const cv = $('chart-iv');
+        $('ivy-msg').textContent = '';
         if (!led) { drawChart(cv, { xmin: 0, xmax: 3.5, ymin: 0, ymax: 10, xl: '전압 V (V)', yl: '전류 I (mA)' }); return; }
-        const pts = led.iv.filter(p => isFinite(p.v) && isFinite(p.i));
+        const all = led.iv.filter(p => isFinite(p.v) && isFinite(p.i));
         const c = color(led);
-        const vmax = Math.max(1, ...pts.map(p => p.v)), imax = Math.max(1, ...pts.map(p => p.i));
-        const vmin = pts.length ? Math.max(0, Math.min(...pts.map(p => p.v)) - 0.1) : 0;
+        const vmax = Math.max(1, ...all.map(p => p.v));
+        const vmin = all.length ? Math.max(0, Math.min(...all.map(p => p.v)) - 0.1) : 0;
+        const iTop = all.length ? Math.max(...all.map(p => p.i)) : 0;
+        const msgs = [];
+
+        // 세로축 정하기
+        let mode = state.ivY, ymin = 0, ymax = iTop > 0 ? iTop * 1.15 : 0.1, yticks = null, yfmt = null, ty = y => y, pts = all;
+        if (mode === 'log') {
+            const pos = all.filter(p => p.i > 0);
+            if (!pos.length) { msgs.push('0 보다 큰 전류가 없어 로그 눈금으로 그릴 수 없습니다. 자동 눈금으로 보여 줍니다.'); mode = 'auto'; }
+            else {
+                const lo = Math.floor(Math.log10(Math.min(...pos.map(p => p.i))));
+                let hi = Math.ceil(Math.log10(Math.max(...pos.map(p => p.i))));
+                if (hi <= lo) hi = lo + 1;
+                ymin = lo; ymax = hi; ty = y => Math.log10(y);
+                yticks = []; for (let k = lo; k <= hi; k++) yticks.push(k);
+                yfmt = pow10Label;
+                pts = pos;
+                if (pos.length < all.length) msgs.push('전류가 0 인 점 ' + (all.length - pos.length) + '개는 로그 눈금에 나타나지 않습니다.');
+            }
+        } else if (mode === 'manual') {
+            const mn = num(state.ivYmin), mx = num(state.ivYmax);
+            if (mn != null && mx != null && mn < mx) {
+                ymin = mn; ymax = mx;
+                const out = all.filter(p => p.i < mn || p.i > mx).length;
+                if (out) msgs.push('정한 범위 밖에 있는 점 ' + out + '개는 보이지 않습니다.');
+            } else msgs.push('최소 < 최대가 되도록 두 값을 넣으세요. 지금은 자동 눈금으로 보여 줍니다.');
+        }
         const o = {
-            xmin: vmin, xmax: vmax + 0.05 * (vmax - vmin + 0.1), ymin: 0, ymax: imax * 1.1,
-            xl: '전압 V (V)', yl: '전류 I (mA)', yd: imax < 5 ? 2 : 1,
-            pts: pts.map(p => ({ x: p.v, y: p.i, color: c, hollow: state.curMode === 'extrapolate' && p.i < state.iMin })),
+            xmin: vmin, xmax: vmax + 0.05 * (vmax - vmin + 0.1), ymin, ymax, yticks, yfmt,
+            xl: '전압 V (V)', yl: '전류 I (mA)' + (yticks ? ', 로그' : ''), yd: decimalsFor(ymax - ymin),
+            pts: pts.map(p => ({ x: p.v, y: ty(p.i), color: c, hollow: state.curMode === 'extrapolate' && p.i < state.iMin })),
             lines: [], vlines: []
         };
         if (t && !t.error) {
             o.vlines.push({ x: t.v0, color: '#333' });
             if (state.curMode === 'extrapolate') {
-                const v2 = Math.max(...pts.map(p => p.v));
-                o.lines.push({ pts: [{ x: t.v0, y: 0 }, { x: v2, y: t.slope * v2 + t.intercept }], color: '#333', dash: [6, 4], width: 1.5 });
+                // 로그 눈금에서는 직선이 곡선이 되므로 연장선을 그리지 않는다
+                if (!yticks) {
+                    const v2 = Math.max(...all.map(p => p.v));
+                    o.lines.push({ pts: [{ x: t.v0, y: 0 }, { x: v2, y: t.slope * v2 + t.intercept }], color: '#333', dash: [6, 4], width: 1.5 });
+                }
             } else {
-                o.lines.push({ pts: [{ x: o.xmin, y: state.iRef }, { x: o.xmax, y: state.iRef }], color: '#999', dash: [2, 3], width: 1 });
+                o.lines.push({ pts: [{ x: o.xmin, y: ty(state.iRef) }, { x: o.xmax, y: ty(state.iRef) }], color: '#999', dash: [2, 3], width: 1 });
             }
         }
+        $('ivy-msg').textContent = msgs.join(' ');
         drawChart(cv, o);
     }
 
@@ -459,12 +586,12 @@
         document.body.appendChild(a); a.click(); a.remove();
     }
     $('btn-csv').addEventListener('click', () => {
-        const rows = ['led,wavelength_nm,frequency_1e14Hz,method,voltage_V,current_mA'];
+        const rows = ['led,wavelength_nm,frequency_1e14Hz,method,voltage_V,current_mA,resistor_voltage_V,resistor_ohm'];
         const q = s => '"' + String(s).replace(/"/g, '""') + '"';
         for (const l of state.leds) {
             const f = (P.freqOf(l.lambda) / 1e14).toFixed(4);
-            for (const p of l.iv) rows.push([q(l.name), l.lambda, f, 'current', p.v, p.i].join(','));
-            for (const v of l.glow) rows.push([q(l.name), l.lambda, f, 'glow', v, ''].join(','));
+            for (const p of l.iv) rows.push([q(l.name), l.lambda, f, 'current', p.v, p.i, p.vr != null ? p.vr : '', p.r != null ? p.r : ''].join(','));
+            for (const v of l.glow) rows.push([q(l.name), l.lambda, f, 'glow', v, '', '', ''].join(','));
         }
         download('planck-led.csv', rows.join('\n'), 'text/csv');
     });
@@ -493,31 +620,70 @@
     });
 
     // ---------- 1. 설정 이벤트 ----------
-    $('sel-bat').addEventListener('change', e => { state.bat = e.target.value; state.batReal = ''; $('bat-real').value = ''; save(); renderSetup(); });
-    $('bat-real').addEventListener('input', e => { state.batReal = e.target.value; save(); renderSetup(); });
+    $('bat-v').addEventListener('input', e => { state.bat = e.target.value.trim(); save(); renderSetup(); });
+    document.querySelectorAll('[data-bat]').forEach(b => b.addEventListener('click', () => {
+        state.bat = b.dataset.bat; $('bat-v').value = state.bat; save(); renderSetup();
+    }));
     $('sel-imax').addEventListener('change', e => { state.iMax = e.target.value; save(); renderSetup(); });
     $('sel-pot').addEventListener('change', e => { state.pot = e.target.value; save(); renderSetup(); });
     $('sel-rs').addEventListener('change', e => { state.rs = e.target.value; save(); renderSetup(); });
     $('rs-custom').addEventListener('input', e => { state.rsCustom = e.target.value; save(); renderSetup(); });
+
+    // ---------- 7. 결론 및 분석: 기준별 결과 요약 ----------
+    function fitFor(m, origin) {
+        const items = usedLeds().filter(l => l.fit)
+            .map(l => ({ lambda: l.lambda, t: thr(l, m) }))
+            .filter(x => !x.t.error)
+            .map(x => ({ lambda: x.lambda, v0: x.t.v0 }));
+        return { n: items.length, res: P.planckFit(items, { origin }) };
+    }
+    function renderConclusion() {
+        const rows = [
+            { name: '⚡ 전류 기준 (본 실험)', ...fitFor('current', false), slopeInfo: true },
+            { name: '⚡ 전류 기준, 원점을 지나는 직선', ...fitFor('current', true) },
+            { name: '💡 빛 기준 (비교 실험)', ...fitFor('glow', false), slopeInfo: true }
+        ];
+        const cell = r => {
+            if (!r.res) return '<td colspan="4" class="note">' + (r.n ? 'LED ' + r.n + '개 — 2개 이상 필요' : '측정하지 않음') + '</td>';
+            const err = Math.abs(r.res.errorPct);
+            return '<td><b>' + (r.res.h / 1e-34).toFixed(2) + '</b></td><td>' + err.toFixed(1) + ' %</td>' +
+                '<td>' + (r.res.fit.r2 != null ? r.res.fit.r2.toFixed(3) : '–') + '</td>' +
+                '<td>' + (r.slopeInfo ? r.res.fit.intercept.toFixed(2) + ' V' : '0') + '</td>';
+        };
+        let html = '<div class="tbl-wrap" style="max-height:none"><table class="sum-table"><thead><tr><th>기준</th><th>h (×10⁻³⁴ J·s)</th><th>오차율</th><th>R²</th><th>절편</th></tr></thead><tbody>' +
+            rows.map(r => '<tr><td>' + r.name + (r.res ? ' <span class="note">(LED ' + r.n + '개)</span>' : '') + '</td>' + cell(r) + '</tr>').join('') +
+            '</tbody></table></div>';
+        const [cur, , glow] = rows;
+        const notes = [];
+        if (cur.res && glow.res) {
+            const better = Math.abs(cur.res.errorPct) <= Math.abs(glow.res.errorPct) ? '전류 기준' : '빛 기준';
+            notes.push('두 기준 중 참값에 더 가까운 것: <b>' + better + '</b>. 표 1 의 V₀ 와 \'비교\' 칸을 색깔별로 비교해 보세요. 어느 색에서 차이가 큰가요?');
+        }
+        if (cur.res) notes.push('참값 h = 6.626 × 10⁻³⁴ J·s. 이론대로라면 절편은 0 V 입니다. 우리 결과의 절편은 ' + cur.res.fit.intercept.toFixed(2) + ' V 입니다.');
+        else notes.push('5. 데이터 수집에서 LED 2개 이상(3개 이상 추천)을 측정하면 결과가 여기에 요약됩니다.');
+        html += '<p class="note">' + notes.join('<br>') + '</p>';
+        $('concl-sum').innerHTML = html;
+    }
 
     function renderAll() {
         renderSetup();
         renderLeds();
         renderMeasure();
         renderResults();
+        renderConclusion();
     }
 
     // ---------- 입력 중인 값 ----------
     function saveDraft() {
-        state.draft = { v: $('in-v').value, i: $('in-i').value, gv: $('in-gv').value };
+        state.draft = { v: $('in-v').value, i: $('in-i').value, vr: $('in-vr').value, gv: $('in-gv').value };
         save();
     }
-    ['in-v', 'in-i', 'in-gv'].forEach(id => $(id).addEventListener('input', saveDraft));
+    ['in-v', 'in-i', 'in-vr', 'in-gv'].forEach(id => $(id).addEventListener('input', saveDraft));
 
     // ---------- 탭 ----------
-    const TABS = ['theory', 'setup', 'leds', 'measure', 'result'];
+    const TABS = ['purpose', 'theory', 'materials', 'procedure', 'data', 'result', 'conclusion'];
     function showTab(t, scroll) {
-        if (!TABS.includes(t)) t = 'theory';
+        if (!TABS.includes(t)) t = 'purpose';
         state.tab = t;
         document.querySelectorAll('.panel').forEach(p => { p.hidden = p.dataset.tab !== t; });
         document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t ? 'true' : 'false'));
@@ -532,11 +698,14 @@
         $('sel-pot').value = state.pot;
         $('sel-rs').value = state.rs;
         $('rs-custom').value = state.rsCustom;
-        $('sel-bat').value = state.bat;
-        $('bat-real').value = state.batReal;
+        $('bat-v').value = state.bat;
+        $('ivy-min').value = state.ivYmin;
+        $('ivy-max').value = state.ivYmax;
         $('sel-imax').value = state.iMax;
         $('in-v').value = state.draft.v;
         $('in-i').value = state.draft.i;
+        $('in-vr').value = state.draft.vr;
+        $('r-meas').value = state.rMeas;
         $('in-gv').value = state.draft.gv;
     }
 
