@@ -23,7 +23,6 @@
 | `tests/`, `tools/`, `vendor/sensirion/` | 센서 테스트, VOC 알고리즘 재빌드 도구, 제조사 원본·라이선스·WebAssembly |
 | `walk-run-detector/` | 걷기·뛰기 판정 머신러닝 수업 앱 (자체 README 참고) |
 | `pass/` | 예전 조퇴증·외출증 공유 링크를 새 주소(aks-sci-lab.github.io/teacher-desk/)로 넘기는 페이지만 남김 |
-| `uploader.html` | 아두이노 펌웨어 업로더 |
 | `app.py` | 날씨 API 로컬 서버 (Firebase Hosting 에는 배포되지 않음) |
 | `firestore.rules` | Firestore 보안 규칙 |
 
@@ -104,3 +103,4 @@
   - 확인 필요: 실제 API 키로 AI 그림 품질·시간(시험은 가짜 응답), jsdelivr `+esm` 로 SDK 불러오기(시험 환경에서 CDN 차단), 한글(HWP)에 PNG 붙여 넣기, 학교 PC 브라우저의 그림 복사 지원
 - 2026-10-28: 문항 그림 도구 AI 그리기에 LM Studio(내 PC 로컬 LLM) 추가 (사용자 요청: 8845HS·24GB 에서 Gemma 4 12B). 연결 확인·모델 목록(Gemma 자동 선택), 스트리밍으로 받은 글자 수 표시, 사진은 image_url, 대화 길이·CORS·사진 미지원 오류 안내. 그림 생성 모델(Stable Diffusion 등)은 시험 그림에 맞지 않아 쓰지 않기로 함. 사용자의 직접 지시로 Claude Code 가 PR #48 머지·배포 — Claude Code
   - 확인 필요: 실제 Gemma 4 12B 의 그림 자료 품질·시간, https 사이트에서 127.0.0.1 접속(브라우저의 로컬 네트워크 허용 창), LM Studio 의 json_schema 지원 여부
+- 2026-10-30: 무결성 검증(시험 123+23개, 전체 페이지 열기, 센서 원본 지문값·링크·비밀값·DB 규칙 컬렉션·배포 기록 확인) 후 정리 — Chart.js 를 4.6.1 로 버전 고정(7개 페이지), 동작하지 않던 펌웨어 업로더(`uploader.html`, avrbro 가 브라우저용이 아니고 펌웨어 주소가 빈칸, 링크 없음)와 빈 파일(`새 텍스트 문서.txt` 2개, `css/style.html`) 삭제 — Claude Code
