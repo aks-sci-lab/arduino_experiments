@@ -339,3 +339,16 @@ HI = T + (H - 60) × 0.05
 - 계산 로직: `js/malus-math.js`, UI: `js/malus-law.js`
 - 구글 스프레드시트: "표 복사"로 붙여넣기, 또는 본인 시트에 Apps Script 웹 앱을 배포하고 URL을 입력해 전송 (페이지 5번 카드 참고)
 - 각자의 구글 계정으로 로그인해 본인 드라이브에 새 스프레드시트를 만들어 내보내기 (`js/malus-sheets.js`, drive.file 권한만 사용)
+
+## ✏️ 문항 출제용 그림·그래프 (선생님용)
+
+`projects/figure-maker.html` — 시험 문항에 넣을 흑백 그림을 그려 PNG·SVG 로 내보냅니다. 설치 없이 브라우저에서 쓰고, 그림은 서버로 보내지 않습니다.
+
+- 그래프: 식(`y = 2x+1`, `3/x`, `sin(x)`)·점 이어 그리기, 문자 눈금(`1:*t*_0`), 축까지 점선, 선 아래 넓이 빗금, 모눈
+- 도형: 선·화살표·꺾은선·사각형(기울이기)·원·글자(`v_0`, `x^2`, `*v*` 기울임)·점·각도·빗금 바닥·용수철
+- 회로도: 저항·전지·전구·스위치·전류계·전압계·LED·축전기 등, 도선이 소자 끝에 자동으로 붙음
+- 광학·파동: 볼록·오목 렌즈, 평면·오목·볼록 거울, 사인 파동·정상파
+- AI 그리기: 글이나 손그림·문항 사진을 주면 Claude 가 그림 자료(JSON)를 만들어 넣음 → 보통 그림처럼 고칠 수 있음. 선생님 본인의 Claude API 키가 필요하고, 브라우저에서 Anthropic 으로 바로 보냄
+- AI 그리기 (내 PC): LM Studio 의 로컬 모델(예: Gemma)로도 그림. 요금 없고 내용이 PC 밖으로 나가지 않음. LM Studio 에서 Context Length 16384 이상, 서버의 Enable CORS 켜기 (`js/figure-ai-local.js`)
+- 내보내기: PNG 복사(한글·워드에 바로 붙여 넣기)·PNG 저장(2~4배)·SVG 저장, 작업 파일(.json) 저장·열기, 브라우저에 자동 저장
+- 계산·그리기: `js/figure-model.js` (Node 시험 `tests/figure-model.test.cjs`), 화면: `js/figure-maker.js`, AI: `js/figure-ai.js`
