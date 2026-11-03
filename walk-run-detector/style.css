@@ -250,3 +250,6 @@ body.wr-editing .wr-selected { outline: 2px solid var(--accent) !important; outl
 .edit-dialog { width: min(92vw, 520px); border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); }
 .edit-dialog textarea { width: 100%; }
 body.wr-editing button:disabled, body.wr-editing input:disabled, body.wr-editing select:disabled { pointer-events: none; }
+
+/* 로그인 안내 */
+.top > .notice { max-width: 728px; margin: 6px auto 0; }

@@ -9,7 +9,7 @@ import { initCompare } from './ui-compare.js';
 import { initAI } from './ui-ai.js';
 import { initAdmin } from './ui-admin.js';
 import { initEdit, loadSavedLayout, exitEdit } from './ui-edit.js';
-import { initAccounts, signIn, signOut, loadAIConfig } from './accounts.js';
+import { initAccounts, signIn, signOut, loadAIConfig, authErrorMessage } from './accounts.js';
 
 async function onAccountChange({ user, isAdmin, unavailable }) {
   const acc = state.account;
@@ -42,12 +42,21 @@ function renderAccount() {
   emit('account');
 }
 
+function showLoginMessage(msg) {
+  $('login-msg').textContent = msg || '';
+  $('login-msg').hidden = !msg;
+}
+
+// 카카오톡·네이버·인스타 같은 앱 안의 브라우저에서는 구글이 로그인을 막는다 (QR/메신저 링크로 들어온 경우에 흔함)
+const IN_APP = /KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\/|DaumApps|; wv\)/i;
+
 async function onLogin() {
+  showLoginMessage('');
   try {
     await signIn();
   } catch (e) {
-    if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return;
-    alert('로그인에 실패했습니다: ' + (e.message || e));
+    const msg = authErrorMessage(e);
+    if (msg) showLoginMessage(msg);
   }
 }
 
@@ -64,7 +73,10 @@ function init() {
   $('btn-logout').addEventListener('click', () => signOut());
   initTabs();
   renderModelLine();
-  initAccounts(onAccountChange);
+  initAccounts(onAccountChange, e => showLoginMessage(authErrorMessage(e)));
+  if (IN_APP.test(navigator.userAgent)) {
+    showLoginMessage('앱 안의 브라우저에서는 구글 로그인이 막힙니다. 메뉴(⋮)에서 "다른 브라우저로 열기"로 Chrome 또는 Safari에서 열어 주세요.');
+  }
   loadSavedLayout();
 }
 

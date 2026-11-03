@@ -21,8 +21,8 @@ export function firebaseReady() {
   return auth !== null;
 }
 
-// onChange({ user, isAdmin }) 가 로그인 상태가 바뀔 때마다 호출된다.
-export function initAccounts(onChange) {
+// onChange({ user, isAdmin }) 가 로그인 상태가 바뀔 때마다 호출된다. onError(e)는 리다이렉트 로그인 실패를 알린다.
+export function initAccounts(onChange, onError = () => {}) {
   if (typeof firebase === 'undefined') {
     onChange({ user: null, isAdmin: false, unavailable: true });
     return;
@@ -39,6 +39,8 @@ export function initAccounts(onChange) {
   auth.onAuthStateChanged(async user => {
     onChange({ user, isAdmin: user ? await checkIsAdmin(user) : false });
   });
+  // 팝업이 막혀 리다이렉트로 로그인한 경우, 돌아온 뒤의 실패를 여기서 알린다.
+  auth.getRedirectResult().catch(onError);
 }
 
 async function checkIsAdmin(user) {
@@ -52,8 +54,39 @@ async function checkIsAdmin(user) {
 }
 
 export async function signIn() {
-  if (!auth) throw new Error('Firebase를 불러오지 못했습니다. 인터넷 연결을 확인하세요.');
-  await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+  if (!auth) throw new Error('Firebase를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요.');
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    await auth.signInWithPopup(provider);
+  } catch (e) {
+    // 팝업이 차단되면 페이지를 이동하는 방식으로 다시 시도한다.
+    if (e.code === 'auth/popup-blocked') return auth.signInWithRedirect(provider);
+    throw e;
+  }
+}
+
+// 로그인 오류를 원인과 해결 방법이 보이는 문장으로 바꾼다. 사용자가 닫은 경우는 null.
+export function authErrorMessage(e) {
+  const host = location.hostname;
+  switch (e?.code) {
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return null;
+    case 'auth/unauthorized-domain':
+      return `이 사이트 주소(${host})가 Firebase의 "승인된 도메인"에 없습니다. 선생님이 Firebase 콘솔 → Authentication → 설정 → 승인된 도메인에 "${host}"를 추가해야 로그인할 수 있습니다.`;
+    case 'auth/operation-not-allowed':
+      return 'Firebase에서 Google 로그인이 꺼져 있습니다. 선생님이 Firebase 콘솔 → Authentication → 로그인 방법에서 Google을 사용 설정해야 합니다.';
+    case 'auth/network-request-failed':
+      return '네트워크 연결에 실패했습니다. 인터넷 연결을 확인하고 다시 시도하세요.';
+    case 'auth/operation-not-supported-in-this-environment':
+    case 'auth/web-storage-unsupported':
+    case 'auth/internal-error':
+      return '이 브라우저 환경에서는 구글 로그인을 쓸 수 없습니다. 카카오톡·네이버 같은 앱 안의 브라우저나 시크릿 모드라면 Chrome 또는 Safari에서 주소를 직접 열어 보세요.';
+    case 'auth/too-many-requests':
+      return '로그인 시도가 너무 많습니다. 잠시 뒤에 다시 시도하세요.';
+    default:
+      return `로그인에 실패했습니다 (${e?.code || '알 수 없는 오류'}): ${e?.message || e}`;
+  }
 }
 
 export function signOut() {
