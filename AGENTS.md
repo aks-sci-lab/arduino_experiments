@@ -18,7 +18,7 @@
 | `index.html` | 메인 페이지: 구글 로그인, 교사/학생 역할, 실험 목록, 기록 조회 |
 | `projects/*.html` | 실험 페이지 (가속도계, 환경 센서, 자유낙하, 스마트폰 가속도, 말루스 법칙, LED 플랑크 상수, 이상기체 상태 방정식) |
 | `projects/figure-maker.html` | 문항 그림 도구 넘김 페이지만 남김 (도구는 `aks-sci-lab/figure-maker` 로 독립, 2026-10-30). 자동 저장된 그림을 `#move=` 로 넘김 |
-| `js/`, `css/` | 실험 페이지용 스크립트·스타일 (`malus-*.js`: 말루스 법칙 실험, `planck-*.js`: LED 플랑크 상수 실험, `ideal-gas*.js`: 이상기체 실험) |
+| `js/`, `css/` | 실험 페이지용 스크립트·스타일 (`malus-*.js`: 말루스 법칙 실험 — `malus-math.js` 계산, `malus-tutorial.js` 접해보기 탭, `malus-law.js` 측정·분석·설정, `malus-sheets.js` 구글 시트, `planck-*.js`: LED 플랑크 상수 실험, `ideal-gas*.js`: 이상기체 실험) |
 | `firmware/pico2w-environment/` | Pico 센서 보드용 MicroPython 펌웨어와 Thonny 설치 안내 |
 | `tests/`, `tools/`, `vendor/sensirion/` | 센서 테스트, VOC 알고리즘 재빌드 도구, 제조사 원본·라이선스·WebAssembly |
 | `walk-run-detector/` | 걷기·뛰기 판정 머신러닝 수업 앱 (자체 README 참고) |
@@ -97,6 +97,7 @@
 - 2026-10-26: PR #30 검토(테스트 73+23개 통과, 보호 파일 무변경, 전체 페이지 로드 확인) 후 머지, Hosting 자동 배포 재개 — Claude Code
 - 2026-10-26: 말루스 실험 개선(측정 영역 선 굵게, 확대 보기, 측정 전 대기·빛 위치 자동 추적·영역 넘침/카메라 이동 경고, Enter 키 기록) PR — Claude Code
 - 2026-10-26: 말루스 실험 회차별 정규화(회차마다 따로 적합해 (I−B)/A, 결측치 표시·자동 결측, 회차 색 구분 그래프, CSV·시트에 회차/정규화/결측 열) PR — Claude Code
+- 2026-10-26: 말루스 실험 탐구 중심 개편(탭: 접해보기[예측·측정 계획·의심 기준] / 측정하기[계획표] / 분석하기[모델 비교·잔차·정규화 전후 비교·결론] / 설정[학습·빠른 모드]) PR — Claude Code
 - 2026-10-26: 교사 업무 데스크(`teacher-desk/`, `pass/`) — 조퇴증·외출증(인쇄·QR 공유), 업무 수신함(쿨메신저·에듀파인 hwp/hwpx/pdf, 날짜·마감 추출·분류·요약·문서번호 연결), 9·12·15시 예약 수집, 달력·.ics, 오늘 대시보드·검색, 텔레그램 알림·명령, 화면 배치 모드 PR — Claude Code
   - 확인 필요: 쿨메신저 저장 형식(진단 결과 대기), 학교 조퇴증 실제 양식과 차이, 학교 PC 에서 Python 설치·실행 가능 여부
 - 2026-10-27: 업무 데스크 윈도우용 ZIP(Python 설치 불필요, embeddable 3.12 + pypdf, 바탕화면 바로 가기), 윈도우 자동 시험(들어 있는 Python 으로 시험 38개·start-desk.bat·화면 열림·바로 가기), `.bat` CP949 한글 깨짐 수정. 사용자의 직접 지시로 Claude Code 가 PR #34 머지·배포 — Claude Code
@@ -119,7 +120,7 @@
   - 확인 필요: 실제 API 키로 AI 그림 품질·시간(시험은 가짜 응답), jsdelivr `+esm` 로 SDK 불러오기(시험 환경에서 CDN 차단), 한글(HWP)에 PNG 붙여 넣기, 학교 PC 브라우저의 그림 복사 지원
 - 2026-10-28: 문항 그림 도구 AI 그리기에 LM Studio(내 PC 로컬 LLM) 추가 (사용자 요청: 8845HS·24GB 에서 Gemma 4 12B). 연결 확인·모델 목록(Gemma 자동 선택), 스트리밍으로 받은 글자 수 표시, 사진은 image_url, 대화 길이·CORS·사진 미지원 오류 안내. 그림 생성 모델(Stable Diffusion 등)은 시험 그림에 맞지 않아 쓰지 않기로 함. 사용자의 직접 지시로 Claude Code 가 PR #48 머지·배포 — Claude Code
   - 확인 필요: 실제 Gemma 4 12B 의 그림 자료 품질·시간, https 사이트에서 127.0.0.1 접속(브라우저의 로컬 네트워크 허용 창), LM Studio 의 json_schema 지원 여부
-- 2026-11-03: 통합 관리 세션 지정, 세션·브랜치·PR 현황표(`docs/MANAGEMENT.md`) 작성 — Claude Code
 - 2026-10-30: 무결성 검증(시험 123+23개, 전체 페이지 열기, 센서 원본 지문값·링크·비밀값·DB 규칙 컬렉션·배포 기록 확인) 후 정리 — Chart.js 를 4.6.1 로 버전 고정(7개 페이지), 동작하지 않던 펌웨어 업로더(`uploader.html`, avrbro 가 브라우저용이 아니고 펌웨어 주소가 빈칸, 링크 없음)와 빈 파일(`새 텍스트 문서.txt` 2개, `css/style.html`) 삭제 — Claude Code
 - 2026-10-30: 저장소 정리(사용자 지정) — 날씨 데모(`app.py`·`run.bat`·`run.command`, README 날씨 설명)는 `aks-sci-lab/weather-app` 에 같은 내용이 있어 이 저장소에서 제거, 실수로 올라간 빈 파일 `projects/새 텍스트 문서.txt` 제거 — Claude Code
 - 2026-10-30: 문항 출제용 그림·그래프 도구를 `aks-sci-lab/figure-maker` 로 독립(사용자 지정, GitHub Pages). 이 저장소에서는 `js/figure-*.js`·`css/figure-maker.css`·`tests/figure-*` 제거, `projects/figure-maker.html` 은 새 주소로 넘기는 페이지(자동 저장 그림 함께 넘김, API 키는 옮기지 않음) — Claude Code
+- 2026-11-03: 통합 관리 세션 지정, 세션·브랜치·PR 현황표(`docs/MANAGEMENT.md`) 작성 — Claude Code
