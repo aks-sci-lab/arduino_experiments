@@ -334,10 +334,10 @@
                 const c = 0.5;                         // 코일 중심 시각
                 const gauss = (x, s) => Math.exp(-(x * x) / (2 * s * s));
                 // 진입: 양의 봉우리, 이탈: 더 큰 음의 봉우리(자석이 가속되었으므로)
-                let eps = 0;
-                eps += 38 * ((ph - (c - 0.07)) / 0.05) * gauss(ph - (c - 0.07), 0.05);
-                eps -= 62 * ((ph - (c + 0.07)) / 0.04) * gauss(ph - (c + 0.07), 0.04);
-                eps = -eps;
+                // 들어갈 때(선속 증가) 양의 봉우리 하나, 나올 때(선속 감소) 음의 봉우리 하나.
+                // 떨어지며 빨라지므로 나올 때 봉우리가 더 높고 좁다. 두 넓이(∫ε dt)는 같다(선속이 처음과 같아짐).
+                const eps = 30 * gauss(ph - (c - 0.07), 0.04)
+                          - 40 * gauss(ph - (c + 0.07), 0.03);
                 const noise = (Math.random() - 0.5) * 0.8;
                 const v = eps + noise + 1.2;                  // 1.2 mV 의 센서 오프셋
                 const i = eps / Rcircuit + (Math.random() - 0.5) * 0.02 + 0.03;   // mV ÷ Ω = mA

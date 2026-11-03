@@ -23,7 +23,7 @@
 | 개발: 문항 그림 도구 (figure-maker) | 사용자 답 대기 | PR #50 머지 (2026-11-03) | 2단계 시작 여부 (`aks-sci-lab/figure-maker` 저장소에서) |
 | 머지 전용: 문항 그림 도구 | 끝남 | (figure-maker 저장소 PR #1 머지 완료) | 없음 |
 | 말루스의 법칙 실험 설계 | 끝남 | PR #33 머지 (2026-11-03) | 수업에서 탭 화면 확인 |
-| 전자기 유도 센서 측정 웹앱 | 끝남 | `claude/stoic-archimedes-48nbsd` (PR 없음) | 실제 ADS1115 센서 시험, PR 만들지 결정 (65 커밋 뒤처짐) |
+| 전자기 유도 센서 측정 웹앱 | 끝남 | 통합 관리 세션이 최신 main 으로 옮겨 PR (2026-11-03, 원래 브랜치 `claude/stoic-archimedes-48nbsd`) | PR 머지 여부, 실제 ADS1115 센서 시험 |
 | 스마트폰 가속도 센서 웹앱 | 끝남 | PR #42 머지 (2026-11-03) | 없음 |
 | 이상기체 상태방정식 검증 실험 | 끝남 | PR #46 머지·배포 완료 | 실제 장비 측정 |
 | LED 플랑크 상수 측정 웹앱 | 끝남 | PR #37~#45 머지·배포 완료 | 초록 LED 재측정 |
@@ -52,13 +52,13 @@ teacher-desk 는 별개 프로젝트이므로 그쪽 총괄 세션이 관리한�
 |---|---|---|---|
 | `handoff/figure-maker-new-repo` | 1 | 그림 도구를 새 저장소로 옮길 때 쓴 넘김용 브랜치 | 그림 도구가 새 저장소로 옮겨졌고 PR #50 도 머지되어 삭제 후보 (C 참고) |
 
-`stoic-archimedes`(전자기 유도)는 A-1 의 세션이 맡고 있다. PR #49 는 2026-11-03 머지되었다.
+PR #49 는 2026-11-03 머지되었다. 전자기 유도(`stoic-archimedes`)는 PR 로 올렸다(A-1).
 
 ---
 
 ## C. 정리해도 되는 브랜치 (내용이 모두 main 에 있음)
 
-머지가 끝나 지워도 되는 브랜치 (사용자 승인 후 Copilot 이 삭제):
+머지가 끝나 지워도 되는 브랜치 (2026-11-03 사용자 승인 "정리해", Copilot 이 삭제 — 이슈 참고):
 
 - `claude/gifted-keller-w81hco` (PR #51), `claude/jolly-brown-sggwyd` (PR #49), `claude/figure-maker-move` (PR #50), `ccr-d5d43435-sy4j52` (PR #42), `claude/malus-inquiry-tabs` (PR #33), `handoff/figure-maker-new-repo`
 - 통합 PR 의 브랜치 `claude/quirky-heisenberg-fdz1qp` 는 통합 관리 세션이 계속 쓰므로 남긴다.
@@ -74,8 +74,8 @@ teacher-desk 는 별개 프로젝트이므로 그쪽 총괄 세션이 관리한�
 
 ## 결정이 필요한 것 (사용자)
 
-1. 전자기 유도(`stoic-archimedes`)를 PR 로 올릴지, 보류할지
-2. C 의 머지 끝난 브랜치 6개 삭제 여부
+1. 전자기 유도 PR 머지 여부
+2. 전자기 유도 PR 이 머지되면 `claude/stoic-archimedes-48nbsd` 도 삭제 대상 (같은 내용이 옮겨짐)
 
 ## 관리 방법
 

@@ -48,7 +48,9 @@ bool conversionDone() {
   Wire.endTransmission();
   Wire.requestFrom(ADS_ADDR, (uint8_t)2);
   if (Wire.available() < 2) return false;
-  uint16_t v = (Wire.read() << 8) | Wire.read();
+  uint8_t hi = Wire.read();  // 높은 바이트를 먼저 읽는다 (한 식에서 두 번 읽으면 순서가 보장되지 않음)
+  uint8_t lo = Wire.read();
+  uint16_t v = ((uint16_t)hi << 8) | lo;
   return v & 0x8000;
 }
 
@@ -58,7 +60,9 @@ int16_t readConversion() {
   Wire.endTransmission();
   Wire.requestFrom(ADS_ADDR, (uint8_t)2);
   if (Wire.available() < 2) return 0;
-  return (int16_t)((Wire.read() << 8) | Wire.read());
+  uint8_t hi = Wire.read();
+  uint8_t lo = Wire.read();
+  return (int16_t)(((uint16_t)hi << 8) | lo);
 }
 
 int16_t measure(uint16_t mux) {
