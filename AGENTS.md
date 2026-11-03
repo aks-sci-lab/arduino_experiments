@@ -16,9 +16,10 @@
 | 경로 | 내용 |
 |---|---|
 | `index.html` | 메인 페이지: 구글 로그인, 교사/학생 역할, 실험 목록, 기록 조회 |
-| `projects/*.html` | 실험 페이지 (가속도계, 환경 센서, 자유낙하, 스마트폰 가속도, 말루스 법칙, LED 플랑크 상수, 이상기체 상태 방정식) |
+| `projects/*.html` | 실험 페이지 (가속도계, 환경 센서, 자유낙하, 스마트폰 가속도, 말루스 법칙, LED 플랑크 상수, 이상기체 상태 방정식, 전자기 유도) |
 | `projects/figure-maker.html` | 문항 그림 도구 넘김 페이지만 남김 (도구는 `aks-sci-lab/figure-maker` 로 독립, 2026-10-30). 자동 저장된 그림을 `#move=` 로 넘김 |
 | `js/`, `css/` | 실험 페이지용 스크립트·스타일 (`malus-*.js`: 말루스 법칙 실험 — `malus-math.js` 계산, `malus-tutorial.js` 접해보기 탭, `malus-law.js` 측정·분석·설정, `malus-sheets.js` 구글 시트, `planck-*.js`: LED 플랑크 상수 실험, `ideal-gas*.js`: 이상기체 실험) |
+| `firmware/em-induction/` | 전자기 유도 실험용 아두이노 펌웨어 (ADS1115 로 코일 전압·션트 전압, USB 시리얼 115200, 웹 시리얼은 PC 크롬·엣지만) |
 | `firmware/pico2w-environment/` | Pico 센서 보드용 MicroPython 펌웨어와 Thonny 설치 안내 |
 | `tests/`, `tools/`, `vendor/sensirion/` | 센서 테스트, VOC 알고리즘 재빌드 도구, 제조사 원본·라이선스·WebAssembly |
 | `walk-run-detector/` | 걷기·뛰기 판정 머신러닝 수업 앱 (자체 README 참고) |
@@ -127,3 +128,5 @@
 - 2026-10-30: 문항 출제용 그림·그래프 도구를 `aks-sci-lab/figure-maker` 로 독립(사용자 지정, GitHub Pages). 이 저장소에서는 `js/figure-*.js`·`css/figure-maker.css`·`tests/figure-*` 제거, `projects/figure-maker.html` 은 새 주소로 넘기는 페이지(자동 저장 그림 함께 넘김, API 키는 옮기지 않음) — Claude Code
 - 2026-11-03: 통합 관리 세션 지정, 세션·브랜치·PR 현황표(`docs/MANAGEMENT.md`) 작성 — Claude Code
 - 2026-11-03: 열린 PR 5개(#33 말루스 탭 개편, #42 걷기·뛰기 링크, #49 문서 정리·날씨 데모 제거, #50 그림 도구 독립, #51 Chart.js 고정·업로더 제거)를 한 PR 에 모아 AGENTS.md 충돌 해결, 시험(JS 109개·Python 23개)·전체 13페이지 열기 확인 후 사용자의 직접 지시로 머지·배포 — Claude Code
+- 2026-11-03: 전자기 유도 전압·전류 측정(`projects/em-induction.html`, `firmware/em-induction/`, 원래 10-22 브랜치 `claude/stoic-archimedes-48nbsd`, 사용자 지시로 PR) — 아두이노 + ADS1115 차동 측정(코일 A0−A1, 10 Ω 션트 A2−A3), 웹 시리얼 연결·시뮬레이션, 영점 보정, 봉우리·렌츠 순서·∫ε dt·ΔΦ, CSV. 최신 main 으로 옮기며 펌웨어 I2C 바이트 읽기 순서 고정, 시뮬레이션 파형을 설명대로(들어갈 때 +, 나올 때 더 큰 −) 수정 — Claude Code
+  - 확인 필요: 실제 ADS1115·코일·자석 측정, 아두이노 IDE 컴파일(시험 환경에 없음), 닫힌 회로에서 '코일 전압'은 기전력이 아니라 단자 전압(= 기전력 − 코일 저항×I = 션트 전압)이라 화면 이름·설명을 맞출지
