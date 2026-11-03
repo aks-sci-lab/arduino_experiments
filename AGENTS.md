@@ -17,7 +17,7 @@
 |---|---|
 | `index.html` | 메인 페이지: 구글 로그인, 교사/학생 역할, 실험 목록, 기록 조회 |
 | `projects/*.html` | 실험 페이지 (가속도계, 환경 센서, 자유낙하, 스마트폰 가속도, 말루스 법칙, LED 플랑크 상수, 이상기체 상태 방정식) |
-| `projects/figure-maker.html` | 선생님용 문항 출제 그림·그래프 도구 (`figure-model.js` 그림 자료·SVG, `figure-maker.js` 화면, `figure-ai.js` AI 그리기) |
+| `projects/figure-maker.html` | 문항 그림 도구 넘김 페이지만 남김 (도구는 `aks-sci-lab/figure-maker` 로 독립, 2026-10-30). 자동 저장된 그림을 `#move=` 로 넘김 |
 | `js/`, `css/` | 실험 페이지용 스크립트·스타일 (`malus-*.js`: 말루스 법칙 실험, `planck-*.js`: LED 플랑크 상수 실험, `ideal-gas*.js`: 이상기체 실험) |
 | `firmware/pico2w-environment/` | Pico 센서 보드용 MicroPython 펌웨어와 Thonny 설치 안내 |
 | `tests/`, `tools/`, `vendor/sensirion/` | 센서 테스트, VOC 알고리즘 재빌드 도구, 제조사 원본·라이선스·WebAssembly |
@@ -34,8 +34,6 @@
 - 화면 문구와 주석은 한국어. 스마트폰 화면 폭을 기본으로 생각한다.
 - Firebase 설정값은 기존 파일(`js/phone-accel-cloud.js` 등)의 것을 그대로 쓴다. 로그인 세션은 같은 사이트 안에서 공유된다.
 - 비밀값(API 키 파일 `key.txt`, 서비스 계정 JSON)은 커밋하지 않는다.
-- 문항 그림 도구의 AI 는 선생님 본인의 Claude API 키로 브라우저에서 Anthropic 에 바로 요청한다 (키는 선택 시 그 브라우저 localStorage 에만). 사이트에 키를 넣거나 서버를 두지 않는다. SDK 는 jsdelivr `@anthropic-ai/sdk@0.133.0/+esm` 로 버전 고정.
-- 문항 그림 도구는 내 PC 의 LM Studio(OpenAI 호환, 기본 `http://127.0.0.1:1234`)도 쓸 수 있다 (사용자 PC: Ryzen 7 8845HS·24GB, Gemma 4 12B). 그림 규칙은 `figure-ai-prompt.js` 하나를 Claude·LM Studio 가 같이 쓴다. Gemma 를 위해 규칙을 system 이 아닌 첫 사용자 글에 넣고, JSON 스키마(`response_format`)를 거절하면 빼고 다시, 깨진 JSON 은 한 번 고쳐 쓰게 한다.
 
 ## 배포 상태 (2026-10-26)
 
@@ -124,3 +122,4 @@
 - 2026-11-03: 통합 관리 세션 지정, 세션·브랜치·PR 현황표(`docs/MANAGEMENT.md`) 작성 — Claude Code
 - 2026-10-30: 무결성 검증(시험 123+23개, 전체 페이지 열기, 센서 원본 지문값·링크·비밀값·DB 규칙 컬렉션·배포 기록 확인) 후 정리 — Chart.js 를 4.6.1 로 버전 고정(7개 페이지), 동작하지 않던 펌웨어 업로더(`uploader.html`, avrbro 가 브라우저용이 아니고 펌웨어 주소가 빈칸, 링크 없음)와 빈 파일(`새 텍스트 문서.txt` 2개, `css/style.html`) 삭제 — Claude Code
 - 2026-10-30: 저장소 정리(사용자 지정) — 날씨 데모(`app.py`·`run.bat`·`run.command`, README 날씨 설명)는 `aks-sci-lab/weather-app` 에 같은 내용이 있어 이 저장소에서 제거, 실수로 올라간 빈 파일 `projects/새 텍스트 문서.txt` 제거 — Claude Code
+- 2026-10-30: 문항 출제용 그림·그래프 도구를 `aks-sci-lab/figure-maker` 로 독립(사용자 지정, GitHub Pages). 이 저장소에서는 `js/figure-*.js`·`css/figure-maker.css`·`tests/figure-*` 제거, `projects/figure-maker.html` 은 새 주소로 넘기는 페이지(자동 저장 그림 함께 넘김, API 키는 옮기지 않음) — Claude Code
