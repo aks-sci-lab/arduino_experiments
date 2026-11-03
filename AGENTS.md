@@ -79,6 +79,8 @@
 
 - 대화(세션)와 GitHub 브랜치·PR 의 짝, 대화 없이 GitHub 에만 남은 것, 정리할 브랜치는 `docs/MANAGEMENT.md` 에서 관리한다 (사용자 지정 "통합 관리 세션").
 - 새 대화를 시작하거나 PR 을 만들면 그 표에 한 줄 적는다.
+- 통합 관리 세션은 "한 대화는 한 저장소" 규칙의 예외로, 다른 저장소의 대화도 **목록으로만** 본다. 다른 저장소의 코드는 고치지 않는다.
+- 통합 관리 세션은 자기 브랜치 외에는 push·삭제 권한이 없다. 브랜치 삭제 같은 GitHub 작업은 이슈로 남겨 GitHub Copilot 이 수행한다.
 
 ## 교사 업무 데스크 (2026-10-27 독립)
 
@@ -124,3 +126,4 @@
 - 2026-10-30: 저장소 정리(사용자 지정) — 날씨 데모(`app.py`·`run.bat`·`run.command`, README 날씨 설명)는 `aks-sci-lab/weather-app` 에 같은 내용이 있어 이 저장소에서 제거, 실수로 올라간 빈 파일 `projects/새 텍스트 문서.txt` 제거 — Claude Code
 - 2026-10-30: 문항 출제용 그림·그래프 도구를 `aks-sci-lab/figure-maker` 로 독립(사용자 지정, GitHub Pages). 이 저장소에서는 `js/figure-*.js`·`css/figure-maker.css`·`tests/figure-*` 제거, `projects/figure-maker.html` 은 새 주소로 넘기는 페이지(자동 저장 그림 함께 넘김, API 키는 옮기지 않음) — Claude Code
 - 2026-11-03: 통합 관리 세션 지정, 세션·브랜치·PR 현황표(`docs/MANAGEMENT.md`) 작성 — Claude Code
+- 2026-11-03: 열린 PR 5개(#33 말루스 탭 개편, #42 걷기·뛰기 링크, #49 문서 정리·날씨 데모 제거, #50 그림 도구 독립, #51 Chart.js 고정·업로더 제거)를 한 PR 에 모아 AGENTS.md 충돌 해결, 시험(JS 109개·Python 23개)·전체 13페이지 열기 확인 후 사용자의 직접 지시로 머지·배포 — Claude Code
