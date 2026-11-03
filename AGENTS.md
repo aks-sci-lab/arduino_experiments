@@ -5,10 +5,11 @@
 
 ## 프로젝트
 
-중·고등학교 과학 수업용 **웹 실험실**. 학생이 스마트폰/PC 브라우저로 접속해 센서·카메라로 실험하고 결과를 분석·제출한다.
+**센서 기반 실험실** — 중·고등학교 과학 수업용 웹 실험실. 학생이 스마트폰/PC 브라우저로 접속해 센서·카메라로 실험하고 결과를 분석·제출한다.
 사용자(교사)는 코딩 초보이므로, 설명은 쉬운 한국어로 하고 용어는 풀어서 쓴다.
 
 - 서비스 주소: https://aks-sci-lab.web.app (Firebase Hosting)
+- GitHub 저장소: `aks-sci-lab/sensor-lab` (2026-11-03 사용자 지정, 예전 이름 `arduino_experiments`. GitHub 은 예전 주소를 새 주소로 자동으로 넘겨 준다)
 - Firebase 프로젝트(로그인·DB): `web-experiment-f9b24`
 
 ## 구조
@@ -66,7 +67,7 @@
 - 두 대화는 서로의 기억을 공유하지 않는다. 인계는 **PR 설명**(요구사항·바꾼 내용·테스트·미검증)으로 한다.
 - 같은 브랜치·같은 폴더를 두 대화가 동시에 고치지 않는다. 머지 대화는 GitHub 에서 PR 만 다룬다.
 - 머지는 여전히 사용자가 "머지해" 라고 직접 말한 PR 에 대해서만 한다 (머지 = 배포).
-- **한 대화는 한 저장소만 다룬다.** 실험실(`arduino_experiments`)·업무 데스크(`teacher-desk`)·문항 그림 도구(`figure-maker`) 일을 한 대화에 섞지 않는다. 다른 저장소 일이 생기면 그 프로젝트의 대화에 PR 설명이나 메시지로 넘긴다 (사용자 결정 2026-10-30).
+- **한 대화는 한 저장소만 다룬다.** 실험실(`sensor-lab`)·업무 데스크(`teacher-desk`)·문항 그림 도구(`figure-maker`) 일을 한 대화에 섞지 않는다. 다른 저장소 일이 생기면 그 프로젝트의 대화에 PR 설명이나 메시지로 넘긴다 (사용자 결정 2026-10-30).
 
 ## 작업 흐름과 배포
 
@@ -82,6 +83,18 @@
 - 새 대화를 시작하거나 PR 을 만들면 그 표에 한 줄 적는다.
 - 통합 관리 세션은 "한 대화는 한 저장소" 규칙의 예외로, 다른 저장소의 대화도 **목록으로만** 본다. 다른 저장소의 코드는 고치지 않는다.
 - 통합 관리 세션은 자기 브랜치 외에는 push·삭제 권한이 없다. 브랜치 삭제 같은 GitHub 작업은 이슈로 남겨 GitHub Copilot 이 수행한다.
+
+## 저장소 이름 바꾸기 (2026-11-03, 사용자 지정)
+
+프로젝트 이름은 **센서 기반 실험실**, GitHub 저장소 이름은 `sensor-lab` 이다 (GitHub 저장소 이름에는 한글을 쓸 수 없음). 문서·화면 이름은 PR 로 바꿨고, 저장소 이름 자체는 GitHub 설정에서 사람이 바꾼다.
+
+1. GitHub → `aks-sci-lab/arduino_experiments` → Settings → General → Repository name 에 `sensor-lab` 입력 → Rename
+2. 바꾼 뒤 확인할 것
+   - 사이트(https://aks-sci-lab.web.app)·Firebase 는 영향 없음. 자동 배포는 `main` push 로 그대로 동작
+   - 예전 GitHub 주소(저장소·git clone·Releases `desk-latest` 내려받기)는 GitHub 이 새 주소로 자동으로 넘겨 준다. 단, 나중에 누가 `arduino_experiments` 라는 새 저장소를 만들면 넘김이 끊기므로 그 이름은 다시 쓰지 않는다
+   - **GitHub Pages 주소는 넘겨 주지 않는다**: `aks-sci-lab.github.io/arduino_experiments/` → `aks-sci-lab.github.io/sensor-lab/` 로 바뀐다. 수업에서는 web.app 주소를 쓴다
+   - PC 에 내려받은 폴더는 그대로 써도 되고, 원하면 `git remote set-url origin https://github.com/aks-sci-lab/sensor-lab.git`
+   - Claude Code 새 대화에서는 저장소를 `sensor-lab` 으로 고른다
 
 ## 교사 업무 데스크 (2026-10-27 독립)
 
@@ -130,3 +143,4 @@
 - 2026-11-03: 열린 PR 5개(#33 말루스 탭 개편, #42 걷기·뛰기 링크, #49 문서 정리·날씨 데모 제거, #50 그림 도구 독립, #51 Chart.js 고정·업로더 제거)를 한 PR 에 모아 AGENTS.md 충돌 해결, 시험(JS 109개·Python 23개)·전체 13페이지 열기 확인 후 사용자의 직접 지시로 머지·배포 — Claude Code
 - 2026-11-03: 전자기 유도 전압·전류 측정(`projects/em-induction.html`, `firmware/em-induction/`, 원래 10-22 브랜치 `claude/stoic-archimedes-48nbsd`, 사용자 지시로 PR) — 아두이노 + ADS1115 차동 측정(코일 A0−A1, 10 Ω 션트 A2−A3), 웹 시리얼 연결·시뮬레이션, 영점 보정, 봉우리·렌츠 순서·∫ε dt·ΔΦ, CSV. 최신 main 으로 옮기며 펌웨어 I2C 바이트 읽기 순서 고정, 시뮬레이션 파형을 설명대로(들어갈 때 +, 나올 때 더 큰 −) 수정 — Claude Code
   - 확인 필요: 실제 ADS1115·코일·자석 측정, 아두이노 IDE 컴파일(시험 환경에 없음), 닫힌 회로에서 '코일 전압'은 기전력이 아니라 단자 전압(= 기전력 − 코일 저항×I = 션트 전압)이라 화면 이름·설명을 맞출지
+- 2026-11-03: 프로젝트 이름을 '센서 기반 실험실'(GitHub `sensor-lab`, 사용자 지정)로 통일 — 메인 제목·탭 이름·README·펌웨어 안내·문서, 저장소 이름 바꾸는 방법 정리. 저장소 이름은 사용자가 GitHub 설정에서 바꿈 — Claude Code
