@@ -8,7 +8,7 @@
 - **C. 정리해도 되는 브랜치**: 내용이 이미 `main` 에 다 들어간 브랜치
 
 기준 시점: 2026-11-03. 수치는 `main`(7b65615) 과 비교한 커밋 수.
-머지·삭제는 사용자 승인 후에만 한다 (`AGENTS.md` 역할 분담).
+머지·삭제는 사용자 승인 후에만 한다. 이 대화는 자기 브랜치 외에는 push·삭제 권한이 없으므로, 브랜치 삭제 같은 GitHub 작업은 이슈로 남겨 GitHub Copilot 이 수행한다 (`AGENTS.md` 역할 분담).
 
 ---
 
@@ -59,21 +59,11 @@ PR #42·#50·#51·#33, `stoic-archimedes` 는 A-1 의 세션이 맡고 있다.
 
 ## C. 정리해도 되는 브랜치 (내용이 모두 main 에 있음)
 
-main 보다 앞선 커밋이 0 이거나, 같은 변경이 이미 main 에 들어간 브랜치. 삭제해도 잃는 것이 없다.
+지금은 없음.
 
-| 브랜치 | 비고 |
-|---|---|
-| `aks-sci-lab-restore-live-sensor-work` | PR #30 (머지됨) |
-| `ccr-ac50da94-kx64gv` | PR #46 (머지됨) |
-| `claude/keen-mccarthy-i86emx` | PR #27~#32 (머지됨) |
-| `claude/lucid-pasteur-bjiyj4` | PR #37~#45 (머지됨) |
-| `claude/modest-shannon-47w7u0` | PR #47·#48 (머지됨) |
-| `claude/malus-view-stability` | 앞선 커밋 1개가 같은 내용으로 main 에 이미 있음 (452d608) |
-| `lany0665-hash-motion-analysis` | PR #22·#23 (머지됨) |
-| `lany0665-hash-weather-stargazing-feature` | 9월 작업, 모두 main 에 있음 |
-| `lany0665-hash-web-page-optimization` | 8월 작업, 모두 main 에 있음 |
-
-삭제는 사용자가 "정리해" 라고 하면 한 번에 한다.
+- 2026-11-03 정리 완료: 내용이 모두 main 에 있던 브랜치 9개를 사용자 승인으로 삭제 (이슈 #52, GitHub Copilot 수행, 통합 관리 세션에서 확인).
+  `aks-sci-lab-restore-live-sensor-work`, `ccr-ac50da94-kx64gv`, `claude/keen-mccarthy-i86emx`, `claude/lucid-pasteur-bjiyj4`, `claude/modest-shannon-47w7u0`, `claude/malus-view-stability`, `lany0665-hash-motion-analysis`, `lany0665-hash-weather-stargazing-feature`, `lany0665-hash-web-page-optimization`
+- 필요하면 GitHub 브랜치 화면의 "Restore" 로 되살릴 수 있다.
 
 ---
 
@@ -82,7 +72,6 @@ main 보다 앞선 커밋이 0 이거나, 같은 변경이 이미 main 에 들�
 1. 열린 PR 5개 머지 여부: #33(말루스 탭 개편), #42(걷기·뛰기 링크), #49(문서 정리), #50(그림 도구 독립), #51(무결성 정리)
    - #49·#50·#51 은 모두 AGENTS.md 를 바꾸므로, 하나를 머지하면 나머지는 충돌을 풀어야 할 수 있다.
 2. 전자기 유도(`stoic-archimedes`)를 PR 로 올릴지, 보류할지
-3. C 의 브랜치 9개 삭제 여부
 
 ## 관리 방법
 
