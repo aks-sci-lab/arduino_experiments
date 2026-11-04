@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let vocProcessor = null;
     const receiverSupported = EnvironmentProtocol.version === 'multi-sensor-v2';
 
-    document.title = config.title + ' | 센서 기반 웹실험실';
+    document.title = config.title + ' | 센서 기반 실험실';
     element('pageTitle').textContent = config.title;
     element('description').textContent = config.description;
     const readouts = new Map();
