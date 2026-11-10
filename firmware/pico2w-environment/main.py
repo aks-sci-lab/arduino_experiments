@@ -8,8 +8,10 @@ try:
 except ImportError:
     print("[FATAL] bluetooth module missing. Install RPI_PICO2_W MicroPython UF2.")
     raise
+import gc
 import json
 import machine
+import os
 import struct
 import time
 from micropython import const
@@ -29,6 +31,58 @@ SERVICE = bluetooth.UUID("19b10000-e8f2-537e-4f6c-d104768a1214")
 TX = bluetooth.UUID("19b10001-e8f2-537e-4f6c-d104768a1214")
 CMD = bluetooth.UUID("19b10002-e8f2-537e-4f6c-d104768a1214")
 ACCEL = bluetooth.UUID("19b10004-e8f2-537e-4f6c-d104768a1214")
+FIRMWARE_VERSION = "2026.11-board"
+# 보드 번호를 적어 두는 작은 설정 파일. 없거나 깨졌으면 자동 이름(PicoEnv-XXXX)을 쓴다.
+BOARD_FILE = "board.json"
+MAX_CONSECUTIVE_FAILURES = 5
+
+
+def load_board(path=None):
+    """설정 파일의 보드 번호(1~99)를 돌려준다. 읽을 수 없으면 None."""
+    try:
+        with open(path or BOARD_FILE) as file:
+            value = json.load(file)["board"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 99:
+        return value
+    return None
+
+
+def save_board(number, path=None):
+    """번호를 저장한다. number 가 None 이면 설정 파일을 지운다."""
+    path = path or BOARD_FILE
+    if number is None:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        return
+    temporary = path + ".tmp"
+    with open(temporary, "w") as file:
+        file.write(json.dumps({"board": number}))
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+    os.rename(temporary, path)
+
+
+def bootsel_pressed():
+    """BOOTSEL 단추가 눌려 있으면 True, 아니면 False, 읽을 수 없으면 None."""
+    try:
+        import rp2
+        return bool(rp2.bootsel_button())
+    except (ImportError, AttributeError):
+        return None
+
+
+def log_exception(error):
+    printer = getattr(sys, "print_exception", None)
+    if printer:
+        printer(error)
+    else:
+        print(repr(error))
 
 
 class EnvironmentBLE:
@@ -53,8 +107,14 @@ class EnvironmentBLE:
         self.accel_batch_sequence = 0
         self.accel_buffered = False
         self.mtu = 23
-        suffix = "".join("%02X" % b for b in machine.unique_id()[-2:])
-        self.name = "PicoEnv-" + suffix
+        self.reschedule = False
+        self.blink_toggles = 0
+        self.reply_sequence = 0
+        unique = machine.unique_id()
+        self.chip_id = "".join("%02X" % b for b in unique)
+        self.auto_name = "PicoEnv-" + "".join("%02X" % b for b in unique[-2:])
+        self.board = load_board()
+        self.name = self.board_name()
         ((self.tx_handle, self.cmd_handle, self.accel_handle),) = self.ble.gatts_register_services((
             (SERVICE, (
                 (TX, bluetooth.FLAG_NOTIFY),
@@ -65,7 +125,46 @@ class EnvironmentBLE:
         self.ble.gatts_set_buffer(self.accel_handle, 164)
         self.ble.gatts_set_buffer(self.cmd_handle, 128)
         self.ble.irq(self._irq)
+        self.apply_gap_name()
         self.advertise()
+
+    def board_name(self):
+        return "PicoEnv-%02d" % self.board if self.board else self.auto_name
+
+    def apply_gap_name(self):
+        # 연결 뒤 브라우저가 읽는 장치 이름도 광고 이름과 같게 맞춘다.
+        try:
+            self.ble.config(gap_name=self.name)
+        except (ValueError, OSError, TypeError):
+            pass
+
+    def send_board(self, saved=False):
+        self.reply_sequence += 1
+        self.send({"type": "board", "ts": self.reply_sequence, "seq": self.reply_sequence,
+                   "data": {"name": self.name, "board": self.board, "id": self.chip_id,
+                            "fw": FIRMWARE_VERSION, "saved": saved}})
+
+    def change_board(self, number):
+        pressed = bootsel_pressed()
+        if pressed is None:
+            self.send({"type": "error", "message":
+                       "이 보드의 MicroPython 은 BOOTSEL 단추를 읽지 못해 번호를 바꿀 수 없습니다. 최신 MicroPython 을 설치하세요."})
+            return
+        if not pressed:
+            self.send({"type": "error", "message":
+                       "보드의 BOOTSEL 단추를 누르고 있는 동안에만 번호를 바꿀 수 있습니다. 단추를 누른 채로 다시 저장하세요."})
+            return
+        try:
+            save_board(number)
+        except OSError as error:
+            self.send({"type": "error", "message": "보드 번호를 저장하지 못했습니다: " + str(error)})
+            return
+        self.board = number
+        self.name = self.board_name()
+        self.apply_gap_name()
+        self.blink_toggles = 12
+        print("[BOARD] Name is now", self.name, "(advertised after this connection ends)")
+        self.send_board(True)
 
     def advertise(self):
         flags = b"\x02\x01\x06"
@@ -83,6 +182,7 @@ class EnvironmentBLE:
             self.connection_log_pending = True
             self.streaming = False
             self.commands.clear()
+            self.blink_toggles = 6
         elif event == IRQ_DISCONNECT:
             self.accel_count = 0
             self.connection = None
@@ -175,6 +275,7 @@ class EnvironmentBLE:
                 value = command.split(":", 1)[1]
                 if value in ("1000", "2000", "5000"):
                     self.interval = int(value)
+                    self.reschedule = True
                 else:
                     self.send({"type": "error", "message": "Rate must be 1000, 2000 or 5000 ms"})
             elif command.startswith("SET_IMU_RATE:"):
@@ -187,6 +288,18 @@ class EnvironmentBLE:
                     self.revision += 1
                 else:
                     self.send({"type": "error", "message": "IMU rate must be 25, 50, 100 or 200 Hz"})
+            elif command == "GET_BOARD":
+                self.send_board()
+            elif command == "IDENTIFY":
+                self.blink_toggles = 20
+            elif command == "CLEAR_BOARD":
+                self.change_board(None)
+            elif command.startswith("SET_BOARD:"):
+                value = command.split(":", 1)[1]
+                if value.isdigit() and len(value) <= 2 and 1 <= int(value) <= 99:
+                    self.change_board(int(value))
+                else:
+                    self.send({"type": "error", "message": "보드 번호는 1부터 99까지의 숫자여야 합니다."})
             else:
                 self.send({"type": "error", "message": "Unknown command"})
 
@@ -245,6 +358,13 @@ def main():
             sensor_errors[mode] = mode.upper() + " init failed: " + str(error)
             print("[SENSOR]", sensor_errors[mode])
 
+    try:
+        led = machine.Pin("LED", machine.Pin.OUT)
+        led.value(0)
+    except (ValueError, TypeError, OSError, AttributeError) as error:
+        led = None
+        print("[LED] Board LED unavailable:", error)
+
     print("[BLE] Initializing radio and GATT services")
     peripheral = EnvironmentBLE()
     print("[READY] Keep this program running. Do not press Thonny Stop.")
@@ -255,6 +375,8 @@ def main():
     sequence = 0
     revision = -1
     next_status = 0
+    next_blink = 0
+    failures = 0
     voc_active = False
     try:
         while True:
@@ -269,10 +391,22 @@ def main():
                 if peripheral.advertise_pending:
                     peripheral.advertise_pending = False
                     peripheral.advertise()
+                if led is not None and peripheral.blink_toggles and uptime >= next_blink:
+                    # 연결 직후(또는 IDENTIFY 명령) LED 를 깜빡여 어느 보드인지 알려 준다.
+                    peripheral.blink_toggles -= 1
+                    led.value(peripheral.blink_toggles & 1)
+                    next_blink = uptime + 150
                 peripheral.process_commands()
+                if peripheral.reschedule:
+                    # 측정 간격을 바꾸면 이미 잡힌 긴 대기를 기다리지 않고 바로 적용한다.
+                    peripheral.reschedule = False
+                    next_sample = min(next_sample, uptime + peripheral.interval)
                 if voc_active and (peripheral.mode not in ("voc", "env_voc") or not peripheral.streaming):
                     voc_active = False
-                    sensors["voc"].stop()
+                    try:
+                        sensors["voc"].stop()
+                    except (OSError, RuntimeError) as error:
+                        print("[SENSOR] VOC heater stop failed:", error)
                 if revision != peripheral.revision:
                     revision = peripheral.revision
                     next_sample = uptime
@@ -322,11 +456,30 @@ def main():
                     next_sample += interval
                     if next_sample <= uptime:
                         next_sample = uptime + interval
+                failures = 0
             except OSError as error:
-                print("BLE transport error:", error)
+                print("[BLE] transport error:", error)
                 peripheral.streaming = False
                 if peripheral.connection is not None:
-                    peripheral.ble.gap_disconnect(peripheral.connection)
+                    try:
+                        peripheral.ble.gap_disconnect(peripheral.connection)
+                    except OSError:
+                        pass
+            except Exception as error:
+                # 예상하지 못한 오류로 펌웨어가 멈추지 않게 한다. 측정만 멈추고 계속 돈다.
+                failures += 1
+                peripheral.streaming = False
+                gc.collect()
+                print("[ERROR] Unexpected firmware error (%d/%d)" % (failures, MAX_CONSECUTIVE_FAILURES))
+                log_exception(error)
+                if failures >= MAX_CONSECUTIVE_FAILURES:
+                    print("[RESTART] Too many errors in a row; restarting the board in 2 s.")
+                    time.sleep_ms(2000)
+                    machine.reset()
+                try:
+                    peripheral.send({"type": "error", "message": "Firmware error: " + repr(error)})
+                except Exception:
+                    pass
             if uptime >= next_status:
                 peripheral.report_status(uptime, sensor is not None, imu is not None)
                 next_status = uptime + 5000
@@ -334,7 +487,15 @@ def main():
     finally:
         peripheral.ble.active(False)
         if voc_active:
-            sensors["voc"].stop()
+            try:
+                sensors["voc"].stop()
+            except (OSError, RuntimeError):
+                pass
+        if led is not None:
+            try:
+                led.value(0)
+            except OSError:
+                pass
         print("[STOP] BLE stopped. Run main.py again or reconnect power to advertise.")
 
 
@@ -345,5 +506,5 @@ if __name__ == "__main__":
         print("[STOP] Program interrupted from USB/Thonny.")
     except Exception as error:
         print("[FATAL] Firmware stopped; Bluetooth search is unavailable.")
-        sys.print_exception(error)
+        log_exception(error)
         raise
