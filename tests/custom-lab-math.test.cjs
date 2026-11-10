@@ -98,3 +98,48 @@ test('CSV: BOM, 단위 붙은 머리글, 빈 행 제외, 따옴표 처리', () =
     const csv = M.toCsv([{ name: '전류', unit: 'A' }, { name: '메모', unit: '' }], [['1', '좋음, "최고"'], ['', ''], ['2', '']]);
     assert.strictEqual(csv, '﻿전류 (A),메모\r\n1,"좋음, ""최고"""\r\n2,\r\n');
 });
+
+test('센서 기능 목록: 다섯 기능, 값 이름이 겹치지 않음', () => {
+    assert.deepStrictEqual(Object.keys(M.SENSORS), ['env', 'light', 'uv', 'voc', 'imu']);
+    Object.values(M.SENSORS).forEach(s => {
+        const keys = s.fields.map(f => f[0]);
+        assert.strictEqual(new Set(keys).size, keys.length);
+        assert.ok(s.rates.length >= 1 && s.command);
+    });
+});
+
+test('센서 설정 다듬기', () => {
+    assert.deepStrictEqual(M.normalizeSensor(undefined), { mode: 'none', fields: [] });
+    assert.deepStrictEqual(M.normalizeSensor({ mode: '없는기능', fields: ['lux'] }), { mode: 'none', fields: [] });
+    assert.deepStrictEqual(M.normalizeSensor({ mode: 'toString' }), { mode: 'none', fields: [] });
+    // 모르는 값 이름은 버리고 목록 순서를 따른다. 하나도 없으면 첫 번째 값
+    assert.deepStrictEqual(M.normalizeSensor({ mode: 'env', fields: ['pressure', '가짜', 'temp'] }), { mode: 'env', fields: ['temp', 'pressure'] });
+    assert.deepStrictEqual(M.normalizeSensor({ mode: 'light', fields: [] }), { mode: 'light', fields: ['lux'] });
+    assert.deepStrictEqual(M.sensorFields({ mode: 'imu', fields: ['z', 'total'] }), [
+        { key: 'total', name: '가속도 크기', unit: 'g', digits: 3 }, { key: 'z', name: 'z축 가속도', unit: 'g', digits: 3 }
+    ]);
+    assert.deepStrictEqual(M.sensorFields({ mode: 'none' }), []);
+    // 실험 설정에 포함되고, 예전(센서 칸이 없는) 설정은 '사용 안 함'
+    assert.deepStrictEqual(M.normalizeDefinition({ title: 't', columns: [{ name: 'x' }] }).sensor, { mode: 'none', fields: [] });
+    assert.deepStrictEqual(M.normalizeDefinition({ title: 't', columns: [{ name: 'x' }], sensor: { mode: 'uv' } }).sensor, { mode: 'uv', fields: ['uvRaw'] });
+});
+
+test('센서 기록 다듬기·솎아 내기·CSV·요약', () => {
+    const fields = M.sensorFields({ mode: 'env', fields: ['temp', 'humidity'] });
+    const good = { t: [0, 1, 2], v: { temp: [20, 20.5, null], humidity: [40, 41, 42], extra: [1, 2, 3] } };
+    assert.deepStrictEqual(M.normalizeSeries(good, fields), { t: [0, 1, 2], v: { temp: [20, 20.5, null], humidity: [40, 41, 42] } });
+    assert.deepStrictEqual(M.normalizeSeries({ t: [0, 1], v: { temp: [1] } }, fields), M.emptySeries(fields));   // 길이가 모자람
+    assert.deepStrictEqual(M.normalizeSeries({ t: ['a'], v: { temp: [1], humidity: [1] } }, fields), M.emptySeries(fields));
+    assert.deepStrictEqual(M.normalizeSeries(null, fields), { t: [], v: { temp: [], humidity: [] } });
+
+    const long = { t: Array.from({ length: 101 }, (_, i) => i), v: { temp: Array.from({ length: 101 }, (_, i) => i * 2) } };
+    const thin = M.thinSeries(long, 11);
+    assert.strictEqual(thin.thinned, true);
+    assert.deepStrictEqual(thin.series.t, [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
+    assert.deepStrictEqual(thin.series.v.temp[10], 200);
+    assert.strictEqual(M.thinSeries(long, 200).thinned, false);
+
+    assert.strictEqual(M.seriesToCsv(good, fields), '\uFEFF시간 (s),온도 (°C),습도 (%RH)\r\n0.000,20.00,40.0\r\n1.000,20.50,41.0\r\n2.000,,42.0\r\n');
+    assert.strictEqual(M.seriesSummary(good, fields), '센서 3점 (2.0초): 온도 20.00~20.50 °C, 습도 40.0~42.0 %RH');
+    assert.strictEqual(M.seriesSummary(M.emptySeries(fields), fields), '');
+});

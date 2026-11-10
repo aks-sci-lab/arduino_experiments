@@ -18,7 +18,7 @@
 |---|---|
 | `index.html` | 메인 페이지: 구글 로그인, 교사/학생 역할, 실험 목록, 기록 조회 |
 | `projects/*.html` | 실험 페이지 (가속도계, 환경 센서, 자유낙하, 스마트폰 가속도, 말루스 법칙, LED 플랑크 상수, 이상기체 상태 방정식, 전자기 유도) |
-| `projects/custom-lab.html` | 선생님이 만든 실험 한 페이지로 세 가지 화면: `?id=` 학생 화면(안내·측정값 표·그래프·질문·제출), `?edit=new\|id` 선생님 만들기·고치기, `?record=` 제출 내용 보기. `js/custom-lab.js` 화면, `js/custom-lab-math.js` 계산·검사(시험 있음). 설정은 Firestore `customExperiments`, 제출은 `experiments`(`tab: 'custom-lab'`) |
+| `projects/custom-lab.html` | 선생님이 만든 실험 한 페이지로 세 가지 화면: `?id=` 학생 화면(안내·측정값 표·그래프·질문·제출), `?edit=new\|id` 선생님 만들기·고치기, `?record=` 제출 내용 보기. `js/custom-lab.js` 화면, `js/custom-lab-math.js` 계산·검사·센서 기능 목록(시험 있음), `js/custom-lab-sensor.js` Pico 센서 보드 블루투스 연결(기존 `pico-ble.js`·`environment-protocol.js`·`sensor-definitions.js`·`accelerometer-protocol.js`·`voc-index.js` 를 그대로 씀). 설정은 Firestore `customExperiments`, 제출은 `experiments`(`tab: 'custom-lab'`) |
 | `projects/figure-maker.html` | 문항 그림 도구 넘김 페이지만 남김 (도구는 `aks-sci-lab/figure-maker` 로 독립, 2026-10-30). 자동 저장된 그림을 `#move=` 로 넘김 |
 | `js/`, `css/` | 실험 페이지용 스크립트·스타일 (`malus-*.js`: 말루스 법칙 실험 — `malus-math.js` 계산, `malus-tutorial.js` 접해보기 탭, `malus-law.js` 측정·분석·설정, `malus-sheets.js` 구글 시트, `planck-*.js`: LED 플랑크 상수 실험, `ideal-gas*.js`: 이상기체 실험) |
 | `firmware/em-induction/` | 전자기 유도 실험용 아두이노 펌웨어 (ADS1115 로 코일 전압·션트 전압, USB 시리얼 115200, 웹 시리얼은 PC 크롬·엣지만) |
@@ -149,3 +149,5 @@
 - 2026-11-04: 모든 세션을 통합 관리 세션의 하위 세션으로 재분류(사용자 지정) — 태그 `통합관리:실험실·그림도구·업무데스크·기타` 를 24개 세션에 붙이고 `docs/MANAGEMENT.md` 를 계층 목록으로 — Claude Code
 - 2026-11-10: 웹앱에서 실험 추가(사용자 요청, "선생님이 실험을 직접 만들기" 선택) **(규칙 배포 필요)** — 메인 페이지 교사용 모드의 "➕ 새 실험 만들기"로 제목·안내 글·측정값 표의 열(최대 8)·그래프 기본 축·맞춤(없음/비례/일차)·생각해 볼 질문(최대 5)·공개 여부를 정하면 학생용 페이지가 생김(`projects/custom-lab.html`). 학생: 표 입력·스프레드시트 붙여넣기·그래프·맞춤 결과·CSV·표 복사·자동 저장·제출, 선생님: 대시보드에서 '제출 내용 보기', 설정 파일(JSON) 저장·불러오기. Firestore `customExperiments` 규칙 추가. 메인 기록 목록은 학생이 넣은 글을 HTML 로 실행하지 않게 바꿈 — Claude Code
   - 확인 필요: 실제 Firebase(시험은 규칙을 흉내 낸 가짜 Firebase), **규칙 배포 전에는 만들기·목록이 동작하지 않음**(학생 화면에는 영향 없음), 한글 이름 CSV 내려받기 파일 이름(시험 브라우저에서는 'download' 로 나옴), 학교 PC 브라우저의 표 복사
+- 2026-11-10: 선생님이 만든 실험에서 우리 센서 보드를 기능별로 골라 그래프로 보기(사용자 요청) — 만들기 화면에서 센서 기능 하나(환경 온도·습도·기압 / 조도 / 자외선 / 공기질 VOC Index / 가속도)와 그 안의 측정값을 고르면, 학생 화면에 센서 연결·지금 값·측정값별 시간 그래프·측정 주기·기록 시작/중지·센서 CSV·"지금 값을 표에 넣기"(같은 이름의 열)가 생기고 기록이 제출에 포함됨(1500점 넘으면 고르게 줄임). 펌웨어는 바꾸지 않음(보드가 한 번에 한 기능만 측정하므로 기능은 하나만 고름). 규칙 변경 없음 — Claude Code
+  - 확인 필요: 실제 센서 보드 연결(시험은 펌웨어 명령을 흉내 낸 가짜 블루투스), 실제 VOC Index 값이 나올 때까지의 화면(시험은 준비 중 표시까지만), 가속도 1초에 100번에서 휴대폰 그래프 속도

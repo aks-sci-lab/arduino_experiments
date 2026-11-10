@@ -46,6 +46,13 @@
         .col-row button, .q-row button, table.data button, .userbar button { width: auto; flex: 0 0 auto; }
         .row > button { width: auto; flex: 1 1 auto; }
         .row select { width: auto; max-width: 100%; }
+        .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 10px 0; }
+        .readout { background: #f1f3f5; border-radius: 8px; padding: 8px; text-align: center; }
+        .readout .k { font-size: 0.85em; color: #555; }
+        .readout .v { font-size: 1.5em; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .sensor-chart { position: relative; height: 200px; margin-top: 8px; }
+        #edSensorFields label { display: block; margin: 6px 0; }
+        button.rec { background: #DC3545; border-color: #DC3545; color: #fff; }
         [hidden] { display: none !important; }
         @media print {
             button, .no-print, .userbar { display: none !important; }
@@ -83,6 +90,25 @@
                 <input type="text" id="stId" placeholder="학번" style="width:8em" autocomplete="off">
                 <input type="text" id="stName" placeholder="이름" style="width:8em" autocomplete="off">
             </div>
+        </div>
+
+        <div class="card" id="sensorCard" hidden>
+            <h2>🔌 센서 <span id="sensorName" class="muted"></span></h2>
+            <div class="row no-print" id="sensorButtons">
+                <button id="btnSensorConnect" class="primary">🔌 센서 연결</button>
+                <button id="btnSensorDisconnect" hidden>연결 해제</button>
+                <label>측정 주기 <select id="selRate"></select></label>
+            </div>
+            <div id="sensorStatus" class="muted" style="margin-top:6px"></div>
+            <div id="sensorReadouts" class="readouts"></div>
+            <div class="row no-print" id="sensorRecButtons">
+                <button id="btnRec" disabled>● 기록 시작</button>
+                <button id="btnToTable" disabled>📥 지금 값을 표에 넣기</button>
+                <button id="btnSeriesCsv" disabled>⬇ 센서 기록 CSV</button>
+                <button id="btnSeriesClear" class="danger" disabled>🗑 센서 기록 지우기</button>
+            </div>
+            <div id="sensorInfo" class="muted" style="margin-top:6px"></div>
+            <div id="sensorCharts"></div>
         </div>
 
         <div class="card">
@@ -139,7 +165,7 @@
     <!-- ============ 선생님: 실험 만들기 · 고치기 ============ -->
     <section id="editSection" hidden>
         <h1 id="editTitle">새 실험 만들기</h1>
-        <p class="muted">제목, 안내 글, 측정값 표의 열을 정하면 학생용 실험 페이지가 만들어집니다. 학생은 값을 넣고 그래프를 본 뒤 제출합니다.</p>
+        <p class="muted">제목, 안내 글, 측정값 표의 열을 정하면 학생용 실험 페이지가 만들어집니다. 학생은 값을 넣고 그래프를 본 뒤 제출합니다. 센서 보드를 쓰는 실험도 만들 수 있습니다.</p>
 
         <div class="card">
             <label class="f" for="edTitle">실험 제목</label>
@@ -154,6 +180,14 @@
             <p class="muted">학생이 값을 넣을 칸입니다. 이름과 단위를 적으세요. 숫자가 아닌 메모 열을 만들어도 됩니다.</p>
             <div id="edColumns"></div>
             <button id="btnAddCol">➕ 열 추가</button>
+        </div>
+
+        <div class="card">
+            <h2>🔌 센서 사용 <span class="muted">(선택)</span></h2>
+            <p class="muted">우리 센서 보드(Pico 환경 센서)를 블루투스로 연결해, 고른 측정값을 시간에 따른 그래프로 보여 줍니다. 보드는 한 번에 한 기능만 측정하므로 기능 하나를 고르고, 그 안에서 볼 값을 고르세요.</p>
+            <label>센서 기능 <select id="edSensorMode"></select></label>
+            <div id="edSensorFields"></div>
+            <p class="muted" id="edSensorHelp"></p>
         </div>
 
         <div class="card">
@@ -198,7 +232,13 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-<script src="../js/custom-lab-math.js?v=1"></script>
-<script src="../js/custom-lab.js?v=1"></script>
+<script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
+<script src="../js/pico-ble.js?v=setup-v3"></script>
+<script src="../js/sensor-definitions.js?v=voc-index-v3"></script>
+<script src="../js/accelerometer-protocol.js"></script>
+<script src="../js/voc-index.js?v=official-v1"></script>
+<script src="../js/custom-lab-math.js?v=2"></script>
+<script src="../js/custom-lab-sensor.js?v=1"></script>
+<script src="../js/custom-lab.js?v=2"></script>
 </body>
 </html>

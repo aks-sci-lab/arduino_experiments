@@ -10,6 +10,106 @@
     const MAX_TITLE = 80;
     const MAX_DESC = 5000;
     const FITS = ['none', 'proportional', 'linear'];
+    const MAX_SERIES = 3000;        // 센서로 한 번에 기록하는 점 수 한도
+    const MAX_SUBMIT_SERIES = 1500; // 제출에 담는 점 수 한도 (넘으면 고르게 솎아 냄)
+
+    // 우리 센서 보드(Pico 환경 센서)의 기능. 보드는 한 번에 한 기능만 측정한다 (펌웨어 START:<command>).
+    // fields: [값 이름(key), 화면 이름, 단위, 소수 자릿수]. rates: 측정 주기 선택지 [보드에 보내는 값, 화면 이름]
+    const SLOW_RATES = [['1000', '1초마다'], ['2000', '2초마다'], ['5000', '5초마다']];
+    const SENSORS = {
+        env: {
+            label: '환경 (온도·습도·기압)', command: 'ENV', rates: SLOW_RATES,
+            fields: [['temp', '온도', '°C', 2], ['humidity', '습도', '%RH', 1], ['pressure', '기압', 'kPa', 3]]
+        },
+        light: {
+            label: '조도 (밝기)', command: 'LIGHT', rates: SLOW_RATES,
+            fields: [['lux', '조도', 'lux', 2], ['full', '광대역 채널', 'counts', 0], ['infrared', '적외선 채널', 'counts', 0]]
+        },
+        uv: {
+            label: '자외선', command: 'UV', rates: SLOW_RATES,
+            fields: [['uvRaw', '자외선 원시 신호', 'counts', 0]]
+        },
+        voc: {
+            label: '공기질 (VOC Index)', command: 'VOC', rates: [['1000', '1초마다']],
+            fields: [['vocIndex', 'VOC Index', 'Index', 0], ['temp', '온도', '°C', 2], ['humidity', '습도', '%RH', 1]]
+        },
+        imu: {
+            label: '가속도', command: 'IMU', rates: [['25', '1초에 25번'], ['50', '1초에 50번'], ['100', '1초에 100번']],
+            fields: [['total', '가속도 크기', 'g', 3], ['x', 'x축 가속도', 'g', 3], ['y', 'y축 가속도', 'g', 3], ['z', 'z축 가속도', 'g', 3]]
+        }
+    };
+
+    // 실험 설정의 센서 부분을 다듬는다. 반환: { mode: 'none' | 기능 이름, fields: [값 이름...] }
+    function normalizeSensor(sensor) {
+        const mode = sensor && Object.prototype.hasOwnProperty.call(SENSORS, sensor.mode) ? sensor.mode : 'none';
+        if (mode === 'none') return { mode: 'none', fields: [] };
+        const known = SENSORS[mode].fields.map(f => f[0]);
+        const picked = Array.isArray(sensor.fields) ? sensor.fields : [];
+        let fields = known.filter(k => picked.includes(k));   // 목록의 순서를 따른다
+        if (!fields.length) fields = [known[0]];
+        return { mode, fields };
+    }
+    // 고른 측정값의 정보 목록: [{ key, name, unit, digits }]
+    function sensorFields(sensor) {
+        const s = normalizeSensor(sensor);
+        if (s.mode === 'none') return [];
+        return SENSORS[s.mode].fields.filter(f => s.fields.includes(f[0]))
+            .map(f => ({ key: f[0], name: f[1], unit: f[2], digits: f[3] }));
+    }
+    // 센서 값을 화면·표에 넣을 글자로 (자릿수 맞춤). 값이 없으면 빈 글자
+    function sensorValueText(value, digits) {
+        return typeof value === 'number' && isFinite(value) ? value.toFixed(digits) : '';
+    }
+
+    // 센서 기록: { t: [초...], v: { 값 이름: [값...] } }
+    function emptySeries(fields) {
+        const v = {};
+        fields.forEach(f => { v[f.key] = []; });
+        return { t: [], v };
+    }
+    // 저장·제출에서 읽어 온 기록을 확인해 다듬는다 (모양이 다르면 빈 기록)
+    function normalizeSeries(series, fields) {
+        const out = emptySeries(fields);
+        if (!series || !Array.isArray(series.t) || !series.v) return out;
+        const n = Math.min(series.t.length, MAX_SERIES);
+        if (!fields.every(f => Array.isArray(series.v[f.key]) && series.v[f.key].length >= n)) return out;
+        for (let i = 0; i < n; i++) {
+            if (typeof series.t[i] !== 'number' || !isFinite(series.t[i])) return emptySeries(fields);
+            out.t.push(series.t[i]);
+            fields.forEach(f => {
+                const val = series.v[f.key][i];
+                out.v[f.key].push(typeof val === 'number' && isFinite(val) ? val : null);
+            });
+        }
+        return out;
+    }
+    // 점이 max 개를 넘으면 처음과 끝을 지키며 고르게 솎아 낸다. 반환: { series, thinned }
+    function thinSeries(series, max) {
+        const n = series.t.length;
+        if (n <= max) return { series, thinned: false };
+        const idx = [];
+        for (let i = 0; i < max; i++) idx.push(Math.round(i * (n - 1) / (max - 1)));
+        const out = { t: idx.map(i => series.t[i]), v: {} };
+        Object.keys(series.v).forEach(k => { out.v[k] = idx.map(i => series.v[k][i]); });
+        return { series: out, thinned: true };
+    }
+    function seriesToCsv(series, fields) {
+        const lines = [['시간 (s)'].concat(fields.map(f => f.name + ' (' + f.unit + ')')).join(',')];
+        series.t.forEach((t, i) => {
+            lines.push([t.toFixed(3)].concat(fields.map(f => sensorValueText(series.v[f.key][i], f.digits))).join(','));
+        });
+        return '\uFEFF' + lines.join('\r\n') + '\r\n';
+    }
+    // 기록 요약 문장: "조도 12.3~456.7 lux"
+    function seriesSummary(series, fields) {
+        if (!series.t.length) return '';
+        const parts = fields.map(f => {
+            const vals = series.v[f.key].filter(v => v !== null);
+            if (!vals.length) return f.name + ' 값 없음';
+            return f.name + ' ' + sensorValueText(Math.min.apply(null, vals), f.digits) + '~' + sensorValueText(Math.max.apply(null, vals), f.digits) + ' ' + f.unit;
+        });
+        return '센서 ' + series.t.length + '점 (' + series.t[series.t.length - 1].toFixed(1) + '초): ' + parts.join(', ');
+    }
 
     // 글자 → 숫자. 빈칸·숫자가 아닌 글자는 null. 쉼표 소수점(3,14)과 유니코드 빼기(−)도 받는다.
     function parseNumber(v) {
@@ -51,6 +151,7 @@
             yCol: idx(def.yCol, Math.min(1, Math.max(0, columns.length - 1))),
             fit: FITS.includes(def.fit) ? def.fit : 'none',
             questions,
+            sensor: normalizeSensor(def.sensor),
             published: def.published === true
         };
     }
@@ -153,7 +254,8 @@
     }
 
     return {
-        MAX_COLS, MAX_ROWS, MAX_QUESTIONS, MAX_TITLE, MAX_DESC, FITS,
+        MAX_COLS, MAX_ROWS, MAX_QUESTIONS, MAX_TITLE, MAX_DESC, FITS, MAX_SERIES, MAX_SUBMIT_SERIES, SENSORS,
+        normalizeSensor, sensorFields, sensorValueText, emptySeries, normalizeSeries, thinSeries, seriesToCsv, seriesSummary,
         parseNumber, parsePaste, normalizeDefinition, validateDefinition, columnLabel,
         pointsFromRows, filledRowCount, fit, formatNumber, fitText, toCsv
     };

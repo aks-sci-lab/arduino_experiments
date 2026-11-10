@@ -3,6 +3,7 @@
 //   ?edit=new|문서id 선생님 화면: 실험 만들기·고치기
 //   ?record=문서id  제출 내용 보기 (본인 또는 선생님)
 // 실험 설정은 Firestore `customExperiments` 에, 학생 제출은 기존 `experiments` 에 저장한다.
+// 실험 설정에서 센서 기능을 고르면 Pico 환경 센서 보드를 연결해 시간 그래프를 그린다 (custom-lab-sensor.js).
 (function () {
     'use strict';
     const M = window.CustomLabMath;
@@ -121,6 +122,12 @@
         def: null, rows: [], answers: [], student: { id: '', name: '' },
         sel: { x: 0, y: 1, fit: 'none' }, submitted: '', readOnly: false, chart: null
     };
+    // 센서: fields 고른 측정값, series 기록한 값, live 기록하지 않을 때 보여 주는 최근 값
+    const sensor = {
+        fields: [], series: { t: [], v: {} }, live: { t: [], v: {} }, latest: null,
+        rate: '', conn: null, recording: false, recStart: 0, charts: [], thinnedNote: ''
+    };
+    const LIVE_POINTS = 300;
     const dataKey = () => 'customLab:v1:' + expId;
     const defKey = () => 'customLabDef:v1:' + expId;
 
@@ -159,6 +166,7 @@
         const d = view.def;
         view.sel = { x: d.xCol, y: d.yCol, fit: d.fit };
         view.rows = []; view.answers = d.questions.map(() => ''); view.student = { id: '', name: '' }; view.submitted = '';
+        sensor.series = M.emptySeries(sensor.fields);
         try {
             const raw = localStorage.getItem(dataKey());
             if (raw) {
@@ -175,6 +183,10 @@
                     if (M.FITS.includes(s.sel.fit)) view.sel.fit = s.sel.fit;
                 }
                 if (typeof s.submitted === 'string') view.submitted = s.submitted;
+                if (sensor.fields.length) {
+                    sensor.series = M.normalizeSeries(s.series, sensor.fields);
+                    if (typeof s.rate === 'string' && M.SENSORS[d.sensor.mode].rates.some(r => r[0] === s.rate)) sensor.rate = s.rate;
+                }
             }
         } catch (e) { /* 깨진 저장값은 무시하고 빈 표로 시작 */ }
         while (view.rows.length < DEFAULT_ROWS) view.rows.push(emptyRow());
@@ -189,7 +201,8 @@
         if (view.readOnly) return;
         try {
             localStorage.setItem(dataKey(), JSON.stringify({
-                v: 1, rows: view.rows, answers: view.answers, student: view.student, sel: view.sel, submitted: view.submitted
+                v: 1, rows: view.rows, answers: view.answers, student: view.student, sel: view.sel, submitted: view.submitted,
+                series: sensor.fields.length ? sensor.series : undefined, rate: sensor.rate || undefined
             }));
             $('saveStatus').textContent = '';
         } catch (e) {
@@ -203,6 +216,8 @@
         $('title').textContent = def.title;
         $('description').textContent = def.description;
         $('descCard').hidden = !def.description.trim();
+        sensor.fields = M.sensorFields(def.sensor);
+        if (sensor.fields.length) sensor.rate = M.SENSORS[def.sensor.mode].rates[0][0];
         if (!view.readOnly) {
             restoreData();
             $('draftNotice').hidden = def.published;
@@ -224,6 +239,181 @@
         $('viewSection').hidden = false;
         loaded = true;
         refreshGraph();
+        setupSensor();
+    }
+
+    // ---------- 센서 (실험 설정에서 센서 기능을 고른 경우) ----------
+    function setupSensor() {
+        const mode = view.def.sensor.mode;
+        if (!sensor.fields.length) { $('sensorCard').hidden = true; return; }
+        const config = M.SENSORS[mode];
+        $('sensorCard').hidden = false;
+        $('sensorName').textContent = '— ' + config.label;
+        const readouts = $('sensorReadouts'), charts = $('sensorCharts');
+        readouts.textContent = ''; charts.textContent = '';
+        sensor.charts = [];
+        sensor.live = M.emptySeries(sensor.fields);
+        sensor.fields.forEach(f => {
+            const value = el('div', { className: 'v', textContent: '--' });
+            value.dataset.key = f.key;
+            readouts.appendChild(el('div', { className: 'readout' }, [
+                el('div', { className: 'k', textContent: f.name }), value, el('div', { className: 'k', textContent: f.unit })
+            ]));
+            const canvas = el('canvas');
+            canvas.setAttribute('aria-label', f.name + ' 시간 그래프');
+            charts.appendChild(el('div', { className: 'sensor-chart' }, [canvas]));
+            if (typeof Chart !== 'undefined') {
+                sensor.charts.push(new Chart(canvas.getContext('2d'), {
+                    type: 'scatter',
+                    data: { datasets: [{ label: f.name + ' (' + f.unit + ')', data: [], showLine: true, borderColor: '#007BFF', backgroundColor: '#007BFF', borderWidth: 1.5, pointRadius: 0 }] },
+                    options: {
+                        animation: false, responsive: true, maintainAspectRatio: false, parsing: false,
+                        scales: { x: { type: 'linear', title: { display: true, text: '시간 (s)' } }, y: { title: { display: true, text: f.name + ' (' + f.unit + ')' } } },
+                        plugins: { legend: { display: false } }
+                    }
+                }));
+            }
+        });
+        if (typeof Chart === 'undefined') charts.appendChild(el('p', { className: 'muted', textContent: '그래프 도구를 불러오지 못했습니다 (인터넷 연결 확인). 값 표시와 기록·CSV 저장은 그대로 쓸 수 있습니다.' }));
+        if (view.readOnly) {
+            $('sensorButtons').hidden = true; $('sensorReadouts').hidden = true;
+            $('btnRec').hidden = true; $('btnToTable').hidden = true; $('btnSeriesClear').hidden = true;
+            $('sensorStatus').textContent = '';
+        } else {
+            const sel = $('selRate');
+            sel.textContent = '';
+            config.rates.forEach(r => sel.appendChild(el('option', { value: r[0], textContent: r[1] })));
+            sel.value = sensor.rate;
+            sel.disabled = config.rates.length < 2;
+            // 표에 같은 이름의 열이 있을 때만 "표에 넣기"를 쓴다
+            $('btnToTable').hidden = !sensor.fields.some(f => columnIndexFor(f) >= 0);
+            const reason = CustomLabSensor.unsupportedReason();
+            $('btnSensorConnect').disabled = !!reason;
+            $('sensorStatus').textContent = reason ? '⚠ ' + reason : '센서 보드의 전원을 켜고 "센서 연결"을 누르세요.';
+            sensor.conn = CustomLabSensor.create({
+                mode, rate: sensor.rate,
+                onSample: handleSensorSample,
+                onStatus: text => { $('sensorStatus').textContent = text; },
+                onState: connected => {
+                    $('btnSensorConnect').hidden = connected;
+                    $('btnSensorDisconnect').hidden = !connected;
+                    if (!connected) {
+                        if (sensor.recording) stopRecording('연결이 끊어져 기록을 멈췄습니다.');
+                        sensor.latest = null;
+                        $('sensorReadouts').querySelectorAll('.v').forEach(v => { v.textContent = '--'; });
+                    }
+                    updateSensorButtons();
+                }
+            });
+        }
+        updateSensorButtons();
+        drawSensor();
+    }
+    function columnIndexFor(field) {
+        return view.def.columns.findIndex(c => c.name === field.name);
+    }
+    function updateSensorButtons() {
+        const has = sensor.series.t.length > 0;
+        const connected = !!(sensor.conn && sensor.conn.isConnected());
+        $('btnRec').disabled = !connected || !sensor.latest;
+        $('btnRec').textContent = sensor.recording ? '■ 기록 중지' : '● 기록 시작';
+        $('btnRec').className = sensor.recording ? 'rec' : '';
+        $('btnToTable').disabled = !connected || !sensor.latest;
+        $('btnSeriesCsv').disabled = sensor.recording || !has;
+        $('btnSeriesClear').disabled = sensor.recording || !has;
+        let info = '';
+        if (sensor.recording) info = '기록 중: ' + sensor.series.t.length + '점';
+        else if (has) info = '기록한 값: ' + M.seriesSummary(sensor.series, sensor.fields) + (sensor.thinnedNote ? ' ' + sensor.thinnedNote : '');
+        else if (!view.readOnly) info = '연결하면 지금 값이 그래프에 보입니다. "기록 시작"을 누르면 그때부터의 값이 저장되어 제출에 포함됩니다.';
+        else info = '이 제출에는 센서 기록이 없습니다.';
+        $('sensorInfo').textContent = info;
+    }
+    function handleSensorSample(sample) {
+        sensor.latest = sample;
+        // 연결이 다시 시작되어 시간이 0 으로 돌아가면 최근 값 그래프를 새로 그린다
+        const live = sensor.live;
+        if (live.t.length && sample.t < live.t[live.t.length - 1]) sensor.live = M.emptySeries(sensor.fields);
+        sensor.live.t.push(sample.t);
+        sensor.fields.forEach(f => sensor.live.v[f.key].push(sample.values[f.key]));
+        if (sensor.live.t.length > LIVE_POINTS) {
+            sensor.live.t.shift();
+            sensor.fields.forEach(f => sensor.live.v[f.key].shift());
+        }
+        if (sensor.recording) {
+            if (!sensor.series.t.length) sensor.recStart = sample.t;
+            sensor.series.t.push(Math.round((sample.t - sensor.recStart) * 1000) / 1000);
+            sensor.fields.forEach(f => sensor.series.v[f.key].push(sample.values[f.key]));
+            if (sensor.series.t.length >= M.MAX_SERIES) stopRecording('기록할 수 있는 점 수(' + M.MAX_SERIES + '개)를 채워 기록을 멈췄습니다.');
+        }
+        sensorDrawSoon();
+    }
+    let sensorTimer = null;
+    function sensorDrawSoon() { if (!sensorTimer) sensorTimer = setTimeout(() => { sensorTimer = null; drawSensor(); }, 250); }
+    function drawSensor() {
+        if (!sensor.fields.length) return;
+        if (sensor.latest) {
+            $('sensorReadouts').querySelectorAll('.v').forEach(v => {
+                const f = sensor.fields.find(x => x.key === v.dataset.key);
+                v.textContent = M.sensorValueText(sensor.latest.values[f.key], f.digits) || '준비 중';
+            });
+        }
+        // 기록 중이거나 기록한 값이 있으면 그 기록을, 아니면 최근 값을 그린다
+        const src = (sensor.recording || sensor.series.t.length) ? sensor.series : sensor.live;
+        sensor.charts.forEach((chart, i) => {
+            const key = sensor.fields[i].key;
+            const pts = [];
+            for (let k = 0; k < src.t.length; k++) if (src.v[key][k] !== null) pts.push({ x: src.t[k], y: src.v[key][k] });
+            chart.data.datasets[0].data = pts;
+            chart.update('none');
+        });
+        updateSensorButtons();
+    }
+    function stopRecording(note) {
+        sensor.recording = false;
+        saveNow();
+        drawSensor();
+        if (note) $('sensorInfo').textContent = note + ' ' + $('sensorInfo').textContent;
+    }
+    function bindSensor() {
+        $('btnSensorConnect').addEventListener('click', () => { if (sensor.conn) sensor.conn.connect(); });
+        $('btnSensorDisconnect').addEventListener('click', () => { if (sensor.conn) sensor.conn.disconnect(); });
+        $('selRate').addEventListener('change', () => {
+            sensor.rate = $('selRate').value;
+            if (sensor.conn) sensor.conn.setRate(sensor.rate);
+            saveSoon();
+        });
+        $('btnRec').addEventListener('click', () => {
+            if (sensor.recording) { stopRecording(''); return; }
+            if (sensor.series.t.length && !confirm('앞서 기록한 센서 값을 지우고 새로 기록할까요? (남기려면 먼저 "센서 기록 CSV"로 저장하세요)')) return;
+            sensor.series = M.emptySeries(sensor.fields);
+            sensor.thinnedNote = '';
+            sensor.recording = true;
+            drawSensor();
+        });
+        $('btnSeriesClear').addEventListener('click', () => {
+            if (!confirm('기록한 센서 값을 지울까요?')) return;
+            sensor.series = M.emptySeries(sensor.fields);
+            sensor.thinnedNote = '';
+            saveNow(); drawSensor();
+        });
+        $('btnSeriesCsv').addEventListener('click', () => {
+            download(safeFileName(view.def.title) + '_센서.csv', M.seriesToCsv(sensor.series, sensor.fields), 'text/csv;charset=utf-8');
+        });
+        // 지금 센서 값을, 이름이 같은 열의 첫 빈 행에 넣는다 (다른 열은 학생이 직접 채움)
+        $('btnToTable').addEventListener('click', () => {
+            if (!sensor.latest) return;
+            const targets = sensor.fields.map(f => ({ f, c: columnIndexFor(f) })).filter(x => x.c >= 0);
+            if (!targets.length) return;
+            let r = view.rows.findIndex(row => targets.every(x => String(row[x.c]).trim() === ''));
+            if (r < 0) {
+                if (view.rows.length >= M.MAX_ROWS) { alert('행은 최대 ' + M.MAX_ROWS + '개까지 넣을 수 있습니다.'); return; }
+                view.rows.push(emptyRow());
+                r = view.rows.length - 1;
+            }
+            targets.forEach(x => { view.rows[r][x.c] = M.sensorValueText(sensor.latest.values[x.f.key], x.f.digits); });
+            renderTable(); saveSoon(); refreshGraph();
+            $('sensorInfo').textContent = (r + 1) + '행에 지금 값을 넣었습니다: ' + targets.map(x => x.f.name + ' ' + view.rows[r][x.c] + ' ' + x.f.unit).join(', ');
+        });
     }
 
     function renderTable() {
@@ -350,6 +540,7 @@
         const cols = view.def.columns;
         let s = '측정 ' + n + '행';
         if (result) s += ' · ' + M.fitText(result, cols[view.sel.x].name, cols[view.sel.y].name);
+        if (sensor.series.t.length) s += ' · ' + M.seriesSummary(sensor.series, sensor.fields);
         return s;
     }
 
@@ -443,13 +634,19 @@
             $(view.student.id.trim() ? 'stName' : 'stId').focus();
             return;
         }
-        if (!M.filledRowCount(view.rows)) { alert('측정값을 한 행 이상 넣으세요.'); return; }
+        if (sensor.recording) { alert('센서 기록을 먼저 멈추세요.'); return; }
+        if (!M.filledRowCount(view.rows) && !sensor.series.t.length) {
+            alert(sensor.fields.length ? '표에 측정값을 넣거나 센서 값을 기록한 뒤 제출하세요.' : '측정값을 한 행 이상 넣으세요.');
+            return;
+        }
         const emptyAnswers = view.def.questions.filter((_, i) => !(view.answers[i] || '').trim()).length;
         if (emptyAnswers && !confirm('답을 쓰지 않은 질문이 ' + emptyAnswers + '개 있습니다. 그래도 제출할까요?')) return;
         const btn = $('btnSubmit');
         try {
             btn.disabled = true; btn.textContent = '제출 중...';
             const d = view.def;
+            // 센서 기록이 길면 제출용으로 고르게 솎아 낸다 (이 기기의 기록과 CSV 는 그대로)
+            const thin = M.thinSeries(sensor.series, M.MAX_SUBMIT_SERIES);
             await db.collection('experiments').add({
                 userId: user.uid,
                 userEmail: user.email,
@@ -462,7 +659,9 @@
                 // 제출 시점의 실험 설정과 값을 그대로 담아, 나중에 실험을 고치거나 지워도 제출 내용을 볼 수 있게 한다
                 customJson: JSON.stringify({
                     v: 1,
-                    def: { title: d.title, description: d.description, columns: d.columns, questions: d.questions, xCol: d.xCol, yCol: d.yCol, fit: d.fit },
+                    def: { title: d.title, description: d.description, columns: d.columns, questions: d.questions, xCol: d.xCol, yCol: d.yCol, fit: d.fit, sensor: d.sensor },
+                    series: sensor.series.t.length ? thin.series : undefined,
+                    seriesThinned: thin.thinned ? sensor.series.t.length : undefined,
                     rows: view.rows.filter(r => r.some(c => String(c).trim() !== '')),
                     answers: view.answers, student: view.student, sel: view.sel
                 }),
@@ -505,6 +704,10 @@
                 y: payload.sel && ok(payload.sel.y) ? payload.sel.y : def.yCol,
                 fit: payload.sel && M.FITS.includes(payload.sel.fit) ? payload.sel.fit : def.fit
             };
+            const recFields = M.sensorFields(def.sensor);
+            sensor.fields = recFields;
+            sensor.series = M.normalizeSeries(payload.series, recFields);
+            sensor.thinnedNote = payload.seriesThinned ? '(기록한 ' + payload.seriesThinned + '점을 고르게 줄여 제출함)' : '';
             const when = data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().toLocaleString('ko-KR') : '';
             const info = $('recordInfo');
             info.textContent = '📄 제출 내용 보기 — ' + (data.userEmail || '') + (when ? ' · ' + when : '') + ' (고칠 수 없습니다)';
@@ -519,7 +722,30 @@
     // =====================================================================
     // 선생님: 실험 만들기 · 고치기
     // =====================================================================
-    const ed = { columns: [], questions: [], existing: null };
+    const ed = { columns: [], questions: [], existing: null, sensorFields: [] };
+
+    function renderEdSensor() {
+        const mode = $('edSensorMode').value;
+        const box = $('edSensorFields');
+        box.textContent = '';
+        if (mode === 'none') { $('edSensorHelp').textContent = ''; return; }
+        M.SENSORS[mode].fields.forEach(f => {
+            const cb = el('input', { type: 'checkbox', checked: ed.sensorFields.includes(f[0]) });
+            cb.dataset.key = f[0];
+            cb.addEventListener('change', () => {
+                ed.sensorFields = Array.from(box.querySelectorAll('input')).filter(i => i.checked).map(i => i.dataset.key);
+                // 고른 측정값과 이름이 같은 열을 표에 만들어 두면, 학생이 "지금 값을 표에 넣기"를 쓸 수 있다
+                if (cb.checked && !ed.columns.some(c => c.name.trim() === f[1])) {
+                    const blank = ed.columns.findIndex(c => !c.name.trim() && !c.unit.trim());
+                    if (blank >= 0) ed.columns[blank] = { name: f[1], unit: f[2] };
+                    else if (ed.columns.length < M.MAX_COLS) ed.columns.push({ name: f[1], unit: f[2] });
+                    renderEdColumns(); renderEdSelectors();
+                }
+            });
+            box.appendChild(el('label', {}, [cb, ' ' + f[1] + ' (' + f[2] + ')']));
+        });
+        $('edSensorHelp').textContent = '값을 고르면 같은 이름의 열이 표에 생깁니다. 학생은 "지금 값을 표에 넣기"로 센서 값을 그 열에 넣고, 나머지 열(예: 거리)은 직접 적습니다. 필요 없으면 그 열을 지워도 됩니다. 센서 연결은 PC·안드로이드의 크롬·엣지에서만 됩니다.';
+    }
 
     function renderEdColumns() {
         const box = $('edColumns');
@@ -577,19 +803,30 @@
         renderEdQuestions();
         $('edFit').value = def.fit;
         $('edPublished').checked = def.published;
+        $('edSensorMode').value = def.sensor.mode;
+        ed.sensorFields = def.sensor.fields.slice();
+        renderEdSensor();
     }
     function collectEditor() {
         return {
             title: $('edTitle').value, description: $('edDesc').value,
             columns: ed.columns, questions: ed.questions,
             xCol: +$('edX').value || 0, yCol: +$('edY').value || 0,
-            fit: $('edFit').value, published: $('edPublished').checked
+            fit: $('edFit').value, published: $('edPublished').checked,
+            sensor: { mode: $('edSensorMode').value, fields: ed.sensorFields }
         };
     }
     let editorBound = false;
     function bindEditor() {
         if (editorBound) return;
         editorBound = true;
+        const modeSel = $('edSensorMode');
+        modeSel.appendChild(el('option', { value: 'none', textContent: '사용 안 함' }));
+        Object.keys(M.SENSORS).forEach(k => modeSel.appendChild(el('option', { value: k, textContent: M.SENSORS[k].label })));
+        modeSel.addEventListener('change', () => {
+            ed.sensorFields = [];   // 기능을 바꾸면 값 선택은 처음부터
+            renderEdSensor();
+        });
         $('btnAddCol').addEventListener('click', () => {
             if (ed.columns.length >= M.MAX_COLS) return;
             ed.columns.push({ name: '', unit: '' });
@@ -708,5 +945,6 @@
     }
 
     bindView();
+    bindSensor();
     start();
 })();
