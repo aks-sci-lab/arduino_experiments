@@ -76,6 +76,27 @@ service cloud.firestore {
                    request.resource.data.json.size() < 200000;
     }
 
+    // 선생님이 만든 실험 설정 (projects/custom-lab.html)
+    // 읽기: 공개(published)된 것은 누구나(로그인 전 메인 목록에도 보임, 민감 정보 없음), 숨긴 것은 교사만.
+    // 쓰기: 교사만. 제목·안내·열 수 한도를 확인한다. 학생 제출은 위 experiments 에 저장된다.
+    match /customExperiments/{docId} {
+      allow read: if resource.data.published == true ||
+                     (request.auth != null && isTeacher(request));
+      allow create, update: if request.auth != null && isTeacher(request) &&
+                            request.resource.data.title is string &&
+                            request.resource.data.title.size() >= 1 &&
+                            request.resource.data.title.size() <= 80 &&
+                            request.resource.data.description is string &&
+                            request.resource.data.description.size() <= 5000 &&
+                            request.resource.data.columns is list &&
+                            request.resource.data.columns.size() >= 1 &&
+                            request.resource.data.columns.size() <= 8 &&
+                            request.resource.data.questions is list &&
+                            request.resource.data.questions.size() <= 5 &&
+                            request.resource.data.published is bool;
+      allow delete: if request.auth != null && isTeacher(request);
+    }
+
     // Roles collection (read-only for clients, managed by Admin SDK)
     match /roles/{uid} {
       allow read: if request.auth != null;

@@ -41,7 +41,7 @@ firebase init hosting:github
 
 ## Firestore 보안 규칙
 
-`firestore.rules` 는 자동 배포하지 않습니다. 규칙을 바꾼 PR(커밋 메시지에 "배포 필요")이 머지되면 PC에서 한 번 실행하세요.
+`firestore.rules` 는 자동 배포하지 않습니다. PC 없이 하려면 Firebase 콘솔(console.firebase.google.com) → 프로젝트 `web-experiment-f9b24` → Firestore Database → **규칙** 탭에 `firestore.rules` 내용을 통째로 붙여 넣고 **게시**를 눌러도 됩니다. 규칙을 바꾼 PR(커밋 메시지에 "배포 필요")이 머지되면 PC에서 한 번 실행하세요.
 
 ```bash
 firebase deploy --only firestore:rules --project web-experiment-f9b24
