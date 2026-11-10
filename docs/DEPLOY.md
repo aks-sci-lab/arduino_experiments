@@ -19,11 +19,11 @@
 ```bash
 npm install -g firebase-tools
 firebase login
-cd arduino_experiments
+cd sensor-lab
 firebase init hosting:github
 ```
 
-질문이 나오면 저장소는 `aks-sci-lab/arduino_experiments` 를 입력하고, 워크플로 파일 생성 질문에는 **No**를 선택합니다(이미 있음).
+질문이 나오면 저장소는 `aks-sci-lab/sensor-lab` 를 입력하고, 워크플로 파일 생성 질문에는 **No**를 선택합니다(이미 있음).
 이 명령이 키를 만들어 GitHub Secrets 에 자동으로 등록합니다. 등록된 이름이 `FIREBASE_SERVICE_ACCOUNT_...` 처럼 다르면
 `.github/workflows/deploy-hosting.yml` 의 `FIREBASE_SERVICE_ACCOUNT` 를 그 이름으로 바꾸세요.
 
@@ -41,7 +41,7 @@ firebase init hosting:github
 
 ## Firestore 보안 규칙
 
-`firestore.rules` 는 자동 배포하지 않습니다. 규칙을 바꾼 PR(커밋 메시지에 "배포 필요")이 머지되면 PC에서 한 번 실행하세요.
+`firestore.rules` 는 자동 배포하지 않습니다. PC 없이 하려면 Firebase 콘솔(console.firebase.google.com) → 프로젝트 `web-experiment-f9b24` → Firestore Database → **규칙** 탭에 `firestore.rules` 내용을 통째로 붙여 넣고 **게시**를 눌러도 됩니다. 규칙을 바꾼 PR(커밋 메시지에 "배포 필요")이 머지되면 PC에서 한 번 실행하세요.
 
 ```bash
 firebase deploy --only firestore:rules --project web-experiment-f9b24

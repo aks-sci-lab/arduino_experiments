@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="센서 기반 웹실험실 - 가속도, 환경, 조도, 자외선, VOC 측정">
-    <title>센서 기반 웹실험실</title>
+    <meta name="description" content="센서 기반 실험실 - 가속도, 환경, 조도, 자외선, VOC 측정">
+    <title>센서 기반 실험실</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
         .auth-bar {
@@ -133,7 +133,7 @@
             </div>
         </div>
 
-        <h1>센서 기반 웹실험실</h1>
+        <h1>센서 기반 실험실</h1>
         <p>환영합니다! 아래에서 수행할 실험 프로젝트를 선택하세요.</p>
         <p>센서 실험은 <strong>Bluetooth 지원 제어 보드 + Pico-Environment-Sensor</strong>를 사용합니다.
             각 실험 페이지의 Thonny 준비 안내에서 동일한 MicroPython 파일 네 개를 다운로드하세요.
@@ -154,6 +154,17 @@
             <li><a href="projects/figure-maker.html">✏️ 문항 출제용 그림·그래프 그리기 (선생님용)</a></li>
             <li><a href="walk-run-detector/index.html">➡️ 걷기·뛰기 판정 (데이터로 학습하는 머신러닝)</a></li>
         </ul>
+
+        <!-- 선생님이 만든 실험 (Firestore customExperiments 에서 불러옴) -->
+        <div id="customSection" style="display:none;">
+            <h2>선생님이 만든 실험</h2>
+            <ul class="project-list" id="customList"></ul>
+            <p id="customNotice" style="color:#6c757d;"></p>
+            <p id="customTeacherTools" style="display:none;">
+                <a class="auth-btn btn-mode" style="text-decoration:none; display:inline-block;" href="projects/custom-lab.html?edit=new">➕ 새 실험 만들기</a>
+                <a class="auth-btn btn-mode" style="text-decoration:none; display:inline-block;" href="projects/board-setup.html">🔢 센서 보드 번호 정하기</a>
+            </p>
+        </div>
 
         <!-- 학생 및 교사 실험 데이터 기록 영역 -->
         <div id="studentRecordsSection" class="records-section">
@@ -260,6 +271,59 @@
                 title.textContent = '🧪 실험 데이터 저장 & 조회';
                 notice.textContent = '구글 로그인 시 작성된 실험 기록을 저장하고 조회할 수 있습니다.';
             }
+            loadCustomExperiments();
+        }
+
+        // 선생님이 만든 실험 목록. 학생·로그인 전에는 공개된 것만, 교사용 모드에서는 숨긴 것까지 보인다.
+        let customLoadSeq = 0;
+        async function loadCustomExperiments() {
+            const section = document.getElementById('customSection');
+            const list = document.getElementById('customList');
+            const notice = document.getElementById('customNotice');
+            const tools = document.getElementById('customTeacherTools');
+            if (!db || !section) return;
+            const teacherView = !!currentUser && isTeacherUser && currentViewMode === 'teacher';
+            const seq = ++customLoadSeq;
+            tools.style.display = teacherView ? 'block' : 'none';
+            try {
+                const col = db.collection('customExperiments');
+                const snap = await (teacherView ? col.get() : col.where('published', '==', true).get());
+                if (seq !== customLoadSeq) return;   // 그 사이 로그인 상태가 바뀌었으면 버림
+                const items = [];
+                snap.forEach(doc => items.push(Object.assign({ id: doc.id }, doc.data())));
+                items.sort((a, b) => (a.order || 0) - (b.order || 0));
+                list.textContent = '';
+                items.forEach(item => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = 'projects/custom-lab.html?id=' + encodeURIComponent(item.id);
+                    a.textContent = '➡️ ' + (item.title || '이름 없는 실험') + (item.published === true ? '' : ' (숨김)');
+                    li.appendChild(a);
+                    if (teacherView) {
+                        const edit = document.createElement('a');
+                        edit.href = 'projects/custom-lab.html?edit=' + encodeURIComponent(item.id);
+                        edit.textContent = '✏️ 고치기';
+                        edit.style.fontSize = '1em';
+                        edit.style.marginLeft = '12px';
+                        li.appendChild(edit);
+                    }
+                    list.appendChild(li);
+                });
+                notice.textContent = (teacherView && !items.length) ? '아직 만든 실험이 없습니다. 아래 단추로 첫 실험을 만들어 보세요.' : '';
+                section.style.display = (items.length || teacherView) ? 'block' : 'none';
+            } catch (e) {
+                if (seq !== customLoadSeq) return;
+                console.error('Custom experiments load error:', e);
+                list.textContent = '';
+                // 학생에게는 조용히 숨기고, 선생님에게는 원인을 알려 준다 (보안 규칙이 아직 배포되지 않은 경우 등)
+                notice.textContent = teacherView ? '선생님이 만든 실험 목록을 불러오지 못했습니다: ' + e.message + ' (Firestore 보안 규칙이 배포되었는지 확인하세요)' : '';
+                section.style.display = teacherView ? 'block' : 'none';
+            }
+        }
+
+        // 화면에 넣기 전에 HTML 특수 문자를 바꾼다 (학생이 넣은 글이 그대로 실행되지 않게)
+        function escapeHtml(v) {
+            return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
         }
 
         function toggleViewMode() {
@@ -350,14 +414,14 @@
 
             docs.forEach(data => {
                 const dateStr = data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().toLocaleString('ko-KR') : '방금 전';
-                const expName = data.experimentName || data.tab || '아두이노 실험';
-                const studentLabel = isTeacher ? `<span class="student-info">👤 <strong>${data.userEmail || data.userId}</strong></span>` : '';
+                const expName = escapeHtml(data.experimentName || data.tab || '아두이노 실험');
+                const studentLabel = isTeacher ? `<span class="student-info">👤 <strong>${escapeHtml(data.userEmail || data.userId)}</strong></span>` : '';
                 
                 let detailSummary = '';
                 if (data.dataSummary) {
-                    detailSummary = `📊 요약: ${data.dataSummary}`;
+                    detailSummary = `📊 요약: ${escapeHtml(data.dataSummary)}`;
                 } else if (data.trialsCount !== undefined) {
-                    detailSummary = `📊 회차 수: ${data.trialsCount}회`;
+                    detailSummary = `📊 회차 수: ${escapeHtml(data.trialsCount)}회`;
                 } else {
                     detailSummary = '📊 저장 완료됨';
                 }
@@ -374,6 +438,7 @@
                         <div class="exp-details">
                             ${detailSummary}
                             ${data.tab === 'ideal-gas-law' && data.report ? `<br><a href="projects/ideal-gas.html?report=${encodeURIComponent(data.docId)}">📄 보고서 보기</a>` : ''}
+                            ${data.tab === 'custom-lab' && data.customJson ? `<br><a href="projects/custom-lab.html?record=${encodeURIComponent(data.docId)}">📄 제출 내용 보기</a>` : ''}
                         </div>
                     </li>
                 `;

@@ -391,7 +391,7 @@ test('all three HTML pages wire shared scripts and firmware downloads', () => {
         }
     }
     const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-    assert.match(index, /<h1>센서 기반 웹실험실<\/h1>/);
+    assert.match(index, /<h1>센서 기반 실험실<\/h1>/);
     for (const mode of ['light', 'uv']) assert.ok(index.includes(`projects/${mode}-lab.html`));
     assert.ok(index.includes('projects/environment-lab.html'));
     assert.ok(!index.includes('projects/voc-lab.html'));

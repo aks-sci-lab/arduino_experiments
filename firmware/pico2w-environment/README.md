@@ -1,4 +1,4 @@
-# 센서 기반 웹실험실 (Thonny / MicroPython)
+# 센서 기반 실험실 (Thonny / MicroPython)
 
 환경 실험 페이지: https://aks-sci-lab.web.app/projects/environment-lab.html
 
