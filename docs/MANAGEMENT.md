@@ -8,7 +8,7 @@
 - **C. 정리해도 되는 브랜치**: 내용이 이미 `main` 에 다 들어간 브랜치
 
 기준 시점: 2026-11-03. 열린 PR 5개(#33·#42·#49·#50·#51)는 사용자 지시("모든 PR 진행해")로 통합 관리 세션이 한 PR 에 모아 충돌을 풀고 머지했다.
-머지·삭제는 사용자 승인 후에만 한다. 이 대화는 자기 브랜치 외에는 push·삭제 권한이 없으므로, 브랜치 삭제 같은 GitHub 작업은 이슈로 남겨 GitHub Copilot 이 수행한다 (`AGENTS.md` 역할 분담).
+머지·삭제는 사용자 승인 후에만 한다. 2026-11-11 부터 Claude Code 로만 작업한다. Claude Code 대화는 자기 브랜치 외에는 push·삭제 권한이 없으므로, 브랜치 삭제는 사용자가 GitHub 웹에서 한다 (`AGENTS.md` 역할 분담).
 
 ---
 
@@ -109,9 +109,9 @@ PR #49·#54 는 2026-11-03 머지되었다.
 
 ## C. 정리해도 되는 브랜치 (내용이 모두 main 에 있음)
 
-머지가 끝나 지워도 되는 브랜치 (2026-11-03 사용자 승인 "정리해", Copilot 이 삭제 — 이슈 참고):
+머지가 끝나 지워도 되는 브랜치 8개 (사용자 승인 2026-11-03·11-10, **사용자가 GitHub 웹에서 삭제** — 확인할 것은 이슈 #55):
 
-- `claude/gifted-keller-w81hco` (PR #51), `claude/jolly-brown-sggwyd` (PR #49), `claude/figure-maker-move` (PR #50), `ccr-d5d43435-sy4j52` (PR #42), `claude/malus-inquiry-tabs` (PR #33), `handoff/figure-maker-new-repo`
+- `claude/gifted-keller-w81hco` (PR #51), `claude/jolly-brown-sggwyd` (PR #49), `claude/figure-maker-move` (PR #50), `ccr-d5d43435-sy4j52` (PR #42), `claude/malus-inquiry-tabs` (PR #33), `claude/firmware-stability-board-number` (PR #57), `claude/stoic-archimedes-48nbsd` (PR #54 로 옮겨 머지), `handoff/figure-maker-new-repo` (figure-maker 저장소에 같은 파일이 있는지 확인 후)
 - 통합 PR 의 브랜치 `claude/quirky-heisenberg-fdz1qp` 는 통합 관리 세션이 계속 쓰므로 남긴다.
 
 지난 정리:

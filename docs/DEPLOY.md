@@ -5,7 +5,7 @@
 
 ## 평소 흐름
 
-1. AI(Copilot, Claude)가 브랜치에서 작업하고 PR(변경 요청)을 만든다.
+1. AI(Claude Code)가 브랜치에서 작업하고 PR(변경 요청)을 만든다.
 2. PR을 확인하고 **Merge** 버튼을 누르면 `main` 에 반영된다.
 3. `main` 에 반영되면 GitHub Actions가 자동으로 https://aks-sci-lab.web.app 에 배포한다.
    - 진행 상황: 저장소의 **Actions** 탭 → "Deploy to Firebase Hosting"
