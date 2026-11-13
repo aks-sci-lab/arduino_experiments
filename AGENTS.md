@@ -23,6 +23,7 @@
 | `js/`, `css/` | 실험 페이지용 스크립트·스타일 (`malus-*.js`: 말루스 법칙 실험 — `malus-math.js` 계산, `malus-tutorial.js` 접해보기 탭, `malus-law.js` 측정·분석·설정, `malus-sheets.js` 구글 시트, `planck-*.js`: LED 플랑크 상수 실험, `ideal-gas*.js`: 이상기체 실험) |
 | `firmware/em-induction/` | 전자기 유도 실험용 아두이노 펌웨어 (ADS1115 로 코일 전압·션트 전압, USB 시리얼 115200, 웹 시리얼은 PC 크롬·엣지만) |
 | `firmware/pico2w-environment/` | Pico 센서 보드용 MicroPython 펌웨어와 Thonny 설치 안내 |
+| `firmware/nano33-ble-sense-rev2/` | 아두이노 Nano 33 BLE Sense Rev2 펌웨어(`NanoSenseLab/NanoSenseLab.ino`, 가속도 BMI270·온습도 HS3003·기압 LPS22HB, 이름은 칩 주소로 `NanoSense-XXXX`, 블루투스 약속은 Pico 와 같음)와 아두이노 IDE 설치 안내. 페이지는 `projects/arduino-nano-lab.html`(`js/arduino-nano-lab.js` 화면, `js/nano-sense.js` 약속·CSV, 시험 있음) |
 | `tests/`, `tools/`, `vendor/sensirion/` | 센서 테스트, VOC 알고리즘 재빌드 도구, 제조사 원본·라이선스·WebAssembly |
 | `walk-run-detector/` | 걷기·뛰기 판정 머신러닝 수업 앱 (자체 README 참고) |
 | `pass/` | 예전 조퇴증·외출증 공유 링크를 새 주소(aks-sci-lab.github.io/teacher-desk/)로 넘기는 페이지만 남김 |
@@ -159,4 +160,6 @@
 - 2026-11-10: 펌웨어 세션이 PR #57 올림 — Pico 펌웨어 안정성(예상 밖 오류에도 유지, 5번 연달아 나면 재시작), 보드 번호(`board.json` → `PicoEnv-07`, 명령 `GET_BOARD`·`SET_BOARD:NN`·`CLEAR_BOARD`·`IDENTIFY`, 번호 변경은 BOOTSEL 단추를 누른 동안만), 연결 시 LED, 선생님용 `projects/board-setup.html`. 설치 파일 하나로 묶기는 계획만(README). 통합 관리 세션은 메인 페이지 교사용 모드에 "센서 보드 번호 정하기" 링크 추가(PR #56) — 이 링크는 PR #57 이 머지되어야 열림 — Claude Code
   - 확인 필요: 실제 보드에서 BOOTSEL 읽기·LED·`board.json` 쓰기·이름 바뀐 뒤 브라우저의 옛 이름 기억 (PR #57 설명에 확인 순서)
 - 2026-11-10: 사용자의 직접 지시("그렇게 머지해")로 PR #57(펌웨어) → PR #56(실험 만들기·센서 그래프·이름·세션 문서) 순서로 머지, 합친 상태에서 시험(JS 135개·Python 45개)·전체 16페이지 열기 확인, 두 번 모두 배포 성공. **남은 일: Firestore 규칙 배포, 보드에 새 펌웨어 올리기, 저장소 이름 바꾸기** — Claude Code
+- 2026-11-13: **결정 변경(사용자): 아두이노 Nano 33 BLE Sense Rev2 용 페이지·펌웨어도 만든다** (11-10 의 "아두이노용은 만들지 않음"을 바꿈, Pico 펌웨어·기존 페이지는 그대로). `firmware/nano33-ble-sense-rev2/`(가속도 ±16 g(사용자 지정, 라이브러리로 켠 뒤 범위 레지스터를 직접 바꿈)·최대 100 Hz, 온습도·기압, 이름은 칩 주소로 자동 `NanoSense-XXXX`, UUID·명령·값 모양은 Pico 와 같음) + `projects/arduino-nano-lab.html`(가속도/환경 탭, 지금 값, 시간 그래프, 측정 시작·중지, CSV, 끊김·15초 안내). 통합 관리 세션이 만든 하위 세션이 PR 로 올림(머지 안 함) — Claude Code
+  - 확인 필요: 실제 보드 업로드·연결(시험은 펌웨어를 흉내 낸 가짜 블루투스), 아두이노 IDE 컴파일(시험 환경에서 arduino-cli 내려받기가 막혀 g++ 문법 검사만), ±16 g 설정이 실제로 되는지(시리얼 모니터 `+/-16 g VERIFIED`, 보드 정보의 '±16 g 확인됨', 가만히 두면 |a| ≈ 1 g), 100 Hz 알림이 끊기지 않는지, 보드 열로 인한 온도 차이
 - 2026-11-11: **Claude Code 로만 작업하기로 함(사용자 결정).** 역할 분담에서 GitHub Copilot 을 빼고 검토·머지도 Claude Code(머지 대화·통합 관리 세션)가 사용자 승인 후 맡음. 브랜치 삭제는 사용자가 GitHub 웹에서(자동 삭제 설정 권장) — Claude Code
