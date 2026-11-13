@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>아두이노 Nano 33 BLE Sense 센서 실험</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
+    <style>
+        body { padding: 10px; }
+        .container { padding: 16px; width: 100%; box-sizing: border-box; max-width: 960px; }
+        h1 { font-size: 1.4em; margin: 0.4em 0; }
+        .status { padding: 10px 12px; border-radius: 8px; background: #eef4ff; color: #123; margin: 8px 0; }
+        .status.warn { background: #fff3cd; color: #664d03; }
+        .status.error { background: #f8d7da; color: #842029; }
+        .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+        button, select { font-size: 1em; padding: 10px 14px; border-radius: 8px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; }
+        button:disabled, select:disabled { opacity: 0.55; cursor: not-allowed; }
+        .btn-primary { background: #007bff; border-color: #007bff; color: #fff; }
+        .btn-danger { background: #dc3545; border-color: #dc3545; color: #fff; }
+        .tabs { display: flex; gap: 6px; margin: 12px 0 6px; }
+        .tabs button { flex: 1; }
+        .tabs button[aria-pressed="true"] { background: #343a40; border-color: #343a40; color: #fff; }
+        .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 10px 0; }
+        .readout { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 10px; text-align: center; }
+        .readout .name { color: #495057; font-size: 0.9em; }
+        .readout .value { font-size: 1.6em; font-weight: bold; color: #007bff; }
+        .chart-box { position: relative; height: 260px; margin: 8px 0 16px; }
+        .note { color: #555; font-size: 0.92em; line-height: 1.5; }
+        details { border: 1px solid #ddd; border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+        details summary { cursor: pointer; font-weight: bold; }
+        .board-info { font-size: 0.9em; color: #333; }
+        code { background: #f1f3f5; padding: 1px 4px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
+        <h1>아두이노 Nano 33 BLE Sense Rev2 센서 실험</h1>
+        <p class="note">보드 안에 들어 있는 <strong>가속도 센서</strong>와 <strong>환경 센서(온도·습도·기압)</strong>의 값을 블루투스로 받아 그래프로 봅니다.</p>
+
+        <div id="status" class="status" role="status" aria-live="polite">연결 대기 — 아래 <strong>블루투스 연결</strong>을 누르세요.</div>
+
+        <div class="row">
+            <button id="connectButton" class="btn-primary">블루투스 연결</button>
+            <button id="disconnectButton" style="display:none;">연결 끊기</button>
+            <button id="identifyButton" style="display:none;" title="연결된 보드의 주황 LED 를 깜빡입니다">💡 어느 보드인지 깜빡이기</button>
+        </div>
+        <p id="boardInfo" class="board-info"></p>
+
+        <div class="tabs" role="group" aria-label="측정할 센서 고르기">
+            <button id="tabImu" data-mode="imu" aria-pressed="true">가속도</button>
+            <button id="tabEnv" data-mode="env" aria-pressed="false">환경 (온도·습도·기압)</button>
+        </div>
+        <p id="modeNote" class="note"></p>
+
+        <div class="row">
+            <label for="rateSelect">측정 간격</label>
+            <select id="rateSelect"></select>
+        </div>
+        <div class="row">
+            <button id="startButton" class="btn-primary" disabled>▶ 측정 시작</button>
+            <button id="stopButton" class="btn-danger" disabled>■ 측정 중지</button>
+            <button id="csvButton" disabled>CSV 저장</button>
+            <button id="clearButton" disabled>기록 지우기</button>
+        </div>
+        <p id="countText" class="note"></p>
+
+        <h2 style="font-size:1.1em;">지금 값</h2>
+        <div id="readouts" class="readouts"></div>
+
+        <h2 style="font-size:1.1em;">시간 그래프</h2>
+        <div id="charts"></div>
+
+        <details>
+            <summary>처음 쓸 때: 보드 준비 방법</summary>
+            <ol class="note">
+                <li>PC 에 <a href="https://www.arduino.cc/en/software" target="_blank" rel="noopener">아두이노 IDE</a> 를 설치합니다.</li>
+                <li>보드 관리자에서 <code>Arduino Mbed OS Nano Boards</code> 를 설치합니다.</li>
+                <li>라이브러리 관리자에서 <code>ArduinoBLE</code>, <code>Arduino_BMI270_BMM150</code>, <code>Arduino_HS300x</code>, <code>Arduino_LPS22HB</code> 를 설치합니다.</li>
+                <li><a href="../firmware/nano33-ble-sense-rev2/NanoSenseLab/NanoSenseLab.ino" download="NanoSenseLab.ino">NanoSenseLab.ino 내려받기</a> → <code>NanoSenseLab</code> 폴더에 넣고 열어 업로드합니다.</li>
+                <li>보드를 USB 나 보조배터리로 켜고, 이 페이지에서 <strong>블루투스 연결</strong> → <code>NanoSense-XXXX</code> 를 고릅니다. 이름은 보드의 칩 주소로 저절로 정해집니다.</li>
+            </ol>
+            <p class="note">자세한 설명: <a href="../firmware/nano33-ble-sense-rev2/README.md">설치 안내 (README)</a></p>
+        </details>
+        <details>
+            <summary>알아 두기</summary>
+            <ul class="note">
+                <li><strong>웹 블루투스는 PC·안드로이드의 크롬·엣지에서만</strong> 됩니다. 아이폰·아이패드(사파리 포함)와 파이어폭스에서는 안 됩니다. 사이트 주소는 https 여야 합니다.</li>
+                <li>가속도 범위는 <strong>±4 g</strong>, 측정은 <strong>1초에 최대 100번</strong>입니다 (센서 라이브러리 기본값). Pico 보드의 200 Hz·±16 g 보다 범위가 좁아, 세게 부딪히면 4 g 에서 값이 잘립니다.</li>
+                <li>가만히 둔 보드에서는 중력 때문에 크기 |a| 가 약 1 g 로 나옵니다.</li>
+                <li>온도 센서는 보드 위에 있어서 <strong>보드가 스스로 내는 열 때문에 실제 기온보다 1~3 °C 높게</strong> 나올 수 있습니다. 켜고 몇 분 지나 값이 안정된 뒤 재고, 정확한 기온은 온도계와 비교하세요.</li>
+                <li>값이 15초 동안 오지 않으면 안내가 나옵니다. 보드 전원과 거리(5 m 안)를 확인하세요.</li>
+            </ul>
+        </details>
+    </div>
+
+    <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
+    <script src="../js/accelerometer-protocol.js?v=batch-200-v4"></script>
+    <script src="../js/pico-ble.js?v=setup-v3"></script>
+    <script src="../js/nano-sense.js?v=nano-v1"></script>
+    <script src="../js/arduino-nano-lab.js?v=nano-v1"></script>
+</body>
+</html>
