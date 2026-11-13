@@ -29,6 +29,21 @@ test('펌웨어는 칩 주소로 NanoSense-XXXX 이름을 만들고, 페이지�
     for (const command of ['"STOP"', '"GET_BOARD"', '"IDENTIFY"']) assert.ok(sketch.includes(command), command);
 });
 
+test('펌웨어는 가속도를 ±16 g 로 바꾸고 확인한 뒤 2048 LSB/g 로 읽는다', () => {
+    assert.match(sketch, /BMI270_ACC_RANGE = 0x41/);
+    assert.match(sketch, /ACC_RANGE_16G = 0x03/);
+    assert.match(sketch, /LSB_PER_G_16G = 2048\.0f/);
+    assert.match(sketch, /bool setAccelerometer16g\(\)/);
+    assert.ok(!/IMU\.readAcceleration\(/.test(sketch), '라이브러리 readAcceleration 은 ±4 g 기준이라 쓰면 안 됨');
+    // 가장 큰 값(-32768/2048 = -16 g)도 기존 가속도 해석기 범위 안
+    const view = new DataView(new ArrayBuffer(16));
+    view.setUint32(0, 1, true);
+    view.setFloat32(4, -32768 / 2048, true);
+    view.setFloat32(8, 32767 / 2048, true);
+    view.setFloat32(12, 1, true);
+    assert.equal(new AccelerometerProtocol.Receiver().read(view)[0].x, -16);
+});
+
 test('이름 확인', () => {
     assert.ok(N.isNanoName('NanoSense-A3F1'));
     assert.ok(!N.isNanoName('PicoEnv-07'));

@@ -20,7 +20,7 @@
     const tabs = [$('tabImu'), $('tabEnv')];
 
     const MODE_NOTES = {
-        imu: '가속도 센서(BMI270): x·y·z 세 방향과 크기 |a| 를 g 단위로 보여 줍니다 (1 g ≈ 9.8 m/s²). 범위 ±4 g, 최대 100 Hz.',
+        imu: '가속도 센서(BMI270): x·y·z 세 방향과 크기 |a| 를 g 단위로 보여 줍니다 (1 g ≈ 9.8 m/s²). 범위 ±16 g, 최대 100 Hz.',
         env: '환경 센서: 온도·습도(HS3003), 기압(LPS22HB, kPa). 온도는 보드 열 때문에 실제보다 조금 높게 나올 수 있습니다.'
     };
 
@@ -200,7 +200,8 @@
     function handlePacket(packet) {
         if (packet.type === 'board') {
             const data = packet.data;
-            boardInfo.textContent = `보드: ${data.name} · 칩 주소 ${data.id || '?'} · 펌웨어 ${data.fw}`;
+            const range = data.accelRange === 16 ? ' · 가속도 ±16 g 확인됨' : data.accelRange === 0 ? ' · ⚠️ 가속도 범위를 ±16 g 로 바꾸지 못함' : '';
+            boardInfo.textContent = `보드: ${data.name} · 칩 주소 ${data.id || '?'} · 펌웨어 ${data.fw}${range}`;
             return;
         }
         if (firstEnvTs === null) firstEnvTs = packet.ts;

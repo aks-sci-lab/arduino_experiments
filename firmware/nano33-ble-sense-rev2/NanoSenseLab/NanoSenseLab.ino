@@ -1,7 +1,7 @@
 // 센서 기반 실험실 — Arduino Nano 33 BLE Sense Rev2 펌웨어
 //
 // 보드에 들어 있는 센서를 블루투스(BLE)로 웹 페이지에 보낸다.
-//   - 가속도: BMI270  (라이브러리 기본값 ±4 g, 1초에 100번)
+//   - 가속도: BMI270  (±16 g, 1초에 100번. 라이브러리로 켠 뒤 범위만 직접 바꿈)
 //   - 온도·습도: HS3003
 //   - 기압: LPS22HB (kPa)
 //
@@ -27,8 +27,23 @@
 #include <Arduino_BMI270_BMM150.h>
 #include <Arduino_HS300x.h>
 #include <Arduino_LPS22HB.h>
+#include <Wire.h>
 
-static const char *FIRMWARE_VERSION = "2026.11-nano-rev2";
+// BMI270 가속도 범위를 ±16 g 로 쓰기 위한 값.
+// 라이브러리(Arduino_BMI270_BMM150)는 ±4 g 로 켜고, 값도 ±4 g 기준으로만 바꿔 준다.
+// 그래서 라이브러리로 센서를 켠 뒤(설정 파일 올리기 포함) 범위 레지스터를 직접 바꾸고,
+// 가속도 값도 직접 읽어 2048 (= 1 g) 으로 나눈다.
+static const uint8_t BMI270_ADDRESS = 0x68;     // 보드 안쪽 I2C(Wire1)
+static const uint8_t BMI270_STATUS = 0x03;      // 7번 비트: 새 가속도 값 있음
+static const uint8_t BMI270_ACC_DATA = 0x0C;    // x, y, z (각 2바이트, 리틀 엔디언)
+static const uint8_t BMI270_ACC_CONF = 0x40;    // 출력 속도·필터
+static const uint8_t BMI270_ACC_RANGE = 0x41;   // 0=±2, 1=±4, 2=±8, 3=±16 g
+static const uint8_t BMI270_PWR_CONF = 0x7C;    // 0 = 고급 절전 끔 (설정을 바로 바꾸기 위해)
+static const uint8_t ACC_CONF_100HZ = 0xA8;     // 100 Hz, 보통 필터(라이브러리 기본과 같음)
+static const uint8_t ACC_RANGE_16G = 0x03;
+static const float LSB_PER_G_16G = 2048.0f;
+
+static const char *FIRMWARE_VERSION = "2026.11-nano-rev2-16g";
 static const char *SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
 static const char *TX_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
 static const char *CMD_UUID = "19b10002-e8f2-537e-4f6c-d104768a1214";
@@ -43,6 +58,7 @@ enum Mode { MODE_ENV, MODE_IMU };
 void startMode(Mode next);  // 아두이노 IDE 가 함수 원형을 enum 보다 앞에 두지 않도록 직접 적음
 
 bool imuOk = false;
+uint8_t accelRangeRegister = 0xFF;  // 실제로 읽어 확인한 범위 레지스터 값
 bool humidityOk = false;
 bool pressureOk = false;
 bool streaming = false;
@@ -66,6 +82,47 @@ const int COMMAND_QUEUE = 4;
 char commandQueue[COMMAND_QUEUE][65];
 int commandHead = 0;
 int commandCount = 0;
+
+bool bmiWrite(uint8_t reg, uint8_t value) {
+  Wire1.beginTransmission(BMI270_ADDRESS);
+  Wire1.write(reg);
+  Wire1.write(value);
+  bool ok = Wire1.endTransmission() == 0;
+  delayMicroseconds(1000);  // 절전 모드에서도 쓰기가 반영되도록 잠깐 기다림
+  return ok;
+}
+
+bool bmiRead(uint8_t reg, uint8_t *buffer, uint8_t length) {
+  Wire1.beginTransmission(BMI270_ADDRESS);
+  Wire1.write(reg);
+  if (Wire1.endTransmission(false) != 0) return false;
+  if (Wire1.requestFrom(BMI270_ADDRESS, length) != length) return false;
+  for (uint8_t i = 0; i < length; i++) buffer[i] = Wire1.read();
+  return true;
+}
+
+// ±16 g, 100 Hz 로 바꾸고 다시 읽어 확인한다. 성공하면 true.
+bool setAccelerometer16g() {
+  uint8_t value = 0xFF;
+  bmiWrite(BMI270_PWR_CONF, 0x00);
+  bmiWrite(BMI270_ACC_CONF, ACC_CONF_100HZ);
+  bmiWrite(BMI270_ACC_RANGE, ACC_RANGE_16G);
+  if (!bmiRead(BMI270_ACC_RANGE, &value, 1)) return false;
+  accelRangeRegister = value & 0x03;
+  return accelRangeRegister == ACC_RANGE_16G;
+}
+
+// 새 가속도 값이 있으면 읽어서 g 로 바꾼다.
+bool readAcceleration16g(float &x, float &y, float &z) {
+  uint8_t status = 0;
+  if (!bmiRead(BMI270_STATUS, &status, 1) || !(status & 0x80)) return false;
+  uint8_t raw[6];
+  if (!bmiRead(BMI270_ACC_DATA, raw, 6)) return false;
+  x = (int16_t)(raw[0] | (raw[1] << 8)) / LSB_PER_G_16G;
+  y = (int16_t)(raw[2] | (raw[3] << 8)) / LSB_PER_G_16G;
+  z = (int16_t)(raw[4] | (raw[5] << 8)) / LSB_PER_G_16G;
+  return true;
+}
 
 void sendText(const char *text) {
   // 기본 MTU(23)에서도 되도록 20바이트씩 나눠 보낸다. 한글이 중간에서 잘려도
@@ -92,8 +149,10 @@ void sendBoard() {
   char line[220];
   snprintf(line, sizeof(line),
            "{\"type\":\"board\",\"ts\":%lu,\"seq\":%lu,\"data\":{\"name\":\"%s\",\"board\":null,"
-           "\"id\":\"%s\",\"fw\":\"%s\",\"saved\":false,\"model\":\"nano33-ble-sense-rev2\"}}\n",
-           millis(), messageSequence, deviceName, chipId, FIRMWARE_VERSION);
+           "\"id\":\"%s\",\"fw\":\"%s\",\"saved\":false,\"model\":\"nano33-ble-sense-rev2\","
+           "\"accelRange\":%d}}\n",
+           millis(), messageSequence, deviceName, chipId, FIRMWARE_VERSION,
+           accelRangeRegister == ACC_RANGE_16G ? 16 : 0);
   messageSequence++;
   sendText(line);
 }
@@ -124,8 +183,7 @@ void sendEnvironment() {
 
 void sendAcceleration() {
   float x, y, z;
-  if (!IMU.accelerationAvailable()) return;
-  if (!IMU.readAcceleration(x, y, z)) return;
+  if (!readAcceleration16g(x, y, z)) return;
   if (imuSkipCount > 0) {
     imuSkipCount--;
     return;
@@ -147,13 +205,19 @@ void startMode(Mode next) {
     streaming = false;
     return;
   }
+  if (next == MODE_IMU && !setAccelerometer16g()) {
+    // 범위가 ±16 g 가 아니면 값의 크기가 틀리므로 보내지 않는다.
+    sendError("가속도 범위를 ±16 g 로 바꾸지 못했습니다. 보드 전원을 껐다 켜 보세요.");
+    streaming = false;
+    return;
+  }
   mode = next;
   streaming = true;
   nextEnvAt = millis();
   imuSkipCount = 0;
   // 멈춰 있던 동안 쌓인 가속도 값은 버린다.
   float x, y, z;
-  while (imuOk && IMU.accelerationAvailable()) IMU.readAcceleration(x, y, z);
+  for (int i = 0; imuOk && i < 4 && readAcceleration16g(x, y, z); i++) {}
 }
 
 bool startsWith(const char *text, const char *prefix) {
@@ -274,9 +338,10 @@ void setup() {
   Serial.print(" LPS22HB=");
   Serial.println(pressureOk ? "OK" : "ERROR");
   if (imuOk) {
-    Serial.print("[IMU] accelerometer sample rate = ");
-    Serial.print(IMU.accelerationSampleRate());
-    Serial.println(" Hz, range = +/-4 g (library default)");
+    bool ranged = setAccelerometer16g();
+    Serial.print("[IMU] accelerometer 100 Hz, range register = ");
+    Serial.print(accelRangeRegister);
+    Serial.println(ranged ? " -> +/-16 g VERIFIED (2048 LSB/g)" : " -> ERROR: could not set +/-16 g");
   }
 
   if (!BLE.begin()) {
