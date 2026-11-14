@@ -39,6 +39,38 @@
         return s;
     }
 
+    // ---------- 선생님마다 다른 시트: 웹 앱 주소 ↔ 스크립트 ID ----------
+    /* 웹 앱 주소 https://script.google.com/macros/s/<스크립트 ID>/exec 에서 ID 만 주고받는다.
+       학생 링크·QR 에는 ?s=<ID> 만 넣어 짧게 하고, 받은 쪽은 이 모양 그대로 주소를 다시 만든다
+       (그래서 아무 주소로나 보내게 할 수 없다: 늘 script.google.com 의 웹 앱). */
+    var SCRIPT_ID_RE = /^[A-Za-z0-9_-]{20,120}$/;
+    function isScriptId(id) { return SCRIPT_ID_RE.test(String(id || '')); }
+    function scriptIdFromUrl(url) {
+        var m = /^https:\/\/script\.google\.com\/(?:a\/macros\/[^\/?#]+|macros)\/s\/([A-Za-z0-9_-]{20,120})\/(?:exec|dev)\/?(?:[?#].*)?$/.exec(String(url || '').trim());
+        return m ? m[1] : null;
+    }
+    function urlFromScriptId(id) { return isScriptId(id) ? 'https://script.google.com/macros/s/' + id + '/exec' : ''; }
+    /* 이 화면이 쓸 서버 주소 정하기
+       - 주소의 ?s=ID 가 있으면 그것 (remember 면 이 브라우저에 기억)
+       - 없으면 remember 일 때만 기억해 둔 것, 그것도 없으면 사이트 기본(js/pendulum-config.js)
+       돌려주는 값: { url, id, from: 'link'|'saved'|'default'|'none' } */
+    var SERVER_KEY = 'pendulum:server';
+    function resolveServer(search, defaultUrl, store, remember) {
+        var m = /[?&]s=([^&#]*)/.exec(search || ''), id = m ? decodeURIComponent(m[1]) : '';
+        if (isScriptId(id)) {
+            if (remember && store) { try { store.setItem(SERVER_KEY, id); } catch (e) { /* 저장 불가 */ } }
+            return { url: urlFromScriptId(id), id: id, from: 'link' };
+        }
+        if (remember && store) {
+            var saved = null;
+            try { saved = store.getItem(SERVER_KEY); } catch (e) { saved = null; }
+            if (isScriptId(saved)) return { url: urlFromScriptId(saved), id: saved, from: 'saved' };
+        }
+        if (defaultUrl) return { url: defaultUrl, id: scriptIdFromUrl(defaultUrl), from: 'default' };
+        return { url: '', id: null, from: 'none' };
+    }
+    function forgetServer(store) { try { store.removeItem(SERVER_KEY); } catch (e) { /* 저장 불가 */ } }
+
     // ---------- 원본 데이터 줄이기 ----------
     function encode(samples, step) {
         var pick = [];
@@ -174,6 +206,8 @@
 
     return {
         GROUP_RE: GROUP_RE, CELL_MAX: CELL_MAX, RAW_CELLS: RAW_CELLS,
+        isScriptId: isScriptId, scriptIdFromUrl: scriptIdFromUrl, urlFromScriptId: urlFromScriptId,
+        resolveServer: resolveServer, forgetServer: forgetServer, SERVER_KEY: SERVER_KEY,
         normalizeGroup: normalizeGroup, isGroupCode: isGroupCode, makeGroupCode: makeGroupCode, groupParts: groupParts, newId: newId,
         packSamples: packSamples, unpackSamples: unpackSamples, buildSavePayload: buildSavePayload,
         parseResponse: parseResponse, itemFromServer: itemFromServer, mergeItems: mergeItems,

@@ -5,6 +5,9 @@
 (function () {
     'use strict';
     var PM = window.PendulumMath, PC = window.PendulumCloud, CONFIG = window.PENDULUM_CONFIG || {};
+    // 어느 선생님 시트를 쓸지: 링크의 ?s=스크립트ID > 이 노트북에 기억한 것 > 사이트 기본 (js/pendulum-cloud.js)
+    var STORE = (function () { try { return window.localStorage; } catch (e) { return null; } })();
+    var SERVER = PC.resolveServer(location.search, CONFIG.appsScriptUrl, STORE, true);
     var $ = function (id) { return document.getElementById(id); };
     var GROUP_KEY = 'pendulum-report:group', GREF_KEY = 'pendulum-report:gref';
 
@@ -44,8 +47,28 @@
         $('qrCard').hidden = true; $('groupCard').hidden = false; $('groupMsg').textContent = '';
         render();
     }
+    // 폰 주소에는 쓰는 시트의 ID 도 넣어, 폰이 같은 선생님 시트로 보내게 한다
     function measureUrl() {
-        return new URL('pendulum-measure.html?group=' + encodeURIComponent(state.group), location.href).href;
+        return new URL('pendulum-measure.html?group=' + encodeURIComponent(state.group) +
+            (SERVER.id ? '&s=' + encodeURIComponent(SERVER.id) : ''), location.href).href;
+    }
+    function showServer() {
+        var el = $('serverInfo');
+        if (!el) return;
+        if (SERVER.from === 'none') { el.hidden = true; return; }
+        var short = SERVER.id ? SERVER.id.slice(0, 6) + '…' + SERVER.id.slice(-4) : '';
+        el.hidden = false;
+        el.innerHTML = '📒 저장할 곳: ' + (SERVER.from === 'default' ? '사이트 기본 선생님 시트' : '선생님 시트 <span class="num">' + esc(short) + '</span>' +
+            (SERVER.from === 'saved' ? ' (이 노트북에 기억됨)' : '')) +
+            (SERVER.from !== 'default' && CONFIG.appsScriptUrl ? ' <button id="btnForget" type="button">기본 시트로 되돌리기</button>' : '');
+        var b = $('btnForget');
+        if (b) b.addEventListener('click', function () {
+            if (!confirm('이 노트북이 기억한 선생님 시트를 지우고 사이트 기본 시트를 쓸까요?')) return;
+            PC.forgetServer(STORE);
+            // 주소의 ?s= 를 빼고 다시 열기 (같은 주소로 가면 # 뒤만 바뀌어 새로 읽지 않으므로 reload)
+            history.replaceState(null, '', location.pathname + location.hash);
+            location.reload();
+        });
     }
     function qrSvg(text) {
         if (typeof window.qrcode !== 'function') return null;
@@ -67,7 +90,7 @@
         el.innerHTML = text;
     }
     function startPolling() {
-        if (!CONFIG.appsScriptUrl) {
+        if (!SERVER.url) {
             setConn('⚙️ 선생님 설정이 필요해요(서버 주소 없음). 폰에서 <b>CSV 저장</b> → 아래 <b>CSV 불러오기</b>로 할 수 있어요.', 'warn');
             return;
         }
@@ -86,7 +109,7 @@
         if (document.hidden) { schedule(); return; }
         state.polling = true;
         var group = state.group;
-        var res = await PC.list(CONFIG.appsScriptUrl, group);
+        var res = await PC.list(SERVER.url, group);
         state.polling = false;
         if (group !== state.group) return;   // 기다리는 동안 조 코드를 바꿈
         if (res.ok) {
@@ -107,7 +130,7 @@
         }
         schedule();
     }
-    document.addEventListener('visibilitychange', function () { if (!document.hidden && state.group && CONFIG.appsScriptUrl) { stopPolling(); poll(); } });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && state.group && SERVER.url) { stopPolling(); poll(); } });
 
     // ---------- 표 ----------
     function included() {
@@ -156,7 +179,7 @@
     async function downloadRaw(id, btn) {
         var it = state.items.filter(function (x) { return x.id === id; })[0];
         btn.disabled = true; btn.textContent = '…';
-        var res = await PC.raw(CONFIG.appsScriptUrl, state.group, id);
+        var res = await PC.raw(SERVER.url, state.group, id);
         btn.disabled = false; btn.textContent = '원본';
         if (!res.ok) { $('importMsg').textContent = '원본을 가져오지 못했어요: ' + res.error; return; }
         var samples = PC.unpackSamples(res.raw);
@@ -292,7 +315,8 @@
 
     // ---------- 시작 ----------
     function init() {
-        if (!CONFIG.appsScriptUrl) $('cfgWarn').hidden = false;
+        if (!SERVER.url) $('cfgWarn').hidden = false;
+        showServer();
         $('gRef').value = load(GREF_KEY, '9.80');
         $('gRef').addEventListener('input', function () { save(GREF_KEY, $('gRef').value); renderFit(); });
         $('btnMake').addEventListener('click', function () {
