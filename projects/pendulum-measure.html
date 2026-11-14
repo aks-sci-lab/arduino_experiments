@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="../css/pendulum.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" defer></script>
     <script src="../js/pendulum-math.js" defer></script>
+    <script src="../js/pendulum-config.js" defer></script>
+    <script src="../js/pendulum-cloud.js" defer></script>
     <script src="../js/pendulum-measure.js" defer></script>
 </head>
 <body>
@@ -49,11 +51,18 @@
         <p class="note">L 은 줄을 매단 곳부터 폰까지의 길이예요. 폰의 무게중심까지 정확히 몰라도 괜찮아요 (여러 길이로 재면 2단계 분석에서 그래프 기울기로 g 를 구해요).</p>
     </section>
 
+    <!-- 노트북과 연결 (주소에 ?group=조코드 가 있을 때만: 노트북 분석 화면의 QR 로 연 경우) -->
+    <section id="linkBox" class="pd-link" hidden aria-live="polite">
+        <div><b>💻 노트북과 연결됨</b> · 조 코드 <b id="linkGroup" class="num"></b></div>
+        <p id="linkMsg" class="note">측정이 끝나면 <b>💻 노트북으로 보내기</b>를 누르세요. 노트북 표에 자동으로 들어가요.</p>
+    </section>
+
     <!-- 상태 + 주요 단추 -->
     <div class="dash-bar">
         <span id="pdStatus" class="dash-status" role="status" aria-live="polite">⏸ 대기 중</span>
         <button id="btnStart" class="btn-primary" title="아이폰은 처음에 '동작 센서 허용' 창이 뜹니다">▶ 측정 시작</button>
         <button id="btnStop" class="btn-danger" disabled>■ 중지</button>
+        <button id="btnSend" class="btn-success" disabled hidden>💻 노트북으로 보내기</button>
         <button id="btnCsv" class="btn-info" disabled>CSV 저장</button>
     </div>
 

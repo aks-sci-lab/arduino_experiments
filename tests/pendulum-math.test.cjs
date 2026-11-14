@@ -145,3 +145,13 @@ test('잡음이 너무 커서 틀린 주기가 나오면 반드시 경고', () =
         assert.ok(right || r.error || r.warnings.length, `seed ${seed}: T=${r.T} 인데 경고 없음`);
     }
 });
+
+test('L·T 맞는지 확인: 적은 L 이 잰 T 와 크게 어긋나면 알림 (시뮬레이션 0.90 m 인데 L = 0.50 m 로 남은 경우)', () => {
+    const T09 = P.theoryPeriod(0.9, P.G_STD, 5);
+    assert.equal(P.lengthCheck(0.5, T09).ok, false);
+    assert.ok(Math.abs(P.lengthCheck(0.5, T09).impliedL - 0.9) < 0.01);
+    assert.equal(P.lengthCheck(0.9, T09).ok, true);
+    // 폰 무게중심까지 8 cm 더해진 실제 측정은 괜찮음 (짧은 줄도)
+    for (const L of [0.3, 0.5, 1.1]) assert.equal(P.lengthCheck(L, P.theoryPeriod(L + 0.08, P.G_STD)).ok, true, `L ${L}`);
+    assert.equal(P.lengthCheck(0, 1).ok, false);
+});
