@@ -131,3 +131,33 @@ test('Apps Script: 잘못된 요청은 막고 이유를 알려 줌, 수식처럼
     assert.equal(row[9], "'=IMPORTXML(\"x\")");
     assert.ok(!JSON.stringify(row).includes('홍길동') && !JSON.stringify(row).includes('a@b.c'), '받지 않은 항목은 저장 안 함');
 });
+
+test('선생님 시트: 웹 앱 주소 ↔ 스크립트 ID', () => {
+    const id = 'AKfycbxX-2giNNmH-2loNRX3UDzJqWKYXnFT2zjfWMXFgsXjfpU_JBlQ2DA6DSK1pQyJunjI';
+    const url = 'https://script.google.com/macros/s/' + id + '/exec';
+    assert.equal(C.scriptIdFromUrl(url), id);
+    assert.equal(C.scriptIdFromUrl('  ' + url + '?action=ping '), id);
+    assert.equal(C.scriptIdFromUrl('https://script.google.com/a/macros/school.kr/s/' + id + '/exec'), id, '학교 Workspace 주소');
+    assert.equal(C.urlFromScriptId(id), url);
+    for (const bad of ['', 'http://script.google.com/macros/s/' + id + '/exec', 'https://evil.com/macros/s/' + id + '/exec',
+        'https://script.google.com/macros/s/short/exec', 'https://script.google.com/macros/s/' + id + '/edit']) assert.equal(C.scriptIdFromUrl(bad), null, bad);
+    assert.equal(C.urlFromScriptId('a/b'), '');
+    assert.equal(C.isScriptId('<script>alert(1)</script>xxxxxxxxxxxx'), false);
+});
+
+test('선생님 시트 고르기: 링크의 ?s= > 기억한 것(노트북) > 사이트 기본', () => {
+    const mem = new Map(), store = { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v), removeItem: k => mem.delete(k) };
+    const A = 'A'.repeat(30), B = 'B'.repeat(30), def = 'https://script.google.com/macros/s/' + 'D'.repeat(30) + '/exec';
+    assert.equal(C.resolveServer('', def, store, true).from, 'default');
+    let r = C.resolveServer('?s=' + A, def, store, true);
+    assert.equal(r.from, 'link'); assert.equal(r.url, 'https://script.google.com/macros/s/' + A + '/exec');
+    r = C.resolveServer('?group=2-3-4821', def, store, true);
+    assert.equal(r.from, 'saved'); assert.equal(r.id, A, '노트북은 한 번 연 선생님 시트를 기억');
+    assert.equal(C.resolveServer('?s=' + B, def, store, true).id, B);
+    // 폰(remember=false)은 링크에 없으면 늘 기본: 예전 선생님 시트로 잘못 보내지 않게
+    assert.equal(C.resolveServer('?group=2-3-4821', def, store, false).from, 'default');
+    assert.equal(C.resolveServer('?s=bad!id', def, store, false).from, 'default');
+    C.forgetServer(store);
+    assert.equal(C.resolveServer('', def, store, true).from, 'default');
+    assert.equal(C.resolveServer('', '', null, true).from, 'none');
+});

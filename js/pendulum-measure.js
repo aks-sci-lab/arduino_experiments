@@ -17,6 +17,8 @@
     };
     var PC = window.PendulumCloud;
     var CONFIG = window.PENDULUM_CONFIG || {};
+    // 폰은 기억하지 않고 링크(QR)의 ?s= 만 따른다: 예전에 쓴 다른 선생님 시트로 잘못 보내지 않게
+    var SERVER = PC ? PC.resolveServer(location.search, CONFIG.appsScriptUrl, null, false) : { url: CONFIG.appsScriptUrl || '' };
     var charts = { gyro: null, acc: null };
 
     // ---------- 저장(새로고침해도 조건·설정 유지) ----------
@@ -330,7 +332,7 @@
         var ready = state.samples.length && state.result && !state.result.error && state.phase === 'idle';
         btn.disabled = !ready || state.sending;
         if (!ready || state.sending) return;
-        if (!CONFIG.appsScriptUrl) {
+        if (!SERVER.url) {
             btn.disabled = true;
             linkMsg('선생님 설정이 아직 안 되어 있어 바로 보낼 수 없어요. <b>CSV 저장</b>을 눌러 파일을 노트북으로 옮긴 뒤, 노트북 화면에서 불러오세요.', 'warn');
             return;
@@ -358,7 +360,7 @@
         $('btnSend').textContent = '⏳ 보내는 중…';
         linkMsg('보내는 중이에요… (몇 초 걸려요)');
         var key = sendKey();
-        var res = await PC.save(CONFIG.appsScriptUrl, built.payload);
+        var res = await PC.save(SERVER.url, built.payload);
         state.sending = false;
         if (res.ok) {
             state.sentKey = key;
@@ -384,7 +386,7 @@
         $('cGroup').value = String(PC.groupParts(code).jo);
         $('cGroup').readOnly = true;
         saveCond();
-        if (!CONFIG.appsScriptUrl) linkMsg('선생님 설정이 아직 안 되어 있어요. 측정한 뒤 <b>CSV 저장</b>으로 파일을 노트북에 옮겨 불러오세요.', 'warn');
+        if (!SERVER.url) linkMsg('선생님 설정이 아직 안 되어 있어요. 측정한 뒤 <b>CSV 저장</b>으로 파일을 노트북에 옮겨 불러오세요.', 'warn');
     }
 
     function renderResult(r) {

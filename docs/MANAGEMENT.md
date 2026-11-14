@@ -57,7 +57,7 @@
 | 걷기·뛰기 판정 | `walk-run-detector/` | 대기 |
 | 선생님이 만든 실험 | `projects/custom-lab.html`, `js/custom-lab*.js` | 대기 (Firestore 규칙 게시 확인 남음) |
 | UI 통일성 및 최적화 | `css/lab-base.css`, `js/lab-ui.js`, 화면 배치 | 대기 (#62 머지됨) |
-| 스마트폰 진자 | `projects/pendulum-*.html`, `js/pendulum-*.js` 등 (`docs/pendulum-spec.md`) | **1단계 작업 중** (측정 앱·주기 계산·시뮬레이션) |
+| 스마트폰 진자 | `projects/pendulum-*.html`, `js/pendulum-*.js`, `apps-script/Code.gs` 등 (`docs/pendulum-spec.md`) | 1~3단계 머지(#67·#68·#70), **선생님별 시트(구글 로그인) PR 작업** |
 | 센서 보드 펌웨어 | `firmware/pico2w-environment/` | 기존 "펌웨어 개발: 공용 센서 펌웨어" 세션을 그대로 씀 |
 | 아두이노 Nano | `firmware/nano33-ble-sense-rev2/`, `projects/arduino-nano-lab.html` | 기존 Nano 세션을 그대로 씀 |
 
@@ -76,7 +76,7 @@
 | 아두이노 Nano 33 BLE Sense Rev2 페이지·펌웨어 (2026-11-13, 통합 관리 세션이 만듦) | 끝남 | PR #59 머지·배포 (2026-11-13, 사이트에 페이지 올라간 것 2026-11-14 확인) | 결정 변경(사용자 2026-11-13): 11-10 의 "아두이노용은 만들지 않음"을 바꿔 Rev2 전용 페이지(`projects/arduino-nano-lab.html`)·펌웨어(`firmware/nano33-ble-sense-rev2/`)를 추가, Pico 는 그대로. 남은 일: 실제 보드 업로드·연결 확인(±16 g, 100 Hz, 아두이노 IDE 컴파일) |
 | 문서 정리 (2026-11-14, 이 PC 에서 시작한 Claude Code 대화) | PR 올림 | 브랜치 `claude/docs-status-nano-merged` | PR #59 머지 반영, 결정 목록 정리. 남은 일: 사용자 머지 결정 |
 | UI 통일성 (2026-11-14, 이 PC 에서 시작한 Claude Code 대화) | PR 올림 | 브랜치 `claude/ui-foundation` | 1단계: 공통 CSS(`css/lab-base.css`)·크게 보기(Alt+B)·색 대비·가속도계 휴대폰 화면. 2단계: 조도·자외선을 환경 페이지로 합침. 3단계: 말루스·전자기 유도·자유낙하 7단계. 4단계: 만든 실험의 화면 방식 선택. 5단계: 센서 페이지 한 화면 배치. 남은 일: 사용자 PR·머지 결정, 플랑크·이상기체를 공통 7단계 부품으로 옮기기(PR #61 머지 뒤) (`AGENTS.md` UI 규칙) |
-| 스마트폰 진자 (2026-11-14, 통합 관리 세션이 다시 만듦) | 2·3단계 PR 올림 | 1단계 PR #67 머지·배포, 2·3단계 브랜치 `claude/pendulum-report` | 1단계: 측정 앱. 2·3단계: 노트북 분석 화면(조 코드 QR → 폰에서 보내기 → 표 자동 추가, T²–L 로 g), Apps Script(`apps-script/Code.gs`), 선생님 설정 화면. 남은 일: 사용자 머지 결정, 선생님 Apps Script 배포 후 주소를 `js/pendulum-config.js` 에, 실제 폰 확인, 4단계 보고서·AI (`docs/pendulum-spec.md`) |
+| 스마트폰 진자 (2026-11-14, 통합 관리 세션이 다시 만듦) | 선생님별 시트 PR 올림 (브랜치 `claude/pendulum-teacher-login`, 규칙 배포 필요) · 2·3단계 PR #68 머지 | PR #67·#68 머지·배포, 기본 시트 주소 PR #70 | 1단계: 측정 앱. 2·3단계: 노트북 분석 화면(조 코드 QR → 폰에서 보내기 → 표 자동 추가, T²–L 로 g), Apps Script(`apps-script/Code.gs`). 선생님별 시트: 설정 화면 구글 로그인 → Firestore `pendulumTeachers` → 우리 반 링크 `?s=`. 남은 일: 사용자 머지 결정, **Firestore 규칙 게시**, 템플릿 시트 만들기(선택), 실제 폰 확인, 4단계 보고서·AI |
 | 머지 전용: 실험실 PR #49 | 보관됨 | PR #49 머지 (2026-11-03) | 없음 |
 | 깃허브 작업 가져오기 | 보관됨 | — | 없음 |
 
