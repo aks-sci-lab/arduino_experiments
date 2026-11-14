@@ -8,6 +8,19 @@
     <title>환경 센서 실시간 모니터</title>
     
     <link rel="stylesheet" href="../css/style.css">
+    <script data-role="sensor-mode">
+        // 측정할 센서: 주소 끝 ?sensor=light(조도) / ?sensor=uv(자외선), 없으면 온도·습도·기압·VOC
+        (function () {
+            var m = new URLSearchParams(location.search).get('sensor');
+            window.SENSOR_MODE = (m === 'light' || m === 'uv') ? m : 'environment';
+            if (window.SENSOR_MODE !== 'environment') {
+                var link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = '../css/sensor-lab.css?v=layout-v3';
+                document.head.appendChild(link);
+            }
+        })();
+    </script>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
@@ -55,9 +68,16 @@
 </head>
 <body>
     <div class="container">
+        <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
+        <nav class="seg sensor-switch" aria-label="측정할 센서 고르기">
+            <a href="environment-lab.html" data-mode="environment">🌡️ 환경<small>온도·습도·기압·VOC</small></a>
+            <a href="environment-lab.html?sensor=light" data-mode="light">💡 조도<small>TSL2591</small></a>
+            <a href="environment-lab.html?sensor=uv" data-mode="uv">☀️ 자외선<small>LTR390</small></a>
+        </nav>
+        <p class="note">센서 보드는 한 번에 한 가지만 측정합니다. 센서를 바꾸면 연결이 끊기니 다시 연결하세요.</p>
+        <div id="envView">
         <div class="header" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
                 <h1>환경 센서 실시간 모니터</h1>
                 <p>상태: <span id="status">연결 대기</span></p>
             </div>
@@ -181,7 +201,64 @@
                 </div>
             </div>
         </div>
+        </div><!-- /envView -->
+
+        <template id="singleSensorView">
+        <h1 id="pageTitle">센서 측정</h1>
+        <p id="description"></p>
+        <p>상태: <span id="status" role="status">연결 대기</span></p>
+        <details class="firmware-guide">
+            <summary>센서 / Thonny 준비 안내</summary>
+            <p>Pico-Environment-Sensor를 방향에 맞춰 결합하세요. I2C0 SDA GP20, SCL GP21.
+                조도 TSL2591 주소 0x29, 자외선 LTR390 주소 0x53.</p>
+            <p><a href="https://micropython.org/download/RPI_PICO2_W/">이 장치용 MicroPython</a>을 설치하고 아래 네 파일을 Thonny에서 Pico 루트에 저장하세요.
+                기존 main.py도 교체한 뒤 실행합니다. 다른 실험의 BLE 연결을 먼저 해제하세요.</p>
+            <p><a href="../firmware/pico2w-environment/main.py?v=extra-v1" download="main.py">main.py</a> ·
+                <a href="../firmware/pico2w-environment/bme280.py" download>bme280.py</a> ·
+                <a href="../firmware/pico2w-environment/imu.py" download>imu.py</a> ·
+                <a href="../firmware/pico2w-environment/extra_sensors.py" download>extra_sensors.py</a> ·
+                <a href="../firmware/pico2w-environment/README.md">상세 안내</a></p>
+            <p>PC/Android Chrome·Edge에서 PicoEnv-XXXX를 선택합니다. Thonny 셸에 BLE=ADVERTISING을 확인하고 중지 버튼을 누르지 마세요.
+                센서 포화 시 측정을 중단합니다. 조도는 이득이 달라지면 원시 카운트를 직접 비교하지 마세요. 자외선 UVS 원시 값은 UV Index가 아닙니다.</p>
+        </details>
+        <div class="lab-controls">
+            <button id="connectButton" class="ble-button">Bluetooth 연결</button>
+            <button id="disconnectButton" style="display:none;">연결 해제</button>
+            <button id="recordButton" disabled>측정 시작</button>
+            <label>샘플링 <select id="samplingRateSelect"><option value="1000">1초</option><option value="2000">2초</option><option value="5000">5초</option></select></label>
+            <button id="downloadButton" disabled>CSV 저장</button>
+        </div>
+        <div class="sensor-lab-layout">
+        <section aria-label="측정 데이터">
+        <div id="readouts" class="sensor-grid"></div>
+        <h2>측정 로그</h2>
+        <div class="table-container"><table><thead><tr id="tableHead"><th>시간 (s)</th></tr></thead><tbody id="historyTbody"></tbody></table></div>
+        <h2>회차 저장</h2>
+        <div class="lab-controls"><button id="saveTrialButton" disabled>현재 회차 저장</button><button id="clearTrialsButton">모든 회차 삭제</button></div>
+        <ul id="trialList"></ul>
+        <p id="authNotice">메인 페이지에서 Google 로그인 후 Cloud 제출이 가능합니다.</p>
+        <p>로컬 회차와 CSV에는 원시 값·보조 데이터도 보관하며, Cloud에는 회차 수·샘플 수 요약만 제출합니다.</p>
+        <button id="saveCloudButton">Cloud에 요약 제출</button>
+        </section>
+        <section aria-label="측정 그래프">
+            <h2>실시간 변화 그래프</h2>
+            <div class="sensor-chart"><canvas id="chart"></canvas></div>
+        </section>
+        </div>
+        </template>
     </div>
+    <script data-role="sensor-switch">
+        // 고른 센서에 맞는 화면만 남긴다 (두 화면의 단추가 동시에 있으면 연결이 겹침)
+        (function () {
+            var mode = window.SENSOR_MODE || 'environment';
+            document.body.dataset.sensor = mode;
+            document.querySelectorAll('.sensor-switch a').forEach(function (a) {
+                if (a.dataset.mode === mode) a.setAttribute('aria-current', 'page');
+            });
+            if (mode === 'environment') return;
+            document.getElementById('envView').replaceWith(document.getElementById('singleSensorView').content.cloneNode(true));
+        })();
+    </script>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -192,9 +269,12 @@
     <script src="../js/sensor-definitions.js?v=voc-index-v3"></script>
     <script src="../js/voc-index.js?v=official-v1"></script>
     <script src="../js/environment-metrics.js?v=env-voc-v1"></script>
+    <script src="../js/sensor-lab.js?v=merged-v1"></script>
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // 조도·자외선을 고른 화면에서는 js/sensor-lab.js 가 맡는다
+        if (['light', 'uv'].includes(document.body.dataset && document.body.dataset.sensor)) return;
         // Firebase Config
         const firebaseConfig = {
             projectId: "web-experiment-f9b24",

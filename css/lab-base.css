@@ -76,6 +76,23 @@ button:disabled { cursor: not-allowed; }
 /* 표 머리 줄의 제목과 버튼이 좁은 화면에서 서로 밀어내지 않게 */
 .table-header { flex-wrap: wrap; gap: var(--sp-2); }
 
+/* ---------- 고르기 단추 묶음 (예: 측정할 센서 고르기) ----------
+   <nav class="seg"><a href="…" aria-current="page">…</a><a href="…">…</a></nav> */
+.seg {
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--sp-1);
+    margin: var(--sp-3) 0 var(--sp-2); padding: var(--sp-1);
+    background: var(--c-fill); border-radius: var(--r-card);
+}
+.seg a {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    min-height: var(--tap); padding: var(--sp-1) var(--sp-2); border-radius: 8px;
+    color: var(--c-text); font-weight: 600; font-size: var(--fs-sm); text-decoration: none;
+}
+.seg a small { font-weight: 400; font-size: .75rem; color: var(--c-muted); }
+.seg a:hover { background: rgba(255, 255, 255, .6); color: var(--c-primary); }
+.seg a[aria-current="page"] { background: var(--c-card); color: var(--c-primary); box-shadow: var(--shadow); }
+.note { color: var(--c-muted); font-size: var(--fs-sm); }
+
 /* ---------- 크게 보기 (교실 프로젝터용, Alt+B 로 켜고 끔: js/lab-ui.js) ---------- */
 html.big-view body { zoom: 1.35; }
 

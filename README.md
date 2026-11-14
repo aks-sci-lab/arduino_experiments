@@ -18,7 +18,7 @@ Cloud에는 실험 요약만 저장하며 VOC Index와 원시 값은 CSV/로컬 
 브라우저는 독립 WebAssembly 인스턴스로 매 입력을 처리하며, 선택한 1/2/5초 간격은 기록에만 적용합니다.
 초기 60초와 알고리즘 초기화 중에는 Index를 표시하지 않습니다. 연결 해제·데이터 누락 시 학습을 초기화하며,
 이전 SRAW 전용 회차는 Index로 자동 변환하지 않습니다.
-이전 VOC 주소는 환경 모니터로 이동합니다. 기존 `voc_sensor_trials`는 유지하며
+조도·자외선도 환경 페이지에서 고릅니다(`environment-lab.html?sensor=light`·`?sensor=uv`, 예전 주소는 넘김). 이전 VOC 주소는 환경 모니터로 이동합니다. 기존 `voc_sensor_trials`는 유지하며
 `projects/voc-lab.html?legacy=1` 보관 페이지에서 확인·CSV 내보내기가 가능합니다.
 기존 환경 회차에서 VOC Index가 없는 구간은 빈칸으로 유지합니다.
 

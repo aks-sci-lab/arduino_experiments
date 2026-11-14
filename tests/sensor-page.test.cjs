@@ -371,8 +371,16 @@ test('VOC loader and raw input failures stop acquisition without raw-value fallb
 
 test('all three HTML pages wire shared scripts and firmware downloads', () => {
     for (const mode of Object.keys(data)) {
-        const html = fs.readFileSync(path.join(__dirname, '..', 'projects', `${mode}-lab.html`), 'utf8');
-        assert.ok(html.includes(`data-sensor="${mode}"`));
+        // 조도·자외선은 환경 페이지(?sensor=light|uv)에 합쳤다. VOC 는 예전 회차 보관 페이지.
+        const merged = mode !== 'voc';
+        const html = fs.readFileSync(path.join(__dirname, '..', 'projects', merged ? 'environment-lab.html' : 'voc-lab.html'), 'utf8');
+        if (merged) {
+            assert.ok(html.includes(`href="environment-lab.html?sensor=${mode}"`));
+            const old = fs.readFileSync(path.join(__dirname, '..', 'projects', `${mode}-lab.html`), 'utf8');
+            assert.ok(old.includes(`location.replace('environment-lab.html?sensor=${mode}')`));
+        } else {
+            assert.ok(html.includes(`data-sensor="${mode}"`));
+        }
         assert.ok(html.includes('id="connectButton" class="ble-button"'));
         assert.ok(html.includes('sensor-lab.css?v=layout-v3'));
         assert.ok(html.includes('class="sensor-lab-layout"'));
@@ -392,7 +400,7 @@ test('all three HTML pages wire shared scripts and firmware downloads', () => {
     }
     const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     assert.match(index, /<h1>센서 기반 실험실<\/h1>/);
-    for (const mode of ['light', 'uv']) assert.ok(index.includes(`projects/${mode}-lab.html`));
+    for (const mode of ['light', 'uv']) assert.ok(!index.includes(`projects/${mode}-lab.html`));
     assert.ok(index.includes('projects/environment-lab.html'));
     assert.ok(!index.includes('projects/voc-lab.html'));
 });
