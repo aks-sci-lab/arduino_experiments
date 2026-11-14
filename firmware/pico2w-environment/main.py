@@ -18,7 +18,7 @@ from micropython import const
 try:
     from bme280 import BME280
     from imu import IMU
-    from extra_sensors import TSL2591, LTR390, SGP40
+    from extra_sensors import TSL2591, LTR390, SGP40, CurrentMonitor
 except ImportError:
     print("[FATAL] Upload bme280.py, imu.py, extra_sensors.py and main.py to the Pico root.")
     raise
@@ -31,7 +31,7 @@ SERVICE = bluetooth.UUID("19b10000-e8f2-537e-4f6c-d104768a1214")
 TX = bluetooth.UUID("19b10001-e8f2-537e-4f6c-d104768a1214")
 CMD = bluetooth.UUID("19b10002-e8f2-537e-4f6c-d104768a1214")
 ACCEL = bluetooth.UUID("19b10004-e8f2-537e-4f6c-d104768a1214")
-FIRMWARE_VERSION = "2026.11-board"
+FIRMWARE_VERSION = "2026.11-iv"
 # 보드 번호를 적어 두는 작은 설정 파일. 없거나 깨졌으면 자동 이름(PicoEnv-XXXX)을 쓴다.
 BOARD_FILE = "board.json"
 MAX_CONSECUTIVE_FAILURES = 5
@@ -261,7 +261,7 @@ class EnvironmentBLE:
                 self.mode = "imu"
                 self.streaming = True
                 self.revision += 1
-            elif command in ("START:LIGHT", "START:UV", "START:VOC"):
+            elif command in ("START:LIGHT", "START:UV", "START:VOC", "START:IV"):
                 self.mode = command.split(":")[1].lower()
                 self.streaming = True
                 self.revision += 1
@@ -273,11 +273,11 @@ class EnvironmentBLE:
                     self.send({"type": "imu_stopped", "ts": 0, "seq": 0})
             elif command.startswith(("SET_ENV_RATE:", "SET_SENSOR_RATE:")):
                 value = command.split(":", 1)[1]
-                if value in ("1000", "2000", "5000"):
+                if value in ("200", "500", "1000", "2000", "5000"):
                     self.interval = int(value)
                     self.reschedule = True
                 else:
-                    self.send({"type": "error", "message": "Rate must be 1000, 2000 or 5000 ms"})
+                    self.send({"type": "error", "message": "Rate must be 200, 500, 1000, 2000 or 5000 ms"})
             elif command.startswith("SET_IMU_RATE:"):
                 value = command.split(":", 1)[1]
                 if value in ("25", "50", "100", "200"):
@@ -349,6 +349,7 @@ def main():
         ("light", lambda: TSL2591(i2c)),
         ("uv", lambda: LTR390(i2c)),
         ("voc", lambda: SGP40(i2c, sensor)),
+        ("iv", lambda: CurrentMonitor(i2c)),
     ):
         try:
             sensors[mode] = create()

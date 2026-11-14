@@ -22,7 +22,7 @@
 | `projects/figure-maker.html` | 문항 그림 도구 넘김 페이지만 남김 (도구는 `aks-sci-lab/figure-maker` 로 독립, 2026-10-30). 자동 저장된 그림을 `#move=` 로 넘김 |
 | `js/`, `css/` | 실험 페이지용 스크립트·스타일 (`malus-*.js`: 말루스 법칙 실험 — `malus-math.js` 계산, `malus-tutorial.js` 접해보기 탭, `malus-law.js` 측정·분석·설정, `malus-sheets.js` 구글 시트, `planck-*.js`: LED 플랑크 상수 실험, `ideal-gas*.js`: 이상기체 실험) |
 | `firmware/em-induction/` | 전자기 유도 실험용 아두이노 펌웨어 (ADS1115 로 코일 전압·션트 전압, USB 시리얼 115200, 웹 시리얼은 PC 크롬·엣지만) |
-| `firmware/pico2w-environment/` | Pico 센서 보드용 MicroPython 펌웨어와 Thonny 설치 안내 |
+| `firmware/pico2w-environment/` | Pico 센서 보드용 MicroPython 펌웨어와 Thonny 설치 안내. INA219/INA226 전류·전압 모듈(`START:IV`, 플랑크 상수 실험)도 같은 펌웨어로 |
 | `firmware/nano33-ble-sense-rev2/` | 아두이노 Nano 33 BLE Sense Rev2 펌웨어(`NanoSenseLab/NanoSenseLab.ino`, 가속도 BMI270·온습도 HS3003·기압 LPS22HB, 이름은 칩 주소로 `NanoSense-XXXX`, 블루투스 약속은 Pico 와 같음)와 아두이노 IDE 설치 안내. 페이지는 `projects/arduino-nano-lab.html`(`js/arduino-nano-lab.js` 화면, `js/nano-sense.js` 약속·CSV, 시험 있음) |
 | `tests/`, `tools/`, `vendor/sensirion/` | 센서 테스트, VOC 알고리즘 재빌드 도구, 제조사 원본·라이선스·WebAssembly |
 | `walk-run-detector/` | 걷기·뛰기 판정 머신러닝 수업 앱 (자체 README 참고) |
@@ -165,3 +165,5 @@
   - 확인 필요: 실제 보드 업로드·연결(시험은 펌웨어를 흉내 낸 가짜 블루투스), 아두이노 IDE 컴파일(시험 환경에서 arduino-cli 내려받기가 막혀 g++ 문법 검사만), ±16 g 설정이 실제로 되는지(시리얼 모니터 `+/-16 g VERIFIED`, 보드 정보의 '±16 g 확인됨', 가만히 두면 |a| ≈ 1 g), 100 Hz 알림이 끊기지 않는지, 보드 열로 인한 온도 차이
 - 2026-11-13: PR #59(Nano 33 BLE Sense Rev2 페이지·펌웨어) 머지·배포. 2026-11-14 에 사이트의 `projects/arduino-nano-lab.html` 이 `main` 과 같은 것을 확인 — Claude Code
 - 2026-11-14: 현황 문서 정리 — `docs/MANAGEMENT.md` 에 PR #59 머지 반영, 지울 브랜치에 `claude/nano33-ble-sense-lab` 추가, 사용자 결정 목록 번호·지난 항목(PR #56 머지 여부) 정리, 진행 기록 날짜 순서 맞춤 — Claude Code
+- 2026-11-14: LED 플랑크 상수 실험에 블루투스 전류·전압 센서 연동(사용자 요청, INA219 로 먼저 해 보고 부족하면 INA226) — 기존 Pico 펌웨어에 `CurrentMonitor`(INA219, INA226 은 제조사 번호로 자동 인식, 0.1 Ω 션트)와 `START:IV`·`SET_SENSOR_RATE:200/500` 추가(파일 4개 그대로, 모듈 없으면 다른 실험 영향 없음). 회로는 고정 저항을 모듈 앞에 두어 버스 전압 = LED 전압. 플랑크 페이지 데이터 탭에 '측정 도구: 멀티미터 / 블루투스 센서', 실시간 V·I, '이 점 기록'(1초 평균, `PlanckMath.averageSensor`), CSV 에 source 열, 과정 탭에 배선 안내. 연결은 `CustomLabSensor`(mode `iv`)를 그대로 써서 선생님이 만든 실험에서도 '전류·전압' 센서를 고를 수 있음 — Claude Code
+  - 확인 필요: 실제 INA219·INA226 모듈과 보드(시험은 가짜 I2C·가짜 블루투스), Waveshare 환경 센서 보드에서 GP20·GP21 에 선을 꽂을 자리, 0.1 mA 근처 값의 흔들림

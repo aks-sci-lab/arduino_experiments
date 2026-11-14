@@ -198,8 +198,20 @@
         return '#' + h2(r) + h2(g) + h2(b);
     }
 
+    // 블루투스 센서(INA219/INA226)에서 받은 값 여러 개를 한 점으로 평균한다.
+    // samples: [{ voltage: V, current: mA }] → { v, i, n, sdV, sdI } 또는 { error }
+    // 숫자가 아닌 값은 뺀다. 전류 평균이 -0.05 mA 보다 작으면 모듈을 거꾸로 꽂은 것으로 본다.
+    function averageSensor(samples) {
+        const ok = (samples || []).filter(s => s && Number.isFinite(s.voltage) && Number.isFinite(s.current));
+        if (ok.length < 2) return { error: '센서 값이 충분히 오지 않았습니다. 연결 상태를 확인하고 다시 누르세요.' };
+        const vs = ok.map(s => s.voltage), is = ok.map(s => s.current);
+        const i = mean(is);
+        if (i < -0.05) return { error: '전류가 음수입니다. 모듈의 VIN+ 와 VIN− 를 바꿔 꽂으세요.' };
+        return { v: mean(vs), i: Math.max(0, i), n: ok.length, sdV: std(vs), sdI: std(is) };
+    }
+
     return {
-        E_CHARGE, C_LIGHT, H_TRUE, LED_PRESETS,
+        E_CHARGE, C_LIGHT, H_TRUE, LED_PRESETS, averageSensor,
         mean, std, freqOf, photonVolt, leastSquares,
         thresholdByExtrapolation, thresholdAtCurrent, thresholdByGlow, thresholdOf,
         planckFit, currentAt, safeLimit, potGuide, wavelengthColor
