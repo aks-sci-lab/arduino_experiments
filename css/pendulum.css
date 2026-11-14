@@ -107,3 +107,14 @@
 }
 .pd-bigqr #bigQrImg { width: min(80vh, 90vw); }
 .pd-server button { min-height: 0; padding: 2px 8px; font-size: var(--fs-sm); margin-left: var(--sp-1); }
+
+/* 선생님 설정 화면 */
+.pd-setup pre { max-height: 320px; overflow: auto; background: var(--c-fill); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); font-size: .8rem; }
+.pd-setup kbd { background: var(--c-fill); border: 1px solid var(--c-line); border-radius: 4px; padding: 0 4px; font-family: inherit; }
+.pd-setup .pd-mylink { border: 2px solid var(--c-success); }
+.pd-btnlink {
+    display: inline-flex; align-items: center; min-height: var(--tap); padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-card); color: var(--c-text); text-decoration: none;
+}
+.pd-btnlink.primary { background: var(--c-success); border-color: var(--c-success); color: #fff; font-weight: 600; }
+.pd-setup { overflow-wrap: anywhere; }
