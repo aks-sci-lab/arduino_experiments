@@ -1,8 +1,9 @@
 /* ========================================
    자유낙하 및 2차원 운동 분석
-   - 탭 기능 (자유낙하 / 2차원 운동)
+   - 보고서 순서 7단계 화면 (LabUI.initSteps), 1. 목적 맨 위에서 실험 종류(자유낙하 / 2차원 운동) 고르기
    - 모바일 터치 확대 선택
-   - 픽셀-실제 길이 보정
+   - 픽셀-실제 길이 보정 (자 양 끝을 눌러 mm/px 재기)
+   - 측정값 표, 2차 함수·직선 맞춤으로 g·수평 속도 계산
    ======================================== */
 
 const fileInput = document.getElementById('video-upload');
@@ -61,23 +62,138 @@ const ZOOM_RADIUS = 110;
 const ZOOM_SCALE = 3;
 
 /* ========================================
-   탭 전환
+   실험 종류 고르기 (1. 목적 맨 위의 .seg: 자유낙하 / 2차원 운동)
+   - 고른 종류는 이 브라우저에 기억
+   - data-mode="free-fall|projectile" 인 글은 고른 종류일 때만 보임
    ======================================== */
+const MODE_KEY = 'free-fall:mode';
+let analysisDone = false;   // '합성 실행'을 한 번 했는지 (종류를 바꾸면 그래프를 다시 그림)
+
+function setAnalysisMode(mode, save) {
+    if (mode !== 'free-fall' && mode !== 'projectile') mode = 'free-fall';
+    currentAnalysisMode = mode;
+    document.querySelectorAll('.tab-btn').forEach(b => {
+        const on = b.dataset.tab === mode;
+        b.classList.toggle('active', on);
+        if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    document.querySelectorAll('[data-mode]').forEach(el => { el.hidden = el.dataset.mode !== mode; });
+
+    const chartTitle = document.getElementById('chart-title');
+    chartTitle.innerText = mode === 'free-fall' ? '자유낙하 t-y 그래프' : '2차원 운동 궤적 (X-Y 그래프)';
+    document.getElementById('data-mode-label').innerText = mode === 'free-fall' ? '(자유낙하)' : '(2차원 운동)';
+    document.getElementById('table-note').innerText = mode === 'free-fall'
+        ? 't 는 첫 프레임부터 지난 시간, x·y 는 화면 왼쪽 위를 원점으로 한 위치(아래가 +)입니다.'
+        : 't 는 첫 프레임부터 지난 시간, x·y 는 첫 점을 원점으로 한 위치(오른쪽·위쪽이 +)입니다.';
+
+    if (save) {
+        try { localStorage.setItem(MODE_KEY, mode); } catch (e) { /* 저장 불가: 이 화면에서만 적용 */ }
+    }
+    renderDataTable();
+    if (analysisDone && dataPoints.length > 0 && typeof Chart !== 'undefined') drawGraph();
+}
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        currentAnalysisMode = e.target.dataset.tab;
-        
-        const chartTitle = document.getElementById('chart-title');
-        if (currentAnalysisMode === 'free-fall') {
-            chartTitle.innerText = '자유낙하 t-y 그래프';
-        } else {
-            chartTitle.innerText = '2차원 운동 궤적 (X-Y 그래프)';
-        }
-        console.log('Switched to mode:', currentAnalysisMode);
+        e.preventDefault();
+        setAnalysisMode(btn.dataset.tab, true);
     });
 });
+
+/* ========================================
+   측정값 계산 (표·CSV·그래프가 같은 값을 쓰도록)
+   - 자유낙하: 화면 좌표 그대로(아래가 +)
+   - 2차원 운동: 첫 점 기준, 오른쪽·위쪽이 +
+   ======================================== */
+function measuredRows() {
+    if (dataPoints.length === 0 || frames.length === 0) return [];
+    const startTime = frames[0].time;
+    const pixelToMm = parseFloat(pixelToMmInput.value) || 1;
+    const first = dataPoints[0];
+    return dataPoints.map(dp => {
+        const t = dp.time - startTime;
+        if (currentAnalysisMode === 'free-fall') {
+            return { t, x: dp.x * pixelToMm, y: dp.y * pixelToMm };
+        }
+        return { t, x: (dp.x - first.x) * pixelToMm, y: (first.y - dp.y) * pixelToMm };
+    });
+}
+
+function renderDataTable() {
+    const body = document.getElementById('data-table-body');
+    const rows = measuredRows().slice().sort((a, b) => a.t - b.t);
+    if (rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="4" style="text-align:center">아직 찍은 점이 없습니다.</td></tr>';
+        return;
+    }
+    body.innerHTML = rows.map((r, i) =>
+        `<tr><td>${i + 1}</td><td>${r.t.toFixed(4)}</td><td>${r.x.toFixed(2)}</td><td>${r.y.toFixed(2)}</td></tr>`
+    ).join('');
+}
+
+/* 최소제곱법 다항식 맞춤 (degree 1: y = a + bt, degree 2: y = a + bt + ct²)
+   돌려주는 값: { coef: [a, b, c], r2 } 또는 점이 모자라면 null */
+function polyFit(xs, ys, degree) {
+    const n = xs.length;
+    const m = degree + 1;
+    if (n < m + 1) return null;
+    // 정규방정식 A·coef = B
+    const A = Array.from({ length: m }, () => new Array(m).fill(0));
+    const B = new Array(m).fill(0);
+    for (let k = 0; k < n; k++) {
+        const pw = [1];
+        for (let j = 1; j < 2 * m; j++) pw.push(pw[j - 1] * xs[k]);
+        for (let i = 0; i < m; i++) {
+            B[i] += pw[i] * ys[k];
+            for (let j = 0; j < m; j++) A[i][j] += pw[i + j];
+        }
+    }
+    // 가우스 소거
+    for (let i = 0; i < m; i++) {
+        let p = i;
+        for (let r = i + 1; r < m; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
+        [A[i], A[p]] = [A[p], A[i]];
+        [B[i], B[p]] = [B[p], B[i]];
+        if (Math.abs(A[i][i]) < 1e-15) return null;
+        for (let r = i + 1; r < m; r++) {
+            const f = A[r][i] / A[i][i];
+            for (let c = i; c < m; c++) A[r][c] -= f * A[i][c];
+            B[r] -= f * B[i];
+        }
+    }
+    const coef = new Array(m).fill(0);
+    for (let i = m - 1; i >= 0; i--) {
+        let s = B[i];
+        for (let c = i + 1; c < m; c++) s -= A[i][c] * coef[c];
+        coef[i] = s / A[i][i];
+    }
+    const f = x => coef.reduce((s, c, i) => s + c * Math.pow(x, i), 0);
+    const mean = ys.reduce((s, v) => s + v, 0) / n;
+    let ssRes = 0, ssTot = 0;
+    for (let k = 0; k < n; k++) { ssRes += (ys[k] - f(xs[k])) ** 2; ssTot += (ys[k] - mean) ** 2; }
+    while (coef.length < 3) coef.push(0);
+    return { coef, r2: ssTot > 0 ? 1 - ssRes / ssTot : 1, f };
+}
+
+function fitCurve(fit, ts) {
+    if (!fit || ts.length < 2) return [];
+    const t0 = Math.min(...ts), t1 = Math.max(...ts);
+    const pts = [];
+    for (let i = 0; i <= 40; i++) {
+        const t = t0 + (t1 - t0) * i / 40;
+        pts.push({ x: t, y: fit.f(t) });
+    }
+    return pts;
+}
+
+function showFitResult(items, note) {
+    const box = document.getElementById('fit-result');
+    box.innerHTML = items.map(it => `<div><small>${it.label}</small><b>${it.value}</b></div>`).join('');
+    box.hidden = items.length === 0;
+    const noteEl = document.getElementById('fit-note');
+    noteEl.innerText = note || '';
+    noteEl.hidden = !note;
+}
 
 /* ========================================
    단계 1: 영상 로드 및 프레임 추출
@@ -237,6 +353,7 @@ let zoomX = 0;
 let zoomY = 0;
 
 canvas.addEventListener('touchstart', (event) => {
+    if (calibrating) { event.preventDefault(); return; }
     if (!isSelectingMode) return;
     touchStartTime = Date.now();
     isLongPress = false;
@@ -257,6 +374,12 @@ canvas.addEventListener('touchmove', (event) => {
 }, false);
 
 canvas.addEventListener('touchend', (event) => {
+    if (calibrating) {
+        event.preventDefault();
+        const { x, y } = getCanvasCoordinates(event.changedTouches[0]);
+        addCalibrationPoint(x, y);
+        return;
+    }
     if (!isSelectingMode) return;
     
     if (isLongPress) {
@@ -322,7 +445,7 @@ let mouseDownY = 0;
 let isMouseDown = false;
 
 canvas.addEventListener('mousedown', (event) => {
-    if (!isSelectingMode) return;
+    if (!isSelectingMode && !calibrating) return;
     isMouseDown = true;
     mouseDownX = event.clientX;
     mouseDownY = event.clientY;
@@ -335,6 +458,12 @@ canvas.addEventListener('mousemove', (event) => {
 });
 
 canvas.addEventListener('mouseup', (event) => {
+    if (calibrating && isMouseDown) {
+        isMouseDown = false;
+        const { x, y } = getCanvasCoordinates(event);
+        addCalibrationPoint(x, y);
+        return;
+    }
     if (!isSelectingMode || !isMouseDown) return;
     isMouseDown = false;
     
@@ -380,6 +509,68 @@ function getCanvasCoordinates(event) {
     return { x, y };
 }
 
+/* ========================================
+   기준 길이 재기: 화면에서 자의 양 끝을 차례로 누르면 mm/px 계산
+   ======================================== */
+const btnCalibrate = document.getElementById('btn-calibrate');
+const refLengthInput = document.getElementById('ref-length-mm');
+const calibInfo = document.getElementById('calib-info');
+let calibrating = false;
+let calibPoints = [];
+
+function setCalibrating(on) {
+    calibrating = on;
+    calibPoints = [];
+    btnCalibrate.classList.toggle('on', on);
+    btnCalibrate.innerText = on ? '✖ 재기 취소' : '📏 기준 길이 재기';
+    if (on) {
+        calibInfo.innerText = '화면에서 자의 한쪽 끝을 누르세요.';
+    }
+    if (frames.length > 0) displayFrame(currentFrameIndex);
+}
+
+btnCalibrate.addEventListener('click', () => {
+    if (frames.length === 0) { alert('먼저 영상을 불러오세요.'); return; }
+    setCalibrating(!calibrating);
+});
+
+function addCalibrationPoint(x, y) {
+    calibPoints.push({ x, y });
+    ctx.fillStyle = 'rgba(0, 120, 255, 0.9)';
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, 2 * Math.PI);
+    ctx.fill();
+    if (calibPoints.length < 2) {
+        calibInfo.innerText = '이제 자의 다른 쪽 끝을 누르세요.';
+        return;
+    }
+    const [a, b] = calibPoints;
+    ctx.strokeStyle = 'rgba(0, 120, 255, 0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    const px = Math.hypot(b.x - a.x, b.y - a.y);
+    const mm = parseFloat(refLengthInput.value);
+    calibrating = false;
+    btnCalibrate.classList.remove('on');
+    btnCalibrate.innerText = '📏 기준 길이 재기';
+    if (!(px > 2) || !(mm > 0)) {
+        calibInfo.innerText = '두 점이 너무 가깝거나 자 길이가 비어 있습니다. 다시 재세요.';
+        return;
+    }
+    const ratio = mm / px;
+    pixelToMmInput.value = ratio.toFixed(4);
+    calibInfo.innerText = `자 ${mm} mm = ${px.toFixed(1)} px → ${ratio.toFixed(4)} mm/px`;
+    renderDataTable();
+    setTimeout(() => { if (frames.length > 0 && !calibrating) displayFrame(currentFrameIndex); }, 1200);
+}
+
+pixelToMmInput.addEventListener('input', () => {
+    renderDataTable();
+});
+
 function addDataPoint(x, y) {
     const existingIndex = dataPoints.findIndex(d => d.frameIndex === currentFrameIndex);
     if (existingIndex >= 0) {
@@ -396,6 +587,7 @@ function addDataPoint(x, y) {
     });
 
     selectedCount.innerText = dataPoints.length;
+    renderDataTable();
     displayFrame(currentFrameIndex);
 
     if (currentFrameIndex < frames.length - 1) {
@@ -407,6 +599,7 @@ btnUndoPoint.addEventListener('click', () => {
     if (dataPoints.length > 0) {
         dataPoints.pop();
         selectedCount.innerText = dataPoints.length;
+        renderDataTable();
         displayFrame(currentFrameIndex);
     }
 });
@@ -415,6 +608,7 @@ btnClearPoints.addEventListener('click', () => {
     if (confirm('선택된 모든 점을 초기화하시겠습니까?')) {
         dataPoints = [];
         selectedCount.innerText = '0';
+        renderDataTable();
         displayFrame(currentFrameIndex);
     }
 });
@@ -495,7 +689,10 @@ btnStrobo.addEventListener('click', () => {
     isSelectingMode = false;
     frameNavControls.style.display = 'none';
     trackingInfo.style.display = 'none';
-    statusMsg.innerText = "분석 완료! 그래프와 합성된 사진을 확인하세요.";
+    statusMsg.innerText = "분석 완료! 합성된 사진은 아래에, 그래프와 맞춤 결과는 6. 결과에서 확인하세요.";
+    analysisDone = true;
+    document.getElementById('result-empty').hidden = true;
+    renderDataTable();
     drawGraph();
     btnCsv.style.display = 'inline-block';
     stroboContainer.scrollIntoView({ behavior: 'smooth' });
@@ -513,10 +710,25 @@ function drawGraph() {
 
     const startTime = frames[0].time;
     const pixelToMm = parseFloat(pixelToMmInput.value);
-    
+    const rows = measuredRows();
+    const ts = rows.map(r => r.t);
+    const calibNote = Math.abs(pixelToMm - 1) < 1e-9
+        ? '기준 길이를 재지 않아 1 px = 1 mm 로 계산했습니다. 5. 데이터에서 기준 길이를 재면 g 값이 맞게 나옵니다.'
+        : '';
+    const fmt = (v, d) => (v === null || !isFinite(v)) ? '-' : v.toFixed(d);
+
     if (currentAnalysisMode === 'free-fall') {
-        // 자유낙하: 시간 vs Y 좌표
+        // 자유낙하: 시간 vs Y 좌표 (아래가 +), 2차 함수 맞춤 y = a + bt + ct² → g = 2c
         document.getElementById('projectile-charts').style.display = 'none';
+        const fit = polyFit(ts, rows.map(r => r.y), 2);
+        const g = fit ? 2 * fit.coef[2] / 1000 : null;   // mm/s² → m/s²
+        showFitResult(fit ? [
+            { label: '맞춤식 (y: mm, t: s)', value: `y = ${fit.coef[0].toFixed(1)} + ${fit.coef[1].toFixed(1)}t + ${fit.coef[2].toFixed(1)}t²` },
+            { label: '중력가속도 g = 2c', value: `${fmt(g, 2)} m/s²` },
+            { label: '9.8 m/s² 와의 상대 오차', value: `${fmt(Math.abs(g - 9.8) / 9.8 * 100, 1)} %` },
+            { label: '처음 속도 b', value: `${fmt(fit.coef[1] / 1000, 3)} m/s` },
+            { label: '결정계수 R²', value: fmt(fit.r2, 4) }
+        ] : [], (fit ? '' : '맞춤에는 점이 4개 이상 필요합니다. ') + calibNote);
         const scatterData = dataPoints.map(dp => ({
             x: (dp.time - startTime).toFixed(4),
             y: (dp.y * pixelToMm).toFixed(2)
@@ -535,6 +747,14 @@ function drawGraph() {
                     fill: false,
                     tension: 0.3,
                     pointRadius: 6
+                }, {
+                    label: '2차 함수 맞춤',
+                    data: fitCurve(fit, ts),
+                    borderColor: 'rgba(21, 101, 192, 0.8)',
+                    backgroundColor: 'rgba(21, 101, 192, 0.8)',
+                    showLine: true,
+                    borderDash: [6, 4],
+                    pointRadius: 0
                 }]
             },
             options: {
@@ -569,6 +789,22 @@ function drawGraph() {
         const baseX = firstPoint.x;
         const baseY = firstPoint.y;
         
+        // 맞춤: x–t 는 직선(수평 속도), y–t 는 2차 함수(위쪽 + 이므로 g = −2c)
+        const fitX = polyFit(ts, rows.map(r => r.x), 1);
+        const fitY = polyFit(ts, rows.map(r => r.y), 2);
+        const gY = fitY ? -2 * fitY.coef[2] / 1000 : null;
+        const items = [];
+        if (fitX) {
+            items.push({ label: 'x–t 직선 맞춤 기울기 (수평 속도 vₓ)', value: `${fmt(fitX.coef[1] / 1000, 3)} m/s` });
+            items.push({ label: 'x–t 결정계수 R²', value: fmt(fitX.r2, 4) });
+        }
+        if (fitY) {
+            items.push({ label: 'y–t 2차 맞춤으로 구한 g = −2c', value: `${fmt(gY, 2)} m/s²` });
+            items.push({ label: '9.8 m/s² 와의 상대 오차', value: `${fmt(Math.abs(gY - 9.8) / 9.8 * 100, 1)} %` });
+            items.push({ label: 'y–t 결정계수 R²', value: fmt(fitY.r2, 4) });
+        }
+        showFitResult(items, (fitY ? '' : '맞춤에는 점이 4개 이상 필요합니다. ') + calibNote);
+
         // 상대 좌표 계산 (첫 점을 원점으로, 화면 좌표계 반대)
         const scatterDataXT = dataPoints.map(dp => ({
             x: (dp.time - startTime).toFixed(4),
@@ -604,6 +840,14 @@ function drawGraph() {
                     fill: false,
                     tension: 0.3,
                     pointRadius: 5
+                }, {
+                    label: '직선 맞춤',
+                    data: fitCurve(fitX, ts),
+                    borderColor: 'rgba(95, 107, 122, 0.9)',
+                    backgroundColor: 'rgba(95, 107, 122, 0.9)',
+                    showLine: true,
+                    borderDash: [6, 4],
+                    pointRadius: 0
                 }]
             },
             options: {
@@ -634,6 +878,14 @@ function drawGraph() {
                     fill: false,
                     tension: 0.3,
                     pointRadius: 5
+                }, {
+                    label: '2차 함수 맞춤',
+                    data: fitCurve(fitY, ts),
+                    borderColor: 'rgba(95, 107, 122, 0.9)',
+                    backgroundColor: 'rgba(95, 107, 122, 0.9)',
+                    showLine: true,
+                    borderDash: [6, 4],
+                    pointRadius: 0
                 }]
             },
             options: {
@@ -728,3 +980,26 @@ btnCsv.addEventListener('click', () => {
 });
 
 btnReset.addEventListener('click', () => { location.reload(); });
+
+/* ========================================
+   7단계 화면 (js/lab-ui.js 의 LabUI.initSteps)
+   - 결과 단계가 보일 때 숨어 있던 그래프 크기를 다시 잡는다
+   ======================================== */
+(function initPage() {
+    let savedMode = 'free-fall';
+    try { savedMode = localStorage.getItem(MODE_KEY) || 'free-fall'; } catch (e) { /* 저장 불가 */ }
+    setAnalysisMode(savedMode, false);
+
+    if (window.LabUI && LabUI.initSteps) {
+        LabUI.initSteps({
+            key: 'free-fall',
+            onShow: step => {
+                if (step === 'result') {
+                    [chartInstance, window.chartXT, window.chartYT, window.chartYX].forEach(c => {
+                        if (c) c.resize();
+                    });
+                }
+            }
+        });
+    }
+})();

@@ -93,6 +93,36 @@ button:disabled { cursor: not-allowed; }
 .seg a[aria-current="page"] { background: var(--c-card); color: var(--c-primary); box-shadow: var(--shadow); }
 .note { color: var(--c-muted); font-size: var(--fs-sm); }
 
+/* ---------- 단계형 실험: 보고서 순서 7단계 탭 (플랑크 상수 페이지 모양, js/lab-ui.js 의 LabUI.initSteps) ----------
+   <nav class="steps" role="tablist" aria-label="실험 단계">
+     <button role="tab" data-step="purpose"><b>1</b><span>목적</span></button> … 7개
+   </nav>
+   <section class="step-panel" data-step="purpose">…<div class="step-next"><button data-go="theory">다음: 2. 이론 →</button></div></section>
+   단계 이름(고정): 1 목적 · 2 이론 · 3 준비물 · 4 과정 · 5 데이터 · 6 결과 · 7 결론 */
+.steps {
+    position: sticky; top: 0; z-index: 10;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-1);
+    margin: 0 0 var(--sp-2); padding: 6px 0; background: var(--c-bg);
+}
+@media (min-width: 640px) { .steps { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+.steps button {
+    min-width: 0; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: var(--sp-1);
+    padding: 7px 2px; margin: 0; background: var(--c-card); color: var(--c-text);
+    border: 1px solid var(--c-line); border-radius: 8px; font-size: .82rem; font-weight: 500; cursor: pointer;
+}
+.steps button b {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 18px; height: 18px; border-radius: 50%; background: #e9ecef; color: var(--c-text); font-size: .75rem;
+}
+.steps button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 이미 본 단계는 번호 대신 ✓ */
+.steps button.done:not([aria-selected="true"]) b { background: var(--c-ok-bg); color: var(--c-ok-text); font-size: 0; }
+.steps button.done:not([aria-selected="true"]) b::before { content: "✓"; font-size: .75rem; }
+.steps button[aria-selected="true"] { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+.steps button[aria-selected="true"] b { background: #fff; color: var(--c-primary); }
+.step-next { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-2); margin-top: var(--sp-4); }
+.step-next [data-go]:last-child { margin-left: auto; }
+
 /* ---------- 크게 보기 (교실 프로젝터용, Alt+B 로 켜고 끔: js/lab-ui.js) ---------- */
 html.big-view body { zoom: 1.35; }
 

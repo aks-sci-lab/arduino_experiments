@@ -1,4 +1,4 @@
-// 말루스 법칙 실험 — 접해보기 탭: 측정 전에 학생이 정하는 것(예측, 측정 계획, 이상한 값 판단 기준)
+// 말루스 법칙 실험 — 4. 과정 단계: 측정 전에 학생이 정하는 것(예측, 측정 계획, 이상한 값 판단 기준)
 // 다른 스크립트는 window.MalusTutorial.get() 으로 내용을 읽고, onStart / onChange 로 변화를 받는다.
 (function () {
     'use strict';
@@ -173,7 +173,7 @@
         listeners.start.forEach(cb => cb(api.get()));
     };
 
-    document.querySelectorAll('[data-panel=explore] input, [data-panel=explore] textarea').forEach(el => {
+    document.querySelectorAll('#tutorial-box input, #tutorial-box textarea').forEach(el => {
         el.addEventListener('input', changed);
         el.addEventListener('change', changed);
     });
