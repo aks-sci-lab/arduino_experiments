@@ -17,7 +17,7 @@
  * 4단계(보고서·AI)용 시트 reports·ai_logs·quiz 는 만들어 두기만 한다.
  */
 
-var VERSION = 1;
+var VERSION = 2;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)
 var GROUP_RE = /^\d{1,2}-\d{1,2}-\d{4}$/;      // 반-조-4자리 숫자 (예: 2-3-4821)
 var ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
 var MAX_BODY = 400000;                            // 보내는 글자 수 한도
@@ -78,10 +78,12 @@ function numIn(v, lo, hi, name, optional) {
   return n;
 }
 function text(v, max) {
-  // 수식으로 실행되지 않게 = + - @ 로 시작하면 앞에 ' 를 붙인다
+  // 시트가 글자를 날짜·숫자·수식으로 바꾸지 않게 앞에 ' 를 붙인다 (' 는 값에 남지 않고 글자로 저장하라는 표시)
+  //  예: 조 코드 2-3-5376 을 그냥 넣으면 날짜가 되어 나중에 그 조를 찾지 못한다
   var s = String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').slice(0, max);
-  return /^[=+\-@]/.test(s) ? "'" + s : s;
+  return s ? "'" + s : s;
 }
+function same(cell, s) { return String(cell) === s; }   // 시트 값과 글자 비교
 
 function sheet(name) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -109,7 +111,7 @@ function saveMeasurement(b) {
   var cols = SHEETS.measurements;
   var rec = {
     timestamp: new Date(),
-    groupCode: group,
+    groupCode: text(group, 20),
     L: numIn(b.L, 0.01, 10, '줄 길이 L'),
     amplitude: numIn(b.amplitude, 0, 90, '진폭', true),
     sensorAxis: text(b.sensorAxis, 10),
@@ -117,7 +119,7 @@ function saveMeasurement(b) {
     T_mean: numIn(b.T_mean, 0.05, 30, '주기 T'),
     T_std: numIn(b.T_std, 0, 30, 'T 표준편차', true),
     note: text(b.note, 200),
-    id: id,
+    id: text(id, 40),
     kind: b.kind === 'acc' ? 'acc' : 'gyro',
     source: b.source === 'simulation' ? 'simulation' : 'sensor',
     T_sem: numIn(b.T_sem, 0, 30, 'T 표준오차', true),
@@ -126,8 +128,8 @@ function saveMeasurement(b) {
     measuredAt: text(b.measuredAt, 40),
     rawInfo: text(b.rawInfo, 200)
   };
-  rec.rawData = raw[0] || '';
-  for (var k = 2; k <= RAW_CELLS; k++) rec['rawData' + k] = raw[k - 1] || '';
+  rec.rawData = text(raw[0], CELL_MAX);
+  for (var k = 2; k <= RAW_CELLS; k++) rec['rawData' + k] = text(raw[k - 1], CELL_MAX);
   var row = cols.map(function (c) { return rec[c] === undefined ? '' : rec[c]; });
 
   var lock = LockService.getScriptLock();
@@ -156,17 +158,17 @@ function idx(name) { return SHEETS.measurements.indexOf(name); }
 function findRow(sh, group, id) {
   var rows = allRows(sh);
   for (var i = 0; i < rows.length; i++) {
-    if (rows[i][idx('groupCode')] === group && rows[i][idx('id')] === id) return i + 2;
+    if (same(rows[i][idx('groupCode')], group) && same(rows[i][idx('id')], id)) return i + 2;
   }
   return 0;
 }
 function countGroup(sh, group) {
-  return allRows(sh).filter(function (r) { return r[idx('groupCode')] === group; }).length;
+  return allRows(sh).filter(function (r) { return same(r[idx('groupCode')], group); }).length;
 }
 
 function listGroup(group) {
   var keep = ['timestamp', 'L', 'amplitude', 'sensorAxis', 'nPeriods', 'T_mean', 'T_std', 'note', 'id', 'kind', 'source', 'T_sem', 'rate', 'device', 'measuredAt', 'rawInfo'];
-  return allRows(sheet('measurements')).filter(function (r) { return r[idx('groupCode')] === group; }).map(function (r) {
+  return allRows(sheet('measurements')).filter(function (r) { return same(r[idx('groupCode')], group); }).map(function (r) {
     var o = { group: group };
     keep.forEach(function (k) {
       var v = r[idx(k)];
@@ -181,7 +183,7 @@ function rawOf(group, id) {
   var rows = allRows(sheet('measurements'));
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
-    if (r[idx('groupCode')] === group && r[idx('id')] === id) {
+    if (same(r[idx('groupCode')], group) && same(r[idx('id')], id)) {
       var parts = [r[idx('rawData')]];
       for (var k = 2; k <= RAW_CELLS; k++) parts.push(r[idx('rawData' + k)]);
       return { ok: true, id: id, raw: parts.filter(function (p) { return p; }).map(String) };

@@ -84,7 +84,7 @@
 .pd-qr-wrap { display: grid; gap: var(--sp-3); grid-template-columns: minmax(0, 1fr); align-items: center; }
 @media (min-width: 640px) { .pd-qr-wrap { grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); } }
 .pd-qr { background: #fff; border-radius: var(--r-card); padding: var(--sp-2); max-width: 300px; width: 100%; justify-self: center; }
-.pd-qr svg, .pd-bigqr svg { width: 100%; height: auto; display: block; }
+.pd-qr svg { width: 100%; height: auto; display: block; }
 .pd-code { font-size: var(--fs-reading); font-weight: 700; color: var(--c-primary); letter-spacing: .04em; }
 .pd-url { word-break: break-all; }
 .pd-conn { margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-card); background: var(--c-fill); font-weight: 600; font-size: var(--fs-sm); }
@@ -103,11 +103,15 @@
 }
 .pd-drop.over { border-color: var(--c-primary); background: var(--c-primary-soft); }
 .pd-fit-chart { height: clamp(260px, 45vh, 420px); }
+/* QR 크게: 창 높이에 맞춰 QR 이 줄어들고 조 코드·닫기 단추는 늘 보인다 (크게 보기 Alt+B 에서도) */
 .pd-bigqr {
-    position: fixed; inset: 0; z-index: 100; background: #fff; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: var(--sp-3); padding: var(--sp-4);
+    position: fixed; inset: 0; z-index: 1000; background: #fff; display: grid;
+    grid-template-rows: minmax(0, 1fr) auto auto; justify-items: center; align-items: center;
+    gap: var(--sp-2); padding: var(--sp-3);
 }
-.pd-bigqr #bigQrImg { width: min(80vh, 90vw); }
+html.big-view .pd-bigqr { zoom: calc(1 / 1.35); }
+.pd-bigqr #bigQrImg { height: 100%; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.pd-bigqr #bigQrImg svg { height: 100%; width: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1; }
 .pd-server button { min-height: 0; padding: 2px 8px; font-size: var(--fs-sm); margin-left: var(--sp-1); }
 
 /* 선생님 설정 화면 */

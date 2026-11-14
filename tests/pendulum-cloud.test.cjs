@@ -128,7 +128,8 @@ test('Apps Script: 잘못된 요청은 막고 이유를 알려 줌, 수식처럼
     assert.match(gs.get({ action: 'list', group: 'abc' }).error, /조 코드/);
     assert.equal(gs.post({ ...good, note: '=IMPORTXML("x")', name: '홍길동', email: 'a@b.c' }).ok, true);
     const row = gs.ss.sheets.get('measurements').rows[1];
-    assert.equal(row[9], "'=IMPORTXML(\"x\")");
+    assert.equal(gs.ss.sheets.get('measurements').written[1][9], "'=IMPORTXML(\"x\")", "앞에 ' 를 붙여 글자로 저장(수식 실행 안 됨)");
+    assert.equal(row[9], '=IMPORTXML("x")', '시트 값에는 \' 가 남지 않음');
     assert.ok(!JSON.stringify(row).includes('홍길동') && !JSON.stringify(row).includes('a@b.c'), '받지 않은 항목은 저장 안 함');
 });
 
@@ -160,4 +161,20 @@ test('선생님 시트 고르기: 링크의 ?s= > 기억한 것(노트북) > 사
     C.forgetServer(store);
     assert.equal(C.resolveServer('', def, store, true).from, 'default');
     assert.equal(C.resolveServer('', '', null, true).from, 'none');
+});
+
+test('Apps Script: 조 코드·id 가 시트에서 날짜·숫자로 바뀌지 않아 목록·고쳐 쓰기·원본이 됨 (2026-11-14 실제 문제)', () => {
+    const gs = loadCodeGs();
+    const base = { action: 'save', group: '2-3-5376', L: 0.9, nPeriods: 10, T_mean: 1.9, raw: ['P1|3|10|0,a,b'] };
+    assert.equal(gs.post({ ...base, id: '1234567890' }).ok, true);           // 숫자만 있는 id
+    assert.equal(gs.post({ ...base, id: 'abc-123', note: '1-2' }).ok, true);   // 날짜처럼 보이는 메모
+    const sh = gs.ss.sheets.get('measurements');
+    assert.equal(typeof sh.rows[1][1], 'string', '조 코드가 글자로 저장');
+    const list = gs.get({ action: 'list', group: '2-3-5376' });
+    assert.equal(list.items.length, 2);
+    assert.deepEqual(list.items.map(it => String(it.id)).sort(), ['1234567890', 'abc-123']);
+    assert.equal(list.items.find(it => it.id === 'abc-123').note, '1-2');
+    assert.equal(gs.post({ ...base, id: '1234567890', T_mean: 1.95 }).updated, true, '같은 id 는 고쳐 씀');
+    assert.equal(gs.get({ action: 'list', group: '2-3-5376' }).items.length, 2);
+    assert.deepEqual(gs.get({ action: 'raw', group: '2-3-5376', id: 'abc-123' }).raw, ['P1|3|10|0,a,b']);
 });
