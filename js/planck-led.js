@@ -13,7 +13,8 @@
         origin: false,
         sel: null,             // 측정 중인 LED id
         pot: '10000', rs: '330', rsCustom: '',
-        iMode: 'resistor',     // 전류 재는 법: 'resistor' (고정 저항 전압 ÷ 저항) | 'meter' (전류계)
+        iMode: 'resistor',     // 전류 재는 법: 'resistor' (고정 저항 전압 ÷ 저항) | 'meter' (전류계) | 'sensor' (블루투스 센서)
+        manualIMode: 'resistor', // 멀티미터로 돌아갈 때 쓸 방법 ('resistor' | 'meter')
         rMeas: '', vrUnit: 'V', // 고정 저항 실제 값 (비우면 회로 탭 값), 저항 전압 단위
         ivY: 'auto', ivYmin: '', ivYmax: '', // I–V 그래프 세로축: 'auto' | 'manual' | 'log'
         bat: '4.5', iMax: '10', // bat: 건전지 전압 (V, 사용자가 자유롭게 입력)
@@ -47,7 +48,8 @@
             if (state.rs == null) state.rs = '330';
             if (state.rsCustom == null) state.rsCustom = '';
             state.draft = Object.assign({ v: '', i: '', vr: '', gv: '' }, d.draft);
-            if (state.iMode !== 'meter') state.iMode = 'resistor';
+            if (!['meter', 'sensor'].includes(state.iMode)) state.iMode = 'resistor';
+            if (state.manualIMode !== 'meter') state.manualIMode = 'resistor';
             if (state.vrUnit !== 'mV') state.vrUnit = 'V';
             if (state.rMeas == null) state.rMeas = '';
             state.leds.forEach(l => { l.iv = Array.isArray(l.iv) ? l.iv : []; l.glow = Array.isArray(l.glow) ? l.glow : []; if (l.fit == null) l.fit = true; });
@@ -215,7 +217,12 @@
         $('i-min').value = state.iMin;
         $('i-ref').value = state.iRef;
         const byR = state.iMode === 'resistor';
-        $('sel-imode').value = state.iMode;
+        const bySensor = state.iMode === 'sensor';
+        $('sel-tool').value = bySensor ? 'sensor' : 'multimeter';
+        $('box-sensor').hidden = !bySensor;
+        $('row-manual').hidden = bySensor;
+        $('i-calc').hidden = bySensor;
+        $('sel-imode').value = bySensor ? state.manualIMode : state.iMode;
         $('row-rmeas').hidden = !byR;
         $('lbl-vr').hidden = !byR;
         $('lbl-i').hidden = byR;
@@ -226,6 +233,7 @@
         const led = current();
         $('led-lambda').innerHTML = led ? '<span class="dot" style="background:' + color(led) + '"></span>광자 에너지 hc/λ = ' + P.photonVolt(led.lambda).toFixed(2) + ' eV' : '';
         ['in-v', 'in-i', 'in-vr', 'btn-add-iv', 'in-gv', 'btn-add-glow', 'btn-clear-led'].forEach(id => { $(id).disabled = !led; });
+        renderSensorButtons();
         if (!led) {
             $('thr-out').textContent = '3. 실험 준비물 탭에서 사용할 LED 를 하나 이상 고르세요.';
             $('meas-head').innerHTML = ''; $('meas-body').innerHTML = '';
@@ -321,6 +329,65 @@
         $('in-gv').focus();
     }
     $('btn-add-iv').addEventListener('click', addIV);
+
+    // ---------- 블루투스 센서 (Pico + INA219/INA226) ----------
+    // 다른 센서 실험과 같은 연결 코드(CustomLabSensor)를 쓰고, 0.2초마다 오는 값을 1초 모아 평균해 한 점으로 기록한다.
+    const SENSOR_WINDOW_MS = 1000;
+    let sensor = null, sensorConnected = false, collecting = null;
+    function renderSensorButtons() {
+        $('btn-sensor').textContent = sensorConnected ? '🔌 연결 끊기' : '🔗 센서 연결';
+        $('btn-add-sensor').disabled = !current() || !sensorConnected || !!collecting;
+    }
+    function showLive(values) {
+        const v = values.voltage, i = values.current;
+        $('live-v').textContent = Number.isFinite(v) ? v.toFixed(3) : '–';
+        $('live-i').textContent = Number.isFinite(i) ? i.toFixed(3) : '–';
+    }
+    function sensorController() {
+        if (sensor) return sensor;
+        sensor = window.CustomLabSensor.create({
+            mode: 'iv', rate: '200',
+            onSample(sample) {
+                showLive(sample.values);
+                if (collecting) collecting.push(sample.values);
+            },
+            onStatus(text) { $('sensor-status').textContent = text; },
+            onState(connected) {
+                sensorConnected = connected;
+                if (!connected) { showLive({}); collecting = null; }
+                renderSensorButtons();
+            }
+        });
+        return sensor;
+    }
+    $('btn-sensor').addEventListener('click', () => {
+        if (!window.CustomLabSensor) { $('sensor-status').textContent = '⚠ 센서 연결 코드를 불러오지 못했습니다. 페이지를 새로고침하세요.'; return; }
+        const reason = window.CustomLabSensor.unsupportedReason();
+        if (reason) { $('sensor-status').textContent = '⚠ ' + reason; return; }
+        const s = sensorController();
+        if (sensorConnected) s.disconnect(); else s.connect();
+    });
+    $('btn-add-sensor').addEventListener('click', () => {
+        const led = current(); if (!led || !sensorConnected || collecting) return;
+        collecting = [];
+        renderSensorButtons();
+        $('btn-add-sensor').textContent = '⏳ 1초 동안 재는 중…';
+        setTimeout(() => {
+            const samples = collecting || [];
+            collecting = null;
+            $('btn-add-sensor').textContent = '✅ 이 점 기록 (1초 평균)';
+            renderSensorButtons();
+            const r = P.averageSensor(samples);
+            if (r.error) { alert(r.error); return; }
+            const target = state.leds.find(l => l.id === led.id);
+            if (!target) return;
+            target.iv.push({ v: Math.round(r.v * 10000) / 10000, i: Math.round(r.i * 10000) / 10000, src: 'sensor', n: r.n });
+            const warns = [];
+            if (r.i > parseFloat(state.iMax)) warns.push('⚠️ 전류가 ' + state.iMax + ' mA 를 넘었습니다. LED 가 뜨거워지면 문턱 전압이 바뀝니다. 전압을 더 올리지 마세요.');
+            $('iv-warn').innerHTML = warns.join('<br>'); $('iv-warn').hidden = !warns.length;
+            save(); renderAll();
+        }, SENSOR_WINDOW_MS);
+    });
     $('btn-add-glow').addEventListener('click', addGlow);
     // Enter: 전압 → 전류 칸으로, 전류 칸에서 Enter 면 기록
     $('in-v').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $(state.iMode === 'resistor' ? 'in-vr' : 'in-i').focus(); } });
@@ -339,7 +406,16 @@
     });
     $('ivy-min').addEventListener('input', e => { state.ivYmin = e.target.value; save(); renderMeasure(); });
     $('ivy-max').addEventListener('input', e => { state.ivYmax = e.target.value; save(); renderMeasure(); });
-    $('sel-imode').addEventListener('change', e => { state.iMode = e.target.value; save(); renderMeasure(); });
+    $('sel-imode').addEventListener('change', e => {
+        state.manualIMode = e.target.value === 'meter' ? 'meter' : 'resistor';
+        if (state.iMode !== 'sensor') state.iMode = state.manualIMode;
+        save(); renderMeasure();
+    });
+    $('sel-tool').addEventListener('change', e => {
+        state.iMode = e.target.value === 'sensor' ? 'sensor' : state.manualIMode;
+        if (state.iMode !== 'sensor' && sensor) sensor.disconnect();
+        save(); renderMeasure();
+    });
     $('sel-vr-unit').addEventListener('change', e => { state.vrUnit = e.target.value; save(); showCalc(); });
     $('r-meas').addEventListener('input', e => { state.rMeas = e.target.value; save(); showCalc(); });
     $('in-gv').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addGlow(); } });
@@ -586,12 +662,12 @@
         document.body.appendChild(a); a.click(); a.remove();
     }
     $('btn-csv').addEventListener('click', () => {
-        const rows = ['led,wavelength_nm,frequency_1e14Hz,method,voltage_V,current_mA,resistor_voltage_V,resistor_ohm'];
+        const rows = ['led,wavelength_nm,frequency_1e14Hz,method,voltage_V,current_mA,resistor_voltage_V,resistor_ohm,source'];
         const q = s => '"' + String(s).replace(/"/g, '""') + '"';
         for (const l of state.leds) {
             const f = (P.freqOf(l.lambda) / 1e14).toFixed(4);
-            for (const p of l.iv) rows.push([q(l.name), l.lambda, f, 'current', p.v, p.i, p.vr != null ? p.vr : '', p.r != null ? p.r : ''].join(','));
-            for (const v of l.glow) rows.push([q(l.name), l.lambda, f, 'glow', v, '', '', ''].join(','));
+            for (const p of l.iv) rows.push([q(l.name), l.lambda, f, 'current', p.v, p.i, p.vr != null ? p.vr : '', p.r != null ? p.r : '', p.src === 'sensor' ? 'sensor' : 'multimeter'].join(','));
+            for (const v of l.glow) rows.push([q(l.name), l.lambda, f, 'glow', v, '', '', '', 'eye'].join(','));
         }
         download('planck-led.csv', rows.join('\n'), 'text/csv');
     });

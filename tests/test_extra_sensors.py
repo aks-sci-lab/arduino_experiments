@@ -156,5 +156,67 @@ class ExtraSensorTests(unittest.TestCase):
         self.assertIn(b"\x26\x0F\x80\x00\xA2\x66\x66\x93", bus.writes)
 
 
+
+
+class CurrentBus:
+    """INA219/INA226 를 흉내 낸 I2C. ina226=True 면 제조사 번호(0xFE)에 TI 를 돌려준다."""
+
+    def __init__(self, ina226=False, shunt=0, bus=0, keep_config=True):
+        self.ina226 = ina226
+        self.values = {0x01: shunt & 0xFFFF, 0x02: bus}
+        self.config = None
+        self.keep_config = keep_config
+
+    def readfrom_mem(self, address, register, length):
+        assert address == 0x40 and length == 2
+        if register == 0xFE:
+            if not self.ina226:
+                raise OSError("no such register")
+            value = 0x5449
+        elif register == 0x00:
+            value = self.config if self.keep_config else 0x399F
+        else:
+            value = self.values[register]
+        return struct.pack(">H", value)
+
+    def writeto_mem(self, address, register, data):
+        assert address == 0x40 and register == 0x00
+        self.config = struct.unpack(">H", data)[0]
+
+
+class CurrentMonitorTests(unittest.TestCase):
+    def test_ina219_led_voltage_and_current(self):
+        # 션트 500 × 10 µV = 5 mV → 0.1 Ω 에서 50 mA, 버스 (500 << 3) × 4 mV = 2.000 V
+        bus = CurrentBus(shunt=500, bus=500 << 3)
+        monitor = sensors.CurrentMonitor(bus)
+        self.assertEqual(monitor.kind, "INA219")
+        self.assertEqual(bus.config, 0x0777)
+        data = monitor.read()
+        self.assertEqual(data, {"voltage": 2.0, "current": 50.0, "shunt": 5.0, "chip": "INA219"})
+
+    def test_ina219_small_and_negative_current(self):
+        monitor = sensors.CurrentMonitor(CurrentBus(shunt=-3, bus=(456 << 3)))
+        data = monitor.read()
+        self.assertAlmostEqual(data["current"], -0.3)
+        self.assertAlmostEqual(data["voltage"], 1.824)
+
+    def test_ina219_overflow_is_reported(self):
+        monitor = sensors.CurrentMonitor(CurrentBus(shunt=4000, bus=(500 << 3) | 0x01))
+        with self.assertRaises(RuntimeError):
+            monitor.read()
+
+    def test_ina226_is_detected_with_finer_steps(self):
+        # 션트 2000 × 2.5 µV = 5 mV → 50 mA, 버스 1600 × 1.25 mV = 2.000 V
+        bus = CurrentBus(ina226=True, shunt=2000, bus=1600)
+        monitor = sensors.CurrentMonitor(bus)
+        self.assertEqual(monitor.kind, "INA226")
+        self.assertEqual(bus.config, 0x4727)
+        self.assertEqual(monitor.read(), {"voltage": 2.0, "current": 50.0, "shunt": 5.0, "chip": "INA226"})
+
+    def test_wrong_chip_fails_configuration_check(self):
+        with self.assertRaises(RuntimeError):
+            sensors.CurrentMonitor(CurrentBus(keep_config=False))
+
+
 if __name__ == "__main__":
     unittest.main()

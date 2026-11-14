@@ -41,3 +41,13 @@ test('rejects saturated optical and misleading VOC data', () => {
         ['voc', { ppm: 100 }]
     ]) assert.throws(() => validate(mode, { type: mode, ts: 0, seq: 0, data }));
 });
+
+test('iv packets accept INA219/INA226 values and reject bad ones', () => {
+    const packet = data => ({ type: 'iv', ts: 200, seq: 1, data });
+    const ok = { voltage: 2.012, current: 5.25, shunt: 0.525, chip: 'INA219' };
+    assert.equal(validate('iv', packet(ok)).data.voltage, 2.012);
+    assert.ok(validate('iv', packet({ ...ok, current: -0.1, chip: 'INA226' })));
+    assert.throws(() => validate('iv', packet({ ...ok, chip: 'X' })));
+    assert.throws(() => validate('iv', packet({ ...ok, voltage: -1 })));
+    assert.throws(() => validate('iv', packet({ ...ok, current: NaN })));
+});

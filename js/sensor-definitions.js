@@ -16,6 +16,11 @@
             title: 'VOC Index 측정', sensor: 'SGP40', command: 'VOC', key: 'vocIndex', unit: 'Index', digits: 0,
             description: 'Sensirion 공식 Gas Index Algorithm으로 계산한 상대 VOC 지표(1~500)입니다. 100은 알고리즘이 학습한 평소 수준, 100보다 높으면 상대적으로 VOC가 많은 방향, 낮으면 적은 방향입니다. ppm 농도나 건강·안전 기준이 아닙니다. 첫 60초와 알고리즘 초기화 중에는 값을 표시하지 않으며, 연결 중 1초마다 계산합니다.',
             fields: [['vocIndex', 'VOC Index', 'Index'], ['sraw', 'VOC 원시 신호', 'SRAW'], ['warmup', '안정화 남은 시간', 's'], ['temp', '보정 온도', '°C'], ['humidity', '보정 습도', '%RH']]
+        },
+        iv: {
+            title: '전류·전압 측정', sensor: 'INA219/INA226', command: 'IV', key: 'current', unit: 'mA', digits: 3,
+            description: '모듈의 VIN− 와 GND 사이 전압(회로대로 꽂으면 LED 전압)과 0.1 Ω 전류 측정 저항으로 계산한 전류입니다. INA219 는 전류 약 0.1 mA·전압 4 mV, INA226 은 약 0.025 mA·1.25 mV 눈금입니다.',
+            fields: [['voltage', '전압', 'V'], ['current', '전류', 'mA'], ['shunt', '전류 측정 저항 전압', 'mV']]
         }
     };
 
@@ -34,6 +39,9 @@
                 && inRange('infrared', 0, 36862, true) && [1, 25].includes(data.gain);
         } else if (mode === 'uv') {
             valid = inRange('uvRaw', 0, 1048574, true);
+        } else if (mode === 'iv') {
+            valid = inRange('voltage', 0, 36) && inRange('current', -1000, 1000)
+                && inRange('shunt', -100, 100) && ['INA219', 'INA226'].includes(data.chip);
         } else {
             valid = inRange('sraw', 0, 65535, true) && inRange('warmup', 0, 60, true)
                 && inRange('temp', -40, 85) && inRange('humidity', 0, 100);

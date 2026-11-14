@@ -100,7 +100,7 @@ test('CSV: BOM, 단위 붙은 머리글, 빈 행 제외, 따옴표 처리', () =
 });
 
 test('센서 기능 목록: 다섯 기능, 값 이름이 겹치지 않음', () => {
-    assert.deepStrictEqual(Object.keys(M.SENSORS), ['env', 'light', 'uv', 'voc', 'imu']);
+    assert.deepStrictEqual(Object.keys(M.SENSORS), ['env', 'light', 'uv', 'voc', 'imu', 'iv']);
     Object.values(M.SENSORS).forEach(s => {
         const keys = s.fields.map(f => f[0]);
         assert.strictEqual(new Set(keys).size, keys.length);

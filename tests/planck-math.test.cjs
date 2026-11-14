@@ -116,3 +116,14 @@ test('a series resistor makes the full knob turn safe', () => {
     assert.ok(x < 1);
     near(P.currentAt(4.5, 10000, x, 2.0, 100), 10, 1e-9);
 });
+
+test('averageSensor averages valid samples and rejects too few or reversed wiring', () => {
+    const r = P.averageSensor([{ voltage: 2.0, current: 5 }, { voltage: 2.02, current: 5.2 }, { voltage: NaN, current: 1 }, null]);
+    near(r.v, 2.01, 1e-9); near(r.i, 5.1, 1e-9); assert.equal(r.n, 2);
+    near(r.sdI, Math.sqrt(0.02), 1e-9);
+    assert.ok(P.averageSensor([{ voltage: 2, current: 5 }]).error);
+    assert.ok(P.averageSensor([]).error);
+    assert.match(P.averageSensor([{ voltage: 2, current: -1 }, { voltage: 2, current: -1.2 }]).error, /VIN/);
+    // 0 근처에서 살짝 음수로 흔들리는 값은 0 으로
+    assert.equal(P.averageSensor([{ voltage: 1.5, current: -0.02 }, { voltage: 1.5, current: 0 }]).i, 0);
+});
