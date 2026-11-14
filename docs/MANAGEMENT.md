@@ -44,6 +44,24 @@
 
 ### A-1. 실험실 (`통합관리:실험실`)
 
+**2026-11-14 다시 만든 실험별 하위 세션** (다른 계정의 세션 나누기를 이 계정에서 똑같이, 사용자 지시). 각 세션은 자기 파일만 고치고, 사용자가 그 대화에서 일을 시킬 때만 작업한다(진자만 바로 시작). PR·머지 소식은 통합 관리 세션에 보낸다.
+
+| 세션 | 담당 파일 | 상태 |
+|---|---|---|
+| 플랑크 상수 (LED) | `projects/planck-led.html`, `js/planck-*.js` | 대기 (PR #61 머지됨, 실물 INA219/INA226 확인 남음) |
+| 말루스 법칙 | `projects/malus-law.html`, `js/malus-*.js` | 대기 |
+| 이상기체 상태 방정식 | `projects/ideal-gas.html`, `js/ideal-gas*.js` | 대기 |
+| 전자기 유도 | `projects/em-induction.html`, `firmware/em-induction/` | 대기 (코일 전압 이름·보정 결정 남음) |
+| 환경·조도·자외선·VOC | `projects/environment-lab.html` 등, `js/sensor-lab.js` 등 | 대기 |
+| 가속도·자유낙하·스마트폰 가속도 | `projects/accelerometer-lab.html`, `free-fall.html`, `phone-accelerometer.html` | 대기 |
+| 걷기·뛰기 판정 | `walk-run-detector/` | 대기 |
+| 선생님이 만든 실험 | `projects/custom-lab.html`, `js/custom-lab*.js` | 대기 (Firestore 규칙 게시 확인 남음) |
+| UI 통일성 및 최적화 | `css/lab-base.css`, `js/lab-ui.js`, 화면 배치 | 대기 (#62 머지됨) |
+| 스마트폰 진자 | `projects/pendulum-*.html`, `js/pendulum-*.js` 등 (`docs/pendulum-spec.md`) | **1단계 작업 중** (측정 앱·주기 계산·시뮬레이션) |
+| 센서 보드 펌웨어 | `firmware/pico2w-environment/` | 기존 "펌웨어 개발: 공용 센서 펌웨어" 세션을 그대로 씀 |
+| 아두이노 Nano | `firmware/nano33-ble-sense-rev2/`, `projects/arduino-nano-lab.html` | 기존 Nano 세션을 그대로 씀 |
+
+
 | 세션 | 상태 | 연결된 GitHub | 남은 일 |
 |---|---|---|---|
 | 통합 관리 세션 (이 대화, `통합관리:본부`) | 진행 중 | `claude/quirky-heisenberg-fdz1qp` (PR #56 머지·배포 2026-11-10) | 이 문서 관리 |
