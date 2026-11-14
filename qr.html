@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR 코드로 접속 | 센서 기반 실험실</title>
+    <style>
+        /* 교실 프로젝터·인쇄용: QR 을 크게, 글자는 굵게 */
+        :root { --c-primary: #1565c0; --c-text: #222; --c-muted: #555; --c-line: #d0d7e2; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif; color: var(--c-text); background: #fff; }
+        main { max-width: 760px; margin: 0 auto; padding: 16px; text-align: center; }
+        h1 { font-size: 1.5em; margin: 8px 0 4px; }
+        .tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; margin: 12px 0; }
+        select, button, a.btn { min-height: 44px; font-size: 1em; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--c-line); background: #fff; color: var(--c-text); text-decoration: none; }
+        select { max-width: 100%; }
+        button.primary, a.btn.primary { background: var(--c-primary); border-color: var(--c-primary); color: #fff; font-weight: bold; }
+        #qr { display: inline-block; padding: 16px; background: #fff; border: 1px solid var(--c-line); border-radius: 12px; }
+        #qr svg { display: block; width: min(80vw, 60vh, 520px); height: auto; }
+        #title { font-size: 1.6em; font-weight: bold; margin: 14px 0 4px; }
+        #url { font-size: 1.1em; color: var(--c-primary); word-break: break-all; margin: 0 0 8px; }
+        .note { color: var(--c-muted); font-size: .95em; }
+        #error { color: #b00020; font-weight: bold; }
+        @media print {
+            .tools, .note, .back { display: none !important; }
+            #qr { border: none; }
+            #qr svg { width: 14cm; }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <p class="back" style="text-align:left;"><a href="index.html">← 메인으로</a></p>
+    <h1>📱 휴대폰으로 접속하기</h1>
+    <p class="note">휴대폰 카메라로 QR 코드를 비추면 바로 열립니다.</p>
+
+    <div class="tools">
+        <label>열 페이지
+            <select id="page"></select>
+        </label>
+        <button id="btn-copy">🔗 주소 복사</button>
+        <button id="btn-full" class="primary">⛶ 크게 보기</button>
+        <button id="btn-print">🖨️ 인쇄</button>
+    </div>
+
+    <div id="qr" aria-label="접속 QR 코드"></div>
+    <p id="title"></p>
+    <p id="url"></p>
+    <p id="error" hidden></p>
+    <p class="note">센서·카메라 실험은 https 주소에서만 동작합니다. 블루투스 센서는 안드로이드·PC 의 크롬이나 엣지에서 여세요 (아이폰은 블루투스 연결이 안 됩니다).</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script>
+(function () {
+    'use strict';
+    const SITE = 'https://aks-sci-lab.web.app/';
+    // 메인 페이지의 프로젝트 목록과 같은 순서
+    const PAGES = [
+        ['', '센서 기반 실험실 (메인)'],
+        ['projects/accelerometer-lab.html', '가속도계 데이터 분석'],
+        ['projects/environment-lab.html', '환경 센서 실시간 모니터'],
+        ['projects/light-lab.html', '조도 센서 측정'],
+        ['projects/uv-lab.html', '자외선 센서 측정'],
+        ['projects/free-fall.html', '자유낙하 궤적 분석'],
+        ['projects/phone-accelerometer.html', '스마트폰 가속도 센서 실험'],
+        ['projects/malus-law.html', '말루스 법칙 실험'],
+        ['projects/planck-led.html', 'LED 로 플랑크 상수 측정'],
+        ['projects/ideal-gas.html', '이상기체 상태 방정식 검증'],
+        ['projects/arduino-nano-lab.html', '아두이노 Nano 33 BLE Sense 실험'],
+        ['projects/em-induction.html', '전자기 유도 전압·전류 측정'],
+        ['walk-run-detector/index.html', '걷기·뛰기 판정']
+    ];
+    const $ = id => document.getElementById(id);
+    const select = $('page');
+    PAGES.forEach(([path, name], i) => {
+        const option = document.createElement('option');
+        option.value = String(i);
+        option.textContent = name;
+        select.appendChild(option);
+    });
+    // 주소 뒤의 ?page=projects/planck-led.html 로 바로 고를 수 있다
+    const wanted = new URLSearchParams(location.search).get('page');
+    const start = PAGES.findIndex(p => p[0] === wanted);
+    select.value = String(start >= 0 ? start : 0);
+
+    function currentUrl() { return SITE + PAGES[Number(select.value)][0]; }
+
+    function draw() {
+        const url = currentUrl();
+        $('title').textContent = PAGES[Number(select.value)][1];
+        $('url').textContent = url;
+        if (typeof window.qrcode !== 'function') {
+            $('error').hidden = false;
+            $('error').textContent = 'QR 코드를 만드는 코드를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요. 위의 주소를 직접 알려 주어도 됩니다.';
+            return;
+        }
+        const qr = window.qrcode(0, 'M');   // 크기 자동, 오류 정정 M (조금 가려져도 읽힘)
+        qr.addData(url);
+        qr.make();
+        $('qr').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true });
+    }
+
+    select.addEventListener('change', () => {
+        const path = PAGES[Number(select.value)][0];
+        history.replaceState(null, '', path ? '?page=' + encodeURIComponent(path) : location.pathname);
+        draw();
+    });
+    $('btn-copy').addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(currentUrl()); $('btn-copy').textContent = '✅ 복사했습니다'; }
+        catch (e) { prompt('아래 주소를 복사하세요.', currentUrl()); }
+        setTimeout(() => { $('btn-copy').textContent = '🔗 주소 복사'; }, 1500);
+    });
+    $('btn-full').addEventListener('click', () => {
+        const el = document.documentElement;
+        if (document.fullscreenElement) document.exitFullscreen();
+        else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+    });
+    $('btn-print').addEventListener('click', () => window.print());
+    draw();
+})();
+</script>
+</body>
+</html>
