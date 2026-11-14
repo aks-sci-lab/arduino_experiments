@@ -97,6 +97,17 @@ service cloud.firestore {
       allow delete: if request.auth != null && isTeacher(request);
     }
 
+    // 스마트폰 진자: 선생님마다 자기 Apps Script 웹 앱(스크립트 ID)을 자기 계정에 저장 (projects/pendulum-setup.html)
+    // 본인만 읽고 쓴다. 학생 화면은 이 문서를 읽지 않는다(링크의 ?s= 로 시트를 고름).
+    match /pendulumTeachers/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid &&
+                            request.resource.data.keys().hasOnly(['scriptId', 'updatedAt']) &&
+                            request.resource.data.scriptId is string &&
+                            request.resource.data.scriptId.matches('^[A-Za-z0-9_-]{20,120}$') &&
+                            request.resource.data.updatedAt == request.time;
+    }
+
     // Roles collection (read-only for clients, managed by Admin SDK)
     match /roles/{uid} {
       allow read: if request.auth != null;
