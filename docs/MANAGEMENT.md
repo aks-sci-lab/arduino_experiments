@@ -55,7 +55,8 @@
 | LED 플랑크 상수 측정 웹앱 | 끝남 | PR #37~#45 머지·배포 완료 | 초록 LED 재측정 |
 | 코드 최적화 및 무결성 검증 | 끝남 | — | 없음 |
 | 펌웨어 개발: 공용 센서 펌웨어 (`통합관리:펌웨어`, 2026-11-10 만듦) | PR 올림 (2026-11-10, 사용자가 그 대화에서 직접 승인. 앞으로 통합 관리 세션이 전하는 작업은 PR 생성까지 알아서 진행) | PR #57 머지·배포 (2026-11-10, 사용자 승인으로 통합 관리 세션이 머지) | Pico 환경 센서 하나로 진행, 초기 설정 최소화(사용자 결정). 맡긴 일: ① 안정성 고치기 ② 보드 번호를 선생님 화면(`projects/board-setup.html`)에서 블루투스로 정하기(BOOTSEL 단추를 누른 동안만)·연결 시 LED ③ 설치 파일 하나로 묶기(확인 못 하면 계획만). PR 이 오면 통합 관리 세션이 메인 페이지 링크·진행 기록 추가. 그 뒤 후보: 여러 기능 동시 측정, 전자기 유도 합치기 |
-| 아두이노 Nano 33 BLE Sense Rev2 페이지·펌웨어 (2026-11-13, 통합 관리 세션이 만듦) | PR 올림 | 브랜치 `claude/nano33-ble-sense-lab` | 결정 변경(사용자 2026-11-13): 11-10 의 "아두이노용은 만들지 않음"을 바꿔 Rev2 전용 페이지(`projects/arduino-nano-lab.html`)·펌웨어(`firmware/nano33-ble-sense-rev2/`)를 추가, Pico 는 그대로. 남은 일: 사용자 머지 결정, 실제 보드 업로드·연결 확인 |
+| 아두이노 Nano 33 BLE Sense Rev2 페이지·펌웨어 (2026-11-13, 통합 관리 세션이 만듦) | 끝남 | PR #59 머지·배포 (2026-11-13, 사이트에 페이지 올라간 것 2026-11-14 확인) | 결정 변경(사용자 2026-11-13): 11-10 의 "아두이노용은 만들지 않음"을 바꿔 Rev2 전용 페이지(`projects/arduino-nano-lab.html`)·펌웨어(`firmware/nano33-ble-sense-rev2/`)를 추가, Pico 는 그대로. 남은 일: 실제 보드 업로드·연결 확인(±16 g, 100 Hz, 아두이노 IDE 컴파일) |
+| 문서 정리 (2026-11-14, 이 PC 에서 시작한 Claude Code 대화) | PR 올림 | 브랜치 `claude/docs-status-nano-merged` | PR #59 머지 반영, 결정 목록 정리. 남은 일: 사용자 머지 결정 |
 | 머지 전용: 실험실 PR #49 | 보관됨 | PR #49 머지 (2026-11-03) | 없음 |
 | 깃허브 작업 가져오기 | 보관됨 | — | 없음 |
 
@@ -110,9 +111,10 @@ PR #49·#54 는 2026-11-03 머지되었다.
 
 ## C. 정리해도 되는 브랜치 (내용이 모두 main 에 있음)
 
-머지가 끝나 지워도 되는 브랜치 8개 (사용자 승인 2026-11-03·11-10, **사용자가 GitHub 웹에서 삭제** — 확인할 것은 이슈 #55):
+머지가 끝나 지워도 되는 브랜치 9개 (사용자 승인 2026-11-03·11-10, **사용자가 GitHub 웹에서 삭제** — 확인할 것은 이슈 #55). 2026-11-14 확인: 아직 GitHub 에 모두 남아 있음.
 
 - `claude/gifted-keller-w81hco` (PR #51), `claude/jolly-brown-sggwyd` (PR #49), `claude/figure-maker-move` (PR #50), `ccr-d5d43435-sy4j52` (PR #42), `claude/malus-inquiry-tabs` (PR #33), `claude/firmware-stability-board-number` (PR #57), `claude/stoic-archimedes-48nbsd` (PR #54 로 옮겨 머지), `handoff/figure-maker-new-repo` (figure-maker 저장소에 같은 파일이 있는지 확인 후)
+- 2026-11-14 추가: `claude/nano33-ble-sense-lab` (PR #59 머지됨, 삭제 승인은 아직 받지 않음)
 - 통합 PR 의 브랜치 `claude/quirky-heisenberg-fdz1qp` 는 통합 관리 세션이 계속 쓰므로 남긴다.
 
 지난 정리:
@@ -126,11 +128,13 @@ PR #49·#54 는 2026-11-03 머지되었다.
 
 ## 결정이 필요한 것 (사용자)
 
+2026-11-14 정리 (PR #56·#57·#59 는 모두 머지·배포됨):
+
 1. **Firestore 규칙 배포** (PR #56 의 `customExperiments` — 배포 전에는 "새 실험 만들기" 저장이 안 됨, `docs/DEPLOY.md`)
-1. 센서 보드에 새 펌웨어 파일 올리기 (PR #57 — 올려야 보드 번호·LED 가 동작), 실제 보드에서 확인
-1. 브랜치 삭제: `claude/stoic-archimedes-48nbsd`(PR #54 로 들어감), `claude/firmware-stability-board-number`(PR #57 머지됨), 이슈 #55 의 브랜치들
-2. PR #56 머지 여부, 머지 뒤 Firestore 규칙 배포 (`docs/DEPLOY.md`)
-3. GitHub 저장소 이름을 `sensor-lab` 으로 바꾸기 (저장소 설정은 사람만 바꿀 수 있음, `AGENTS.md` "저장소 이름 바꾸기" 참고)
+2. Pico 센서 보드에 새 펌웨어 파일 올리기 (PR #57 — 올려야 보드 번호·LED 가 동작), 실제 보드에서 확인
+3. Nano 33 BLE Sense Rev2 보드에 펌웨어 올리고 확인 (PR #59 — 아두이노 IDE 컴파일, 시리얼 모니터 `+/-16 g VERIFIED`, 100 Hz 끊김, `firmware/nano33-ble-sense-rev2/README.md`)
+4. 브랜치 삭제: 위 C 의 브랜치들 (이슈 #55), `claude/nano33-ble-sense-lab` 은 지워도 되는지 승인. Settings → General 의 "Automatically delete head branches" 켜기 권장
+5. GitHub 저장소 이름을 `sensor-lab` 으로 바꾸기 (저장소 설정은 사람만 바꿀 수 있음, `AGENTS.md` "저장소 이름 바꾸기" 참고)
 
 ## 관리 방법
 
