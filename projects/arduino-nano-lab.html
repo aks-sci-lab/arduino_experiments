@@ -68,9 +68,9 @@
         </div>
 
         <!-- 측정할 센서 고르기 -->
-        <div class="seg" role="group" aria-label="측정할 센서 고르기">
-            <button id="tabImu" data-mode="imu" aria-pressed="true">가속도</button>
-            <button id="tabEnv" data-mode="env" aria-pressed="false">환경 (온도·습도·기압)</button>
+        <div class="seg pick" role="group" aria-label="측정할 센서 고르기">
+            <button id="tabImu" data-mode="imu" aria-pressed="true"><span class="ic" aria-hidden="true">📐</span>가속도<small>x·y·z, |a|</small></button>
+            <button id="tabEnv" data-mode="env" aria-pressed="false"><span class="ic" aria-hidden="true">🌡️</span>환경<small>온도·습도·기압</small></button>
         </div>
         <p id="modeNote" class="note"></p>
 

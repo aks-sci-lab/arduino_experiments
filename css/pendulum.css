@@ -50,6 +50,8 @@
 .pd-calib.go { background: var(--c-ok-bg); border-color: var(--c-success); }
 .pd-calib.go .pd-count { color: var(--c-success); }
 
+.pendulum .dash-bar.pd-bar { position: sticky; top: 0; }   /* 휴대폰에서도 측정 단추가 늘 보이게 (단추 3개라 한 줄) */
+.pd-bar button { padding-left: var(--sp-2); padding-right: var(--sp-2); }
 .pd-charts { display: grid; gap: var(--sp-2); min-width: 0; }
 .pd-charts .dash-chart { height: clamp(200px, 30vh, 320px); }
 .pd-key::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #e8590c; vertical-align: middle; }

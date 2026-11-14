@@ -152,9 +152,9 @@
 
     <!-- ================= 4. 과정 ================= -->
     <section class="step-panel" data-step="procedure" hidden>
-        <div class="card">
+        <div class="card" data-subtabs="과정 나눠 보기">
             <h2>4. 실험 과정</h2>
-            <h3>① 회로 연결</h3>
+            <h3 data-subtab="회로">① 회로 연결</h3>
             <div class="tbl-wrap">
             <table class="left">
                 <thead><tr><th>연결점</th><th>ADS1115</th><th>의미</th></tr></thead>
@@ -177,7 +177,7 @@
                 입력 전압은 ADS1115 전원 전압(5 V)을 넘지 않게 하세요.
             </div>
 
-            <h3>② 아두이노 스케치 올리기</h3>
+            <h3 data-subtab="스케치">② 아두이노 스케치 올리기</h3>
             <p class="muted">저장소의 <code>firmware/em-induction/em-induction.ino</code> 파일을 아두이노 IDE 로 열어 업로드합니다. 시리얼 속도는 <b>115200</b>이고, 한 줄에 <code>t_ms,vcoil_uV,vshunt_uV</code> 형식으로 보냅니다.</p>
             <pre id="sketchSample">// 전체 스케치는 firmware/em-induction/em-induction.ino 를 아두이노 IDE로 여세요.
 // 출력 예) 한 줄에 한 샘플:
@@ -185,7 +185,7 @@
 1522,-1180,-11800
 1524, 310, 3100</pre>
 
-            <h3>③ 센서 검증하기 (처음 한 번)</h3>
+            <h3 data-subtab="검증·측정">③ 센서 검증하기 (처음 한 번)</h3>
             <ol>
                 <li>자석을 코일에서 멀리 둔 상태에서 <b>영점 보정</b>을 누릅니다. 값이 0 근처에서 흔들리면 정상입니다.</li>
                 <li>전압 센서 검증: 1.5 V 건전지를 A0/A1에 직접 대고 이득을 ±2.048 V로 하면 약 1500 mV가 표시되어야 합니다 (멀티미터와 비교).</li>
