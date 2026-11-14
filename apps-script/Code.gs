@@ -13,11 +13,15 @@
  *   GET ?action=raw&group=…&id=…       → 측정 한 개의 원본 데이터 조각
  *   GET ?action=ping                    → 연결 확인
  *
+ *   LED 플랑크 상수 실험(projects/planck-led.html)도 같은 시트를 쓴다 (exp: 'planck', 3판부터):
+ *   POST { action: 'save', exp: 'planck', id, group, device, led, lambda, V0…, iv, glow }  → planck 시트에 LED 하나당 한 줄 (같은 id 면 고쳐 씀)
+ *   GET ?action=list&exp=planck&group=2-3-4821  → 그 조가 보낸 LED 측정값 (같은 조의 다른 노트북이 불러감)
+ *
  * 개인정보: 학생 이름·학번·이메일은 받지도 저장하지도 않는다. 조 코드로만 구분한다.
  * 4단계(보고서·AI)용 시트 reports·ai_logs·quiz 는 만들어 두기만 한다.
  */
 
-var VERSION = 2;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)
+var VERSION = 3;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가
 var GROUP_RE = /^\d{1,2}-\d{1,2}-\d{4}$/;      // 반-조-4자리 숫자 (예: 2-3-4821)
 var ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
 var MAX_BODY = 400000;                            // 보내는 글자 수 한도
@@ -30,14 +34,23 @@ var SHEETS = {
     'id', 'kind', 'source', 'T_sem', 'rate', 'device', 'measuredAt', 'rawInfo', 'rawData2', 'rawData3', 'rawData4', 'rawData5', 'rawData6'],
   reports: ['timestamp', 'groupCode', 'section', 'content', 'submitted'],
   ai_logs: ['timestamp', 'groupCode', 'source', 'section', 'prompt', 'attachedContext', 'response', 'verification'],
-  quiz: ['timestamp', 'groupCode', 'question', 'answer']
+  quiz: ['timestamp', 'groupCode', 'question', 'answer'],
+  // LED 플랑크 상수: 조의 노트북 한 대가 잰 LED 하나 = 한 줄. 선생님은 이 탭에서 모든 조를 본다
+  planck: ['timestamp', 'groupCode', 'led', 'lambda_nm', 'V0_current', 'V0_glow', 'nIV', 'nGlow',
+    'h_current_e-34', 'error_pct', 'R2', 'h_glow_e-34', 'device', 'id', 'ledKey', 'curMode', 'iMin', 'sentAt', 'ivData', 'glowData']
 };
+var DEVICE_RE = /^[A-Za-z0-9_-]{4,20}$/;
+var PLANCK_POINTS = 500;                          // LED 하나·기준 하나에 받는 점 수 한도
 
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
     if (p.action === 'ping') return json({ ok: true, version: VERSION });
     var group = cleanGroup(p.group);
+    if (p.exp === 'planck') {
+      if (p.action === 'list') return json({ ok: true, group: group, items: listPlanck(group) });
+      throw new Error('알 수 없는 요청입니다.');
+    }
     if (p.action === 'list') return json({ ok: true, group: group, items: listGroup(group) });
     if (p.action === 'raw') {
       if (!ID_RE.test(String(p.id || ''))) throw new Error('측정 번호(id)가 올바르지 않습니다.');
@@ -55,6 +68,7 @@ function doPost(e) {
     if (!bodyText) throw new Error('보낸 내용이 없습니다.');
     if (bodyText.length > MAX_BODY) throw new Error('보낸 내용이 너무 큽니다.');
     var body = JSON.parse(bodyText);
+    if (body.action === 'save' && body.exp === 'planck') return json(savePlanck(body));
     if (body.action === 'save') return json(saveMeasurement(body));
     throw new Error('알 수 없는 요청입니다.');
   } catch (err) {
@@ -149,21 +163,22 @@ function saveMeasurement(b) {
   }
 }
 
-function allRows(sh) {
+// 시트 이름(sheetName)을 주지 않으면 진자 measurements 시트
+function allRows(sh, sheetName) {
   var n = sh.getLastRow();
   if (n < 2) return [];
-  return sh.getRange(2, 1, n - 1, SHEETS.measurements.length).getValues();
+  return sh.getRange(2, 1, n - 1, SHEETS[sheetName || 'measurements'].length).getValues();
 }
-function idx(name) { return SHEETS.measurements.indexOf(name); }
-function findRow(sh, group, id) {
-  var rows = allRows(sh);
+function idx(name, sheetName) { return SHEETS[sheetName || 'measurements'].indexOf(name); }
+function findRow(sh, group, id, sheetName) {
+  var rows = allRows(sh, sheetName);
   for (var i = 0; i < rows.length; i++) {
-    if (same(rows[i][idx('groupCode')], group) && same(rows[i][idx('id')], id)) return i + 2;
+    if (same(rows[i][idx('groupCode', sheetName)], group) && same(rows[i][idx('id', sheetName)], id)) return i + 2;
   }
   return 0;
 }
-function countGroup(sh, group) {
-  return allRows(sh).filter(function (r) { return same(r[idx('groupCode')], group); }).length;
+function countGroup(sh, group, sheetName) {
+  return allRows(sh, sheetName).filter(function (r) { return same(r[idx('groupCode', sheetName)], group); }).length;
 }
 
 function listGroup(group) {
@@ -190,4 +205,89 @@ function rawOf(group, id) {
     }
   }
   return { ok: false, error: '그 측정을 찾지 못했습니다.' };
+}
+
+// ---------- LED 플랑크 상수 (projects/planck-led.html, js/planck-cloud.js) ----------
+// 측정점은 JSON 글자로: iv = [[V_LED, I(mA), V_R 또는 null, R 또는 null, 센서면 1], …], glow = [V, …]
+// 받은 그대로 저장하지 않고 숫자만 골라 다시 만든다 (이상한 글자·큰 값이 시트에 들어가지 않게)
+function cleanPoints(textValue, isIv, name) {
+  if (textValue === '' || textValue == null) return '[]';
+  var arr;
+  try { arr = JSON.parse(String(textValue)); } catch (err) { throw new Error(name + ' 형식이 올바르지 않습니다.'); }
+  if (!Array.isArray(arr) || arr.length > PLANCK_POINTS) throw new Error(name + ' 점 수가 너무 많거나 형식이 올바르지 않습니다.');
+  var out = arr.map(function (p) {
+    if (!isIv) return numIn(p, 0, 50, name + ' 전압');
+    if (!Array.isArray(p) || p.length < 2 || p.length > 5) throw new Error(name + ' 형식이 올바르지 않습니다.');
+    var row = [numIn(p[0], 0, 50, name + ' 전압'), numIn(p[1], 0, 1000, name + ' 전류')];
+    if (p.length > 2) row.push(p[2] == null ? null : numIn(p[2], 0, 50, name + ' 저항 전압'));
+    if (p.length > 3) row.push(p[3] == null ? null : numIn(p[3], 0, 1e7, name + ' 저항'));
+    if (p.length > 4) row.push(p[4] ? 1 : 0);
+    return row;
+  });
+  var s = JSON.stringify(out);
+  if (s.length > CELL_MAX) throw new Error(name + ' 이 너무 큽니다.');
+  return s;
+}
+
+function savePlanck(b) {
+  var group = cleanGroup(b.group);
+  var id = String(b.id || '');
+  if (!ID_RE.test(id)) throw new Error('측정 번호(id)가 올바르지 않습니다.');
+  var device = String(b.device || '');
+  if (!DEVICE_RE.test(device)) throw new Error('노트북 번호가 올바르지 않습니다.');
+  var led = String(b.led == null ? '' : b.led).trim();
+  if (!led) throw new Error('LED 이름이 없습니다.');
+  var ledKey = String(b.ledKey || '');
+  var rec = {
+    timestamp: new Date(),
+    groupCode: text(group, 20),
+    led: text(led, 40),
+    lambda_nm: numIn(b.lambda, 200, 1100, 'LED 파장'),
+    V0_current: numIn(b.v0Current, 0, 10, '문턱 전압(전류 기준)', true),
+    V0_glow: numIn(b.v0Glow, 0, 10, '문턱 전압(빛 기준)', true),
+    nIV: numIn(b.nIV, 0, PLANCK_POINTS, '점 수'),
+    nGlow: numIn(b.nGlow, 0, PLANCK_POINTS, '점 수'),
+    'h_current_e-34': numIn(b.hCurrent, 0, 100, '플랑크 상수', true),
+    error_pct: numIn(b.errorPct, -10000, 10000, '오차율', true),
+    R2: numIn(b.r2, -1, 1, '결정계수', true),
+    'h_glow_e-34': numIn(b.hGlow, 0, 100, '플랑크 상수(빛 기준)', true),
+    device: text(device, 20),
+    id: text(id, 40),
+    ledKey: text(/^[A-Za-z0-9_-]{1,20}$/.test(ledKey) ? ledKey : '', 20),
+    curMode: b.curMode === 'current' ? 'current' : 'extrapolate',
+    iMin: numIn(b.iMin, 0, 100, '직선 부분 기준 전류', true),
+    sentAt: text(b.sentAt, 40),
+    ivData: text(cleanPoints(b.iv, true, 'I–V 측정값'), CELL_MAX),
+    glowData: text(cleanPoints(b.glow, false, '빛 기준 측정값'), CELL_MAX)
+  };
+  var row = SHEETS.planck.map(function (c) { return rec[c] === undefined ? '' : rec[c]; });
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = sheet('planck');
+    var found = findRow(sh, group, id, 'planck');
+    if (found) {
+      sh.getRange(found, 1, 1, row.length).setValues([row]);
+      return { ok: true, id: id, updated: true };
+    }
+    if (countGroup(sh, group, 'planck') >= MAX_ROWS_PER_GROUP) throw new Error('이 조가 보낸 줄이 너무 많습니다(' + MAX_ROWS_PER_GROUP + '개). 선생님께 알려 주세요.');
+    sh.appendRow(row);
+    return { ok: true, id: id, updated: false };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function listPlanck(group) {
+  var cols = SHEETS.planck;
+  return allRows(sheet('planck'), 'planck').filter(function (r) { return same(r[idx('groupCode', 'planck')], group); }).map(function (r) {
+    var o = { group: group };
+    cols.forEach(function (k, j) {
+      if (k === 'groupCode') return;
+      var v = r[j];
+      o[k] = v instanceof Date ? v.toISOString() : v;
+    });
+    return o;
+  });
 }
