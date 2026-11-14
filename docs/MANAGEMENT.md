@@ -115,7 +115,7 @@ PR #49·#54 는 2026-11-03 머지되었다.
 머지가 끝나 지워도 되는 브랜치 9개 (사용자 승인 2026-11-03·11-10, **사용자가 GitHub 웹에서 삭제** — 확인할 것은 이슈 #55). 2026-11-14 확인: 아직 GitHub 에 모두 남아 있음.
 
 - `claude/gifted-keller-w81hco` (PR #51), `claude/jolly-brown-sggwyd` (PR #49), `claude/figure-maker-move` (PR #50), `ccr-d5d43435-sy4j52` (PR #42), `claude/malus-inquiry-tabs` (PR #33), `claude/firmware-stability-board-number` (PR #57), `claude/stoic-archimedes-48nbsd` (PR #54 로 옮겨 머지), `handoff/figure-maker-new-repo` (figure-maker 저장소에 같은 파일이 있는지 확인 후)
-- 2026-11-14 추가: `claude/nano33-ble-sense-lab` (PR #59 머지됨, 삭제 승인은 아직 받지 않음)
+- 2026-11-14 추가 (사용자 "모든 작업 니가 진행해"): `claude/nano33-ble-sense-lab` (PR #59), `claude/docs-status-nano-merged` (PR #60), `claude/site-qr` (PR #63), `claude/handover-2026-11-14` (PR #64), `claude/ui-foundation` (PR #62), `claude/planck-ble-iv-sensor` (PR #61, 통합 관리 세션 PR 로 합쳐 머지), `claude/page-qr-button` (PR 없음, 이미 배포된 #63 `qr.html` 과 기능이 겹치고 #62 와 충돌해 쓰지 않기로 함)
 - 통합 PR 의 브랜치 `claude/quirky-heisenberg-fdz1qp` 는 통합 관리 세션이 계속 쓰므로 남긴다.
 
 지난 정리:
@@ -129,10 +129,11 @@ PR #49·#54 는 2026-11-03 머지되었다.
 
 ## 결정이 필요한 것 (사용자)
 
-2026-11-14 정리 (PR #56·#57·#59 는 모두 머지·배포됨):
+2026-11-14 정리 (PR #56·#57·#59·#60·#61·#62·#63·#64 는 모두 머지·배포됨. #61 은 #62 와 `AGENTS.md` 충돌을 풀어 통합 관리 세션 PR 로 머지):
 
 1. **Firestore 규칙 배포** (PR #56 의 `customExperiments` — 배포 전에는 "새 실험 만들기" 저장이 안 됨, `docs/DEPLOY.md`)
 2. Pico 센서 보드에 새 펌웨어 파일 올리기 (PR #57 — 올려야 보드 번호·LED 가 동작), 실제 보드에서 확인
+3. 플랑크 블루투스 전류·전압 센서(INA219/INA226) 실물 확인 (PR #61 — 보드에 새 펌웨어, 회로: 가변저항 → 330 Ω → VIN+ → VIN− → LED → −)
 3. Nano 33 BLE Sense Rev2 보드에 펌웨어 올리고 확인 (PR #59 — 아두이노 IDE 컴파일, 시리얼 모니터 `+/-16 g VERIFIED`, 100 Hz 끊김, `firmware/nano33-ble-sense-rev2/README.md`)
 4. 브랜치 삭제: 위 C 의 브랜치들 (이슈 #55), `claude/nano33-ble-sense-lab` 은 지워도 되는지 승인. Settings → General 의 "Automatically delete head branches" 켜기 권장
 5. GitHub 저장소 이름을 `sensor-lab` 으로 바꾸기 (저장소 설정은 사람만 바꿀 수 있음, `AGENTS.md` "저장소 이름 바꾸기" 참고)

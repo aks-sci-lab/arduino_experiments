@@ -110,6 +110,7 @@
                 <tr><td>미니 브레드보드</td><td>전원 줄 없는 것</td><td>1개</td></tr>
                 <tr><td>점퍼선</td><td>수–수</td><td>5개 이상</td></tr>
                 <tr><td>디지털 멀티미터</td><td>직류 전압·저항 측정</td><td>2대</td></tr>
+                <tr><td>(선택) 블루투스 센서</td><td>Pico 센서 보드 + INA219 또는 INA226 모듈 — 있으면 멀티미터 대신 씀</td><td>1세트</td></tr>
                 <tr><td>검은 종이 통</td><td>LED 를 덮을 크기 (빛 기준용)</td><td>1개</td></tr>
                 <tr><td>스마트폰 또는 PC</td><td>이 페이지</td><td>1대</td></tr>
             </tbody>
@@ -476,6 +477,20 @@
             <li>문턱 근처에서는 V<sub>R</sub> 이 아주 작습니다. 멀티미터 ② 는 <b>200 mV 범위</b>(자동 범위면 그대로)로 보면 더 정확합니다.</li>
         </ul>
 
+        <details class="sensor-guide" id="sensor-guide">
+            <summary>📡 멀티미터 대신 블루투스 센서로 재기 (INA219·INA226 모듈, 선택)</summary>
+            <p>Pico 센서 보드에 전류·전압 모듈을 꽂으면 V<sub>LED</sub> 와 전류 I 를 한 번에 잽니다. 멀티미터가 필요 없고, 두 값을 <b>같은 순간</b>에 읽습니다.</p>
+            <ol>
+                <li><b>모듈 ↔ 센서 보드</b>: VCC → 3.3 V, GND → GND, SDA → GP20, SCL → GP21. 보드에는 펌웨어 2026.11-iv 이상을 올립니다 (선생님이 미리 준비).</li>
+                <li><b>고정 저항을 모듈 앞에</b>: 고정 저항의 9번 줄 쪽 다리를 빼서 <b>빈 줄</b>에 꽂고, 그 줄 → 모듈 <b>VIN+</b>, 모듈 <b>VIN−</b> → 9번 줄(LED 긴 다리)로 잇습니다.</li>
+                <li>모듈의 <b>GND</b> 를 10번 줄(LED 짧은 다리, 건전지 −)에도 잇습니다. 이렇게 해야 모듈이 재는 전압이 곧 LED 전압이 됩니다.</li>
+                <li>INA226 모듈에 VBUS 핀이 따로 있으면 VBUS 를 VIN− 에 잇습니다.</li>
+                <li>5. 데이터 수집 탭의 <b>측정 도구</b>에서 '📡 블루투스 센서'를 고르고 <b>센서 연결</b>을 누릅니다 (PC·안드로이드의 크롬·엣지, 아이폰은 안 됨).</li>
+                <li>손잡이를 돌리고 값이 멈추면 <b>✅ 이 점 기록</b>을 누릅니다. 1초 동안 받은 값의 평균이 기록됩니다.</li>
+            </ol>
+            <p class="note">전류가 음수로 나오면 VIN+ 와 VIN− 를 바꿔 꽂습니다. INA219 의 전류 눈금은 약 0.1 mA, INA226 은 약 0.025 mA 라서 문턱 근처의 아주 작은 전류는 거칠게 보일 수 있습니다. 직선 연장(1 mA 이상인 점)에는 충분합니다.</p>
+        </details>
+
         <h3>⑤ 측정: 본 실험 (전류 기준)</h3>
         <ol>
             <li>5. 데이터 수집 탭에서 '⚡ 전류 기준'을 고르고, 측정할 LED 를 고릅니다.</li>
@@ -519,8 +534,30 @@
         </div>
 
         <div id="box-current">
+            <div class="row">
+                <label>측정 도구
+                    <select id="sel-tool">
+                        <option value="multimeter">🔧 멀티미터 (손으로 입력)</option>
+                        <option value="sensor">📡 블루투스 센서 (INA219·INA226)</option>
+                    </select>
+                </label>
+            </div>
+            <div id="box-sensor" hidden>
+                <div class="row">
+                    <button id="btn-sensor" class="secondary">🔗 센서 연결</button>
+                    <span id="sensor-status" class="note">4. 실험 과정의 '📡 블루투스 센서로 재기' 대로 회로를 꾸민 뒤 연결하세요.</span>
+                </div>
+                <div class="row sensor-live" id="sensor-live">
+                    <span>V<sub>LED</sub> <b id="live-v">–</b> V</span>
+                    <span>I <b id="live-i">–</b> mA</span>
+                    <span id="live-chip" class="note"></span>
+                </div>
+                <div class="row entry">
+                    <button id="btn-add-sensor" class="good" disabled>✅ 이 점 기록 (1초 평균)</button>
+                </div>
+            </div>
             <div class="row" id="row-rmeas"><label>고정 저항 실제 값 R <input type="number" id="r-meas" min="1" step="1" inputmode="numeric"> Ω</label><span class="note">(4. 실험 과정 ②에서 잰 값)</span></div>
-            <div class="row entry">
+            <div class="row entry" id="row-manual">
                 <label>① V<sub>LED</sub> <input type="number" id="in-v" step="0.01" min="0" inputmode="decimal"> V</label>
                 <label id="lbl-vr">② V<sub>R</sub> <input type="number" id="in-vr" step="0.001" min="0" inputmode="decimal">
                     <select id="sel-vr-unit"><option value="V">V</option><option value="mV">mV</option></select></label>
@@ -658,6 +695,13 @@
     </section>
 </div>
 <script src="../js/planck-math.js"></script>
+<!-- 블루투스 센서(Pico + INA219/INA226) 연결: 다른 센서 실험과 같은 코드를 쓴다 -->
+<script src="../js/pico-ble.js"></script>
+<script src="../js/environment-protocol.js"></script>
+<script src="../js/sensor-definitions.js"></script>
+<script src="../js/accelerometer-protocol.js"></script>
+<script src="../js/custom-lab-math.js"></script>
+<script src="../js/custom-lab-sensor.js"></script>
 <script src="../js/planck-led.js"></script>
 </body>
 </html>

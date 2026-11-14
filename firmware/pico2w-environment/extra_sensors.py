@@ -1,4 +1,4 @@
-"""TSL2591 lux, LTR390 UV counts, and SGP40 humidity-compensated SRAW."""
+"""TSL2591 lux, LTR390 UV counts, SGP40 humidity-compensated SRAW, INA219/INA226 current and voltage."""
 
 import struct
 import time
@@ -123,4 +123,65 @@ class SGP40:
         return {
             "sraw": raw, "warmup": warmup,
             "temp": environment["temp"], "humidity": environment["humidity"],
+        }
+
+
+class CurrentMonitor:
+    """INA219 또는 INA226 전류·전압 모듈 (I2C 주소 0x40, 모듈의 전류 측정 저항 0.1 Ω).
+
+    회로: ... → 고정 저항 → VIN+ → VIN- → LED(+) → LED(-) → 건전지 -, 모듈 GND 도 건전지 - 에.
+    이렇게 꽂으면 버스 전압(VIN- 와 GND 사이)이 곧 LED 전압이고, VIN+ 와 VIN- 사이의
+    작은 저항(션트)에 걸린 전압으로 LED 에 흐르는 전류를 계산한다.
+    INA226 은 제조사 번호 레지스터(0xFE = 0x5449)로 알아본다. 없으면 INA219 로 본다.
+    INA226 모듈은 VBUS 핀을 VIN- 에 이어야 LED 전압이 나온다.
+    """
+
+    SHUNT_OHM = 0.1
+
+    def __init__(self, i2c, address=0x40):
+        self.i2c = i2c
+        self.address = address
+        self.kind = "INA226" if self._is_ina226() else "INA219"
+        if self.kind == "INA226":
+            # 평균 64번, 변환 시간 1.1 ms, 션트·버스 연속 측정 (한 값에 약 0.14 초)
+            config = 0x4727
+            self.shunt_lsb = 0.0000025   # 2.5 µV
+            self.bus_lsb = 0.00125       # 1.25 mV
+        else:
+            # 버스 16 V 범위, 션트 ±40 mV(0.1 Ω 에서 ±400 mA), 12비트 64번 평균, 연속 측정
+            config = 0x0777
+            self.shunt_lsb = 0.00001     # 10 µV
+            self.bus_lsb = 0.004         # 4 mV
+        self._write(0x00, config)
+        if self._read(0x00) != config:
+            raise RuntimeError(self.kind + " configuration check failed")
+
+    def _is_ina226(self):
+        try:
+            return self._read(0xFE) == 0x5449
+        except OSError:
+            return False
+
+    def _write(self, register, value):
+        self.i2c.writeto_mem(self.address, register, bytes([(value >> 8) & 0xFF, value & 0xFF]))
+
+    def _read(self, register):
+        data = self.i2c.readfrom_mem(self.address, register, 2)
+        return (data[0] << 8) | data[1]
+
+    def read(self):
+        raw_shunt = self._read(0x01)
+        if raw_shunt & 0x8000:
+            raw_shunt -= 0x10000
+        raw_bus = self._read(0x02)
+        if self.kind == "INA219":
+            if raw_bus & 0x01:
+                raise RuntimeError("INA219 overflow; current is too large for the 0.1 ohm shunt")
+            raw_bus >>= 3
+        shunt_v = raw_shunt * self.shunt_lsb
+        return {
+            "voltage": round(raw_bus * self.bus_lsb, 4),
+            "current": round(shunt_v / self.SHUNT_OHM * 1000, 4),
+            "shunt": round(shunt_v * 1000, 4),
+            "chip": self.kind,
         }

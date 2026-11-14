@@ -60,8 +60,8 @@
         ['', '센서 기반 실험실 (메인)'],
         ['projects/accelerometer-lab.html', '가속도계 데이터 분석'],
         ['projects/environment-lab.html', '환경 센서 실시간 모니터'],
-        ['projects/light-lab.html', '조도 센서 측정'],
-        ['projects/uv-lab.html', '자외선 센서 측정'],
+        ['projects/environment-lab.html?sensor=light', '조도 센서 측정'],
+        ['projects/environment-lab.html?sensor=uv', '자외선 센서 측정'],
         ['projects/free-fall.html', '자유낙하 궤적 분석'],
         ['projects/phone-accelerometer.html', '스마트폰 가속도 센서 실험'],
         ['projects/malus-law.html', '말루스 법칙 실험'],
@@ -80,7 +80,10 @@
         select.appendChild(option);
     });
     // 주소 뒤의 ?page=projects/planck-led.html 로 바로 고를 수 있다
-    const wanted = new URLSearchParams(location.search).get('page');
+    // 예전 조도·자외선 주소(환경 페이지로 합쳐짐)로 들어와도 같은 항목을 고른다
+    const OLD = { 'projects/light-lab.html': 'projects/environment-lab.html?sensor=light', 'projects/uv-lab.html': 'projects/environment-lab.html?sensor=uv' };
+    const asked = new URLSearchParams(location.search).get('page');
+    const wanted = OLD[asked] || asked;
     const start = PAGES.findIndex(p => p[0] === wanted);
     select.value = String(start >= 0 ? start : 0);
 

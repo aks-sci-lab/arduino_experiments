@@ -281,7 +281,7 @@ class BLETests(unittest.TestCase):
 
     def test_extra_sensor_commands_preserve_imu_rate_and_select_correct_mode(self):
         peripheral = self.peripheral
-        for mode in ("LIGHT", "UV", "VOC", "ENV_VOC"):
+        for mode in ("LIGHT", "UV", "VOC", "ENV_VOC", "IV"):
             peripheral.commands.extend([b"SET_SENSOR_RATE:5000", ("START:" + mode).encode()])
             peripheral.process_commands()
             self.assertEqual(peripheral.mode, mode.lower())
@@ -328,6 +328,7 @@ class BLETests(unittest.TestCase):
             "uv": {"uvRaw": 123},
             "voc": {"sraw": 25000, "warmup": 60, "temp": 25, "humidity": 50},
             "env_voc": {"sraw": 25000, "warmup": 60, "temp": 25, "humidity": 50, "pressure": 101},
+            "iv": {"voltage": 2.012, "current": 5.25, "shunt": 0.525, "chip": "INA219"},
         }
         for mode, data in values.items():
             peripheral = self.firmware.EnvironmentBLE()
@@ -350,6 +351,7 @@ class BLETests(unittest.TestCase):
                     patch.object(self.firmware, "TSL2591", return_value=Sensor(values["light"])), \
                     patch.object(self.firmware, "LTR390", return_value=Sensor(values["uv"])), \
                     patch.object(self.firmware, "SGP40", return_value=voc), \
+                    patch.object(self.firmware, "CurrentMonitor", return_value=Sensor(values["iv"])), \
                     patch.object(self.firmware, "EnvironmentBLE", return_value=peripheral), \
                     patch.object(self.firmware.time, "ticks_ms", side_effect=clock, create=True), \
                     patch.object(self.firmware.time, "ticks_diff", side_effect=lambda a, b: a - b, create=True), \
@@ -444,6 +446,7 @@ class StabilityAndBoardTests(unittest.TestCase):
             "TSL2591": FakeSensor({"lux": 12, "full": 100, "infrared": 15, "gain": 25}),
             "LTR390": FakeSensor({"uvRaw": 123}),
             "SGP40": FakeSensor({"sraw": 25000, "warmup": 60, "temp": 25, "humidity": 50}),
+            "CurrentMonitor": FakeSensor({"voltage": 2.0, "current": 5.0, "shunt": 0.5, "chip": "INA219"}),
         }
         made.update(sensors or {})
         count = [0]
@@ -484,6 +487,7 @@ class StabilityAndBoardTests(unittest.TestCase):
                 patch.object(self.firmware, "TSL2591", side_effect=factory("TSL2591")), \
                 patch.object(self.firmware, "LTR390", side_effect=factory("LTR390")), \
                 patch.object(self.firmware, "SGP40", side_effect=factory("SGP40")), \
+                patch.object(self.firmware, "CurrentMonitor", side_effect=factory("CurrentMonitor")), \
                 patch.object(self.firmware, "EnvironmentBLE", return_value=peripheral), \
                 patch.object(self.firmware.time, "ticks_ms", side_effect=clock, create=True), \
                 patch.object(self.firmware.time, "ticks_diff", side_effect=lambda a, b: a - b, create=True), \
@@ -493,6 +497,31 @@ class StabilityAndBoardTests(unittest.TestCase):
         leds = [item for item in pins if item.name == "LED"]
         return types.SimpleNamespace(sensors=made, led=leds[0] if leds else None, reset=reset,
                                      log=output.getvalue())
+
+    # ---- 전류·전압 (INA219/INA226) ----
+
+    def test_iv_streams_at_fast_rate_and_rejects_unknown_rates(self):
+        peripheral = self.peripheral
+        peripheral._irq(1, (7, 0, b""))
+        peripheral.commands.extend([b"SET_SENSOR_RATE:200", b"START:IV"])
+        self.run_main(peripheral, steps=12)
+        packets = [p for p in self.packets(peripheral) if p["type"] == "iv"]
+        self.assertGreaterEqual(len(packets), 5)
+        self.assertEqual(packets[1]["ts"] - packets[0]["ts"], 200)
+        self.assertEqual(packets[0]["data"]["voltage"], 2.0)
+        peripheral.commands.append(b"SET_SENSOR_RATE:300")
+        peripheral.process_commands()
+        self.assertEqual(peripheral.interval, 200)
+
+    def test_iv_without_module_reports_error(self):
+        peripheral = self.peripheral
+        peripheral._irq(1, (7, 0, b""))
+        peripheral.commands.append(b"START:IV")
+        result = self.run_main(peripheral, steps=5, missing=("CurrentMonitor",))
+        errors = [p for p in self.packets(peripheral) if p["type"] == "error"]
+        self.assertTrue(errors and "IV init failed" in errors[0]["message"])
+        self.assertFalse(peripheral.streaming)
+        self.assertIn("[SENSOR] IV init failed", result.log)
 
     # ---- 보드 번호 ----
 
