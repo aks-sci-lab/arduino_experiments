@@ -57,6 +57,8 @@ body {
     background: var(--c-bg);
     line-height: 1.5;
     -webkit-text-size-adjust: 100%;
+    /* 긴 주소·영어 낱말이 휴대폰 폭을 넘어 가로 스크롤을 만들지 않게 */
+    overflow-wrap: break-word;
 }
 
 a { color: var(--c-primary); }
@@ -106,7 +108,7 @@ button:disabled { cursor: not-allowed; }
 }
 @media (min-width: 640px) { .steps { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
 .steps button {
-    min-width: 0; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: var(--sp-1);
+    min-width: 0; min-height: var(--tap); display: flex; align-items: center; justify-content: center; gap: var(--sp-1);
     padding: 7px 2px; margin: 0; background: var(--c-card); color: var(--c-text);
     border: 1px solid var(--c-line); border-radius: 8px; font-size: .82rem; font-weight: 500; cursor: pointer;
 }
@@ -122,6 +124,37 @@ button:disabled { cursor: not-allowed; }
 .steps button[aria-selected="true"] b { background: #fff; color: var(--c-primary); }
 .step-next { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-2); margin-top: var(--sp-4); }
 .step-next [data-go]:last-child { margin-left: auto; }
+
+/* ---------- 페이지 안 작은 탭 (한 화면에 다 넣으면 길어질 때: js/lab-ui.js 의 LabUI.initTabs) ----------
+   스크롤 대신 탭으로 나눈다. 탭 묶음은 여러 개(안쪽 탭 포함) 써도 된다: 패널은 nav 와 같은 부모 아래의 .tab-panel.
+   <nav class="subtabs" aria-label="…">
+     <button data-tab="prep">① 준비</button><button data-tab="measure">② 측정</button>…
+   </nav>
+   <div class="tab-panel" data-tab="prep">…</div><div class="tab-panel" data-tab="measure">…</div>
+   - 버튼 아래 작은 글(<small>)로 할 일을 한 줄 적을 수 있다
+   - .subtabs.sticky 면 스크롤해도 위에 붙어 있다 */
+.subtabs {
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--sp-1);
+    margin: var(--sp-2) 0 var(--sp-3); padding: var(--sp-1);
+    background: var(--c-fill); border-radius: var(--r-card);
+}
+.subtabs.sticky { position: sticky; top: 0; z-index: 15; box-shadow: 0 1px 0 var(--c-line); }
+nav.subtabs button {
+    position: relative; min-width: 0; min-height: var(--tap); margin: 0; padding: var(--sp-1) var(--sp-2);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    background: transparent; color: var(--c-text); border: 0; border-radius: 8px;
+    font-size: var(--fs-sm); font-weight: 600; line-height: 1.25; cursor: pointer;
+}
+nav.subtabs button small { font-weight: 400; font-size: .72rem; color: var(--c-muted); }
+nav.subtabs button:hover { background: rgba(255, 255, 255, .6); color: var(--c-primary); }
+nav.subtabs button[aria-selected="true"] { background: var(--c-card); color: var(--c-primary); box-shadow: var(--shadow); }
+nav.subtabs button[aria-selected="true"] small { color: var(--c-primary); }
+/* 새 내용(결과 등)이 생겼다는 작은 점 */
+nav.subtabs button.has-news::after {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c-danger);
+    position: absolute; top: 6px; right: 8px;
+}
+.tab-panel > :first-child { margin-top: 0; }
 
 /* ---------- 한 화면형 센서 측정 (실험 이름 없이 센서 값을 보는 페이지) ----------
    위에서부터: 연결·상태 띠(.dash-bar, 위에 붙어 있음) → 큰 숫자(.dash-readouts) → 그래프(.dash-chart)
@@ -152,6 +185,13 @@ button:disabled { cursor: not-allowed; }
 @media (min-width: 900px) { .dash-grid { grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr); } }
 .dash-readouts { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 @media (min-width: 900px) { .dash-readouts { grid-template-columns: minmax(0, 1fr); } }
+/* 휴대폰: 숫자 카드를 작게 세 칸으로 놓아 그래프가 첫 화면에 들어오게 */
+@media (max-width: 639px) {
+    .dash-readouts { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: var(--sp-1); }
+    .dash-card { padding: var(--sp-1) var(--sp-2); }
+    .dash-card .value { font-size: clamp(1.35rem, 6vw, 1.8rem); }
+    .dash-card .label { font-size: .78rem; }
+}
 .dash-card {
     display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--sp-1);
     padding: var(--sp-2) var(--sp-3); background: var(--c-card);

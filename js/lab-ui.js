@@ -111,5 +111,65 @@
         return { show: show, current: function () { return cur; } };
     }
 
-    window.LabUI = { toggleBigView: toggle, initSteps: initSteps };
+    /* 페이지 안 작은 탭 (모양: css/lab-base.css 의 .subtabs) — 길게 스크롤하는 대신 내용을 나눠 보여 준다
+       LabUI.initTabs(nav 또는 선택자, { key: '저장 이름(없으면 기억 안 함)', start: '처음 탭', onShow: function (tab) {} })
+       - nav 안의 button[data-tab] 을 누르면 nav 와 같은 부모 아래의 .tab-panel[data-tab] 중 그 탭만 보인다
+       - 다른 단추에서 [data-tab-go="탭"] 을 누르면 그 탭으로 간다
+       돌려주는 값: { show(tab), current(), mark(tab) }  (mark: 새 내용이 생긴 탭에 작은 점) */
+    function initTabs(nav, opts) {
+        opts = opts || {};
+        if (typeof nav === 'string') nav = document.querySelector(nav);
+        if (!nav) return null;
+        var buttons = Array.prototype.slice.call(nav.querySelectorAll('button[data-tab]'));
+        var order = buttons.map(function (b) { return b.dataset.tab; });
+        var panels = Array.prototype.slice.call(nav.parentElement.children).filter(function (el) {
+            return el.classList.contains('tab-panel') && el.dataset.tab;
+        });
+        var key = opts.key ? 'lab-tabs:' + opts.key : null;
+        var cur = null;
+        nav.setAttribute('role', 'tablist');
+
+        function show(tab, scroll) {
+            if (order.indexOf(tab) < 0) tab = order[0];
+            cur = tab;
+            panels.forEach(function (p) { p.hidden = p.dataset.tab !== tab; });
+            buttons.forEach(function (b) {
+                var on = b.dataset.tab === tab;
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
+                b.tabIndex = on ? 0 : -1;
+                if (on) b.classList.remove('has-news');
+            });
+            if (key) { try { localStorage.setItem(key, tab); } catch (e) { /* 저장 불가: 무시 */ } }
+            // 탭이 화면 위로 올라가 있으면 탭이 보이는 곳까지만 올린다
+            if (scroll) {
+                var top = nav.getBoundingClientRect().top;
+                if (top < 0) window.scrollBy(0, top - 8);
+            }
+            if (typeof opts.onShow === 'function') opts.onShow(tab);
+            window.dispatchEvent(new Event('resize'));
+        }
+        function mark(tab) {
+            buttons.forEach(function (b) { if (b.dataset.tab === tab && tab !== cur) b.classList.add('has-news'); });
+        }
+        buttons.forEach(function (b) {
+            b.type = 'button';
+            b.setAttribute('role', 'tab');
+            b.addEventListener('click', function () { show(b.dataset.tab, true); });
+        });
+        nav.addEventListener('keydown', function (e) {
+            var i = order.indexOf(cur);
+            if (e.key === 'ArrowRight' && i < order.length - 1) { show(order[i + 1]); buttons[i + 1].focus(); }
+            else if (e.key === 'ArrowLeft' && i > 0) { show(order[i - 1]); buttons[i - 1].focus(); }
+        });
+        document.addEventListener('click', function (e) {
+            var go = e.target.closest && e.target.closest('[data-tab-go]');
+            if (go && order.indexOf(go.dataset.tabGo) >= 0) show(go.dataset.tabGo, true);
+        });
+        var saved = null;
+        if (key) { try { saved = localStorage.getItem(key); } catch (e) { saved = null; } }
+        show(opts.start || saved || order[0]);
+        return { show: show, current: function () { return cur; }, mark: mark };
+    }
+
+    window.LabUI = { toggleBigView: toggle, initSteps: initSteps, initTabs: initTabs };
 })();
