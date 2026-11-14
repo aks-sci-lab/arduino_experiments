@@ -46,7 +46,7 @@
 
     function setStatus(text, kind = '') {
         statusBox.textContent = text;
-        statusBox.className = 'status' + (kind ? ' ' + kind : '');
+        statusBox.className = 'dash-status' + (kind ? ' ' + kind : '');
     }
 
     function connected() {
@@ -72,16 +72,20 @@
     function buildReadouts() {
         readouts.innerHTML = '';
         for (const field of N.MODES[mode].fields) {
+            // 공통 큰 숫자 카드 (css/lab-base.css 의 .dash-card)
             const box = document.createElement('div');
-            box.className = 'readout';
-            const name = document.createElement('div');
-            name.className = 'name';
-            name.textContent = `${field.label} (${field.unit})`;
-            const value = document.createElement('div');
-            value.className = 'value';
+            box.className = 'dash-card';
+            const name = document.createElement('span');
+            name.className = 'label';
+            name.textContent = field.label;
+            const value = document.createElement('span');
+            value.className = 'value num';
             value.id = 'value-' + field.key;
             value.textContent = '--';
-            box.append(name, value);
+            const unit = document.createElement('span');
+            unit.className = 'unit';
+            unit.textContent = field.unit;
+            box.append(name, value, unit);
             readouts.appendChild(box);
         }
         const last = samples[mode][samples[mode].length - 1];
@@ -115,13 +119,15 @@
     function buildCharts() {
         for (const key of Object.keys(charts)) { charts[key].destroy(); delete charts[key]; }
         chartsBox.innerHTML = '';
+        // 환경은 그래프가 셋이라 오른쪽 칸에 작게 쌓는다
+        chartsBox.classList.toggle('multi', chartGroups().length > 1);
         if (typeof Chart === 'undefined') {
             chartsBox.textContent = '그래프 프로그램(Chart.js)을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요. 값과 CSV 저장은 그대로 됩니다.';
             return;
         }
         chartGroups().forEach((fields, index) => {
             const box = document.createElement('div');
-            box.className = 'chart-box';
+            box.className = 'dash-chart';
             const canvas = document.createElement('canvas');
             canvas.setAttribute('aria-label', fields.map(field => field.label).join(', ') + ' 시간 그래프');
             box.appendChild(canvas);

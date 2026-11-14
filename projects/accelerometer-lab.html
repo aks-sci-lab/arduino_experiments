@@ -18,83 +18,135 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.js"></script>
     
     <style>
-        body { font-family: var(--font); }
-        .container { max-width: 1600px; margin: 0 auto; padding: 1rem; }
-        
-        /* [수정] 2:3 레이아웃 */
-        .main-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 1rem; }
-        /* 휴대폰·좁은 창: 표와 그래프를 위아래 한 줄로 (예전에는 두 칸이 찌그러져 제목이 한 글자씩 쌓임) */
-        @media (max-width: 800px) {
-            .main-layout { grid-template-columns: minmax(0, 1fr); }
-            .header { flex-wrap: wrap; gap: 8px; }
-            .table-controls { flex-wrap: wrap; }
-        }
-        
-        .content-column { display: flex; flex-direction: column; gap: 1rem; }
+        /* 한 화면형 배치(.dash·.dash-bar·.dash-grid·.dash-card·.dash-chart·.dash-more)는 css/lab-base.css 가 맡는다.
+           style.css 의 body 여백(20px)·가운데 정렬을 휴대폰 폭에 맞게 바꾼다. */
+        body { padding: var(--sp-2) var(--sp-4) var(--sp-5); align-items: stretch; }
+        .dash { width: 100%; }
+        .back-link { display: inline-block; margin-top: var(--sp-1); }
+
         .ble-button { padding: 10px 15px; border: none; border-radius: 5px; color: white; background-color: var(--c-primary); cursor: pointer; }
         button { padding: 8px 12px; border: 1px solid #ccc; border-radius: 5px; background-color: #f0f0f0; cursor: pointer; }
         button:disabled { background-color: #e9ecef; cursor: not-allowed; }
-        select { padding: 8px; border-radius: 5px; }
-        .table-container { max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; }
+        select { padding: 8px; border-radius: 5px; max-width: 100%; }
+
+        /* 측정 품질 글은 숫자 카드 아래에 한 줄 전체로 */
+        .dash-readouts .quality { grid-column: 1 / -1; margin: 0; }
+        .quality { font-size: var(--fs-sm); color: var(--c-muted); }
+
+        /* 그래프 칸: 그래프 상자 + 바로 아래 조절 단추 */
+        .chart-column { min-width: 0; }
+        .chart-box { position: absolute; inset: var(--sp-2); } /* Chart.js 가 이 상자 크기에 맞춤 */
+        .graph-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); margin-top: var(--sp-2); }
+        .checkbox-group { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .checkbox-group label, .graph-controls label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+        .fit-result p { margin: var(--sp-1) 0; overflow-wrap: anywhere; }
+
+        .table-container { max-height: 300px; overflow: auto; border: 1px solid var(--c-line); border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 8px; text-align: left; border-bottom: 1px solid #eee; }
         thead th { position: sticky; top: 0; background-color: #f8f9fa; }
-        .chart-wrapper { position: relative; height: 400px; }
-        .chart-container { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .header-controls { display: flex; gap: 10px; }
-        .table-header { display: flex; justify-content: space-between; align-items: center; }
-        .table-controls { display: flex; gap: 10px; align-items: center; }
-        .checkbox-group { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-        .checkbox-group label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
-        .slider-group { display: flex; align-items: center; gap: 10px; }
-        .trial-management { margin-top: 1rem; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
-        .trial-management h3 { margin-top: 0; }
         .trial-list { list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; }
-        .trial-list li { display: flex; align-items: center; gap: 10px; padding: 5px; border-bottom: 1px solid #eee; }
+        .trial-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 5px; border-bottom: 1px solid #eee; }
         .trial-list li:last-child { border-bottom: none; }
         .trial-list button { padding: 2px 8px; font-size: 0.8em; }
-        .trial-controls { display: flex; gap: 10px; margin-top: 10px; }
-        .graph-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 15px; margin-top: 10px; }
+        .trial-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 
-        /* [수정] 가독성 향상 버튼 스타일 */
-        .btn-action-primary {
-            background-color: var(--c-primary);
-            color: white;
-            border-color: var(--c-primary);
-        }
-        .btn-action-primary:disabled {
-            background-color: #a0cfff;
-            border-color: #a0cfff;
-            color: #f0f0f0;
-        }
-        .btn-action-danger {
-            background-color: var(--c-danger);
-            color: white;
-            border-color: var(--c-danger);
-        }
-        .btn-action-secondary {
-            background-color: var(--c-secondary);
-            color: white;
-            border-color: var(--c-secondary);
-        }
+        /* 가독성 향상 버튼 색 */
+        .btn-action-primary { background-color: var(--c-primary); color: white; border-color: var(--c-primary); }
+        .btn-action-primary:disabled { background-color: #a0cfff; border-color: #a0cfff; color: #f0f0f0; }
+        .btn-action-danger { background-color: var(--c-danger); color: white; border-color: var(--c-danger); }
+        .btn-action-secondary { background-color: var(--c-secondary); color: white; border-color: var(--c-secondary); }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div>
-                <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
-                <h1>가속도계 데이터 분석</h1>
-                <p>상태: <span id="status">연결 대기</span></p>
+    <main class="dash">
+        <a class="back-link" href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
+        <h1>가속도계 데이터 분석</h1>
+
+        <!-- 연결·상태 띠 (위에 붙어 있음) -->
+        <div class="dash-bar">
+            <span class="dash-status">상태: <span id="status" role="status">연결 대기</span></span>
+            <button id="connectBleButton" class="ble-button">Bluetooth 연결</button>
+            <button id="disconnectBleButton" class="ble-button" style="display: none; background-color: var(--c-secondary);">연결 해제</button>
+            <button id="recordButton" disabled>측정 시작</button>
+            <select id="samplingRateSelect" aria-label="측정 속도">
+                <option value="200">5ms (200 Hz · 충돌 비교)</option>
+                <option value="100" selected>10ms (100 Hz)</option>
+                <option value="50">20ms (50 Hz)</option>
+                <option value="25">40ms (25 Hz)</option>
+            </select>
+            <button id="downloadButton" disabled>엑셀(CSV) 저장</button>
+        </div>
+
+        <div class="dash-grid">
+            <!-- 왼쪽: 지금 값 큰 숫자 -->
+            <div class="dash-readouts">
+                <div class="dash-card"><span class="label">X</span><span class="value num" id="latestX">--</span><span class="unit">g</span></div>
+                <div class="dash-card"><span class="label">Y</span><span class="value num" id="latestY">--</span><span class="unit">g</span></div>
+                <div class="dash-card"><span class="label">Z</span><span class="value num" id="latestZ">--</span><span class="unit">g</span></div>
+                <div class="dash-card"><span class="label">전체 |a| (Total)</span><span class="value num" id="latestTotal">--</span><span class="unit">g</span></div>
+                <p id="acquisitionQuality" class="quality" role="status">측정 품질: 측정 대기</p>
             </div>
-            <div class="header-controls">
-                <button id="connectBleButton" class="ble-button">Bluetooth 연결</button>
-                <button id="disconnectBleButton" class="ble-button" style="display: none; background-color: #343a40;">연결 해제</button>
+
+            <!-- 오른쪽: 그래프와 바로 아래 조절 -->
+            <div class="chart-column">
+                <div class="dash-chart">
+                    <div class="chart-box"><canvas id="myChart" aria-label="시간에 따른 가속도 그래프"></canvas></div>
+                </div>
+                <div class="graph-controls">
+                    <span>Y축 선택:</span>
+                    <div id="yAxisCheckboxGroup" class="checkbox-group">
+                        <label><input type="checkbox" name="yAxis" value="X" checked> X</label>
+                        <label><input type="checkbox" name="yAxis" value="Y" checked> Y</label>
+                        <label><input type="checkbox" name="yAxis" value="Z"> Z</label>
+                        <label><input type="checkbox" name="yAxis" value="Total"> Total</label>
+                    </div>
+                    <label><input type="checkbox" id="showLineCheckbox"> 선 연결</label>
+                    <button id="resetZoomButton">줌 리셋</button>
+                </div>
+                <div class="graph-controls fit-controls">
+                    <span><b>* 분석/편집할 영역을 그래프에서 드래그하세요.</b></span>
+                    <button id="cropButton" class="btn-action-primary" disabled>선택 영역만 남기기</button>
+                    <select id="fitTargetSelect" aria-label="피팅 기준 축">
+                        <option value="X">X 기준</option> <option value="Y">Y 기준</option> <option value="Z">Z 기준</option> <option value="Total">Total 기준</option>
+                    </select>
+                    <select id="polynomialOrderSelect" aria-label="다항식 차수">
+                        <option value="1">1차</option><option value="2">2차</option><option value="3" selected>3차</option>
+                    </select>
+                    <button id="fitButton" disabled>함수 피팅</button>
+                </div>
+                <div class="fit-result">
+                    <p>피팅 방정식: <span id="equation"></span></p>
+                    <p><b>결정계수 (R²): <span id="r2_value"></span></b></p>
+                </div>
             </div>
         </div>
 
-        <details class="trial-management">
+        <!-- 기록·회차 (접기) -->
+        <div class="dash-more">
+            <details>
+                <summary>📋 측정 기록 (표)</summary>
+                <p class="quality">최근 500줄만 보입니다. 전체 값은 엑셀(CSV) 저장으로 받으세요.</p>
+                <div class="table-container">
+                    <table id="historyTable">
+                        <thead><tr><th>Time (s)</th><th>X (g)</th><th>Y (g)</th><th>Z (g)</th><th>Total (g)</th></tr></thead>
+                        <tbody id="historyTbody"></tbody>
+                    </table>
+                </div>
+            </details>
+            <details>
+                <summary>🗂 회차 관리·Cloud 제출</summary>
+                <ul id="trial-list" class="trial-list"></ul>
+                <div class="trial-controls">
+                    <button id="saveTrialButton" class="btn-action-primary" disabled>현재 측정 저장</button>
+                    <button id="saveCloudButton" class="btn-action-primary" style="background-color:var(--c-success); border-color:var(--c-success);">☁️ Cloud DB에 제출</button>
+                    <button id="clearTrialsButton" class="btn-action-danger">모든 회차 삭제</button>
+                </div>
+            </details>
+        </div>
+
+        <!-- 펌웨어·센서 준비 안내 (접기) -->
+        <details>
             <summary>센서 준비 안내 (Thonny · BLE 검색 v2)</summary>
             <p>Pico-Environment-Sensor의 IMU를 사용합니다. I2C0: SDA GP20, SCL GP21, 주소 0x68.
                 ICM-20948 또는 MPU-9250/9255를 칩 ID로 확인합니다. 측정값은 중력을 포함한 가속도(g), 최대 범위는 축별 ±16g입니다.
@@ -129,78 +181,7 @@
                 Thonny에 <code>BLE=ADVERTISING</code>이 표시된 뒤 검색합니다.
                 이전 페이지가 남아 있으면 Ctrl+Shift+R로 강력 새로고침하세요.</p>
         </details>
-
-        <div class="main-layout">
-            <div class="content-column">
-                <div class="table-header">
-                    <h2>측정 기록 (현재 작업)</h2>
-                    <div class="table-controls">
-                        <button id="recordButton" disabled>측정 시작</button>
-                        <select id="samplingRateSelect">
-                            <option value="200">5ms (200 Hz · 충돌 비교)</option>
-                            <option value="100" selected>10ms (100 Hz)</option>
-                            <option value="50">20ms (50 Hz)</option>
-                            <option value="25">40ms (25 Hz)</option>
-                        </select>
-                        <button id="downloadButton" disabled>엑셀 저장</button>
-                    </div>
-                    <p id="acquisitionQuality" role="status">측정 품질: 측정 대기</p>
-                </div>
-                <div class="table-container">
-                    <table id="historyTable">
-                        <thead><tr><th>Time (s)</th><th>X (g)</th><th>Y (g)</th><th>Z (g)</th><th>Total (g)</th></tr></thead>
-                        <tbody id="historyTbody"></tbody>
-                    </table>
-                </div>
-
-                <div class="trial-management">
-                    <h3>실험 회차 관리</h3>
-                    <ul id="trial-list" class="trial-list"></ul>
-                    <div class="trial-controls">
-                        <button id="saveTrialButton" class="btn-action-primary" disabled>현재 측정 저장</button>
-                        <button id="saveCloudButton" class="btn-action-primary" style="background-color:var(--c-success); border-color:var(--c-success);">☁️ Cloud DB에 제출</button>
-                        <button id="clearTrialsButton" class="btn-action-danger">모든 회차 삭제</button>
-                    </div>
-                </div>
-            </div>
-            <div class="content-column">
-                <h2>그래프 시각화 및 함수 피팅</h2>
-                <div class="chart-wrapper">
-                    <div class="chart-container"><canvas id="myChart"></canvas></div>
-                </div>
-                <div class="graph-controls">
-                    <span>Y축 선택:</span>
-                    <div id="yAxisCheckboxGroup" class="checkbox-group">
-                        <label><input type="checkbox" name="yAxis" value="X" checked> X</label>
-                        <label><input type="checkbox" name="yAxis" value="Y" checked> Y</label>
-                        <label><input type="checkbox" name="yAxis" value="Z"> Z</label>
-                        <label><input type="checkbox" name="yAxis" value="Total"> Total</label>
-                    </div>
-                    
-                    <div class="slider-group" style="margin-left: auto; gap: 15px;">
-                        <label><input type="checkbox" id="showLineCheckbox"> 선 연결</label>
-                    </div>
-                    <button id="resetZoomButton">줌 리셋</button>
-                    
-                </div>
-                 <div class="graph-controls fit-controls">
-                    <span><b>* 분석/편집할 영역을 그래프에서 드래그하세요.</b></span>
-                    <button id="cropButton" class="btn-action-primary" disabled style="margin-left: auto;">선택 영역만 남기기</button>
-                    <select id="fitTargetSelect">
-                        <option value="X">X 기준</option> <option value="Y">Y 기준</option> <option value="Z">Z 기준</option> <option value="Total">Total 기준</option>
-                    </select>
-                    <select id="polynomialOrderSelect">
-                        <option value="1">1차</option><option value="2">2차</option><option value="3" selected>3차</option>
-                    </select>
-                    <button id="fitButton" disabled>함수 피팅</button>
-                </div>
-                <div class="fit-result">
-                    <p>피팅 방정식: <span id="equation"></span></p>
-                    <p><b>결정계수 (R²): <span id="r2_value"></span></b></p>
-                </div>
-            </div>
-        </div>
-    </div>
+    </main>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -317,6 +298,8 @@
         );
         
         let chartUpdateScheduled = false;
+        let latestSample = null; // 큰 숫자 칸에 보여 줄 마지막 값
+        const latestSpans = { x: 'latestX', y: 'latestY', z: 'latestZ', total: 'latestTotal' };
 
         let draggedTrialId = null;
         let initialDragXValue = 0;
@@ -536,7 +519,7 @@
                 equationSpan.textContent = ''; r2ValueSpan.textContent = ''; // 피팅 결과 초기화
                 
                 // 버튼 상태 변경
-                recordButton.textContent = '측정 중지'; recordButton.style.backgroundColor = '#DC3545';
+                recordButton.textContent = '측정 중지'; recordButton.style.backgroundColor = 'var(--c-danger)';
                 downloadButton.disabled = true; fitButton.disabled = true; saveTrialButton.disabled = true; cropButton.disabled = true;
                 samplingRateSelect.disabled = true; // 측정 중에는 속도 변경 불가
                 
@@ -547,7 +530,7 @@
                 lastSampleAt = null;
 
                 // 버튼 상태 변경
-                recordButton.textContent = '측정 시작'; recordButton.style.backgroundColor = '#28A745'; // 녹색
+                recordButton.textContent = '측정 시작'; recordButton.style.backgroundColor = 'var(--c-success)'; // 녹색
                 samplingRateSelect.disabled = false; // 속도 변경 가능
 
                 statusSpan.textContent = `측정 완료 (총 ${recordedData.length}개 데이터)`;
@@ -573,6 +556,7 @@
             lastSampleAt = performance.now();
 
             const newPointsForChart = { X: [], Y: [], Z: [], Total: [] };
+            if (samples.length) latestSample = samples[samples.length - 1];
             let newRowsHtml = '';
 
             for (const { timestamp: timestampMs, time: elapsedTime, x, y, z, total } of samples) {
@@ -629,6 +613,11 @@
                 acquisitionQuality.textContent = `측정 품질: 평균 ${actualHz === null ? '--' : actualHz.toFixed(1)}Hz / 간격 이상 ${abnormalIntervals}회 / ±16g 포화 의심 ${saturatedSamples}개 / 묶음 누락 ${receiver.droppedBatches}개`
                     + (abnormalIntervals ? ' — 누락 또는 타이밍 지연 가능' : '')
                     + (saturatedSamples ? ' — 충격 최대값을 신뢰할 수 없음' : '');
+                if (latestSample) {
+                    for (const [key, id] of Object.entries(latestSpans)) {
+                        document.getElementById(id).textContent = latestSample[key].toFixed(2);
+                    }
+                }
                 myChart.update('none'); 
                 chartUpdateScheduled = false; 
             }, CHART_UPDATE_INTERVAL_MS);

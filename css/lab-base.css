@@ -123,6 +123,54 @@ button:disabled { cursor: not-allowed; }
 .step-next { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-2); margin-top: var(--sp-4); }
 .step-next [data-go]:last-child { margin-left: auto; }
 
+/* ---------- 한 화면형 센서 측정 (실험 이름 없이 센서 값을 보는 페이지) ----------
+   위에서부터: 연결·상태 띠(.dash-bar, 위에 붙어 있음) → 큰 숫자(.dash-readouts) → 그래프(.dash-chart)
+   → 기록·회차·CSV(.dash-more 안의 <details>) → 펌웨어·준비 안내(<details>)
+   넓은 화면(900px 이상)에서는 숫자를 왼쪽 세로 줄, 그래프를 오른쪽에 두어 스크롤 없이 함께 보인다.
+   <main class="dash">
+     <div class="dash-bar"><span class="dash-status" role="status">연결 대기</span> 단추들…</div>
+     <div class="dash-grid">
+       <div class="dash-readouts"><div class="dash-card"><span class="label">온도</span><span class="value num">--</span><span class="unit">°C</span></div>…</div>
+       <div class="dash-chart"><canvas></canvas></div>
+     </div>
+     <div class="dash-more"><details>…</details></div>
+   </main> */
+.dash { max-width: var(--w-dash); margin: 0 auto; }
+.dash h1 { font-size: var(--fs-h1); margin: var(--sp-2) 0; }
+.dash-bar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+    margin: var(--sp-2) 0 var(--sp-3); padding: var(--sp-2) var(--sp-3);
+    background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); box-shadow: var(--shadow);
+}
+/* 휴대폰: 단추가 여러 줄로 감겨 띠가 높아지므로 위에 붙이지 않는다 (숫자·그래프 자리를 지킴) */
+@media (max-width: 639px) { .dash-bar { position: static; } }
+.dash-bar .dash-status { flex: 1 1 100%; font-weight: 600; font-size: var(--fs-sm); }
+@media (min-width: 640px) { .dash-bar .dash-status { flex-basis: 200px; } }
+.dash-bar button, .dash-bar select { flex: 0 0 auto; width: auto; }
+.dash-grid { display: grid; gap: var(--sp-3); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) { .dash-grid { grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr); } }
+.dash-readouts { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+@media (min-width: 900px) { .dash-readouts { grid-template-columns: minmax(0, 1fr); } }
+.dash-card {
+    display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--sp-1);
+    padding: var(--sp-2) var(--sp-3); background: var(--c-card);
+    border: 1px solid var(--c-line); border-radius: var(--r-card);
+}
+.dash-card .label { flex: 1 1 100%; color: var(--c-muted); font-size: var(--fs-sm); font-weight: 600; }
+.dash-card .value { font-size: var(--fs-reading); font-weight: 700; line-height: 1.15; color: var(--c-primary); font-variant-numeric: tabular-nums; }
+.dash-card .unit { color: var(--c-muted); font-size: var(--fs-sm); }
+.dash-chart {
+    position: relative; height: var(--chart-h); min-width: 0;
+    padding: var(--sp-2); background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card);
+}
+.dash-more { margin-top: var(--sp-3); }
+.dash details, .dash-more details {
+    margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3);
+    background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card);
+}
+.dash details > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+
 /* ---------- 크게 보기 (교실 프로젝터용, Alt+B 로 켜고 끔: js/lab-ui.js) ---------- */
 html.big-view body { zoom: 1.35; }
 

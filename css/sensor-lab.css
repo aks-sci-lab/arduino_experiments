@@ -22,3 +22,15 @@
 #trialList li { margin: 8px 0; }
 #trialList button { margin-left: 8px; }
 .table-container { max-height: 350px; overflow: auto; }
+
+/* 한 화면형(.dash, environment-lab.html?sensor=light|uv): js/sensor-lab.js 가 만드는 지금 값 상자를
+   lab-base.css 의 .dash-card 와 같은 모양으로 (이름 → 큰 숫자). voc-lab.html 은 위의 예전 모양 그대로 */
+.dash .sensor-readout {
+    text-align: left; padding: var(--sp-2) var(--sp-3); background: var(--c-card);
+    border: 1px solid var(--c-line); border-radius: var(--r-card);
+}
+.dash .sensor-readout h3 { margin: 0; color: var(--c-muted); font-size: var(--fs-sm); font-weight: 600; }
+.dash .sensor-readout p {
+    margin: 0; font-size: var(--fs-reading); font-weight: 700; line-height: 1.15;
+    color: var(--c-primary); overflow-wrap: anywhere;
+}

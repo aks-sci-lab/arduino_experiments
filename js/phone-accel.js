@@ -143,7 +143,7 @@ function handleMotion(event) {
     if (sensorWatchdogTimer) { clearTimeout(sensorWatchdogTimer); sensorWatchdogTimer = null; }
     sensorWarningEl.style.display = 'none';
     recordStatusEl.textContent = `🔴 기록 중... (${samples.length + 1}개 샘플)`;
-    recordStatusEl.style.color = '#e74c3c';
+    recordStatusEl.style.color = 'var(--c-danger)';
 
     const t = Date.now();
     if (!sessionStart) sessionStart = t;
@@ -204,7 +204,7 @@ async function startRecording() {
     btnResetData.disabled = true;
     if (btnCloudSubmit) btnCloudSubmit.disabled = true;
     recordStatusEl.textContent = '🔴 기록 중... (센서 신호 대기)';
-    recordStatusEl.style.color = '#e74c3c';
+    recordStatusEl.style.color = 'var(--c-danger)';
     sensorWarningEl.style.display = 'none';
 
     // Watchdog: if no sensor data arrives within 3s, warn the user with likely causes
@@ -226,7 +226,7 @@ function stopRecording() {
     btnStart.disabled = false;
     btnStop.disabled = true;
     recordStatusEl.textContent = `⏸ 대기 중 (샘플 ${samples.length}개 기록됨)`;
-    recordStatusEl.style.color = '#666';
+    recordStatusEl.style.color = 'var(--c-muted)';
     if (btnCloudSubmit) btnCloudSubmit.disabled = samples.length === 0;
 }
 
@@ -284,15 +284,15 @@ function resetDataToOriginal() {
 function updateSelectionStatus() {
     if (selectionMode === 0) {
         selectionStatus.innerText = '준비됨';
-        selectionStatus.style.color = '#666';
+        selectionStatus.style.color = 'var(--c-muted)';
         btnCrop.disabled = true;
     } else if (selectionMode === 1) {
         selectionStatus.innerText = `시작 지점 선택됨 (${cropStartMs.toFixed(0)} ms)`;
-        selectionStatus.style.color = '#e74c3c';
+        selectionStatus.style.color = 'var(--c-danger)';
         btnCrop.disabled = true;
     } else {
         selectionStatus.innerText = `구간 선택됨: ${cropStartMs.toFixed(0)}~${cropEndMs.toFixed(0)} ms`;
-        selectionStatus.style.color = '#27ae60';
+        selectionStatus.style.color = 'var(--c-success)';
         btnCrop.disabled = false;
     }
     accChart.update('none');

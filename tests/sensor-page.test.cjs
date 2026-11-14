@@ -382,9 +382,18 @@ test('all three HTML pages wire shared scripts and firmware downloads', () => {
             assert.ok(html.includes(`data-sensor="${mode}"`));
         }
         assert.ok(html.includes('id="connectButton" class="ble-button"'));
-        assert.ok(html.includes('sensor-lab.css?v=layout-v3'));
-        assert.ok(html.includes('class="sensor-lab-layout"'));
-        assert.ok(html.indexOf('id="historyTbody"') < html.indexOf('id="chart"'));
+        assert.match(html, /sensor-lab\.css\?v=[\w-]+/);
+        if (merged) {
+            // 한 화면형(UI 규칙): 연결 띠 → 지금 값·그래프 → 기록 표(접기) 순서
+            const view = html.slice(html.indexOf('<template id="singleSensorView">'));
+            assert.ok(view.includes('class="dash-bar"') && view.includes('class="dash-grid"') && view.includes('class="dash-more"'));
+            assert.ok(view.indexOf('id="connectButton"') < view.indexOf('id="readouts"'));
+            assert.ok(view.indexOf('id="readouts"') < view.indexOf('id="chart"'));
+            assert.ok(view.indexOf('id="chart"') < view.indexOf('id="historyTbody"'));
+        } else {
+            assert.ok(html.includes('class="sensor-lab-layout"'));
+            assert.ok(html.indexOf('id="historyTbody"') < html.indexOf('id="chart"'));
+        }
         for (const script of ['sensor-lab.js', 'sensor-definitions.js', 'environment-protocol.js', 'pico-ble.js']) {
             assert.ok(html.includes(script));
         }

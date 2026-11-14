@@ -6,72 +6,106 @@
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
     <title>스마트폰 가속도 실험</title>
-    <link rel="stylesheet" href="../css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" defer></script>
     <style>
-        body { font-family: var(--font); padding: 16px; background:#f8f9fa; }
-        .container { max-width: 980px; margin: 0 auto; background:#fff; padding:16px; border-radius:8px; box-shadow:0 4px 10px rgba(0,0,0,0.08); }
-        .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
-        button { padding:10px 14px; border-radius:6px; border:none; background:var(--c-primary); color:#fff; }
-        #acc-values { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0; }
-        .acc-box { background:#f1f3f5; padding:8px 12px; border-radius:6px; min-width:110px; text-align:center; }
-        .graph-card { background:#f8f9fa; border:1px solid #e9ecef; border-radius:8px; padding:12px; margin-top:12px; }
-        .graph-wrap { position:relative; width:100%; height:280px; }
-        .graph-wrap canvas { width:100% !important; height:100% !important; cursor:crosshair; }
-        .timeline-note, .notice { font-size:0.9em; color:#666; margin-top:8px; }
-        .info-box { background:#f1f3f5; padding:10px 12px; border-radius:6px; margin:10px 0; font-size:0.9em; color:#444; }
-        #record-status { font-weight:bold; }
-        #sensor-warning { display:none; background:#fff3cd; color:#856404; padding:10px 12px; border-radius:6px; margin:10px 0; font-size:0.9em; }
-        .btn-cloud { background:var(--c-success); }
+        /* 한 화면형 배치(.dash·.dash-bar·.dash-grid·.dash-card·.dash-chart)는 css/lab-base.css 에 있다. 여기는 이 페이지에만 필요한 것 */
+        body { padding: var(--sp-3) var(--sp-4); }
+        .lead { margin: 0 0 var(--sp-2); color: var(--c-muted); font-size: var(--fs-sm); }
+
+        /* 버튼 */
+        button {
+            font-size: var(--fs-base); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl);
+            border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-text); cursor: pointer;
+        }
+        button:disabled { opacity: .55; }
+        .btn-primary { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+        .btn-danger { background: var(--c-danger); border-color: var(--c-danger); color: #fff; }
+        .btn-info { background: var(--c-info); border-color: var(--c-info); color: #fff; }
+        /* 휴대폰: 위에 붙은 띠가 화면을 너무 가리지 않게 단추를 작게 */
+        @media (max-width: 639px) {
+            .dash-bar button { font-size: var(--fs-sm); padding: var(--sp-2); }
+        }
+        .btn-success { background: var(--c-success); border-color: var(--c-success); color: #fff; }
+
+        #sensor-warning {
+            display: none; margin: 0 0 var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-card);
+            background: var(--c-warn-bg); color: var(--c-warn-text); font-size: var(--fs-sm);
+        }
+
+        /* 오른쪽 칸: 그래프 + 구간 선택 */
+        .chart-col { display: grid; gap: var(--sp-2); min-width: 0; }
+        #accChart { cursor: crosshair; }
+        .panel {
+            padding: var(--sp-2) var(--sp-3); background: var(--c-card);
+            border: 1px solid var(--c-line); border-radius: var(--r-card);
+        }
+        .panel h2 { font-size: var(--fs-h2); margin: 0 0 var(--sp-1); }
+        .row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+        .row .push { margin-left: auto; }
+        #selection-status, #time-range { font-weight: 600; font-size: var(--fs-sm); }
+        .note { margin: var(--sp-1) 0; line-height: 1.5; }
     </style>
 </head>
 <body>
-    <div class="container">
+    <main class="dash">
+        <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
         <h1>스마트폰 가속도 센서 실험</h1>
-        <p class="notice">모바일 기기에서 '시작'을 눌러 데이터를 기록하세요. iOS에서는 권한 요청이 필요합니다. 반드시 https 주소로 접속해야 센서가 동작합니다.</p>
+        <p class="lead">스마트폰 안의 가속도 센서 값을 기록해 그래프로 보고, 필요한 구간만 골라 제출합니다.</p>
 
-        <div class="info-box">
-            <strong>학생:</strong> <a href="../index.html">메인 페이지</a>에서 구글 로그인 후, 이 페이지에서 실험하고 '☁️ Cloud DB에 제출'로 결과를 제출합니다.<br>
-            <strong>교사:</strong> 메인 페이지의 교사 대시보드에서 학생들이 제출한 결과를 확인합니다.
+        <!-- 상태 + 주요 단추 (위에 붙어 있음) -->
+        <div class="dash-bar">
+            <span id="record-status" class="dash-status" role="status" aria-live="polite">⏸ 대기 중</span>
+            <button id="btn-start" class="btn-primary" title="아이폰은 처음에 동작 센서 허용 창이 뜹니다">▶ 시작 (센서 허용)</button>
+            <button id="btn-stop" class="btn-danger" disabled>■ 중지</button>
+            <button id="btn-download" class="btn-info" disabled>CSV 다운로드</button>
         </div>
 
-        <div id="sensor-warning">⚠️ 센서 데이터가 수신되지 않고 있습니다. https 주소로 접속했는지, 브라우저의 동작 센서 권한이 허용되어 있는지 확인하고 기기를 움직여보세요.</div>
+        <div id="sensor-warning" role="alert">⚠️ 센서 데이터가 수신되지 않고 있습니다. https 주소로 접속했는지, 브라우저의 동작 센서 권한이 허용되어 있는지 확인하고 기기를 움직여보세요.</div>
 
-        <div class="controls">
-            <button id="btn-start">시작</button>
-            <button id="btn-stop" disabled>중지</button>
-            <button id="btn-download" disabled>CSV 다운로드</button>
-            <button id="btn-cloud-submit" class="btn-cloud" disabled>☁️ Cloud DB에 제출</button>
-            <label style="margin-left:auto">샘플 버퍼: <span id="buffer-size">100</span></label>
-        </div>
-        <div id="record-status" style="margin-bottom:10px; color:#666;">⏸ 대기 중</div>
+        <!-- 큰 숫자(왼쪽) + 그래프·구간 선택(오른쪽), 휴대폰에서는 위아래 -->
+        <div class="dash-grid">
+            <div class="dash-readouts" aria-label="지금 값">
+                <div class="dash-card"><span class="label">Ax</span><span id="ax" class="value num">0.00</span><span class="unit">g</span></div>
+                <div class="dash-card"><span class="label">Ay</span><span id="ay" class="value num">0.00</span><span class="unit">g</span></div>
+                <div class="dash-card"><span class="label">Az</span><span id="az" class="value num">0.00</span><span class="unit">g</span></div>
+                <div class="dash-card"><span class="label">크기 |a|</span><span id="atot" class="value num">0.00</span><span class="unit">g</span></div>
+            </div>
 
-        <div style="background:#f1f3f5; padding:10px; border-radius:6px; margin:10px 0;">
-            <h3>구간 선택</h3>
-            <p style="font-size:0.9em; color:#555; margin:8px 0;">그래프를 직접 클릭해서 시작 지점과 종료 지점을 선택하면, 해당 구간만 남깁니다.</p>
-            <div class="controls">
-                <span id="selection-status" style="font-weight:bold; color:#666;">준비됨</span>
-                <span id="time-range" style="margin-left:10px; font-weight:bold;">전체: 0 ms</span>
-                <button id="btn-crop" disabled style="margin-left:auto;">선택 구간 크롭</button>
-                <button id="btn-reset-data" disabled>데이터 리셋</button>
+            <div class="chart-col">
+                <div class="dash-chart">
+                    <canvas id="accChart" aria-label="가속도 시간 그래프 (클릭해서 구간 선택)"></canvas>
+                </div>
+                <div class="panel">
+                    <h2>구간 선택</h2>
+                    <p class="note">그래프를 직접 클릭하세요: 첫 클릭은 시작 지점(빨강), 두 번째 클릭은 종료 지점(초록)입니다. 세 번째 클릭 시 선택이 초기화됩니다. 선택한 구간만 남기려면 '선택 구간 크롭'을 누르세요.</p>
+                    <div class="row">
+                        <span id="selection-status">준비됨</span>
+                        <span id="time-range">전체: 0 ms</span>
+                        <button id="btn-crop" class="push" disabled>선택 구간 크롭</button>
+                        <button id="btn-reset-data" disabled>데이터 리셋</button>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div id="acc-values">
-            <div class="acc-box">Ax: <span id="ax">0.00</span> g</div>
-            <div class="acc-box">Ay: <span id="ay">0.00</span> g</div>
-            <div class="acc-box">Az: <span id="az">0.00</span> g</div>
-            <div class="acc-box">|a|: <span id="atot">0.00</span> g</div>
-        </div>
-
-        <div class="graph-card">
-            <h3 style="margin-top:0;">실시간 그래프</h3>
-            <div class="graph-wrap">
-                <canvas id="accChart"></canvas>
+        <div class="dash-more">
+            <div class="panel">
+                <h2>제출</h2>
+                <p class="note"><strong>학생:</strong> <a href="../index.html">메인 페이지</a>에서 구글 로그인 후, 이 페이지에서 실험하고 '☁️ Cloud DB에 제출'로 결과를 제출합니다.<br>
+                <strong>교사:</strong> 메인 페이지의 교사 대시보드에서 학생들이 제출한 결과를 확인합니다.</p>
+                <button id="btn-cloud-submit" class="btn-success" disabled>☁️ Cloud DB에 제출</button>
             </div>
-            <p class="timeline-note">그래프를 직접 클릭하세요: 첫 클릭은 시작 지점(빨강), 두 번째 클릭은 종료 지점(초록)입니다. 세 번째 클릭 시 선택이 초기화됩니다.</p>
+
+            <details>
+                <summary>알아 두기</summary>
+                <ul class="note">
+                    <li>스마트폰에서 '시작'을 눌러 데이터를 기록하세요. 아이폰(iOS)에서는 처음에 동작 센서 권한을 허용해야 합니다.</li>
+                    <li>반드시 https 주소로 접속해야 센서가 동작합니다.</li>
+                    <li>최근 샘플 <span id="buffer-size">100</span>개까지 기록합니다.</li>
+                </ul>
+            </details>
         </div>
-    </div>
+    </main>
 
     <script src="../js/phone-accel.js" defer></script>
 
