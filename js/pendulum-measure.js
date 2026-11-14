@@ -12,8 +12,11 @@
     var state = {
         phase: 'idle',          // idle | calib | record
         samples: [], calibBuf: [], calib: null, source: null, result: null,
-        wakeLock: null, measuredAt: null, liveTimer: null, calibTimer: null, firstSampleTimer: null
+        wakeLock: null, measuredAt: null, liveTimer: null, calibTimer: null, firstSampleTimer: null,
+        group: null, measureId: null, sentKey: null, sending: false
     };
+    var PC = window.PendulumCloud;
+    var CONFIG = window.PENDULUM_CONFIG || {};
     var charts = { gyro: null, acc: null };
 
     // ---------- 저장(새로고침해도 조건·설정 유지) ----------
@@ -121,9 +124,9 @@
         await requestWakeLock();
 
         state.samples = []; state.calibBuf = []; state.calib = null; state.result = null; state.noGyro = false;
-        state.source = 'sensor'; state.measuredAt = new Date();
+        state.source = 'sensor'; state.measuredAt = new Date(); newMeasurement();
         window.addEventListener('devicemotion', onMotion);
-        $('btnStart').disabled = true; $('btnStop').disabled = false; $('btnCsv').disabled = true; $('btnSim').disabled = true;
+        $('btnStart').disabled = true; $('btnStop').disabled = false; $('btnCsv').disabled = true; $('btnSim').disabled = true; $('btnSend').disabled = true;
         clearResult();
         beginCalibration();
         // 1.5초가 지나도 값이 없으면 센서가 없는 기기 (PC 등)
@@ -188,7 +191,7 @@
         state.phase = 'idle';
         $('calibBox').hidden = true;
         $('btnStart').disabled = false; $('btnStop').disabled = true; $('btnSim').disabled = false;
-        if (silent) { setStatus('⏸ 대기 중'); return; }
+        if (silent) { setStatus('⏸ 대기 중'); updateSendState(); return; }
         if (wasCalib) { setStatus('⏸ 보정 중에 멈췄어요. 다시 시작하세요.'); return; }
         setStatus('✅ 측정 끝 (' + state.samples.length + '개)');
         recompute();
@@ -302,6 +305,80 @@
         renderResult(r);
         renderDataTable();
         $('btnCsv').disabled = false;
+        updateSendState();
+    }
+
+    // ---------- 노트북으로 보내기 (Apps Script → 선생님 구글 시트 → 노트북 분석 화면) ----------
+    function newMeasurement() {
+        state.measureId = PC ? PC.newId() : null;
+        state.sentKey = null;
+    }
+    function linkMsg(html, cls) {
+        var box = $('linkBox');
+        box.classList.remove('err', 'warn');
+        if (cls) box.classList.add(cls);
+        $('linkMsg').innerHTML = html;
+    }
+    // 지금 보낼 내용의 '지문': 보낸 뒤 계산 설정이나 L 을 바꾸면 다시 보내라고 알림
+    function sendKey() {
+        var r = state.result || {}, c = conditions();
+        return [state.measureId, c.L, c.amplitude, c.note, r.T, r.axis, r.n].join('|');
+    }
+    function updateSendState() {
+        if (!state.group) return;
+        var btn = $('btnSend');
+        var ready = state.samples.length && state.result && !state.result.error && state.phase === 'idle';
+        btn.disabled = !ready || state.sending;
+        if (!ready || state.sending) return;
+        if (!CONFIG.appsScriptUrl) {
+            btn.disabled = true;
+            linkMsg('선생님 설정이 아직 안 되어 있어 바로 보낼 수 없어요. <b>CSV 저장</b>을 눌러 파일을 노트북으로 옮긴 뒤, 노트북 화면에서 불러오세요.', 'warn');
+            return;
+        }
+        if (state.sentKey === sendKey()) return;
+        btn.textContent = state.sentKey ? '💻 바뀐 값 다시 보내기' : '💻 노트북으로 보내기';
+        linkMsg(state.sentKey ? '보낸 뒤에 값을 바꿨어요. 다시 보내면 노트북 표의 같은 줄이 바뀌어요.'
+            : '계산이 끝났어요. 결과가 괜찮으면 <b>💻 노트북으로 보내기</b>를 누르세요.');
+    }
+    async function sendToLaptop() {
+        if (!PC || state.sending) return;
+        var built = PC.buildSavePayload({
+            id: state.measureId, group: state.group, conditions: conditions(), result: state.result, samples: state.samples,
+            source: state.source, device: state.source === 'simulation' ? 'simulation' : deviceName(),
+            measuredAt: state.measuredAt ? state.measuredAt.toISOString() : ''
+        });
+        if (built.error) { linkMsg('⚠️ ' + esc(built.error), 'warn'); if (/줄 길이/.test(built.error)) $('cL').focus(); return; }
+        state.sending = true; updateSendState();
+        $('btnSend').textContent = '⏳ 보내는 중…';
+        linkMsg('보내는 중이에요… (몇 초 걸려요)');
+        var key = sendKey();
+        var res = await PC.save(CONFIG.appsScriptUrl, built.payload);
+        state.sending = false;
+        if (res.ok) {
+            state.sentKey = key;
+            $('btnSend').textContent = '✅ 보냄';
+            $('btnSend').disabled = true;
+            linkMsg('✅ 노트북으로 보냈어요: L = ' + esc(conditions().L) + ' m, T = ' + fmt(state.result.T, 3) + ' s. 노트북 표에 곧 나타나요. 다른 길이로 또 재려면 L 을 바꾸고 ▶ 측정 시작!');
+        } else {
+            $('btnSend').textContent = '💻 다시 보내기';
+            $('btnSend').disabled = false;
+            linkMsg('❌ 보내지 못했어요: ' + esc(res.error) + '<br>인터넷 연결을 확인하고 다시 눌러 보세요. 계속 안 되면 <b>CSV 저장</b>으로 파일을 옮겨 노트북에서 불러오세요.', 'err');
+        }
+    }
+    function setupLink() {
+        var m = /[?&]group=([^&#]*)/.exec(location.search);
+        if (!m || !PC) return;
+        var code = PC.normalizeGroup(decodeURIComponent(m[1]));
+        if (!PC.isGroupCode(code)) { warn('주소의 조 코드(' + code + ')가 올바르지 않아요. 노트북 화면의 QR 을 다시 찍어 주세요.'); return; }
+        state.group = code;
+        $('linkGroup').textContent = code;
+        $('linkBox').hidden = false;
+        $('btnSend').hidden = false;
+        // 조 번호 칸은 조 코드의 '조' 로 채움
+        $('cGroup').value = String(PC.groupParts(code).jo);
+        $('cGroup').readOnly = true;
+        saveCond();
+        if (!CONFIG.appsScriptUrl) linkMsg('선생님 설정이 아직 안 되어 있어요. 측정한 뒤 <b>CSV 저장</b>으로 파일을 노트북에 옮겨 불러오세요.', 'warn');
     }
 
     function renderResult(r) {
@@ -358,7 +435,7 @@
         state.calib = PM.calibrate(PM.simulate(Object.assign({}, opts, { ampDeg: 0, duration: CALIB_SECONDS })));
         showCalib(state.calib);
         state.samples = PM.simulate(opts);
-        state.source = 'simulation'; state.measuredAt = new Date();
+        state.source = 'simulation'; state.measuredAt = new Date(); newMeasurement();
         // 실험 조건 칸이 비어 있으면 시뮬레이션 값으로 채움
         if (!$('cL').value) $('cL').value = L.toFixed(2);
         if (!$('cAmp').value) $('cAmp').value = amp;
@@ -412,6 +489,9 @@
         $('btnStop').addEventListener('click', function () { stop(false); });
         $('btnCsv').addEventListener('click', downloadCsv);
         $('btnSim').addEventListener('click', simulate);
+        $('btnSend').addEventListener('click', sendToLaptop);
+        ['cL', 'cAmp', 'cNote'].forEach(function (id) { $(id).addEventListener('input', updateSendState); });
+        setupLink();
         $('dataDetails').addEventListener('toggle', renderDataTable);
         if (typeof DeviceMotionEvent === 'undefined') warn('이 기기·브라우저에는 동작 센서가 없어요. 폰으로 열거나, 아래 "🧪 시뮬레이션"으로 연습하세요.');
         if (typeof Chart === 'undefined') warn('그래프 도구를 불러오지 못했어요(인터넷 연결 확인). 계산과 CSV 저장은 그대로 돼요.');

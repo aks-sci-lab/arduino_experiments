@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
+    <title>스마트폰 진자 – 분석 (노트북)</title>
+    <link rel="stylesheet" href="../css/pendulum.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" defer></script>
+    <script src="../js/pendulum-math.js" defer></script>
+    <script src="../js/pendulum-config.js" defer></script>
+    <script src="../js/pendulum-cloud.js" defer></script>
+    <script src="../js/pendulum-report.js" defer></script>
+</head>
+<body>
+<main class="pendulum pd-steps-page">
+    <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
+    <h1>스마트폰 진자 – 분석 (노트북)</h1>
+    <p class="lead">폰으로 잰 주기를 모아 T²–L 그래프를 그리고, 그래프 기울기로 중력가속도 g 를 구합니다.</p>
+
+    <nav class="steps" role="tablist" aria-label="실험 단계">
+        <button data-step="purpose"><b>1</b><span>목적</span></button>
+        <button data-step="theory"><b>2</b><span>이론</span></button>
+        <button data-step="materials"><b>3</b><span>준비물</span></button>
+        <button data-step="procedure"><b>4</b><span>과정</span></button>
+        <button data-step="data"><b>5</b><span>데이터</span></button>
+        <button data-step="result"><b>6</b><span>결과</span></button>
+        <button data-step="conclusion"><b>7</b><span>결론</span></button>
+    </nav>
+
+    <!-- 1 목적 -->
+    <section class="step-panel" data-step="purpose" hidden>
+        <div class="pd-card">
+            <h2>1. 실험 목적</h2>
+            <p>스마트폰 센서로 진자의 주기를 측정하고, <b>T²–L 그래프</b>로 중력가속도 g 를 구한다. 구한 g 가 기준값과 다른 까닭(오차 원인)을 <b>데이터를 근거로</b> 설명한다.</p>
+            <p class="note">보고서 쓰기와 AI 피드백 칸은 다음 업데이트에서 이 단계들에 들어갈 예정이에요. 지금은 5. 데이터와 6. 결과를 써요.</p>
+        </div>
+        <div class="step-next"><button data-go="theory">다음: 2. 이론 →</button></div>
+    </section>
+
+    <!-- 2 이론 -->
+    <section class="step-panel" data-step="theory" hidden>
+        <div class="pd-card">
+            <h2>2. 이론</h2>
+            <p>진폭이 작을 때 단진자의 주기는 <b>T = 2π√(ℓ/g)</b> 예요. ℓ 은 매단 곳부터 <b>무게중심</b>까지의 길이예요.</p>
+            <p>그런데 폰의 무게중심이 정확히 어디인지는 몰라요. 그래서 우리가 잰 줄 길이 L 에 모르는 길이 d 를 더해 ℓ = L + d 라고 두면</p>
+            <p class="pd-formula">T² = (4π²/g) · (L + d) = (4π²/g) · L + (4π²/g) · d</p>
+            <p>T² 을 세로축, L 을 가로축에 그리면 <b>직선</b>이 되고</p>
+            <ul>
+                <li><b>기울기</b> = 4π²/g → <b>g = 4π² ÷ 기울기</b></li>
+                <li><b>절편</b> = (4π²/g)·d → <b>d = 절편 ÷ 기울기</b></li>
+            </ul>
+            <p>즉, d 를 몰라도 <b>기울기만으로 g 를 구할 수 있어요</b>. 길이를 여러 번 바꿔 재야 하는 까닭이에요.</p>
+        </div>
+        <div class="step-next"><button data-go="purpose">← 1. 목적</button><button data-go="materials">다음: 3. 준비물 →</button></div>
+    </section>
+
+    <!-- 3 준비물 -->
+    <section class="step-panel" data-step="materials" hidden>
+        <div class="pd-card">
+            <h2>3. 준비물</h2>
+            <ul>
+                <li>스마트폰 1대 (케이스 끼움) — 측정용</li>
+                <li>노트북 — 이 분석 화면</li>
+                <li>튼튼한 줄 2개 (V자로 매달기), 스탠드 또는 매달 곳, 줄자</li>
+                <li>바닥 매트</li>
+            </ul>
+            <p class="note">선생님: 폰과 노트북이 자동으로 이어지려면 구글 시트 연결을 한 번 설정해야 해요. <a href="pendulum-setup.html">선생님 설정 안내</a></p>
+        </div>
+        <div class="step-next"><button data-go="theory">← 2. 이론</button><button data-go="procedure">다음: 4. 과정 →</button></div>
+    </section>
+
+    <!-- 4 과정 -->
+    <section class="step-panel" data-step="procedure" hidden>
+        <div class="pd-card">
+            <h2>4. 과정</h2>
+            <ol>
+                <li>5. 데이터에서 반·조를 넣고 <b>조 코드</b>를 만들어요. 화면에 QR 코드가 떠요.</li>
+                <li>측정할 폰으로 QR 을 찍어 측정 화면을 열어요 (조 코드가 자동으로 들어가요).</li>
+                <li>폰에 줄 길이 L 을 적고 측정해요. 끝나면 폰에서 <b>💻 노트북으로 보내기</b>.</li>
+                <li>노트북 표에 측정이 자동으로 들어와요. L 을 바꿔(예: 0.5·0.7·0.9·1.1 m) 여러 번 재요.</li>
+                <li>6. 결과에서 T²–L 그래프와 g 를 확인해요.</li>
+            </ol>
+            <p class="note">인터넷이 안 되면: 폰에서 <b>CSV 저장</b> → 파일을 노트북으로 옮김 → 5. 데이터에서 <b>CSV 불러오기</b>.</p>
+        </div>
+        <div class="step-next"><button data-go="materials">← 3. 준비물</button><button data-go="data">다음: 5. 데이터 →</button></div>
+    </section>
+
+    <!-- 5 데이터 -->
+    <section class="step-panel" data-step="data" hidden>
+        <div id="cfgWarn" class="pd-msg warn" hidden>
+            ⚙️ 선생님 설정이 아직 안 되어 있어 폰과 자동으로 이어지지 않아요. 폰에서 <b>CSV 저장</b> → 여기서 <b>CSV 불러오기</b>로 할 수 있어요.
+            <a href="pendulum-setup.html">선생님 설정 안내</a>
+        </div>
+
+        <section class="pd-card" id="groupCard">
+            <h2>① 조 코드 만들기</h2>
+            <div class="pd-form">
+                <label>반 <input id="gBan" type="number" min="1" max="99" inputmode="numeric" placeholder="예: 2"></label>
+                <label>조 <input id="gJo" type="number" min="1" max="99" inputmode="numeric" placeholder="예: 3"></label>
+            </div>
+            <button id="btnMake" class="btn-primary">조 코드 만들기</button>
+            <details class="pd-explain">
+                <summary>같은 조의 다른 노트북이 이미 조 코드를 만들었다면</summary>
+                <div class="pd-form">
+                    <label>조 코드 <input id="gCode" placeholder="예: 2-3-4821" autocomplete="off"></label>
+                </div>
+                <button id="btnJoin">이 조 코드로 연결</button>
+            </details>
+            <p id="groupMsg" class="note" role="status"></p>
+        </section>
+
+        <section class="pd-card" id="qrCard" hidden>
+            <h2>② 측정할 폰으로 QR 찍기</h2>
+            <div class="pd-qr-wrap">
+                <div id="qr" class="pd-qr" aria-label="측정 화면 QR 코드"></div>
+                <div class="pd-qr-info">
+                    <div>조 코드</div>
+                    <div id="codeShow" class="pd-code num"></div>
+                    <p class="note">폰 카메라로 QR 을 비추면 측정 화면이 이 조 코드로 열려요.</p>
+                    <p class="note pd-url"><a id="qrUrl" target="_blank" rel="noopener"></a></p>
+                    <div class="pd-row">
+                        <button id="btnCopy">🔗 주소 복사</button>
+                        <button id="btnBigQr">🔍 QR 크게</button>
+                        <button id="btnLeave">조 코드 바꾸기</button>
+                    </div>
+                </div>
+            </div>
+            <div id="conn" class="pd-conn" role="status" aria-live="polite"></div>
+        </section>
+
+        <section class="pd-card">
+            <h2>③ 측정값 표</h2>
+            <p class="note">폰에서 보낸 측정이 자동으로 들어와요. 잘못 잰 줄은 '쓰기' 칸의 체크를 끄면 계산에서 빠져요.</p>
+            <div class="pd-table-wrap">
+                <table id="mTable" class="pd-table">
+                    <thead><tr><th>쓰기</th><th>번호</th><th>L (m)</th><th>T 평균 (s)</th><th>T 표준편차 (s)</th><th>T² (s²)</th><th>주기 수</th><th>자료</th><th></th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <p id="fitBrief" class="note"></p>
+
+            <div class="pd-import">
+                <div id="drop" class="pd-drop" tabindex="0" role="button" aria-label="CSV 파일 불러오기">
+                    <span>📄 폰에서 저장한 <b>CSV 파일</b>을 여기에 끌어다 놓거나 <u>눌러서 고르세요</u> (여러 개 가능)</span>
+                </div>
+                <input id="fileInput" type="file" accept=".csv,text/csv" multiple hidden>
+                <details class="pd-explain">
+                    <summary>✏️ 직접 넣기 (다른 방법으로 잰 값)</summary>
+                    <div class="pd-form">
+                        <label>L (m) <input id="mL" type="number" step="0.01" min="0.01"></label>
+                        <label>T 평균 (s) <input id="mT" type="number" step="0.001" min="0.05"></label>
+                        <label>T 표준편차 (s) <input id="mS" type="number" step="0.001" min="0" placeholder="몰라도 됨"></label>
+                    </div>
+                    <button id="btnManual">표에 넣기</button>
+                </details>
+                <div class="pd-row">
+                    <button id="btnTableCsv" class="btn-info">표를 CSV 로 저장</button>
+                </div>
+            </div>
+            <p id="importMsg" class="note" role="status"></p>
+        </section>
+        <div class="step-next"><button data-go="procedure">← 4. 과정</button><button data-go="result">다음: 6. 결과 →</button></div>
+    </section>
+
+    <!-- 6 결과 -->
+    <section class="step-panel" data-step="result" hidden>
+        <section class="pd-card">
+            <h2>6. 결과: T²–L 그래프</h2>
+            <div class="dash-chart pd-fit-chart"><canvas id="fitChart" aria-label="T²–L 그래프"></canvas></div>
+            <p class="note">점에 마우스를 올리면 값이 보여요. 청록색 선 = 최소제곱 직선(모든 점에서 가장 가까운 직선).</p>
+            <div class="pd-form">
+                <label>g 기준값 (m/s²) <input id="gRef" type="number" step="0.001" min="9" max="10.5" value="9.80"></label>
+            </div>
+            <div id="fitBox" class="pd-result" aria-live="polite">측정이 2개 이상(서로 다른 길이) 모이면 계산해요.</div>
+            <details class="pd-explain">
+                <summary>계산 과정 보기</summary>
+                <div id="fitSteps"></div>
+            </details>
+        </section>
+        <div class="step-next"><button data-go="data">← 5. 데이터</button><button data-go="conclusion">다음: 7. 결론 →</button></div>
+    </section>
+
+    <!-- 7 결론 -->
+    <section class="step-panel" data-step="conclusion" hidden>
+        <div class="pd-card">
+            <h2>7. 결론 및 검토</h2>
+            <p>생각해 볼 질문</p>
+            <ol>
+                <li>구한 g 는 기준값과 몇 % 다른가요? 그 차이는 T 표준편차로 설명되는 크기인가요?</li>
+                <li>절편으로 구한 d 는 폰의 실제 크기와 비교해 그럴듯한가요?</li>
+                <li>직선에서 가장 멀리 떨어진 점은 어느 것인가요? 그 측정에서 무엇이 달랐을까요?</li>
+                <li>오차 원인을 "공기저항"처럼 일반적으로 말하지 말고, <b>표와 그래프의 어느 값</b>이 근거인지 함께 써 보세요.</li>
+            </ol>
+            <p class="note">보고서 쓰기·AI 피드백·제출은 다음 업데이트에서 이 화면에 들어갈 예정이에요.</p>
+        </div>
+        <div class="step-next"><button data-go="result">← 6. 결과</button></div>
+    </section>
+
+    <!-- QR 크게 보기 -->
+    <div id="bigQr" class="pd-bigqr" hidden role="dialog" aria-label="QR 크게 보기">
+        <div id="bigQrImg"></div>
+        <div class="pd-code" id="bigQrCode"></div>
+        <button id="btnBigClose">닫기</button>
+    </div>
+</main>
+</body>
+</html>
