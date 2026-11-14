@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
     <title>스마트폰 가속도 실험</title>
     <link rel="stylesheet" href="../css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" defer></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 16px; background:#f8f9fa; }
+        body { font-family: var(--font); padding: 16px; background:#f8f9fa; }
         .container { max-width: 980px; margin: 0 auto; background:#fff; padding:16px; border-radius:8px; box-shadow:0 4px 10px rgba(0,0,0,0.08); }
         .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
-        button { padding:10px 14px; border-radius:6px; border:none; background:#007bff; color:#fff; }
+        button { padding:10px 14px; border-radius:6px; border:none; background:var(--c-primary); color:#fff; }
         #acc-values { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0; }
         .acc-box { background:#f1f3f5; padding:8px 12px; border-radius:6px; min-width:110px; text-align:center; }
         .graph-card { background:#f8f9fa; border:1px solid #e9ecef; border-radius:8px; padding:12px; margin-top:12px; }
@@ -20,7 +22,7 @@
         .info-box { background:#f1f3f5; padding:10px 12px; border-radius:6px; margin:10px 0; font-size:0.9em; color:#444; }
         #record-status { font-weight:bold; }
         #sensor-warning { display:none; background:#fff3cd; color:#856404; padding:10px 12px; border-radius:6px; margin:10px 0; font-size:0.9em; }
-        .btn-cloud { background:#28a745; }
+        .btn-cloud { background:var(--c-success); }
     </style>
 </head>
 <body>

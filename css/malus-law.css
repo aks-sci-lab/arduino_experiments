@@ -1,7 +1,7 @@
 /* 말루스 법칙 실험 페이지 */
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { display: block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f8; margin: 0; padding: 12px; color: #222; }
+body { display: block; font-family: var(--font); background: #f4f6f8; margin: 0; padding: 12px; color: #222; }
 .wrap { max-width: 860px; margin: 0 auto; }
 h1 { font-size: 1.35em; margin: 4px 0 8px; }
 h2 { font-size: 1.05em; margin: 0 0 10px; }
@@ -12,10 +12,10 @@ h2 { font-size: 1.05em; margin: 0 0 10px; }
 .ok { background: #e6f4ea; color: #1e6b34; padding: 8px 10px; border-radius: 6px; font-size: .88em; margin: 8px 0; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 .row label { font-size: .9em; display: flex; align-items: center; gap: 6px; }
-button { padding: 10px 14px; border: none; border-radius: 6px; background: #007bff; color: #fff; font-size: .95em; cursor: pointer; }
-button.secondary { background: #6c757d; }
-button.good { background: #28a745; }
-button.danger { background: #dc3545; }
+button { padding: 10px 14px; border: none; border-radius: 6px; background: var(--c-primary); color: #fff; font-size: .95em; cursor: pointer; }
+button.secondary { background: var(--c-secondary); }
+button.good { background: var(--c-success); }
+button.danger { background: var(--c-danger); }
 button:disabled { opacity: .45; cursor: default; }
 input[type=number], select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 1em; }
 input[type=number] { width: 90px; }
@@ -48,7 +48,7 @@ td.acts { white-space: nowrap; }
 /* 탭 */
 .tabs { position: sticky; top: 0; z-index: 5; display: flex; gap: 4px; background: #f4f6f8; padding: 6px 0 8px; margin-bottom: 4px; }
 .tab { flex: 1; padding: 10px 4px; background: #e2e6ea; color: #333; border-radius: 8px; font-size: .9em; white-space: nowrap; }
-.tab.active { background: #007bff; color: #fff; font-weight: 600; }
+.tab.active { background: var(--c-primary); color: #fff; font-weight: 600; }
 .tab-panel[hidden] { display: none; }
 
 /* 입력 */
@@ -72,7 +72,7 @@ canvas.sketch { width: 100%; height: 200px; display: block; background: #fff; bo
 .chip { padding: 6px 8px; border-radius: 14px; background: #f1f3f5; color: #333; font-size: .82em; border: 2px solid transparent; }
 .chip.done { background: #d3f9d8; color: #1e6b34; }
 .chip.part { background: #fff3bf; color: #7a5b00; }
-.chip.current { border-color: #007bff; }
+.chip.current { border-color: var(--c-primary); }
 .recent { font-size: .85em; color: #555; margin-top: 6px; }
 .recent div { padding: 3px 0; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 

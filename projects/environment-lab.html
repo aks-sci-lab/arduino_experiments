@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
     <title>환경 센서 실시간 모니터</title>
     
     <link rel="stylesheet" href="../css/style.css">
@@ -16,7 +18,7 @@
         .sensor-readout-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
         .sensor-readout { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; text-align: center; }
         .sensor-readout h3 { margin-top: 0; font-size: 1.2em; color: #495057; }
-        .sensor-readout .value { font-size: 2.5em; font-weight: bold; color: #007BFF; }
+        .sensor-readout .value { font-size: 2.5em; font-weight: bold; color: var(--c-primary); }
         .graph-controls { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 10px; }
         .trial-management { margin-top: 1rem; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
         .trial-management h3 { margin-top: 0; }
@@ -41,14 +43,14 @@
         button:not(:disabled):hover, .button-link:not(:disabled):hover {
             background-color: #ddd; border-color: #bbb; color: #111;
         }
-        .btn-primary { background-color: #007bff; border-color: #007bff; color: white; }
-        .btn-primary:not(:disabled):hover { background-color: #0056b3; border-color: #0056b3; color: white; }
-        .btn-danger { background-color: #dc3545; border-color: #dc3545; color: white; }
-        .btn-danger:not(:disabled):hover { background-color: #c82333; border-color: #bd2130; color: white; }
-        .btn-secondary { background-color: #6c757d; border-color: #6c757d; color: white; }
+        .btn-primary { background-color: var(--c-primary); border-color: var(--c-primary); color: white; }
+        .btn-primary:not(:disabled):hover { background-color: var(--c-primary-dark); border-color: var(--c-primary-dark); color: white; }
+        .btn-danger { background-color: var(--c-danger); border-color: var(--c-danger); color: white; }
+        .btn-danger:not(:disabled):hover { background-color: var(--c-danger); border-color: var(--c-danger); color: white; }
+        .btn-secondary { background-color: var(--c-secondary); border-color: var(--c-secondary); color: white; }
         .btn-secondary:not(:disabled):hover { background-color: #5a6268; border-color: #545b62; color: white; }
-        .btn-info { background-color: #17a2b8; border-color: #17a2b8; color: white; }
-        .btn-info:not(:disabled):hover { background-color: #138496; border-color: #117a8b; color: white; }
+        .btn-info { background-color: var(--c-info); border-color: var(--c-info); color: white; }
+        .btn-info:not(:disabled):hover { background-color: #138496; border-color: var(--c-info); color: white; }
     </style>
 </head>
 <body>
@@ -147,7 +149,7 @@
                     <ul id="trial-list" class="trial-list"></ul>
                     <div class="trial-controls">
                         <button id="saveTrialButton" class="btn-primary" disabled>현재 측정 저장</button>
-                        <button id="saveCloudButton" class="btn-primary" style="background-color:#28a745; border-color:#28a745;">☁️ Cloud DB에 제출</button>
+                        <button id="saveCloudButton" class="btn-primary" style="background-color:var(--c-success); border-color:var(--c-success);">☁️ Cloud DB에 제출</button>
                         <button id="clearTrialsButton" class="btn-danger">모든 회차 삭제</button>
                     </div>
                 </div>

@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
     <title>가속도계 데이터 분석</title>
     
     <link rel="stylesheet" href="../css/style.css">
@@ -16,14 +18,20 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.js"></script>
     
     <style>
-        body { font-family: sans-serif; }
+        body { font-family: var(--font); }
         .container { max-width: 1600px; margin: 0 auto; padding: 1rem; }
         
         /* [수정] 2:3 레이아웃 */
-        .main-layout { display: grid; grid-template-columns: 2fr 3fr; gap: 1rem; }
+        .main-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 1rem; }
+        /* 휴대폰·좁은 창: 표와 그래프를 위아래 한 줄로 (예전에는 두 칸이 찌그러져 제목이 한 글자씩 쌓임) */
+        @media (max-width: 800px) {
+            .main-layout { grid-template-columns: minmax(0, 1fr); }
+            .header { flex-wrap: wrap; gap: 8px; }
+            .table-controls { flex-wrap: wrap; }
+        }
         
         .content-column { display: flex; flex-direction: column; gap: 1rem; }
-        .ble-button { padding: 10px 15px; border: none; border-radius: 5px; color: white; background-color: #007BFF; cursor: pointer; }
+        .ble-button { padding: 10px 15px; border: none; border-radius: 5px; color: white; background-color: var(--c-primary); cursor: pointer; }
         button { padding: 8px 12px; border: 1px solid #ccc; border-radius: 5px; background-color: #f0f0f0; cursor: pointer; }
         button:disabled { background-color: #e9ecef; cursor: not-allowed; }
         select { padding: 8px; border-radius: 5px; }
@@ -51,9 +59,9 @@
 
         /* [수정] 가독성 향상 버튼 스타일 */
         .btn-action-primary {
-            background-color: #007BFF;
+            background-color: var(--c-primary);
             color: white;
-            border-color: #007BFF;
+            border-color: var(--c-primary);
         }
         .btn-action-primary:disabled {
             background-color: #a0cfff;
@@ -61,14 +69,14 @@
             color: #f0f0f0;
         }
         .btn-action-danger {
-            background-color: #DC3545;
+            background-color: var(--c-danger);
             color: white;
-            border-color: #DC3545;
+            border-color: var(--c-danger);
         }
         .btn-action-secondary {
-            background-color: #6C757D;
+            background-color: var(--c-secondary);
             color: white;
-            border-color: #6C757D;
+            border-color: var(--c-secondary);
         }
     </style>
 </head>
@@ -150,7 +158,7 @@
                     <ul id="trial-list" class="trial-list"></ul>
                     <div class="trial-controls">
                         <button id="saveTrialButton" class="btn-action-primary" disabled>현재 측정 저장</button>
-                        <button id="saveCloudButton" class="btn-action-primary" style="background-color:#28a745; border-color:#28a745;">☁️ Cloud DB에 제출</button>
+                        <button id="saveCloudButton" class="btn-action-primary" style="background-color:var(--c-success); border-color:var(--c-success);">☁️ Cloud DB에 제출</button>
                         <button id="clearTrialsButton" class="btn-action-danger">모든 회차 삭제</button>
                     </div>
                 </div>

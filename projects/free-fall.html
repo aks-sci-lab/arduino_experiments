@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
     <meta name="description" content="자유낙하 궤적 분석 & 다중섬광사진 - 수동 객체 선택 방식">
     <title>자유낙하 다중섬광사진 및 수동 궤적 분석</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" defer></script>
@@ -10,7 +12,7 @@
     <style>
         /* Base layout */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: var(--font);
             max-width: 1100px;
             margin: 0 auto;
             padding: 20px;
@@ -30,7 +32,7 @@
         .tabs { margin-bottom: 12px; text-align: left; }
         .tab-buttons { display:flex; gap:8px; justify-content:flex-start; margin-bottom:8px; }
         .tab-btn { padding:8px 14px; border-radius:6px; border:1px solid #ddd; background:#fff; cursor:pointer; }
-        .tab-btn.active { background:#007bff; color:white; border-color:#007bff; }
+        .tab-btn.active { background:var(--c-primary); color:white; border-color:var(--c-primary); }
 
         .controls, .slider-controls {
             margin: 15px 0;
@@ -73,18 +75,18 @@
             font-size: 15px;
             font-weight: bold;
             color: white;
-            background-color: #007bff;
+            background-color: var(--c-primary);
             border: none;
             border-radius: 6px;
             cursor: pointer;
             transition: background-color 0.2s;
         }
 
-        button:hover { background-color: #0056b3; }
+        button:hover { background-color: var(--c-primary-dark); }
         button:disabled { background-color: #cccccc; cursor: not-allowed; }
 
-        #btn-manual-track { background-color: #dc3545; display: none; }
-        #btn-manual-track:hover { background-color: #c82333; }
+        #btn-manual-track { background-color: var(--c-danger); display: none; }
+        #btn-manual-track:hover { background-color: var(--c-danger); }
         #btn-strobo { background-color: #6f42c1; display: none; }
         #btn-strobo:hover { background-color: #5a32a3; }
         #btn-undo-point { background-color: #fd7e14; display: none; }
@@ -120,11 +122,11 @@
 
         .chart-container { width: 100%; max-width: 900px; margin: 0 auto; display: none; margin-top: 20px; }
 
-        #loading-overlay { display: none; color: #28a745; font-weight: bold; margin-top: 10px; }
+        #loading-overlay { display: none; color: var(--c-success); font-weight: bold; margin-top: 10px; }
 
         .notice { font-size: 0.95em; color: #666; margin-top: 10px; padding: 10px; background-color: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px; }
 
-        #tracking-info { font-size: 1em; color: #28a745; font-weight: bold; margin-top: 10px; padding: 8px; background-color: #d4edda; border-left: 4px solid #28a745; border-radius: 4px; display: none; }
+        #tracking-info { font-size: 1em; color: var(--c-success); font-weight: bold; margin-top: 10px; padding: 8px; background-color: #d4edda; border-left: 4px solid var(--c-success); border-radius: 4px; display: none; }
 
         #strobo-container { display: none; width: 100%; margin-top: 20px; }
 
@@ -194,8 +196,8 @@
                 <span>mm/px</span>
             </div>
             <button id="btn-manual-track">수동 선택 시작</button>
-            <button id="btn-strobo" style="background-color: #28a745;">✓ 합성 실행</button>
-            <button id="btn-csv" style="display:none; background-color: #28a745;">📊 CSV 다운로드</button>
+            <button id="btn-strobo" style="background-color: var(--c-success);">✓ 합성 실행</button>
+            <button id="btn-csv" style="display:none; background-color: var(--c-success);">📊 CSV 다운로드</button>
         </div>
 
         <div id="tracking-info">선택된 점: <span id="selected-count">0</span>개</div>
@@ -227,7 +229,7 @@
         <div id="strobo-container">
             <h2>합성된 다중섬광사진</h2>
             <canvas id="canvas-strobo"></canvas><br>
-            <button id="btn-download-strobo" style="margin-top: 10px; background-color: #17a2b8;">🖼️ 사진 다운로드</button>
+            <button id="btn-download-strobo" style="margin-top: 10px; background-color: var(--c-info);">🖼️ 사진 다운로드</button>
         </div>
 
         <!-- 자유낙하/2차원 운동 그래프 -->

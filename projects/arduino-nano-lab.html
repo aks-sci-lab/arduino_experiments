@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
     <title>아두이노 Nano 33 BLE Sense 센서 실험</title>
     <link rel="stylesheet" href="../css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
@@ -16,15 +18,15 @@
         .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
         button, select { font-size: 1em; padding: 10px 14px; border-radius: 8px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; }
         button:disabled, select:disabled { opacity: 0.55; cursor: not-allowed; }
-        .btn-primary { background: #007bff; border-color: #007bff; color: #fff; }
-        .btn-danger { background: #dc3545; border-color: #dc3545; color: #fff; }
+        .btn-primary { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+        .btn-danger { background: var(--c-danger); border-color: var(--c-danger); color: #fff; }
         .tabs { display: flex; gap: 6px; margin: 12px 0 6px; }
         .tabs button { flex: 1; }
         .tabs button[aria-pressed="true"] { background: #343a40; border-color: #343a40; color: #fff; }
         .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 10px 0; }
         .readout { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 10px; text-align: center; }
         .readout .name { color: #495057; font-size: 0.9em; }
-        .readout .value { font-size: 1.6em; font-weight: bold; color: #007bff; }
+        .readout .value { font-size: 1.6em; font-weight: bold; color: var(--c-primary); }
         .chart-box { position: relative; height: 260px; margin: 8px 0 16px; }
         .note { color: #555; font-size: 0.92em; line-height: 1.5; }
         details { border: 1px solid #ddd; border-radius: 8px; padding: 8px 12px; margin: 10px 0; }

@@ -3,31 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
     <title>전자기 유도 측정기</title>
     <link rel="stylesheet" href="../css/style.css">
     <style>
-        body { font-family: sans-serif; }
+        body { font-family: var(--font); }
         .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
         .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
         .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
         button { padding: 8px 14px; border: 1px solid #ccc; border-radius: 5px; background: #f0f0f0; cursor: pointer; }
         button:disabled { background: #e9ecef; color: #999; cursor: not-allowed; }
-        button.primary { background: #007BFF; border-color: #007BFF; color: #fff; }
+        button.primary { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
         button.primary:disabled { background: #a0cfff; border-color: #a0cfff; }
-        button.rec { background: #DC3545; border-color: #DC3545; color: #fff; }
-        button.ok { background: #28A745; border-color: #28A745; color: #fff; }
+        button.rec { background: var(--c-danger); border-color: var(--c-danger); color: #fff; }
+        button.ok { background: var(--c-success); border-color: var(--c-success); color: #fff; }
         label.f { display: flex; flex-direction: column; font-size: 0.85em; color: #555; gap: 3px; }
         input[type=number], select { padding: 6px; border: 1px solid #ccc; border-radius: 5px; width: 110px; }
         .tabs { display: flex; gap: 4px; margin-bottom: 1rem; flex-wrap: wrap; }
         .tabs button { border-radius: 6px 6px 0 0; }
-        .tabs button[aria-selected=true] { background: #007BFF; color: #fff; border-color: #007BFF; }
+        .tabs button[aria-selected=true] { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
         .panel[hidden] { display: none; }
         .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
         .readout { background: #f8f9fa; border-radius: 8px; padding: 10px; text-align: center; }
         .readout .k { font-size: 0.8em; color: #666; }
         .readout .v { font-size: 1.7em; font-weight: bold; font-variant-numeric: tabular-nums; }
         .readout .u { font-size: 0.8em; color: #666; }
-        .v-volt { color: #d63384; } .v-curr { color: #0d6efd; }
+        .v-volt { color: #d63384; } .v-curr { color: var(--c-primary); }
         canvas { width: 100%; height: 320px; display: block; background: #fff; border: 1px solid #ddd; border-radius: 6px; }
         table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
         th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid #eee; }
@@ -106,7 +108,7 @@
             <canvas id="chart" width="1100" height="320"></canvas>
             <div class="muted" style="margin-top:6px;">
                 <span style="color:#d63384">━ 전압(mV, 왼쪽 축)</span> &nbsp;
-                <span style="color:#0d6efd">━ 전류(mA, 오른쪽 축)</span> &nbsp;
+                <span style="color:var(--c-primary)">━ 전류(mA, 오른쪽 축)</span> &nbsp;
                 측정 중에는 최근 구간이, 측정 후에는 전체가 표시됩니다.
             </div>
         </div>

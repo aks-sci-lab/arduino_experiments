@@ -1,6 +1,6 @@
 /* 이상기체 상태 방정식 실험 페이지 (플랑크 상수 실험 페이지와 같은 모양) */
 * { box-sizing: border-box; }
-body { display: block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f8; margin: 0; padding: 12px; color: #222; }
+body { display: block; font-family: var(--font); background: #f4f6f8; margin: 0; padding: 12px; color: #222; }
 .wrap { max-width: 860px; margin: 0 auto; }
 h1 { font-size: 1.35em; margin: 4px 0 8px; }
 h2 { font-size: 1.05em; margin: 0 0 10px; }
@@ -11,10 +11,10 @@ h2 { font-size: 1.05em; margin: 0 0 10px; }
 .ok { background: #e6f4ea; color: #1e6b34; padding: 8px 10px; border-radius: 6px; font-size: .88em; margin: 8px 0; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 .row label { font-size: .9em; display: flex; align-items: center; gap: 6px; }
-button { padding: 10px 14px; border: none; border-radius: 6px; background: #007bff; color: #fff; font-size: .95em; cursor: pointer; }
-button.secondary { background: #6c757d; }
-button.good { background: #28a745; }
-button.danger { background: #dc3545; }
+button { padding: 10px 14px; border: none; border-radius: 6px; background: var(--c-primary); color: #fff; font-size: .95em; cursor: pointer; }
+button.secondary { background: var(--c-secondary); }
+button.good { background: var(--c-success); }
+button.danger { background: var(--c-danger); }
 button:disabled { opacity: .45; cursor: default; }
 input[type=number], select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 1em; }
 input[type=number] { width: 90px; }
@@ -41,7 +41,7 @@ input[type=text] { padding: 8px; border: 1px solid #ccc; border-radius: 6px; fon
 .led-table td, .led-table th { text-align: left; }
 .methods { display: grid; gap: 8px; margin: 8px 0; }
 .methods label { display: block; border: 2px solid #dee2e6; border-radius: 8px; padding: 10px 12px; cursor: pointer; font-size: .92em; line-height: 1.5; }
-.methods label:has(input:checked) { border-color: #007bff; background: #f0f7ff; }
+.methods label:has(input:checked) { border-color: var(--c-primary); background: #f0f7ff; }
 .methods input { margin-right: 6px; }
 .entry input[type=number] { width: 110px; font-size: 1.15em; }
 .thr { background: #f1f3f5; border-radius: 6px; padding: 8px 10px; margin: 8px 0; font-size: .95em; }
@@ -62,8 +62,8 @@ canvas.chart.small { height: 220px; }
 .tabs button { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 7px 2px; background: #fff; color: #333; border: 1px solid #dee2e6; border-radius: 8px; font-size: .82em; }
 .tabs button b { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #e9ecef; color: #333; font-size: .9em; flex: none; }
 .tabs button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tabs button[aria-selected=true] { background: #007bff; color: #fff; border-color: #007bff; }
-.tabs button[aria-selected=true] b { background: #fff; color: #007bff; }
+.tabs button[aria-selected=true] { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+.tabs button[aria-selected=true] b { background: #fff; color: var(--c-primary); }
 .card h3 { font-size: .98em; margin: 16px 0 6px; color: #1e3a5f; }
 .card p { line-height: 1.65; font-size: .93em; margin: 6px 0; }
 .formula { text-align: center; font-size: 1.08em !important; font-weight: 600; background: #f1f3f5; border-radius: 6px; padding: 8px; font-family: "Times New Roman", serif; }
@@ -86,19 +86,19 @@ textarea { width: 100%; min-height: 84px; padding: 8px; border: 1px solid #ccc; 
 .live { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
 .live div { background: #f1f3f5; border-radius: 8px; padding: 8px; text-align: center; font-size: .82em; color: #555; }
 .live b { display: block; font-size: 1.55em; color: #1e3a5f; font-variant-numeric: tabular-nums; }
-.live div.main b { color: #007bff; }
+.live div.main b { color: var(--c-primary); }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: .85em; background: #e9ecef; }
 .badge.ok { background: #e6f4ea; color: #1e6b34; padding: 2px 8px; margin: 0; }
 .badge.wait { background: #fff3cd; color: #7a5b00; }
 input[readonly] { background: #eef5ff; color: #1e3a5f; }
-.dir-down { color: #007bff; white-space: nowrap; }
+.dir-down { color: var(--c-primary); white-space: nowrap; }
 .dir-up { color: #e67e22; white-space: nowrap; }
 /* 보고서 보기 (제출한 보고서, 인쇄) */
 #report-view { display: none; }
 body.report-mode .wrap > :not(#report-view) { display: none !important; }
 body.report-mode #report-view { display: block; }
 .report h2 { border-bottom: 2px solid #1e3a5f; padding-bottom: 4px; margin-top: 18px; }
-.report .answer { white-space: pre-wrap; background: #f8f9fa; border-left: 3px solid #007bff; padding: 6px 10px; margin: 4px 0 10px; font-size: .93em; line-height: 1.6; }
+.report .answer { white-space: pre-wrap; background: #f8f9fa; border-left: 3px solid var(--c-primary); padding: 6px 10px; margin: 4px 0 10px; font-size: .93em; line-height: 1.6; }
 .report .answer.empty { color: #999; border-left-color: #ccc; }
 .report canvas.chart { height: 240px; }
 .report .meta { font-size: .9em; line-height: 1.7; }
