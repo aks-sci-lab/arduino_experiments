@@ -79,7 +79,7 @@ test('잘못된 값은 저장하지 않고 이유를 알려 줌', () => {
 test('시트에서 수식으로 실행되지 않게 = + - @ 로 시작하는 글은 앞에 \' 를 붙이고, 길이·줄바꿈을 정리', () => {
     const app = loadPlanckApp();
     app.ctx.submitMeasurement(goodPayload({ group: '=IMPORTXML("http://x")', name: '@이름\n두줄', memo: '+메모'.repeat(100) }));
-    const row = app.rows()[1];
+    const row = app.written()[1];   // 시트에 보낸 그대로 (' 는 진짜 시트에서 값에 남지 않음)
     assert.equal(row[1], "'=IMPORTXML(\"http://x");   // 20글자로 자른 뒤 ' 붙임
     assert.equal(row[2], "'@이름 두줄");
     assert.ok(row[15].startsWith("'+메모")); assert.ok(row[15].length <= 201);
@@ -151,4 +151,13 @@ test('화면: 기본 주소는 학생, ?page=teacher 는 선생님, include 가 
     }
     assert.ok(s.html.includes('submitMeasurement') && !s.html.includes('teacherData'));
     assert.ok(t.html.includes('teacherData'));
+});
+
+test('조 이름이 날짜·숫자처럼 보여도(1-2, 3) 시트가 바꾸지 않아 선생님 화면에 그대로 보임', () => {
+    const app = loadPlanckApp();
+    app.ctx.submitMeasurement(goodPayload({ group: '1-2', name: '3' }));
+    assert.equal(typeof app.rows()[1][1], 'string');
+    const data = app.ctx.teacherData('teacher-pw-123');
+    assert.equal(data.rows[0].group, '1-2');
+    assert.equal(data.rows[0].name, '3');
 });

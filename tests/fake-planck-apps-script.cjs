@@ -54,7 +54,7 @@ function loadPlanckApp({ password = 'teacher-pw-123', owner = false } = {}) {
     vm.createContext(ctx);
     vm.runInContext(read('Code.gs'), ctx);
     const sheet = () => ss.getSheetByName('제출');
-    return { ctx, ss, props, cache, state, sheet, rows: () => (sheet() ? sheet().rows : []) };
+    return { ctx, ss, props, cache, state, sheet, rows: () => (sheet() ? sheet().rows : []), written: () => (sheet() ? sheet().written : []) };   // rows: 시트 값, written: 보낸 그대로(' 포함)
 }
 
 // 브라우저에 넣을 가짜 google.script.run. window.__gasCall(함수 이름, 인자들) 이 { ok, value } 또는 { ok: false, message } 를 돌려준다.

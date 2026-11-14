@@ -66,7 +66,7 @@ function submitMeasurement(payload) {
     var id = Utilities.getUuid().slice(0, 8);
     clean.leds.forEach(function (led) {
       sheet.appendRow([
-        now, safeText(clean.group), safeText(clean.name), id, safeText(led.name), led.lambda,
+        now, safeText(clean.group), safeText(clean.name), safeText(id), safeText(led.name), led.lambda,
         round(299792458 / (led.lambda * 1e-9) / 1e14, 4),
         clean.method === 'glow' ? '빛' : '전류(직선 연장, ' + clean.iMin + ' mA 이상)',
         led.v0 == null ? '' : round(led.v0, 4),
@@ -233,6 +233,7 @@ function needNum(v, min, max, label) {
   return x;
 }
 // 시트에서 수식으로 실행되지 않게: = + - @ 로 시작하는 글은 앞에 ' 를 붙여 글자로 저장
-function safeText(s) { return /^[=+\-@]/.test(s) ? "'" + s : s; }
+// 시트가 글자를 수식·날짜·숫자로 바꾸지 않게 늘 앞에 ' 를 붙인다 (예: 조 '1-2' 가 날짜가 되는 것 막기, ' 는 값에 남지 않음)
+function safeText(s) { return s ? "'" + s : s; }
 function plain(v) { return String(v == null ? '' : v).replace(/^'/, ''); }
 function round(x, d) { var k = Math.pow(10, d); return Math.round(x * k) / k; }
