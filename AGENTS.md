@@ -165,3 +165,4 @@
   - 확인 필요: 실제 보드 업로드·연결(시험은 펌웨어를 흉내 낸 가짜 블루투스), 아두이노 IDE 컴파일(시험 환경에서 arduino-cli 내려받기가 막혀 g++ 문법 검사만), ±16 g 설정이 실제로 되는지(시리얼 모니터 `+/-16 g VERIFIED`, 보드 정보의 '±16 g 확인됨', 가만히 두면 |a| ≈ 1 g), 100 Hz 알림이 끊기지 않는지, 보드 열로 인한 온도 차이
 - 2026-11-13: PR #59(Nano 33 BLE Sense Rev2 페이지·펌웨어) 머지·배포. 2026-11-14 에 사이트의 `projects/arduino-nano-lab.html` 이 `main` 과 같은 것을 확인 — Claude Code
 - 2026-11-14: 현황 문서 정리 — `docs/MANAGEMENT.md` 에 PR #59 머지 반영, 지울 브랜치에 `claude/nano33-ble-sense-lab` 추가, 사용자 결정 목록 번호·지난 항목(PR #56 머지 여부) 정리, 진행 기록 날짜 순서 맞춤 — Claude Code
+- 2026-11-14: 모든 실험 페이지·메인·걷기/뛰기 판정기 오른쪽 아래에 '📱 QR' 단추(사용자 요청) — 누르면 지금 페이지로 바로 들어오는 QR 코드(크게 보기·주소 복사), 선생님 고치기 화면(`custom-lab.html?edit=`)은 학생 화면 주소로, 기록·보고서 주소는 빼고 보여 줌. `js/page-qr.js`, QR 도구는 jsdelivr `qrcode-generator@1.4.4` 를 누를 때 불러옴 — Claude Code
