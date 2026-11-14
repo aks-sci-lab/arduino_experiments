@@ -10,6 +10,10 @@
     const MAX_TITLE = 80;
     const MAX_DESC = 5000;
     const FITS = ['none', 'proportional', 'linear'];
+    // 학생 화면 방식: 'single' 한 화면에 모두 / 'steps' 보고서 순서 7단계 탭 (목적·이론·준비물·과정·데이터·결과·결론)
+    const LAYOUTS = ['single', 'steps'];
+    const STEP_TEXTS = ['theory', 'materials', 'procedure'];   // 선생님이 따로 쓰는 단계 글 (목적은 실험 안내 글)
+    const MAX_STEP_TEXT = 3000;
     const MAX_SERIES = 3000;        // 센서로 한 번에 기록하는 점 수 한도
     const MAX_SUBMIT_SERIES = 1500; // 제출에 담는 점 수 한도 (넘으면 고르게 솎아 냄)
 
@@ -152,6 +156,8 @@
             fit: FITS.includes(def.fit) ? def.fit : 'none',
             questions,
             sensor: normalizeSensor(def.sensor),
+            layout: LAYOUTS.includes(def.layout) ? def.layout : 'single',
+            stepTexts: STEP_TEXTS.reduce((o, k) => { o[k] = str(def.stepTexts && def.stepTexts[k], MAX_STEP_TEXT); return o; }, {}),
             published: def.published === true
         };
     }
@@ -255,6 +261,7 @@
 
     return {
         MAX_COLS, MAX_ROWS, MAX_QUESTIONS, MAX_TITLE, MAX_DESC, FITS, MAX_SERIES, MAX_SUBMIT_SERIES, SENSORS,
+        LAYOUTS, STEP_TEXTS, MAX_STEP_TEXT,
         normalizeSensor, sensorFields, sensorValueText, emptySeries, normalizeSeries, thinSeries, seriesToCsv, seriesSummary,
         parseNumber, parsePaste, normalizeDefinition, validateDefinition, columnLabel,
         pointsFromRows, filledRowCount, fit, formatNumber, fitText, toCsv

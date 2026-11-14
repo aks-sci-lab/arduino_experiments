@@ -26,7 +26,10 @@
         input[type=text], textarea, select { padding: 8px; border: 1px solid #bbb; border-radius: 6px; font-size: 1em; box-sizing: border-box; font-family: inherit; }
         textarea { width: 100%; min-height: 80px; }
         label.f { display: block; margin: 10px 0 4px; font-weight: 600; }
-        #description { white-space: pre-wrap; line-height: 1.6; }
+        #description, .pre { white-space: pre-wrap; line-height: 1.6; }
+        .layout-choice label { display: block; border: 2px solid var(--c-line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; cursor: pointer; line-height: 1.5; }
+        .layout-choice label:has(input:checked) { border-color: var(--c-primary); background: var(--c-primary-soft); }
+        .step-empty { color: var(--c-muted); font-size: var(--fs-sm); }
         .table-wrap { overflow-x: auto; }
         table.data { border-collapse: collapse; width: 100%; }
         table.data th, table.data td { border: 1px solid #ddd; padding: 3px; text-align: center; }
@@ -57,6 +60,7 @@
         button.rec { background: var(--c-danger); border-color: var(--c-danger); color: #fff; }
         [hidden] { display: none !important; }
         @media print {
+            .step-next { display: none !important; }
             button, .no-print, .userbar { display: none !important; }
             body { background: #fff; padding: 0; }
             .container { box-shadow: none; }
@@ -81,12 +85,35 @@
         <div id="recordInfo" class="ok" hidden></div>
         <div id="draftNotice" class="warn" hidden>아직 학생에게 공개하지 않은 실험입니다. (선생님에게만 보입니다)</div>
 
+        <nav class="steps" id="stepNav" aria-label="실험 단계" hidden>
+            <button data-step="purpose"><b>1</b><span>목적</span></button>
+            <button data-step="theory"><b>2</b><span>이론</span></button>
+            <button data-step="materials"><b>3</b><span>준비물</span></button>
+            <button data-step="procedure"><b>4</b><span>과정</span></button>
+            <button data-step="data"><b>5</b><span>데이터</span></button>
+            <button data-step="result"><b>6</b><span>결과</span></button>
+            <button data-step="conclusion"><b>7</b><span>결론</span></button>
+        </nav>
+
         <div class="card" id="descCard">
-            <h2>📖 실험 안내</h2>
-            <div id="description"></div>
+            <h2 id="descHeading">📖 실험 안내</h2>
+            <div id="description" class="pre"></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="theoryCard" hidden>
+            <h2>📚 이론</h2>
+            <div id="theoryText" class="pre"></div>
+        </div>
+        <div class="card" id="materialsCard" hidden>
+            <h2>🧰 준비물</h2>
+            <div id="materialsText" class="pre"></div>
+        </div>
+        <div class="card" id="procedureCard" hidden>
+            <h2>🪜 과정</h2>
+            <div id="procedureText" class="pre"></div>
+        </div>
+
+        <div class="card" id="studentCard">
             <h2>👤 학번·이름</h2>
             <div class="row">
                 <input type="text" id="stId" placeholder="학번" style="width:8em" autocomplete="off">
@@ -113,7 +140,7 @@
             <div id="sensorCharts"></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="tableCard">
             <h2>📋 측정값</h2>
             <p class="muted no-print" id="tableHelp">칸을 눌러 값을 넣으세요. 엑셀·한셀·구글 시트에서 복사한 표는 첫 칸을 누르고 붙여넣으면 한 번에 들어갑니다. 입력한 값은 이 기기에 자동으로 저장됩니다.</p>
             <div class="table-wrap"><table class="data" id="dataTable"></table></div>
@@ -173,8 +200,25 @@
             <label class="f" for="edTitle">실험 제목</label>
             <input type="text" id="edTitle" maxlength="80" style="width:100%" placeholder="예: 옴의 법칙 확인">
 
-            <label class="f" for="edDesc">실험 안내 (목표·준비물·과정 등, 줄바꿈 그대로 보임)</label>
+            <label class="f" for="edDesc" id="edDescLabel">실험 안내 (목표·준비물·과정 등, 줄바꿈 그대로 보임)</label>
             <textarea id="edDesc" maxlength="5000" style="min-height:160px" placeholder="예:&#10;[목표] 저항에 걸리는 전압과 전류의 관계를 알아본다.&#10;[준비물] 건전지, 저항, 멀티미터 2대&#10;[과정]&#10;1. 회로를 연결한다.&#10;2. 전압을 바꾸며 전류를 잰다."></textarea>
+        </div>
+
+        <div class="card">
+            <h2>🧭 학생 화면 방식</h2>
+            <div class="layout-choice">
+                <label><input type="radio" name="edLayout" value="single" checked> <b>한 화면</b> — 안내·표·그래프·질문을 한 페이지에 차례로 보여 줍니다. 짧은 측정 활동에 알맞습니다.</label>
+                <label><input type="radio" name="edLayout" value="steps"> <b>7단계</b> — 보고서 순서(1 목적 · 2 이론 · 3 준비물 · 4 과정 · 5 데이터 · 6 결과 · 7 결론) 탭으로 나눠 한 단계씩 진행합니다. 플랑크 상수 실험과 같은 모양입니다.</label>
+            </div>
+            <div id="edStepTexts" hidden>
+                <p class="muted">7단계에서는 위의 '실험 안내' 글이 <b>1. 목적</b>에 보입니다. 5 데이터에는 센서·측정값 표, 6 결과에는 그래프, 7 결론에는 질문·제출이 자동으로 들어갑니다. 아래 칸을 비워 두면 그 단계에는 "따로 적은 내용이 없습니다"로 보입니다.</p>
+                <label class="f" for="edTheory">2. 이론</label>
+                <textarea id="edTheory" maxlength="3000" placeholder="예: 옴의 법칙 V = IR 에서 저항 R 이 일정하면 전압과 전류는 비례한다."></textarea>
+                <label class="f" for="edMaterials">3. 준비물</label>
+                <textarea id="edMaterials" maxlength="3000" placeholder="예: 건전지 4개, 저항 100 Ω, 멀티미터 2대, 집게 전선"></textarea>
+                <label class="f" for="edProcedure">4. 과정</label>
+                <textarea id="edProcedure" maxlength="3000" placeholder="예:&#10;1. 회로를 연결한다.&#10;2. 건전지 수를 바꾸며 전압과 전류를 잰다."></textarea>
+            </div>
         </div>
 
         <div class="card">

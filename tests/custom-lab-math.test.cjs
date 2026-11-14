@@ -143,3 +143,20 @@ test('센서 기록 다듬기·솎아 내기·CSV·요약', () => {
     assert.strictEqual(M.seriesSummary(good, fields), '센서 3점 (2.0초): 온도 20.00~20.50 °C, 습도 40.0~42.0 %RH');
     assert.strictEqual(M.seriesSummary(M.emptySeries(fields), fields), '');
 });
+
+test('학생 화면 방식: 한 화면 기본, 7단계와 단계 글 다듬기', () => {
+    const d = M.normalizeDefinition({ title: 't', columns: [{ name: 'x' }] });
+    assert.strictEqual(d.layout, 'single');
+    assert.deepStrictEqual(d.stepTexts, { theory: '', materials: '', procedure: '' });
+    const s = M.normalizeDefinition({
+        title: 't', columns: [{ name: 'x' }], layout: 'steps',
+        stepTexts: { theory: '옴의 법칙', materials: 7, procedure: 'p'.repeat(5000), extra: 'x' }
+    });
+    assert.strictEqual(s.layout, 'steps');
+    assert.strictEqual(s.stepTexts.theory, '옴의 법칙');
+    assert.strictEqual(s.stepTexts.materials, '');
+    assert.strictEqual(s.stepTexts.procedure.length, M.MAX_STEP_TEXT);
+    assert.strictEqual(s.stepTexts.extra, undefined);
+    assert.strictEqual(M.normalizeDefinition({ title: 't', columns: [{ name: 'x' }], layout: '이상' }).layout, 'single');
+    assert.strictEqual(M.validateDefinition({ title: 't', columns: [{ name: 'x' }], layout: 'steps' }).ok, true);
+});
