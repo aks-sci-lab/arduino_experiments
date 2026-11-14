@@ -1,0 +1,194 @@
+<!-- 학생·선생님 화면이 함께 쓰는 모양(CSS)과 도우미(그래프·CSV·크게 보기).
+     Index.html·Teacher.html 이 include('Common') 으로 끼워 넣는다.
+     색·글꼴 값은 사이트의 css/lab-base.css 와 같다 (Apps Script 에서는 사이트 파일을 불러올 수 없어 옮겨 둠). -->
+<style>
+:root {
+    --c-primary: #1565c0; --c-primary-dark: #0d47a1; --c-primary-soft: #eef5ff;
+    --c-success: #1e7e34; --c-danger: #c62828; --c-info: #0e7490; --c-secondary: #5f6b7a;
+    --c-text: #1f2933; --c-muted: #5f6b7a; --c-bg: #f4f6f8; --c-card: #fff; --c-line: #e3e7ec; --c-fill: #f1f3f5;
+    --c-ok-bg: #e6f4ea; --c-ok-text: #1e6b34; --c-warn-bg: #fff3cd; --c-warn-text: #7a5b00; --c-err-bg: #fdecea; --c-err-text: #8a1c1c;
+    --font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
+    --fs-sm: .875rem; --fs-h2: 1.125rem; --fs-h1: 1.375rem;
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px;
+    --r-ctl: 6px; --r-card: 10px; --shadow: 0 2px 6px rgba(0, 0, 0, .08); --tap: 44px;
+    --w-step: 860px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; font-family: var(--font); color: var(--c-text); background: var(--c-bg); line-height: 1.5; -webkit-text-size-adjust: 100%; }
+main { max-width: var(--w-step); margin: 0 auto; padding: var(--sp-3) var(--sp-4) 48px; }
+h1 { font-size: var(--fs-h1); margin: var(--sp-2) 0; }
+h2 { font-size: var(--fs-h2); margin: 0 0 var(--sp-2); }
+h3 { font-size: 1rem; margin: var(--sp-3) 0 var(--sp-2); }
+a { color: var(--c-primary); }
+.card { background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); box-shadow: var(--shadow); padding: var(--sp-3) var(--sp-4); margin: 0 0 var(--sp-3); }
+.note { color: var(--c-muted); font-size: var(--fs-sm); }
+.row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: flex-end; }
+.row > label { flex: 1 1 140px; min-width: 0; }
+label { display: block; font-size: var(--fs-sm); font-weight: 600; }
+label > input, label > select { display: block; width: 100%; margin-top: 2px; font-weight: 400; }
+input, select, textarea { font: inherit; font-size: 1rem; padding: 8px 10px; border: 1px solid #c3cbd4; border-radius: var(--r-ctl); background: #fff; min-height: var(--tap); max-width: 100%; }
+textarea { width: 100%; min-height: 70px; }
+button { font: inherit; font-weight: 600; min-height: var(--tap); padding: 8px 14px; border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; cursor: pointer; }
+button:hover { background: var(--c-primary-dark); }
+button.secondary { background: var(--c-secondary); }
+button.success { background: var(--c-success); }
+button.danger { background: var(--c-danger); }
+button.info { background: var(--c-info); }
+button.ghost { background: #fff; color: var(--c-primary); border: 1px solid var(--c-primary); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+td button { min-height: 32px; padding: 4px 8px; font-size: var(--fs-sm); }
+:focus-visible { outline: 3px solid var(--c-primary); outline-offset: 2px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--sp-1); padding: var(--sp-1); background: var(--c-fill); border-radius: var(--r-card); margin: var(--sp-1) 0 var(--sp-2); }
+.seg label { position: relative; display: flex; align-items: center; justify-content: center; text-align: center; min-height: var(--tap); padding: 4px 6px; border-radius: 8px; cursor: pointer; font-size: var(--fs-sm); }
+.seg input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: #fff; color: var(--c-primary); box-shadow: var(--shadow); }
+.seg label:has(input:focus-visible) { outline: 3px solid var(--c-primary); }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+th, td { border-bottom: 1px solid var(--c-line); padding: 6px 6px; text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { background: var(--c-fill); font-weight: 600; }
+.chart { position: relative; width: 100%; height: clamp(220px, 38vh, 340px); }
+.chart canvas { width: 100%; height: 100%; display: block; }
+.msg { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); margin: var(--sp-2) 0; font-size: var(--fs-sm); }
+.msg.ok { background: var(--c-ok-bg); color: var(--c-ok-text); }
+.msg.warn { background: var(--c-warn-bg); color: var(--c-warn-text); }
+.msg.err { background: var(--c-err-bg); color: var(--c-err-text); }
+.big { font-size: 1.5rem; font-weight: 700; color: var(--c-primary); }
+.chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 10px; border-radius: 999px; background: #fff; color: var(--c-text); border: 1px solid var(--c-line); font-weight: 500; }
+.chip.on { border-color: var(--c-primary); background: var(--c-primary-soft); color: var(--c-primary); font-weight: 700; }
+.dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex: none; }
+details > summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+html.big-view body { zoom: 1.35; }
+.lab-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 9999; padding: 10px 16px; border-radius: 999px; background: rgba(31, 41, 51, .92); color: #fff; font-size: var(--fs-sm); opacity: 0; transition: opacity .2s; pointer-events: none; }
+.lab-toast.show { opacity: 1; }
+@media print { button, .no-print { display: none !important; } html.big-view body { zoom: 1; } }
+</style>
+<script>
+/* 공용 도우미: LabCommon.$, esc, num, sci, drawChart, csv, download, toast  (+ Alt+B 크게 보기) */
+var LabCommon = (function () {
+    function $(id) { return document.getElementById(id); }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    // 입력 칸 글자 → 숫자 (쉼표 소수점도 받음, 비거나 숫자가 아니면 null)
+    function num(v) {
+        if (v == null) return null;
+        var s = String(v).trim().replace(',', '.');
+        if (!s) return null;
+        var x = Number(s);
+        return isFinite(x) ? x : null;
+    }
+    // 6.63e-34 → "6.63 × 10⁻³⁴" (HTML)
+    function sci(v, d) {
+        if (v == null || !isFinite(v)) return '–';
+        if (v === 0) return '0';
+        var k = Math.floor(Math.log10(Math.abs(v)));
+        return (v / Math.pow(10, k)).toFixed(d == null ? 3 : d) + ' × 10<sup>' + (k < 0 ? '−' + (-k) : k) + '</sup>';
+    }
+
+    // 캔버스 산점도 + 선.  o = { xmin, xmax, ymin, ymax, xl, yl, xd, yd, pts: [{x, y, color, hollow}], lines: [{pts, color, dash, width}], vlines: [{x, color}] }
+    function drawChart(cv, o) {
+        var dpr = window.devicePixelRatio || 1;
+        var W = cv.clientWidth || 600, H = cv.clientHeight || 280;
+        cv.width = W * dpr; cv.height = H * dpr;
+        var g = cv.getContext('2d');
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.clearRect(0, 0, W, H);
+        var L = 54, R = 12, T = 12, B = 40;
+        if (!(o.xmax > o.xmin)) { o.xmin -= 1; o.xmax += 1; }
+        if (!(o.ymax > o.ymin)) { o.ymin -= 1; o.ymax += 1; }
+        var X = function (x) { return L + (x - o.xmin) / (o.xmax - o.xmin) * (W - L - R); };
+        var Y = function (y) { return H - B - (y - o.ymin) / (o.ymax - o.ymin) * (H - T - B); };
+        g.font = '12px sans-serif'; g.fillStyle = '#555'; g.strokeStyle = '#e5e5e5'; g.lineWidth = 1;
+        var i, t;
+        g.textAlign = 'center';
+        for (i = 0; i <= 5; i++) {
+            t = o.xmin + (o.xmax - o.xmin) * i / 5;
+            g.beginPath(); g.moveTo(X(t), T); g.lineTo(X(t), H - B); g.stroke();
+            g.fillText(t.toFixed(o.xd != null ? o.xd : 2), X(t), H - B + 15);
+        }
+        g.textAlign = 'right';
+        for (i = 0; i <= 5; i++) {
+            t = o.ymin + (o.ymax - o.ymin) * i / 5;
+            g.beginPath(); g.moveTo(L, Y(t)); g.lineTo(W - R, Y(t)); g.stroke();
+            g.fillText(t.toFixed(o.yd != null ? o.yd : 2), L - 6, Y(t) + 4);
+        }
+        g.strokeStyle = '#999'; g.strokeRect(L, T, W - L - R, H - T - B);
+        g.fillStyle = '#333'; g.textAlign = 'center';
+        g.fillText(o.xl || '', L + (W - L - R) / 2, H - 6);
+        g.save(); g.translate(13, T + (H - T - B) / 2); g.rotate(-Math.PI / 2); g.fillText(o.yl || '', 0, 0); g.restore();
+        g.save(); g.beginPath(); g.rect(L, T, W - L - R, H - T - B); g.clip();
+        (o.vlines || []).forEach(function (v) {
+            g.setLineDash([4, 4]); g.strokeStyle = v.color || '#999'; g.lineWidth = 1.5;
+            g.beginPath(); g.moveTo(X(v.x), T); g.lineTo(X(v.x), H - B); g.stroke(); g.setLineDash([]);
+        });
+        (o.lines || []).forEach(function (ln) {
+            g.setLineDash(ln.dash || []); g.strokeStyle = ln.color; g.lineWidth = ln.width || 2; g.beginPath();
+            ln.pts.forEach(function (p, k) { if (k) g.lineTo(X(p.x), Y(p.y)); else g.moveTo(X(p.x), Y(p.y)); });
+            g.stroke(); g.setLineDash([]);
+        });
+        (o.pts || []).forEach(function (p) {
+            g.beginPath(); g.arc(X(p.x), Y(p.y), 5, 0, 2 * Math.PI);
+            if (p.hollow) { g.strokeStyle = p.color; g.lineWidth = 1.5; g.stroke(); }
+            else { g.fillStyle = p.color; g.fill(); g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; g.stroke(); }
+        });
+        g.restore();
+    }
+
+    // 2차원 배열 → CSV 글자 (쉼표·따옴표·줄바꿈이 있는 칸은 따옴표로 감쌈, 수식으로 열리지 않게 = + - @ 앞에 ')
+    function csv(rows) {
+        return rows.map(function (r) {
+            return r.map(function (v) {
+                var s = v == null ? '' : String(v);
+                if (typeof v === 'string' && /^[=+\-@]/.test(s)) s = "'" + s;
+                return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            }).join(',');
+        }).join('\r\n');
+    }
+    // 파일 내려받기 (엑셀에서 한글이 깨지지 않게 BOM 을 붙임)
+    function download(name, text) {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }));
+        a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+    }
+
+    var toastTimer = null;
+    function toast(text) {
+        var el = $('labToast');
+        if (!el) { el = document.createElement('div'); el.id = 'labToast'; el.className = 'lab-toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+        el.textContent = text; el.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { el.classList.remove('show'); }, 1800);
+    }
+
+    // 브라우저 저장 (사생활 보호 모드 등에서 막히면 조용히 넘어감)
+    function store(key, value) {
+        try {
+            if (value === undefined) return JSON.parse(localStorage.getItem(key) || 'null');
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) { return null; }
+        return null;
+    }
+
+    // 크게 보기: Alt+B (맥 Option+B) — 사이트의 다른 실험 페이지와 같은 단축키
+    try { if (localStorage.getItem('lab-ui:big-view') === '1') document.documentElement.classList.add('big-view'); } catch (e) {}
+    document.addEventListener('keydown', function (e) {
+        if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'KeyB') {
+            e.preventDefault();
+            var on = document.documentElement.classList.toggle('big-view');
+            try { localStorage.setItem('lab-ui:big-view', on ? '1' : '0'); } catch (err) {}
+            window.dispatchEvent(new Event('resize'));
+            toast(on ? '크게 보기 켜짐 (Alt+B 로 끄기)' : '크게 보기 꺼짐');
+        }
+    });
+
+    return { $: $, esc: esc, num: num, sci: sci, drawChart: drawChart, csv: csv, download: download, toast: toast, store: store };
+})();
+</script>

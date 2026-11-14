@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<?!= include('Common') ?>
+<?!= include('PlanckMath') ?>
+<style>
+.entry { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--sp-2); align-items: end; }
+.entry button { width: 100%; }
+.calc { font-size: var(--fs-sm); color: var(--c-muted); min-height: 1.4em; margin: 4px 0 0; }
+.led-head { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: flex-end; }
+.led-head label { flex: 1 1 120px; }
+.result-line { margin: var(--sp-2) 0 0; }
+#submit-box button { width: 100%; font-size: 1.05rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>💡 LED 플랑크 상수 실험</h1>
+  <p class="note">LED 마다 전압과 전류를 재어 넣으면 문턱 전압 V₀ 와 플랑크 상수 h 를 계산합니다. 다 하면 맨 아래 <b>[제출]</b>을 누르세요. 입력한 값은 이 기기에 자동으로 남습니다.</p>
+
+  <section class="card" aria-labelledby="h-who">
+    <h2 id="h-who">① 조와 이름</h2>
+    <div class="row">
+      <label>조 <input id="in-group" maxlength="20" placeholder="예: 3반 2조" autocomplete="off"></label>
+      <label>이름 또는 번호 <input id="in-name" maxlength="20" placeholder="예: 10307 김과학" autocomplete="off"></label>
+    </div>
+    <p class="note">같은 조는 조 이름을 똑같이 써야 선생님 화면에서 한 조로 묶입니다.</p>
+  </section>
+
+  <section class="card" aria-labelledby="h-how">
+    <h2 id="h-how">② 측정 방식</h2>
+    <div class="seg" role="radiogroup" aria-label="문턱 전압 기준">
+      <label><input type="radio" name="method" value="extrapolate">전류 기준<br>(직선 연장)</label>
+      <label><input type="radio" name="method" value="glow">빛 기준<br>(눈으로 관찰)</label>
+    </div>
+    <div id="current-opts">
+      <div class="seg" role="radiogroup" aria-label="전류 재는 법">
+        <label><input type="radio" name="imode" value="resistor">고정 저항 전압으로<br>전류 계산</label>
+        <label><input type="radio" name="imode" value="ammeter">전류계로<br>전류(mA) 직접</label>
+      </div>
+      <div class="row">
+        <label id="lbl-res">고정 저항 R (Ω) <input id="in-res" inputmode="decimal" placeholder="330"></label>
+        <label>직선 구간 최소 전류 (mA) <input id="in-imin" inputmode="decimal" placeholder="1"></label>
+      </div>
+      <p class="note" id="how-note"></p>
+    </div>
+    <p class="note" id="glow-note" hidden>전압을 천천히 올리면서 LED 가 <b>처음 빛나 보이는 순간</b>의 LED 전압을 여러 번 기록합니다. 평균이 문턱 전압입니다.</p>
+  </section>
+
+  <section class="card" aria-labelledby="h-led">
+    <h2 id="h-led">③ LED 별 측정</h2>
+    <div class="chips" id="led-chips" role="tablist" aria-label="LED 고르기"></div>
+    <div id="led-box">
+      <div class="led-head" style="margin-top:var(--sp-3)">
+        <label>LED 이름 <input id="led-name" maxlength="20"></label>
+        <label>파장 λ (nm) <input id="led-lambda" inputmode="decimal"></label>
+        <button class="danger" id="btn-led-del" type="button">이 LED 빼기</button>
+      </div>
+      <p class="note">파장은 LED 설명서(데이터시트)의 값을 쓰세요. 모르면 기본값을 둡니다.</p>
+
+      <div id="iv-entry">
+        <h3>측정값 넣기</h3>
+        <div class="entry">
+          <label>LED 전압 V (V) <input id="in-v" inputmode="decimal" autocomplete="off"></label>
+          <label id="lbl-i">전류 I (mA) <input id="in-i" inputmode="decimal" autocomplete="off"></label>
+          <label id="lbl-vr">저항 전압 V_R (V) <input id="in-vr" inputmode="decimal" autocomplete="off"></label>
+          <button class="success" id="btn-add" type="button">기록</button>
+        </div>
+        <p class="calc" id="calc-i" aria-live="polite"></p>
+      </div>
+      <div id="glow-entry" hidden>
+        <h3>빛이 나기 시작한 전압</h3>
+        <div class="entry">
+          <label>LED 전압 V (V) <input id="in-gv" inputmode="decimal" autocomplete="off"></label>
+          <button class="success" id="btn-add-glow" type="button">기록</button>
+        </div>
+      </div>
+
+      <div class="table-wrap"><table id="tbl-points"></table></div>
+      <div class="chart" id="iv-chart-box"><canvas id="chart-iv" aria-label="이 LED 의 전류-전압 그래프"></canvas></div>
+      <p class="result-line" id="led-result" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h-res">
+    <h2 id="h-res">④ 결과: 문턱 전압과 플랑크 상수</h2>
+    <div class="table-wrap"><table id="tbl-result"></table></div>
+    <div class="chart"><canvas id="chart-planck" aria-label="진동수-문턱 전압 그래프"></canvas></div>
+    <p class="note">● 내 측정, 파란 선 = 최소제곱 직선, 회색 점선 = 참값 h 로 그린 직선. 기울기 = h / e.</p>
+    <div id="planck-result" aria-live="polite"></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-send" id="submit-box">
+    <h2 id="h-send">⑤ 제출</h2>
+    <label>메모 (선택) <textarea id="in-memo" maxlength="200" placeholder="예: 파랑 LED 는 빛이 약해 관찰이 어려웠음"></textarea></label>
+    <p class="note">제출하면 LED 하나당 한 줄씩 선생님 구글 시트에 저장됩니다. 다시 제출하면 새 줄로 더해집니다.</p>
+    <button class="success" id="btn-submit" type="button">📤 제출</button>
+    <div id="submit-msg" role="status" aria-live="polite"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+    'use strict';
+    var P = window.PlanckMath, U = LabCommon, $ = U.$;
+    var KEY = 'planck-apps-script:v1';
+    var DEFAULT_KEYS = ['red', 'orange', 'yellow', 'green', 'blue'];
+
+    function presetLed(key) {
+        var p = P.LED_PRESETS.filter(function (x) { return x.key === key; })[0];
+        return { key: p.key, name: p.name, lambda: p.lambda, iv: [], glow: [] };
+    }
+    var saved = U.store(KEY) || {};
+    var state = {
+        group: saved.group || '', name: saved.name || '', memo: saved.memo || '',
+        method: saved.method === 'glow' ? 'glow' : 'extrapolate',
+        iMode: saved.iMode === 'ammeter' ? 'ammeter' : 'resistor',
+        resistor: saved.resistor != null ? saved.resistor : '330',
+        iMin: saved.iMin != null ? saved.iMin : '1',
+        leds: Array.isArray(saved.leds) && saved.leds.length ? saved.leds : DEFAULT_KEYS.map(presetLed),
+        cur: saved.cur || 0
+    };
+    if (state.cur >= state.leds.length) state.cur = 0;
+    function save() { U.store(KEY, state); }
+
+    var colorOf = function (l) { return P.wavelengthColor(l.lambda); };
+    var iMin = function () { var x = U.num(state.iMin); return x != null && x >= 0 ? x : 1; };
+    var rOhm = function () { var x = U.num(state.resistor); return x != null && x > 0 ? x : null; };
+    function thr(led) {
+        return state.method === 'glow' ? P.thresholdByGlow(led.glow) : P.thresholdByExtrapolation(led.iv, iMin());
+    }
+    function count(led) { return state.method === 'glow' ? led.glow.length : led.iv.length; }
+
+    /* ---------- 화면 그리기 ---------- */
+    function renderHow() {
+        document.querySelectorAll('input[name=method]').forEach(function (r) { r.checked = r.value === state.method; });
+        document.querySelectorAll('input[name=imode]').forEach(function (r) { r.checked = r.value === state.iMode; });
+        var glow = state.method === 'glow', byR = state.iMode === 'resistor';
+        $('current-opts').hidden = glow; $('glow-note').hidden = !glow;
+        $('iv-entry').hidden = glow; $('glow-entry').hidden = !glow;
+        $('lbl-res').hidden = !byR; $('lbl-vr').hidden = !byR; $('lbl-i').hidden = byR;
+        $('in-res').value = state.resistor; $('in-imin').value = state.iMin;
+        $('how-note').innerHTML = byR
+            ? '멀티미터 두 대로 LED 전압 V 와 고정 저항 양 끝 전압 V_R 을 잽니다. 전류는 <b>I = V_R ÷ R</b> 로 계산합니다.'
+            : '멀티미터 하나는 LED 양 끝 전압(V), 하나는 전류계(mA)로 회로에 직렬로 연결합니다.';
+        $('how-note').innerHTML += ' 전류가 ' + iMin() + ' mA 이상인 점들로 직선을 그어 I = 0 이 되는 전압을 문턱 전압으로 봅니다.';
+    }
+
+    function renderChips() {
+        $('led-chips').innerHTML = state.leds.map(function (l, k) {
+            var n = count(l);
+            return '<button type="button" role="tab" class="chip' + (k === state.cur ? ' on' : '') + '" aria-selected="' + (k === state.cur) + '" data-led="' + k + '">' +
+                '<span class="dot" style="background:' + colorOf(l) + '"></span>' + U.esc(l.name) + (n ? ' · ' + n : '') + '</button>';
+        }).join('') + '<button type="button" class="chip" id="btn-led-add">+ LED 더하기</button>';
+    }
+
+    function renderLed() {
+        var led = state.leds[state.cur];
+        $('led-box').hidden = !led;
+        if (!led) return;
+        $('led-name').value = led.name; $('led-lambda').value = led.lambda;
+        var tb = $('tbl-points');
+        if (state.method === 'glow') {
+            tb.innerHTML = led.glow.length ? '<tr><th>번호</th><th>빛이 난 전압 (V)</th><th></th></tr>' + led.glow.map(function (v, k) {
+                return '<tr><td>' + (k + 1) + '</td><td>' + v.toFixed(3) + '</td><td><button class="secondary" data-del="' + k + '">삭제</button></td></tr>';
+            }).join('') : '';
+        } else {
+            var hasVr = led.iv.some(function (p) { return p.vr != null; });
+            var m = iMin();
+            tb.innerHTML = led.iv.length ? '<tr><th>번호</th><th>V (V)</th>' + (hasVr ? '<th>V_R (V)</th>' : '') + '<th>I (mA)</th><th></th></tr>' +
+                led.iv.map(function (p, k) { return { p: p, k: k }; }).sort(function (a, b) { return a.p.v - b.p.v; }).map(function (o, n) {
+                    return '<tr><td>' + (n + 1) + (o.p.i >= m ? ' ●' : '') + '</td><td>' + o.p.v.toFixed(3) + '</td>' +
+                        (hasVr ? '<td>' + (o.p.vr != null ? o.p.vr.toFixed(4) : '–') + '</td>' : '') +
+                        '<td>' + o.p.i.toFixed(3) + '</td><td><button class="secondary" data-del="' + o.k + '">삭제</button></td></tr>';
+                }).join('') : '';
+        }
+        var t = thr(led);
+        $('iv-chart-box').hidden = state.method === 'glow';
+        if (state.method !== 'glow') drawIV(led, t);
+        $('led-result').innerHTML = t.error ? '<span class="note">' + U.esc(t.error) + '</span>'
+            : '문턱 전압 V₀ = <span class="big">' + t.v0.toFixed(3) + ' V</span>' +
+              (state.method === 'glow' ? ' <span class="note">(' + t.n + '번 평균, 표준편차 ' + t.sd.toFixed(3) + ' V)</span>'
+                : ' <span class="note">(● ' + t.used + '개 점으로 직선, R² = ' + (t.r2 == null ? '–' : t.r2.toFixed(4)) + ')</span>');
+    }
+
+    function drawIV(led, t) {
+        var pts = led.iv, m = iMin(), c = colorOf(led);
+        var vmax = Math.max.apply(null, [1].concat(pts.map(function (p) { return p.v; })));
+        var vmin = pts.length ? Math.max(0, Math.min.apply(null, pts.map(function (p) { return p.v; })) - 0.1) : 0;
+        var imax = pts.length ? Math.max.apply(null, pts.map(function (p) { return p.i; })) : 0;
+        var o = {
+            xmin: vmin, xmax: vmax + 0.05 * (vmax - vmin + 0.1), ymin: 0, ymax: imax > 0 ? imax * 1.15 : 1,
+            xl: 'LED 전압 V (V)', yl: '전류 I (mA)', yd: imax < 0.5 ? 3 : imax < 5 ? 2 : 1,
+            pts: pts.map(function (p) { return { x: p.v, y: p.i, color: c, hollow: p.i < m }; }), lines: [], vlines: []
+        };
+        if (t && !t.error) {
+            var v2 = Math.max.apply(null, pts.map(function (p) { return p.v; }));
+            o.vlines.push({ x: t.v0, color: '#333' });
+            o.lines.push({ pts: [{ x: t.v0, y: 0 }, { x: v2, y: t.slope * v2 + t.intercept }], color: '#333', dash: [6, 4], width: 1.5 });
+        }
+        U.drawChart($('chart-iv'), o);
+    }
+
+    function analysis() {
+        var items = [];
+        state.leds.forEach(function (l) {
+            var t = thr(l);
+            if (!t.error && l.lambda > 0) items.push({ led: l, lambda: Number(l.lambda), v0: t.v0 });
+        });
+        return { items: items, res: P.planckFit(items) };
+    }
+
+    function renderResult() {
+        var a = analysis(), res = a.res;
+        $('tbl-result').innerHTML = '<tr><th>LED</th><th>λ (nm)</th><th>f (10¹⁴ Hz)</th><th>V₀ (V)</th></tr>' +
+            (state.leds.map(function (l) {
+                var t = thr(l);
+                return '<tr><td><span class="dot" style="background:' + colorOf(l) + '"></span> ' + U.esc(l.name) + '</td><td>' + l.lambda + '</td><td>' +
+                    (P.freqOf(l.lambda) / 1e14).toFixed(3) + '</td><td>' + (t.error ? '–' : t.v0.toFixed(3)) + '</td></tr>';
+            }).join(''));
+        // 그래프
+        var pts = a.items.map(function (it) { return { x: P.freqOf(it.lambda) / 1e14, y: it.v0, color: colorOf(it.led) }; });
+        var xmin = 3, xmax = 8;
+        if (pts.length) {
+            xmin = Math.min.apply(null, pts.map(function (p) { return p.x; })) - 0.3;
+            xmax = Math.max.apply(null, pts.map(function (p) { return p.x; })) + 0.3;
+        }
+        var theory = function (x) { return P.H_TRUE * x * 1e14 / P.E_CHARGE; };
+        var lines = [{ pts: [{ x: xmin, y: theory(xmin) }, { x: xmax, y: theory(xmax) }], color: '#aaa', dash: [6, 4], width: 1.5 }];
+        if (res) {
+            var fy = function (x) { return res.fit.slope * x * 1e14 + res.fit.intercept; };
+            lines.push({ pts: [{ x: xmin, y: fy(xmin) }, { x: xmax, y: fy(xmax) }], color: '#1565c0', width: 2 });
+        }
+        var ys = pts.map(function (p) { return p.y; }).concat([theory(xmin), theory(xmax)]);
+        var ymin = Math.min.apply(null, ys), ymax = Math.max.apply(null, ys), pad = (ymax - ymin) * 0.08 || 0.5;
+        U.drawChart($('chart-planck'), { xmin: xmin, xmax: xmax, ymin: ymin - pad, ymax: ymax + pad, xd: 1,
+            xl: '진동수 f (10¹⁴ Hz)', yl: '문턱 전압 V₀ (V)', pts: pts, lines: lines });
+
+        if (!res) {
+            $('planck-result').innerHTML = '<p class="msg warn">문턱 전압을 구한 LED 가 ' + a.items.length + '개입니다. 파장이 다른 LED 를 2개 이상(3개 이상 추천) 측정하면 h 를 계산합니다.</p>';
+            return;
+        }
+        var err = res.errorPct;
+        $('planck-result').innerHTML =
+            '<p>h = e × 기울기 = <span class="big">' + U.sci(res.h, 2) + ' J·s</span>' +
+            (res.sH != null ? ' <span class="note">(± ' + U.sci(res.sH, 1) + ')</span>' : '') + '</p>' +
+            '<p class="msg ' + (Math.abs(err) <= 15 ? 'ok' : 'warn') + '">참값 6.626 × 10<sup>−34</sup> J·s 와의 오차: <b>' + (err > 0 ? '+' : '') + err.toFixed(1) + ' %</b>' +
+            ' · 직선의 R² = ' + (res.fit.r2 == null ? '–' : res.fit.r2.toFixed(4)) + ' · 절편 = −' + res.workEv.toFixed(3) + ' V</p>';
+    }
+
+    function renderAll() {
+        $('in-group').value = state.group; $('in-name').value = state.name; $('in-memo').value = state.memo;
+        renderHow(); renderChips(); renderLed(); renderResult(); showCalc();
+    }
+
+    /* ---------- 입력 ---------- */
+    function showCalc() {
+        var out = $('calc-i');
+        if (state.method === 'glow' || state.iMode !== 'resistor') { out.textContent = ''; return; }
+        var r = rOhm(), vr = U.num($('in-vr').value);
+        if (!r) out.textContent = '② 에서 고정 저항 R 값을 넣으세요.';
+        else if (vr == null) out.textContent = 'I = V_R ÷ ' + r + ' Ω 로 계산합니다.';
+        else out.innerHTML = '→ 전류 I = ' + vr + ' V ÷ ' + r + ' Ω = <b>' + (vr / r * 1000).toFixed(4) + ' mA</b>';
+    }
+
+    function addIV() {
+        var led = state.leds[state.cur]; if (!led) return;
+        var v = U.num($('in-v').value), rec;
+        if (state.iMode === 'resistor') {
+            var r = rOhm(), vr = U.num($('in-vr').value);
+            if (!r) { U.toast('② 에서 고정 저항 R 값을 먼저 넣으세요.'); $('in-res').focus(); return; }
+            if (v == null || vr == null || v < 0 || vr < 0) { U.toast('LED 전압과 저항 전압을 모두 0 이상의 숫자로 넣으세요.'); return; }
+            rec = { v: v, i: vr / r * 1000, vr: vr };
+        } else {
+            var i = U.num($('in-i').value);
+            if (v == null || i == null || v < 0 || i < 0) { U.toast('전압과 전류를 모두 0 이상의 숫자로 넣으세요.'); return; }
+            rec = { v: v, i: i };
+        }
+        if (led.iv.length >= 80) { U.toast('한 LED 에 80개까지 기록합니다.'); return; }
+        led.iv.push(rec);
+        $('in-v').value = ''; $('in-i').value = ''; $('in-vr').value = '';
+        save(); renderChips(); renderLed(); renderResult(); showCalc();
+        $('in-v').focus();
+    }
+    function addGlow() {
+        var led = state.leds[state.cur]; if (!led) return;
+        var v = U.num($('in-gv').value);
+        if (v == null || v < 0) { U.toast('0 이상의 전압을 넣으세요.'); return; }
+        if (led.glow.length >= 20) { U.toast('20번까지 기록합니다.'); return; }
+        led.glow.push(v); $('in-gv').value = '';
+        save(); renderChips(); renderLed(); renderResult();
+        $('in-gv').focus();
+    }
+
+    $('btn-add').addEventListener('click', addIV);
+    $('btn-add-glow').addEventListener('click', addGlow);
+    $('in-v').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $(state.iMode === 'resistor' ? 'in-vr' : 'in-i').focus(); } });
+    $('in-i').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addIV(); } });
+    $('in-vr').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addIV(); } });
+    $('in-gv').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addGlow(); } });
+    $('in-vr').addEventListener('input', showCalc);
+    $('tbl-points').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-del]'); if (!b) return;
+        var led = state.leds[state.cur], k = Number(b.getAttribute('data-del'));
+        (state.method === 'glow' ? led.glow : led.iv).splice(k, 1);
+        save(); renderChips(); renderLed(); renderResult();
+    });
+    $('led-chips').addEventListener('click', function (e) {
+        var b = e.target.closest('button'); if (!b) return;
+        if (b.id === 'btn-led-add') {
+            if (state.leds.length >= 8) { U.toast('LED 는 8개까지입니다.'); return; }
+            state.leds.push({ key: 'custom', name: 'LED ' + (state.leds.length + 1), lambda: 600, iv: [], glow: [] });
+            state.cur = state.leds.length - 1;
+        } else state.cur = Number(b.getAttribute('data-led'));
+        save(); renderChips(); renderLed();
+    });
+    $('btn-led-del').addEventListener('click', function () {
+        var led = state.leds[state.cur]; if (!led) return;
+        if ((led.iv.length || led.glow.length) && !confirm(led.name + ' LED 와 기록을 모두 지울까요?')) return;
+        state.leds.splice(state.cur, 1);
+        state.cur = Math.max(0, state.cur - 1);
+        save(); renderAll();
+    });
+    $('led-name').addEventListener('input', function (e) { state.leds[state.cur].name = e.target.value.slice(0, 20); save(); renderChips(); renderResult(); });
+    $('led-lambda').addEventListener('change', function (e) {
+        var x = U.num(e.target.value);
+        if (x == null || x < 300 || x > 1100) { U.toast('파장은 300 ~ 1100 nm 사이로 넣으세요.'); e.target.value = state.leds[state.cur].lambda; return; }
+        state.leds[state.cur].lambda = x; save(); renderChips(); renderLed(); renderResult();
+    });
+    document.querySelectorAll('input[name=method]').forEach(function (r) { r.addEventListener('change', function () { state.method = r.value; save(); renderAll(); }); });
+    document.querySelectorAll('input[name=imode]').forEach(function (r) { r.addEventListener('change', function () { state.iMode = r.value; save(); renderAll(); }); });
+    $('in-res').addEventListener('change', function (e) { state.resistor = e.target.value; save(); showCalc(); });
+    $('in-imin').addEventListener('change', function (e) { state.iMin = e.target.value; save(); renderHow(); renderChips(); renderLed(); renderResult(); });
+    ['group', 'name', 'memo'].forEach(function (k) {
+        $('in-' + k).addEventListener('input', function (e) { state[k] = e.target.value; save(); $('submit-msg').innerHTML = ''; });
+    });
+    window.addEventListener('resize', function () { renderLed(); renderResult(); });
+
+    /* ---------- 제출 ---------- */
+    function payload() {
+        var a = analysis();
+        var leds = state.leds.filter(function (l) { return state.method === 'glow' ? l.glow.length : l.iv.length >= 2; }).map(function (l) {
+            var t = thr(l);
+            return { name: l.name, lambda: Number(l.lambda), v0: t.error ? null : t.v0,
+                     iv: state.method === 'glow' ? [] : l.iv, glow: state.method === 'glow' ? l.glow : [] };
+        });
+        return {
+            group: state.group.trim(), name: state.name.trim(), memo: state.memo.trim(),
+            method: state.method, iMode: state.iMode, resistor: state.iMode === 'resistor' ? rOhm() : null, iMin: iMin(),
+            hStudent: a.res ? a.res.h / 1e-34 : null, leds: leds
+        };
+    }
+    function showMsg(cls, html) { $('submit-msg').innerHTML = '<p class="msg ' + cls + '">' + html + '</p>'; }
+
+    $('btn-submit').addEventListener('click', function () {
+        var p = payload();
+        if (!p.group) { showMsg('err', '① 에 조를 넣으세요.'); $('in-group').focus(); return; }
+        if (!p.name) { showMsg('err', '① 에 이름 또는 번호를 넣으세요.'); $('in-name').focus(); return; }
+        if (!p.leds.length) { showMsg('err', state.method === 'glow' ? '빛이 나기 시작한 전압을 기록한 LED 가 없습니다.' : '측정점이 2개 이상인 LED 가 없습니다.'); return; }
+        if (!(window.google && google.script && google.script.run)) {
+            showMsg('err', '이 화면은 Apps Script 웹앱 주소로 열어야 제출됩니다.'); return;
+        }
+        var btn = $('btn-submit');
+        btn.disabled = true; btn.textContent = '제출하는 중…';
+        google.script.run
+            .withSuccessHandler(function (r) {
+                btn.disabled = false; btn.textContent = '📤 제출';
+                var when = new Date(r.submittedAt);
+                showMsg('ok', '✅ 제출했습니다. LED ' + r.saved + '개 · ' + when.toLocaleString('ko-KR') + ' · 제출 번호 ' + U.esc(r.id));
+            })
+            .withFailureHandler(function (err) {
+                btn.disabled = false; btn.textContent = '📤 제출';
+                showMsg('err', '제출하지 못했습니다: ' + U.esc(String(err && err.message ? err.message : err).replace(/^(Error|Exception):\s*/, '')) + '<br>인터넷 연결을 확인하고 다시 누르세요. 입력한 값은 이 기기에 남아 있습니다.');
+            })
+            .submitMeasurement(p);
+    });
+
+    renderAll();
+})();
+</script>
+</body>
+</html>

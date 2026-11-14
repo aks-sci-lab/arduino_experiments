@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<?!= include('Common') ?>
+<?!= include('PlanckMath') ?>
+<style>
+main { max-width: 1100px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: flex-end; }
+.toolbar label { flex: 1 1 200px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--sp-2); margin: var(--sp-2) 0; }
+.stat { background: var(--c-fill); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3); }
+.stat span { display: block; font-size: var(--fs-sm); color: var(--c-muted); font-weight: 600; }
+.stat b { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: var(--c-primary-soft); }
+td.memo { white-space: normal; text-align: left; min-width: 140px; }
+#csv-text { font-family: ui-monospace, Consolas, monospace; font-size: .8rem; min-height: 120px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>💡 LED 플랑크 상수 — 선생님 화면</h1>
+
+  <section class="card" id="login-card" aria-labelledby="h-login">
+    <h2 id="h-login">🔒 교사 암호</h2>
+    <p class="note">학생은 이 화면을 열어도 암호 없이는 자료를 볼 수 없습니다. 암호는 Apps Script 의 '스크립트 속성' TEACHER_PASSWORD 에 정한 값입니다.</p>
+    <form class="row" id="login-form">
+      <label>암호 <input type="password" id="in-pw" autocomplete="current-password"></label>
+      <button type="submit" id="btn-login">들어가기</button>
+    </form>
+    <div id="login-msg" role="status" aria-live="polite"></div>
+  </section>
+
+  <div id="app" hidden>
+    <section class="card">
+      <div class="toolbar">
+        <label>조 고르기 <select id="sel-group"></select></label>
+        <button class="secondary" id="btn-reload" type="button">🔄 새로 고침</button>
+        <button class="info" id="btn-csv-all" type="button">⬇ 전체 CSV</button>
+      </div>
+      <p class="note" id="load-info" aria-live="polite"></p>
+    </section>
+
+    <section class="card" id="overview" aria-labelledby="h-ov">
+      <h2 id="h-ov">조별 요약</h2>
+      <p class="note">줄을 누르면 그 조를 자세히 봅니다. 조 h 는 그 조의 모든 LED 문턱 전압으로 V₀–f 직선을 그어 구한 값입니다.</p>
+      <div class="table-wrap"><table id="tbl-overview"></table></div>
+    </section>
+
+    <section class="card" id="detail" aria-labelledby="h-detail" hidden>
+      <h2 id="h-detail"></h2>
+      <div class="stats" id="stats"></div>
+      <div class="chart"><canvas id="chart-group" aria-label="이 조의 진동수-문턱 전압 그래프"></canvas></div>
+      <p class="note">점 색 = LED 색, 파란 선 = 조 전체 최소제곱 직선, 회색 점선 = 참값 h 직선.</p>
+      <h3>제출된 LED (한 줄 = 시트 한 줄)</h3>
+      <div class="table-wrap"><table id="tbl-rows"></table></div>
+      <p class="note">V₀ 는 학생이 보낸 측정점으로 이 화면에서 다시 계산한 값입니다. 학생 화면의 값과 0.005 V 넘게 다르면 ⚠ 를 붙입니다.</p>
+      <div class="row" style="margin-top:var(--sp-2)">
+        <button class="info" id="btn-csv-group" type="button">⬇ 이 조 CSV</button>
+        <button class="secondary" id="btn-csv-show" type="button">CSV 글자로 보기 (복사용)</button>
+      </div>
+    </section>
+
+    <section class="card" id="csv-box" hidden>
+      <h2>CSV 글자</h2>
+      <p class="note">내려받기가 막힌 경우 아래 글자를 모두 골라 복사해 메모장에 붙여 넣고 .csv 로 저장하세요.</p>
+      <textarea id="csv-text" readonly></textarea>
+    </section>
+  </div>
+</main>
+
+<script>
+(function () {
+    'use strict';
+    var P = window.PlanckMath, U = LabCommon, $ = U.$;
+    var password = '';          // 이 창을 닫으면 사라짐 (브라우저에 저장하지 않음)
+    var rows = [];              // 서버에서 받은 줄 (+ 다시 계산한 v0)
+    var groups = [];            // [{ name, rows }]
+    var current = '';           // 고른 조 ('' = 요약만)
+
+    function errText(err) { return String(err && err.message ? err.message : err).replace(/^(Error|Exception):\s*/, ''); }
+    function hasRun() { return window.google && google.script && google.script.run; }
+
+    /* ---------- 들어가기 ---------- */
+    $('login-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var pw = $('in-pw').value;
+        if (!pw) { $('login-msg').innerHTML = '<p class="msg err">암호를 넣으세요.</p>'; return; }
+        if (!hasRun()) { $('login-msg').innerHTML = '<p class="msg err">이 화면은 Apps Script 웹앱 주소(?page=teacher)로 열어야 합니다.</p>'; return; }
+        $('btn-login').disabled = true;
+        google.script.run
+            .withSuccessHandler(function () { password = pw; $('in-pw').value = ''; $('login-card').hidden = true; $('app').hidden = false; load(); })
+            .withFailureHandler(function (err) { $('btn-login').disabled = false; $('login-msg').innerHTML = '<p class="msg err">' + U.esc(errText(err)) + '</p>'; })
+            .teacherLogin(pw);
+    });
+
+    function load() {
+        $('load-info').textContent = '불러오는 중…';
+        $('btn-reload').disabled = true;
+        google.script.run
+            .withSuccessHandler(function (r) {
+                $('btn-reload').disabled = false;
+                prepare(r.rows || []);
+                $('load-info').textContent = '제출 ' + rows.length + '줄 · ' + groups.length + '개 조 · ' + new Date().toLocaleTimeString('ko-KR') + ' 에 불러옴';
+                render();
+            })
+            .withFailureHandler(function (err) {
+                $('btn-reload').disabled = false;
+                $('load-info').innerHTML = '<span class="msg err">불러오지 못했습니다: ' + U.esc(errText(err)) + '</span>';
+            })
+            .teacherData(password);
+    }
+    $('btn-reload').addEventListener('click', load);
+
+    /* ---------- 계산 ---------- */
+    function recompute(r) {
+        var d = r.data || {};
+        var t = null;
+        if (d.method === 'glow' && Array.isArray(d.glow)) t = P.thresholdByGlow(d.glow);
+        else if (Array.isArray(d.iv)) t = P.thresholdByExtrapolation(d.iv, d.iMin != null ? d.iMin : 1);
+        var v0 = t && !t.error ? t.v0 : (r.v0 != null && isFinite(r.v0) ? r.v0 : null);
+        return { v0: v0, note: t && t.error ? t.error : '', differs: t && !t.error && r.v0 != null && Math.abs(t.v0 - r.v0) > 0.005 };
+    }
+    function prepare(list) {
+        rows = list.map(function (r) { var c = recompute(r); r.v0calc = c.v0; r.v0note = c.note; r.v0differs = c.differs; return r; });
+        var map = {};
+        rows.forEach(function (r) { (map[r.group] = map[r.group] || []).push(r); });
+        groups = Object.keys(map).sort(function (a, b) { return a.localeCompare(b, 'ko', { numeric: true }); })
+            .map(function (g) { return { name: g, rows: map[g] }; });
+        if (current && !map[current]) current = '';
+    }
+    function summary(g) {
+        var items = g.rows.filter(function (r) { return r.v0calc != null && r.lambda > 0; }).map(function (r) { return { lambda: r.lambda, v0: r.v0calc }; });
+        var fit = P.planckFit(items);
+        // 학생 h 평균: 제출(제출 번호) 하나에 한 번만 센다
+        var seen = {}, hs = [];
+        g.rows.forEach(function (r) { if (!seen[r.id] && r.hStudent != null && isFinite(r.hStudent)) { seen[r.id] = 1; hs.push(r.hStudent * 1e-34); } });
+        var names = {}; g.rows.forEach(function (r) { names[r.name] = 1; });
+        var last = g.rows.map(function (r) { return r.submittedAt; }).sort().pop();
+        return { fit: fit, items: items, hMean: hs.length ? P.mean(hs) : null, hSd: hs.length > 1 ? P.std(hs) : null, nH: hs.length,
+                 students: Object.keys(names), last: last };
+    }
+    var when = function (iso) { var d = new Date(iso); return isNaN(d) ? String(iso) : d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+    var errPct = function (h) { return (h - P.H_TRUE) / P.H_TRUE * 100; };
+    var pct = function (x) { return (x > 0 ? '+' : '') + x.toFixed(1) + ' %'; };
+
+    /* ---------- 화면 ---------- */
+    function render() {
+        $('sel-group').innerHTML = '<option value="">— 조별 요약만 보기 —</option>' + groups.map(function (g) {
+            return '<option value="' + U.esc(g.name) + '"' + (g.name === current ? ' selected' : '') + '>' + U.esc(g.name) + ' (' + g.rows.length + '줄)</option>';
+        }).join('');
+        $('tbl-overview').innerHTML = groups.length ? '<tr><th>조</th><th>학생</th><th>LED 줄</th><th>조 h (10⁻³⁴ J·s)</th><th>오차</th><th>학생 h 평균</th><th>마지막 제출</th></tr>' +
+            groups.map(function (g) {
+                var s = summary(g);
+                return '<tr class="clickable" tabindex="0" data-group="' + U.esc(g.name) + '"><td>' + U.esc(g.name) + '</td><td>' + s.students.length + '</td><td>' + g.rows.length + '</td>' +
+                    '<td>' + (s.fit ? (s.fit.h / 1e-34).toFixed(2) : '–') + '</td><td>' + (s.fit ? pct(s.fit.errorPct) : '–') + '</td>' +
+                    '<td>' + (s.hMean != null ? (s.hMean / 1e-34).toFixed(2) + (s.hSd != null ? ' ± ' + (s.hSd / 1e-34).toFixed(2) : '') : '–') + '</td>' +
+                    '<td>' + when(s.last) + '</td></tr>';
+            }).join('') : '<tr><td>아직 제출된 자료가 없습니다.</td></tr>';
+        renderDetail();
+    }
+
+    function renderDetail() {
+        var g = groups.filter(function (x) { return x.name === current; })[0];
+        $('detail').hidden = !g;
+        if (!g) return;
+        var s = summary(g);
+        $('h-detail').textContent = '조: ' + g.name;
+        var stat = function (label, value) { return '<div class="stat"><span>' + label + '</span><b>' + value + '</b></div>'; };
+        $('stats').innerHTML =
+            stat('학생', s.students.length + '명') +
+            stat('LED 줄 (문턱 전압 있음)', g.rows.length + ' (' + s.items.length + ')') +
+            stat('조 h (직선)', s.fit ? U.sci(s.fit.h, 2) + ' J·s' : '파장이 다른 LED 2개 이상 필요') +
+            stat('조 h 오차', s.fit ? pct(s.fit.errorPct) + (s.fit.sH != null ? ' <small>(± ' + U.sci(s.fit.sH, 1) + ')</small>' : '') : '–') +
+            stat('학생 h 평균 (' + s.nH + '명)', s.hMean != null ? U.sci(s.hMean, 2) + (s.hSd != null ? ' <small>± ' + U.sci(s.hSd, 1) + '</small>' : '') : '–') +
+            stat('학생 h 평균 오차', s.hMean != null ? pct(errPct(s.hMean)) : '–');
+
+        $('tbl-rows').innerHTML = '<tr><th>제출 시각</th><th>이름</th><th>LED</th><th>λ (nm)</th><th>기준</th><th>점</th><th>V₀ (V)</th><th>학생 h</th><th>메모</th></tr>' +
+            g.rows.slice().sort(function (a, b) { return a.submittedAt < b.submittedAt ? -1 : 1; }).map(function (r) {
+                return '<tr><td>' + when(r.submittedAt) + '</td><td>' + U.esc(r.name) + '</td><td><span class="dot" style="background:' + P.wavelengthColor(r.lambda) + '"></span> ' + U.esc(r.led) + '</td>' +
+                    '<td>' + r.lambda + '</td><td>' + (/^빛/.test(r.method) ? '빛' : '전류') + '</td><td>' + r.nPoints + '</td>' +
+                    '<td' + (r.v0note ? ' title="' + U.esc(r.v0note) + '"' : '') + '>' + (r.v0calc != null ? r.v0calc.toFixed(3) : '–') + (r.v0differs ? ' ⚠' : '') + '</td>' +
+                    '<td>' + (r.hStudent != null ? r.hStudent.toFixed(2) : '–') + '</td><td class="memo">' + U.esc(r.memo) + '</td></tr>';
+            }).join('');
+        drawGroup(s);
+    }
+
+    function drawGroup(s) {
+        var pts = s.items.map(function (it) { return { x: P.freqOf(it.lambda) / 1e14, y: it.v0, color: P.wavelengthColor(it.lambda) }; });
+        var xmin = 3, xmax = 8;
+        if (pts.length) {
+            xmin = Math.min.apply(null, pts.map(function (p) { return p.x; })) - 0.3;
+            xmax = Math.max.apply(null, pts.map(function (p) { return p.x; })) + 0.3;
+        }
+        var theory = function (x) { return P.H_TRUE * x * 1e14 / P.E_CHARGE; };
+        var lines = [{ pts: [{ x: xmin, y: theory(xmin) }, { x: xmax, y: theory(xmax) }], color: '#aaa', dash: [6, 4], width: 1.5 }];
+        if (s.fit) {
+            var fy = function (x) { return s.fit.fit.slope * x * 1e14 + s.fit.fit.intercept; };
+            lines.push({ pts: [{ x: xmin, y: fy(xmin) }, { x: xmax, y: fy(xmax) }], color: '#1565c0', width: 2 });
+        }
+        var ys = pts.map(function (p) { return p.y; }).concat([theory(xmin), theory(xmax)]);
+        var ymin = Math.min.apply(null, ys), ymax = Math.max.apply(null, ys), pad = (ymax - ymin) * 0.08 || 0.5;
+        U.drawChart($('chart-group'), { xmin: xmin, xmax: xmax, ymin: ymin - pad, ymax: ymax + pad, xd: 1,
+            xl: '진동수 f (10¹⁴ Hz)', yl: '문턱 전압 V₀ (V)', pts: pts, lines: lines });
+    }
+
+    function pick(name) { current = name; $('sel-group').value = name; $('csv-box').hidden = true; renderDetail(); if (name) $('detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    $('sel-group').addEventListener('change', function (e) { pick(e.target.value); });
+    $('tbl-overview').addEventListener('click', function (e) { var tr = e.target.closest('tr[data-group]'); if (tr) pick(tr.getAttribute('data-group')); });
+    $('tbl-overview').addEventListener('keydown', function (e) { var tr = e.target.closest('tr[data-group]'); if (tr && e.key === 'Enter') pick(tr.getAttribute('data-group')); });
+    window.addEventListener('resize', function () { if (current) renderDetail(); });
+
+    /* ---------- CSV ---------- */
+    function csvOf(list) {
+        var head = ['제출 시각', '조', '이름(번호)', '제출 번호', 'LED', '파장(nm)', '진동수(10^14 Hz)', '문턱 기준', '문턱 전압 V0(V, 다시 계산)', '학생이 보낸 V0(V)',
+            '점 개수', '전류 입력 방식', '고정 저항(Ω)', '학생 h(10^-34 J·s)', '측정값(V:I mA)', '메모'];
+        var out = [head].concat(list.map(function (r) {
+            var d = r.data || {};
+            var pts = d.method === 'glow' ? (d.glow || []).join(' ') : (d.iv || []).map(function (p) { return p.v + ':' + p.i; }).join(' ');
+            return [r.submittedAt, r.group, r.name, r.id, r.led, r.lambda, (P.freqOf(r.lambda) / 1e14).toFixed(4), r.method,
+                r.v0calc != null ? r.v0calc.toFixed(4) : '', r.v0 != null ? r.v0 : '', r.nPoints, r.iMode, r.resistor != null ? r.resistor : '',
+                r.hStudent != null ? r.hStudent : '', pts, r.memo];
+        }));
+        // 조별 요약을 아래에 붙임
+        out.push([]);
+        out.push(['조', '학생 수', 'LED 줄', '조 h(10^-34 J·s)', '조 h 표준오차', '조 h 오차(%)', '학생 h 평균(10^-34 J·s)', '학생 h 표준편차']);
+        var gl = list === rows ? groups : groups.filter(function (g) { return g.name === current; });
+        gl.forEach(function (g) {
+            var s = summary(g);
+            out.push([g.name, s.students.length, g.rows.length, s.fit ? (s.fit.h / 1e-34).toFixed(4) : '', s.fit && s.fit.sH != null ? (s.fit.sH / 1e-34).toFixed(4) : '',
+                s.fit ? s.fit.errorPct.toFixed(2) : '', s.hMean != null ? (s.hMean / 1e-34).toFixed(4) : '', s.hSd != null ? (s.hSd / 1e-34).toFixed(4) : '']);
+        });
+        return U.csv(out);
+    }
+    var stamp = function () { var d = new Date(); return d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'); };
+    $('btn-csv-all').addEventListener('click', function () { U.download('플랑크상수_전체_' + stamp() + '.csv', csvOf(rows)); });
+    $('btn-csv-group').addEventListener('click', function () {
+        var g = groups.filter(function (x) { return x.name === current; })[0]; if (!g) return;
+        U.download('플랑크상수_' + g.name.replace(/[\\/:*?"<>|\s]+/g, '_') + '_' + stamp() + '.csv', csvOf(g.rows));
+    });
+    $('btn-csv-show').addEventListener('click', function () {
+        var g = groups.filter(function (x) { return x.name === current; })[0]; if (!g) return;
+        $('csv-text').value = csvOf(g.rows); $('csv-box').hidden = false; $('csv-text').focus(); $('csv-text').select();
+    });
+})();
+</script>
+</body>
+</html>
