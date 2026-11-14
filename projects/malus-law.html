@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
     <title>말루스 법칙 실험 (스마트폰 카메라)</title>
     <link rel="stylesheet" href="../css/malus-law.css">
 </head>
@@ -12,17 +14,122 @@
     <h1>🔦 말루스 법칙 실험 (스마트폰 카메라)</h1>
     <p class="note">레이저 → 편광판(회전) → 종이/휴지 스크린 → 카메라 순으로 놓고, 편광판을 돌릴 때 스크린의 밝기가 어떻게 변하는지 탐구합니다. 카메라 접근은 <b>https</b> 주소에서만 동작합니다.</p>
 
-    <nav class="tabs" role="tablist">
-        <button class="tab" role="tab" data-tab="explore">📘 접해보기</button>
-        <button class="tab" role="tab" data-tab="measure">📷 측정하기</button>
-        <button class="tab" role="tab" data-tab="analyze">📊 분석하기</button>
-        <button class="tab" role="tab" data-tab="settings">⚙ 설정</button>
+    <nav class="steps" role="tablist" aria-label="실험 단계">
+        <button role="tab" data-step="purpose"><b>1</b><span>목적</span></button>
+        <button role="tab" data-step="theory"><b>2</b><span>이론</span></button>
+        <button role="tab" data-step="materials"><b>3</b><span>준비물</span></button>
+        <button role="tab" data-step="procedure"><b>4</b><span>과정</span></button>
+        <button role="tab" data-step="data"><b>5</b><span>데이터</span></button>
+        <button role="tab" data-step="result"><b>6</b><span>결과</span></button>
+        <button role="tab" data-step="conclusion"><b>7</b><span>결론</span></button>
     </nav>
 
-    <!-- ===================== 접해보기 ===================== -->
-    <section class="tab-panel" data-panel="explore">
+    <!-- ===================== 1. 목적 ===================== -->
+    <section class="step-panel" data-step="purpose" hidden>
         <div class="card">
-            <h2>① 예측하기</h2>
+            <h2>1. 실험 목적</h2>
+            <ol class="text-list">
+                <li>편광판을 돌린 각도 θ 에 따라 통과한 빛의 세기가 <b>I = I₀ cos²θ</b> (말루스 법칙)로 변하는지 스마트폰 카메라로 확인한다.</li>
+                <li>직선, |cos θ|, cos²θ 세 가지 모델을 측정값에 맞춰 보고, <b>잔차</b>를 보며 어느 모델이 가장 잘 맞는지 근거를 들어 판단한다.</li>
+                <li>회차마다 빛의 세기·카메라 위치가 달라도 <b>정규화</b> (I − B) / A 로 여러 회차를 공정하게 비교하는 방법을 이해한다.</li>
+            </ol>
+        </div>
+        <div class="card box">
+            <h2>이 실험에서 하는 일</h2>
+            <ol class="text-list">
+                <li><b>예측</b> — 각도에 따라 밝기가 어떻게 변할지 그래프로 그려 둔다.</li>
+                <li><b>계획</b> — 잴 각도·반복 횟수·배경광 처리·이상한 값 기준을 미리 정한다.</li>
+                <li><b>측정</b> — 카메라로 스크린의 밝기를 각도마다 기록한다.</li>
+                <li><b>분석</b> — 데이터를 점검하고, 모델을 비교하고, 정규화 전후를 비교한다.</li>
+                <li><b>결론</b> — 주장·증거·추론으로 결론을 쓰고 기록을 내보낸다.</li>
+            </ol>
+        </div>
+        <div class="step-next"><button data-go="theory">다음: 2. 이론 →</button></div>
+    </section>
+
+    <!-- ===================== 2. 이론 ===================== -->
+    <section class="step-panel" data-step="theory" hidden>
+        <div class="card">
+            <h2>2-1. 빛의 편광</h2>
+            <p>빛은 전기장과 자기장이 진행 방향에 <b>수직으로</b> 진동하며 나아가는 전자기파(횡파)입니다. 햇빛이나 전구 빛은 전기장의 진동 방향이 여러 방향으로 섞여 있는데, 이런 빛을 <b>편광되지 않은 빛</b>이라고 합니다.</p>
+            <p><b>편광판</b>은 한 방향(투과축)으로 진동하는 성분만 통과시킵니다. 편광판을 지난 빛은 진동 방향이 한 방향으로 정해진 <b>선편광</b>이 됩니다. 편광되지 않은 빛이 편광판 하나를 지나면 세기가 약 절반으로 줄어듭니다.</p>
+            <p class="note">레이저 포인터의 빛은 대부분 이미 한 방향으로 편광되어 있어서, 편광판 하나만 돌려도 실험할 수 있습니다. 레이저 빛이 편광되어 있지 않으면 레이저 바로 앞에 편광판 하나를 고정해 두고, 두 번째 편광판을 돌립니다.</p>
+        </div>
+        <div class="card">
+            <h2>2-2. 말루스 법칙</h2>
+            <p class="note">💡 <b>4. 과정</b>의 '예측하기'를 먼저 하고 싶다면, 아래를 펼치기 전에 예측부터 해 보세요.</p>
+            <details class="theory">
+                <summary>말루스 법칙 펼쳐 보기</summary>
+                <p>세기가 I₀ 인 선편광 빛이 편광판에 들어갈 때, 빛의 진동 방향과 편광판 투과축 사이의 각을 θ 라고 합시다. 전기장의 진폭 E₀ 중 투과축 방향 성분 <b>E₀ cos θ</b> 만 통과합니다. 빛의 세기는 진폭의 <b>제곱</b>에 비례하므로</p>
+                <p class="formula">I = I₀ cos²θ</p>
+                <ul class="text-list">
+                    <li>θ = 0° (투과축과 진동 방향이 나란함): 가장 밝다 (I = I₀)</li>
+                    <li>θ = 45°: 절반 (cos²45° = 0.5)</li>
+                    <li>θ = 90° (수직): 거의 깜깜하다 (I = 0)</li>
+                    <li>θ = 180°: 다시 가장 밝다 — 주기가 180° 이다</li>
+                </ul>
+                <p class="note">진폭에 비례하는 |cos θ| 모양과 헷갈리기 쉽습니다. 두 모양은 45° 근처에서 0.71 과 0.50 으로 크게 달라서 측정으로 구별할 수 있습니다.</p>
+            </details>
+        </div>
+        <div class="card">
+            <h2>2-3. 실제 측정에 맞춘 식</h2>
+            <p>실제 측정에서는 편광판 눈금의 0° 가 가장 밝은 위치와 정확히 맞지 않고, 주변 빛이나 카메라 잡음 때문에 가장 어두울 때도 밝기가 0 이 되지 않습니다. 그래서 다음 식으로 데이터에 맞춥니다.</p>
+            <p class="formula">I = A · cos²(θ − θ₀) + B</p>
+            <ul class="text-list">
+                <li><b>A</b>: 밝기가 변하는 크기 (가장 밝을 때 − 가장 어두울 때)</li>
+                <li><b>θ₀</b>: 가장 밝은 위치의 눈금 각도</li>
+                <li><b>B</b>: 배경 밝기 (주변 빛, 카메라 잡음, 편광판이 완전히 막지 못한 빛)</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h2>2-4. 왜 정규화하나요? (I − B) / A</h2>
+            <p>회차마다 레이저 세기, 카메라와 스크린의 위치, 노출이 조금씩 달라서 A 와 B 가 달라집니다. 그러면 같은 법칙을 따르더라도 곡선의 높이가 회차마다 달라 한 그래프에서 비교하기 어렵습니다.</p>
+            <p>회차마다 따로 A, B 를 구한 뒤 <b>(I − B) / A</b> 로 바꾸면, 모든 회차가 0(가장 어두움)~1(가장 밝음) 범위로 맞춰집니다. 이렇게 하면 <b>곡선의 모양</b>만 남으므로, 모양이 cos²(θ − θ₀) 를 따르는지 여러 회차를 함께 비교할 수 있습니다.</p>
+        </div>
+        <div class="card">
+            <h2>2-5. 카메라로 밝기 재기</h2>
+            <p>카메라 사진의 픽셀 값(0~255)은 빛의 세기에 정비례하지 않습니다. 사람 눈에 자연스럽게 보이도록 <b>감마</b>라는 변환을 거쳤기 때문입니다. 이 페이지는 감마 보정으로 픽셀 값을 다시 빛의 세기에 비례하는 값으로 바꿔 계산합니다.</p>
+            <p>픽셀 값이 255 에 닿으면(<b>포화</b>) 그보다 밝은 빛도 255 로 잘려 cos² 곡선의 꼭대기가 눌립니다. 또 카메라가 밝기에 따라 노출을 스스로 바꾸면 측정값이 비교되지 않으므로 <b>노출을 고정</b>해야 합니다.</p>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="purpose">← 이전: 1. 목적</button><button data-go="materials">다음: 3. 준비물 →</button></div>
+    </section>
+
+    <!-- ===================== 3. 준비물 ===================== -->
+    <section class="step-panel" data-step="materials" hidden>
+        <div class="card">
+            <h2>3. 준비물</h2>
+            <ul class="text-list">
+                <li><b>광원</b>: 레이저 포인터(빨강 또는 초록, 권장). 레이저가 없으면 LED 손전등이나 모니터 화면(모니터 빛은 이미 편광되어 있음)</li>
+                <li><b>편광판</b>: 1장(편광된 레이저·모니터) 또는 2장(편광되지 않은 빛: 1장은 고정, 1장은 돌림). 편광 필름을 잘라 써도 됩니다.</li>
+                <li><b>각도기</b> 또는 각도 눈금을 붙인 회전판 (편광판을 돌린 각도를 읽음)</li>
+                <li><b>스크린</b>: 종이나 휴지 (빛이 고르게 번지도록)</li>
+                <li><b>스마트폰</b> (카메라, 크롬 브라우저 권장)과 <b>거치대</b> 또는 테이프 — 폰과 스크린이 움직이지 않게 고정</li>
+                <li>레이저·편광판을 세울 받침(클램프, 점토 등)</li>
+                <li><b>어두운 환경</b>: 커튼을 치거나 불을 끄면 배경 밝기 B 가 작아집니다.</li>
+            </ul>
+            <div class="warn">⚠️ <b>안전</b>: 레이저 빛을 눈으로 직접 보거나 다른 사람의 눈에 비추지 마세요. 거울·유리처럼 빛을 반사하는 물건은 치웁니다.</div>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="theory">← 이전: 2. 이론</button><button data-go="procedure">다음: 4. 과정 →</button></div>
+    </section>
+
+    <!-- ===================== 4. 과정 ===================== -->
+    <section class="step-panel" data-step="procedure" hidden>
+        <div class="card">
+            <h2>4. 실험 과정</h2>
+            <ol class="text-list">
+                <li>아래에서 <b>예측</b>하고, <b>측정 계획</b>과 <b>이상한 값 판단 기준</b>을 정합니다.</li>
+                <li>레이저 → 편광판(회전) → 종이/휴지 스크린 → 카메라 순으로 놓습니다. 폰은 스크린 뒤에서 빛 번짐을 찍도록 거치대나 테이프로 고정합니다.</li>
+                <li><b>5. 데이터</b>에서 카메라를 켜고, 초록 사각형(측정 영역)을 빛 번짐 전체가 들어가게 맞춘 뒤 <b>노출 고정</b>을 누릅니다(아이폰 등은 사진 불러오기).</li>
+                <li>가장 밝은 각도에서 포화 픽셀이 거의 0% 가 되도록 종이를 겹치거나 노출을 낮춥니다.</li>
+                <li>계획대로 편광판을 돌리며 각도마다 <b>측정 기록</b>을 누릅니다. 배경을 뺀다면 레이저를 끄고 배경을 잽니다.</li>
+                <li>카메라·스크린을 다시 맞췄다면 <b>새 회차</b>를 시작해 같은 측정을 반복합니다.</li>
+                <li><b>6. 결과</b>에서 데이터를 점검하고 모델과 정규화를 비교한 뒤, <b>7. 결론</b>을 씁니다.</li>
+            </ol>
+        </div>
+
+        <div id="tutorial-box">
+        <div class="card">
+            <h2>① 예측하기 <span class="note">(측정 전에)</span></h2>
             <p class="note">편광판을 0°에서 180°까지 돌린다고 생각해 봅시다. <b>0°를 가장 밝은 위치</b>로 정하면, 각도가 커질 때 밝기는 어떻게 변할까요? 측정하기 전에 예측해 두면 나중에 결과와 비교할 수 있습니다.</p>
             <div class="choice-list" id="hyp-list">
                 <label><input type="radio" name="hyp" value="linear"> <span>각도에 비례해 일정하게 어두워진다</span></label>
@@ -39,7 +146,7 @@
         </div>
 
         <div class="card">
-            <h2>③ 측정 계획 세우기</h2>
+            <h2>② 측정 계획 세우기</h2>
             <p class="note">어떤 각도를 몇 번씩 잴지 정해 보세요. <b>밝기가 빠르게 변하는 곳</b>과 <b>가장 어두운 곳 근처</b>는 어떻게 재면 좋을까요?</p>
             <div class="row">
                 <label>시작 <input type="number" id="plan-start" value="0" step="1"> °</label>
@@ -64,7 +171,7 @@
         </div>
 
         <div class="card">
-            <h2>⑤ 이상한 값 판단 기준 정하기</h2>
+            <h2>③ 이상한 값 판단 기준 정하기</h2>
             <p class="note">측정하다 보면 이상해 보이는 값이 나옵니다. <b>데이터를 보기 전에</b> 어떤 값을 의심할지 정해 두세요. 결과를 본 뒤에 마음에 들지 않는 값을 빼면 공정하지 않기 때문입니다.</p>
             <div class="choice-list">
                 <label><input type="checkbox" id="crit-move" checked> <span>측정 중 빛 위치(카메라)가 움직였을 때</span></label>
@@ -74,17 +181,31 @@
             <label class="block">그 밖의 내 기준
                 <input type="text" id="crit-note" placeholder="예: 측정 중 누가 불을 켰을 때">
             </label>
-            <p class="note">기준에 걸린 값은 <b>⚠ 의심</b>으로 표시됩니다. 실제로 뺄지(결측 처리)는 분석하기에서 이유를 적고 직접 결정합니다.</p>
+            <p class="note">기준에 걸린 값은 <b>⚠ 의심</b>으로 표시됩니다. 실제로 뺄지(결측 처리)는 <b>6. 결과</b> 단계에서 이유를 적고 직접 결정합니다.</p>
         </div>
 
         <div class="card start-card">
-            <button id="btn-plan-start" class="good big">✅ 이 계획으로 측정 시작</button>
+            <button id="btn-plan-start" class="good big">✅ 이 계획으로 측정 시작 (5. 데이터로)</button>
             <span id="plan-msg" class="note"></span>
         </div>
+        </div>
+
+        <details class="card settings-box">
+            <summary>⚙ 설정 (자동화 기능)</summary>
+            <h2>자동화 기능 켜고 끄기</h2>
+            <p class="note"><b>학습 모드</b>는 학생이 직접 판단해야 할 부분을 남겨 둡니다. 시간이 부족한 수업에서는 <b>빠른 모드</b>로 바꿀 수 있습니다.</p>
+            <div class="row">
+                <button id="preset-learn" class="good">🎓 학습 모드 (권장)</button>
+                <button id="preset-fast" class="secondary">⚡ 빠른 모드</button>
+                <span id="preset-txt" class="note"></span>
+            </div>
+            <div class="settings" id="settings-list"></div>
+        </details>
+        <div class="step-next"><button class="secondary" data-go="materials">← 이전: 3. 준비물</button><button data-go="data">다음: 5. 데이터 →</button></div>
     </section>
 
-    <!-- ===================== 측정하기 ===================== -->
-    <section class="tab-panel" data-panel="measure">
+    <!-- ===================== 5. 데이터 ===================== -->
+    <section class="step-panel" data-step="data" hidden>
     <div class="card">
         <h2>1. 카메라 준비</h2>
         <details class="tip">
@@ -176,10 +297,11 @@
             <div class="row"><button id="btn-record" class="good big" disabled>✅ 측정 기록</button><span id="rec-status" class="note"></span></div>
             <div id="recent" class="recent"></div>
         </div>
+        <div class="step-next"><button class="secondary" data-go="procedure">← 이전: 4. 과정</button><button data-go="result">다음: 6. 결과 →</button></div>
     </section>
 
-    <!-- ===================== 분석하기 ===================== -->
-    <section class="tab-panel" data-panel="analyze">
+    <!-- ===================== 6. 결과 ===================== -->
+    <section class="step-panel" data-step="result" hidden>
         <div class="card">
             <h2>1. 데이터 점검 <span id="cnt" class="note"></span></h2>
             <p class="note" id="crit-summary"></p>
@@ -231,8 +353,13 @@
             </div>
         </div>
 
+        <div class="step-next"><button class="secondary" data-go="data">← 이전: 5. 데이터</button><button data-go="conclusion">다음: 7. 결론 →</button></div>
+    </section>
+
+    <!-- ===================== 7. 결론 ===================== -->
+    <section class="step-panel" data-step="conclusion" hidden>
         <div class="card">
-            <h2>4. 결론 쓰기</h2>
+            <h2>1. 결론 쓰기</h2>
             <div id="verdict" hidden></div>
             <label class="block"><b>주장</b> — 편광판 각도와 밝기는 어떤 관계인가요?
                 <textarea id="cer-claim" rows="2"></textarea></label>
@@ -244,22 +371,22 @@
         </div>
 
     <div class="card">
-            <h2>5. 내 구글 스프레드시트로 내보내기</h2>
+            <h2>2. 내 구글 스프레드시트로 내보내기</h2>
             <div class="row">
                 <button id="btn-gs-oauth" class="good" disabled>🟢 구글 로그인 후 내 드라이브에 새 시트 만들기</button>
             </div>
             <div class="row"><span id="gs-oauth-status" class="note"></span> <a id="gs-oauth-link" href="#" target="_blank" rel="noopener" hidden>📄 시트 열기</a></div>
             <p class="note">로그인한 본인 계정의 드라이브에 새 스프레드시트가 만들어지고, 이 앱이 만든 파일에만 접근합니다. 아래는 로그인 없이 쓰는 다른 방법입니다.</p>
-            <hr style="border:none;border-top:1px solid #eee;margin:12px 0">
+            <hr class="sep">
             <div class="row">
                 <button id="btn-copy" class="secondary" disabled>📋 표 복사 (시트에 붙여넣기)</button>
                 <span class="note">복사 후 시트에서 A1 셀을 선택하고 붙여넣기(Ctrl+V)</span>
             </div>
             <div class="row">
-                <label style="flex:1">이름/조 <input type="text" id="gs-name" placeholder="예: 3조" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;width:100%"></label>
+                <label style="flex:1">이름/조 <input type="text" id="gs-name" placeholder="예: 3조" class="wide"></label>
             </div>
             <div class="row">
-                <label style="flex:1">웹 앱 URL <input type="url" id="gs-url" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;width:100%"></label>
+                <label style="flex:1">웹 앱 URL <input type="url" id="gs-url" placeholder="https://script.google.com/macros/s/.../exec" class="wide"></label>
             </div>
             <div class="warn">⚠️ 보내는 열 구성이 바뀌었습니다(회차·결측 사유·의심 열 추가). <b>예전에 이 기능으로 쓰던 시트에 이어 보내지 마세요.</b> 머리글과 데이터 열이 어긋납니다. 새 스프레드시트를 만들어 아래 방법으로 다시 연결하세요. (예전 머리글 줄만 지우는 방법은 새 머리글이 생기지 않으므로 쓰지 마세요.)</div>
             <div class="row"><button id="btn-gs" class="good" disabled>📤 내 시트로 전송</button><span id="gs-status" class="note"></span></div>
@@ -271,31 +398,18 @@
                     <li><b>배포 → 새 배포 → 유형: 웹 앱</b>, 실행 사용자 <b>나</b>, 액세스 권한 <b>모든 사용자</b>로 배포하고 권한을 승인합니다.</li>
                     <li>나온 <b>웹 앱 URL</b>을 위 칸에 붙여넣습니다.</li>
                 </ol>
-                <pre id="gs-code" style="background:#f1f3f5;padding:10px;border-radius:6px;overflow-x:auto;font-size:.8em;white-space:pre-wrap">function doPost(e) {
+                <pre id="gs-code" class="code">function doPost(e) {
   var d = JSON.parse(e.postData.contents);
   var sh = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   if (sh.getLastRow() === 0) sh.appendRow(d.header);
   d.rows.forEach(function (r) { sh.appendRow(r); });
   return ContentService.createTextOutput('ok');
-}</pre>>
+}</pre>
                 <button id="btn-copy-code" class="secondary">코드 복사</button>
                 <p class="note">브라우저 보안상 전송 성공 여부는 앱에서 확인할 수 없으니 시트에 행이 생겼는지 확인하세요. URL을 아는 사람은 누구나 시트에 쓸 수 있으므로 URL을 공유하지 마세요.</p>
             </details>
         </div>
-    </section>
-
-    <!-- ===================== 설정 ===================== -->
-    <section class="tab-panel" data-panel="settings">
-        <div class="card">
-            <h2>자동화 기능 켜고 끄기</h2>
-            <p class="note"><b>학습 모드</b>는 학생이 직접 판단해야 할 부분을 남겨 둡니다. 시간이 부족한 수업에서는 <b>빠른 모드</b>로 바꿀 수 있습니다.</p>
-            <div class="row">
-                <button id="preset-learn" class="good">🎓 학습 모드 (권장)</button>
-                <button id="preset-fast" class="secondary">⚡ 빠른 모드</button>
-                <span id="preset-txt" class="note"></span>
-            </div>
-            <div class="settings" id="settings-list"></div>
-        </div>
+        <div class="step-next"><button class="secondary" data-go="result">← 이전: 6. 결과</button></div>
     </section>
 </div>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>

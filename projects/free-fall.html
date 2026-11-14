@@ -3,100 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
     <meta name="description" content="자유낙하 궤적 분석 & 다중섬광사진 - 수동 객체 선택 방식">
     <title>자유낙하 다중섬광사진 및 수동 궤적 분석</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" defer></script>
     <link rel="stylesheet" href="../css/style.css">
     <style>
-        /* Base layout */
+        /* 기본 틀: 단계형 실험 폭(--w-step) */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 1100px;
+            display: block;
+            max-width: var(--w-step);
             margin: 0 auto;
-            padding: 20px;
-            text-align: center;
-            background-color: #f8f9fa;
+            padding: var(--sp-3);
+            background: var(--c-bg);
         }
         .container {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: auto;
+            max-width: none;
+            background: var(--c-card);
+            padding: var(--sp-4);
+            border-radius: var(--r-card);
+            box-shadow: var(--shadow);
         }
-        h1 { color: #333; }
-        h2 { color: #555; margin-top: 25px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h1 { font-size: var(--fs-h1); margin: 0 0 var(--sp-1); color: var(--c-text); }
+        h2 { font-size: var(--fs-h2); color: var(--c-text); margin-top: var(--sp-5); border-bottom: 2px solid var(--c-line); padding-bottom: var(--sp-2); }
+        .step-panel > h2:first-child { margin-top: var(--sp-2); }
+        h3 { font-size: var(--fs-base); margin: var(--sp-4) 0 var(--sp-2); }
+        .step-panel { line-height: 1.65; }
+        .step-panel ul, .step-panel ol { padding-left: 1.3em; }
+        .step-panel li { margin: var(--sp-1) 0; }
 
-        /* Tabs */
-        .tabs { margin-bottom: 12px; text-align: left; }
-        .tab-buttons { display:flex; gap:8px; justify-content:flex-start; margin-bottom:8px; }
-        .tab-btn { padding:8px 14px; border-radius:6px; border:1px solid #ddd; background:#fff; cursor:pointer; }
-        .tab-btn.active { background:#007bff; color:white; border-color:#007bff; }
-
-        .controls, .slider-controls {
-            margin: 15px 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
-            background-color: #f1f3f5;
-            padding: 15px;
-            border-radius: 8px;
+        /* 식·설명 상자 */
+        .formula {
+            font-family: var(--font-mono);
+            background: var(--c-fill);
+            border-radius: var(--r-ctl);
+            padding: var(--sp-2) var(--sp-3);
+            margin: var(--sp-2) 0;
+            overflow-x: auto;
         }
-
-        input[type="file"] {
-            padding: 10px;
-            background-color: #fff;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            cursor: pointer;
+        .box {
+            background: var(--c-primary-soft);
+            border-left: 4px solid var(--c-primary);
+            border-radius: var(--r-ctl);
+            padding: var(--sp-2) var(--sp-3);
+            margin: var(--sp-3) 0;
         }
+        .box.warn { background: var(--c-warn-bg); color: var(--c-warn-text); border-left-color: var(--c-warn-text); }
+        table.simple { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+        table.simple th, table.simple td { border: 1px solid var(--c-line); padding: 6px 8px; text-align: left; vertical-align: top; }
+        table.simple th { background: var(--c-fill); }
+        .checklist li { list-style: "☐ "; }
 
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: bold;
-        }
+        /* 실험 종류 고르기(.seg) 아래 설명 */
+        .mode-switch { margin-top: 0; }
 
-        .control-group input[type="number"] {
-            width: 70px;
-            padding: 6px;
-            font-size: 15px;
-            text-align: center;
-        }
-
-        .control-group input[type="range"] { cursor: pointer; }
-
-        button {
+        /* 이 페이지의 일반 버튼 (단계 탭은 lab-base.css 모양 그대로) */
+        button:not(.steps button) {
             padding: 10px 18px;
             font-size: 15px;
             font-weight: bold;
-            color: white;
-            background-color: #007bff;
+            color: #fff;
+            background-color: var(--c-primary);
             border: none;
-            border-radius: 6px;
+            border-radius: var(--r-ctl);
             cursor: pointer;
             transition: background-color 0.2s;
         }
+        button:not(.steps button):hover:not(:disabled) { background-color: var(--c-primary-dark); opacity: 1; }
+        button:not(.steps button):disabled { background-color: #ccc; cursor: not-allowed; }
+        .step-next button.prev { background-color: var(--c-secondary); }
 
-        button:hover { background-color: #0056b3; }
-        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        #btn-manual-track { display: none; }
+        #btn-strobo { display: none; }
+        #btn-strobo:hover:not(:disabled), #btn-csv:hover:not(:disabled) { background-color: var(--c-success); filter: brightness(.9); }
+        #btn-undo-point { background-color: var(--c-secondary); display: none; }
+        #btn-clear-points { background-color: var(--c-danger); display: none; }
+        #btn-clear-points:hover:not(:disabled) { background-color: var(--c-danger); filter: brightness(.9); }
+        #btn-calibrate { background-color: var(--c-secondary); }
+        #btn-calibrate.on { background-color: var(--c-danger); }
 
-        #btn-manual-track { background-color: #dc3545; display: none; }
-        #btn-manual-track:hover { background-color: #c82333; }
-        #btn-strobo { background-color: #6f42c1; display: none; }
-        #btn-strobo:hover { background-color: #5a32a3; }
-        #btn-undo-point { background-color: #fd7e14; display: none; }
-        #btn-undo-point:hover { background-color: #e86c00; }
-        #btn-clear-points { background-color: #ffc107; color: #333; display: none; }
-        #btn-clear-points:hover { background-color: #ffb800; }
+        /* 데이터 단계: 영상·조작 */
+        .controls, .slider-controls {
+            margin: var(--sp-4) 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--sp-3);
+            flex-wrap: wrap;
+            background-color: var(--c-fill);
+            padding: var(--sp-3);
+            border-radius: var(--r-card);
+        }
+        input[type="file"] {
+            max-width: 100%;
+            padding: 10px;
+            background-color: var(--c-card);
+            border: 1px solid var(--c-line);
+            border-radius: var(--r-ctl);
+            cursor: pointer;
+        }
+        .control-group { display: flex; align-items: center; gap: var(--sp-2); font-weight: bold; flex-wrap: wrap; }
+        .control-group input[type="number"] { width: 80px; padding: 6px; font-size: 15px; text-align: center; min-height: var(--tap); }
+        .control-group input[type="range"] { cursor: pointer; }
 
-        #video-container { position: relative; display: inline-block; margin: 20px 0; width: 100%; }
-
+        #video-container { position: relative; display: block; margin: var(--sp-4) 0; width: 100%; }
         canvas {
-            border: 2px solid #333;
-            border-radius: 6px;
+            border: 2px solid var(--c-text);
+            border-radius: var(--r-ctl);
             background-color: #fff;
             width: 100%;
             height: auto;
@@ -104,157 +119,319 @@
             display: block;
             touch-action: none;
         }
-
         video { display: none; }
 
         #status-msg {
             font-size: 1.05em;
             font-weight: bold;
-            color: #d35400;
-            margin: 15px 0;
+            color: var(--c-warn-text);
+            margin: var(--sp-4) 0;
             padding: 10px;
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
+            background-color: var(--c-warn-bg);
+            border-left: 4px solid var(--c-warn-text);
             border-radius: 4px;
         }
+        #loading-overlay { display: none; color: var(--c-success); font-weight: bold; margin-top: 10px; }
+        .notice { font-size: 0.95em; color: var(--c-muted); margin-top: 10px; padding: 10px; background-color: var(--c-primary-soft); border-left: 4px solid var(--c-primary); border-radius: 4px; }
+        #tracking-info { font-size: 1em; color: var(--c-ok-text); font-weight: bold; margin-top: 10px; padding: 8px; background-color: var(--c-ok-bg); border-left: 4px solid var(--c-success); border-radius: 4px; display: none; }
+        #calib-info { font-size: var(--fs-sm); color: var(--c-muted); width: 100%; text-align: center; }
 
-        .chart-container { width: 100%; max-width: 900px; margin: 0 auto; display: none; margin-top: 20px; }
+        #strobo-container { display: none; width: 100%; margin-top: var(--sp-4); text-align: center; }
+        #strobo-container button { margin-top: 10px; }
 
-        #loading-overlay { display: none; color: #28a745; font-weight: bold; margin-top: 10px; }
-
-        .notice { font-size: 0.95em; color: #666; margin-top: 10px; padding: 10px; background-color: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px; }
-
-        #tracking-info { font-size: 1em; color: #28a745; font-weight: bold; margin-top: 10px; padding: 8px; background-color: #d4edda; border-left: 4px solid #28a745; border-radius: 4px; display: none; }
-
-        #strobo-container { display: none; width: 100%; margin-top: 20px; }
-
-        .frame-nav { margin: 10px 0 15px 0; display: flex; justify-content: center; gap: 8px; align-items: center; flex-wrap: wrap; background-color: #f1f3f5; padding: 10px; border-radius: 6px; font-size: 0.95em; }
-        .frame-nav button { padding: 6px 12px; font-size: 13px; min-width: 50px; }
-        .frame-nav input { width: 60px; padding: 6px; font-size: 13px; text-align: center; }
+        .frame-nav { margin: 10px 0 15px 0; display: flex; justify-content: center; gap: var(--sp-2); align-items: center; flex-wrap: wrap; background-color: var(--c-fill); padding: 10px; border-radius: var(--r-ctl); font-size: 0.95em; }
+        .frame-nav button:not(.steps button) { padding: 6px 12px; font-size: 13px; min-width: 50px; }
+        .frame-nav input { width: 60px; padding: 6px; font-size: 13px; text-align: center; min-height: var(--tap); }
         .frame-nav span { font-size: 13px; font-weight: bold; }
 
-        /* Zoom overlay */
-        .zoom-overlay { position: fixed; right: 16px; top: 80px; width: 220px; height: 220px; border: 2px solid #333; border-radius: 8px; background: #fff; z-index: 9999; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        /* 확대 보기 (모바일 길게 누르기) */
+        .zoom-overlay { position: fixed; right: 16px; top: 80px; width: 220px; height: 220px; border: 2px solid var(--c-text); border-radius: 8px; background: #fff; z-index: 9999; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        .zoom-overlay canvas { border: none; }
 
-        /* Responsive rules */
+        /* 측정값 표 */
+        .table-wrap { max-height: 320px; overflow: auto; border: 1px solid var(--c-line); border-radius: var(--r-ctl); }
+        .table-wrap table.simple { border: none; }
+        .table-wrap th { position: sticky; top: 0; }
+        .table-wrap td, .table-wrap th { text-align: right; }
+
+        /* 결과 단계: 그래프·맞춤 */
+        .chart-container { width: 100%; margin: var(--sp-4) auto 0; display: none; }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-bottom: var(--sp-4); }
+        .chart-grid > div { min-width: 0; }
+        .chart-container canvas { border: 1px solid var(--c-line); cursor: default; }
+        .fit-result { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-2); margin: var(--sp-3) 0; }
+        .fit-result div { background: var(--c-fill); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3); }
+        .fit-result small { display: block; color: var(--c-muted); }
+        .fit-result b { font-size: 1.2rem; }
+
         @media (max-width: 720px) {
-            body { padding: 12px; }
-            .container { padding: 12px; border-radius: 8px; }
-            .controls, .slider-controls { padding: 10px; gap: 8px; }
-            .tab-buttons { gap:6px; }
-            .tab-btn { padding:8px 10px; font-size:14px; }
-            .chart-container { max-width: 100%; }
+            body { padding: var(--sp-2); }
+            .container { padding: var(--sp-3); }
+            .controls, .slider-controls { padding: 10px; gap: var(--sp-2); }
             canvas { border-width: 1px; }
-            #projectile-charts { grid-template-columns: 1fr !important; }
-        }
-
-        @media (min-width: 1024px) {
-            body { padding: 28px; }
-            .container { max-width: 1000px; margin: 0 auto; }
-            .tab-buttons { justify-content:flex-start; }
+            .chart-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <main class="container">
         <h1>자유낙하 및 2차원 운동 분석</h1>
-        <p>물체의 중심을 직접 선택하거나, 모바일 확대 선택을 사용해 더 정확하게 측정하세요.</p>
+        <p class="note">스마트폰 영상에서 물체의 중심을 직접 골라 다중섬광사진을 만들고, 위치–시간 그래프로 운동을 분석합니다.</p>
 
-        <div class="tabs">
-            <div class="tab-buttons">
-                <button class="tab-btn active" data-tab="free-fall">자유낙하</button>
-                <button class="tab-btn" data-tab="projectile">2차원 운동</button>
+        <nav class="steps" role="tablist" aria-label="실험 단계">
+            <button role="tab" data-step="purpose"><b>1</b><span>목적</span></button>
+            <button role="tab" data-step="theory"><b>2</b><span>이론</span></button>
+            <button role="tab" data-step="materials"><b>3</b><span>준비물</span></button>
+            <button role="tab" data-step="procedure"><b>4</b><span>과정</span></button>
+            <button role="tab" data-step="data"><b>5</b><span>데이터</span></button>
+            <button role="tab" data-step="result"><b>6</b><span>결과</span></button>
+            <button role="tab" data-step="conclusion"><b>7</b><span>결론</span></button>
+        </nav>
+
+        <!-- ===== 1. 목적 ===== -->
+        <section class="step-panel" data-step="purpose" role="tabpanel">
+            <h2>1. 목적</h2>
+            <p class="note">먼저 할 실험을 고르세요. 고른 실험은 이 브라우저에 기억됩니다.</p>
+            <nav class="seg mode-switch" aria-label="실험 종류 고르기">
+                <a href="#" role="button" class="tab-btn" data-tab="free-fall" aria-current="page">자유낙하<small>중력가속도 g 구하기</small></a>
+                <a href="#" role="button" class="tab-btn" data-tab="projectile">2차원 운동<small>수평으로 던진 물체</small></a>
+            </nav>
+            <div data-mode="free-fall">
+                <p>떨어지는 공을 스마트폰으로 찍고, 같은 시간 간격마다 공의 위치를 재어 <b>위치–시간 그래프</b>를 그린다. 그래프를 2차 함수로 맞추어 <b>중력가속도 g</b> 를 구하고, 알려진 값(약 9.8 m/s²)과 비교한다.</p>
             </div>
-        </div>
-
-        <!-- 단계 1: 영상 로드 -->
-        <div class="controls">
-            <input type="file" id="video-upload" accept="video/*">
-            <div class="control-group">
-                <label for="fps-input">영상 FPS:</label>
-                <input type="number" id="fps-input" value="30" min="1" max="240">
+            <div data-mode="projectile" hidden>
+                <p>수평으로 던진(또는 굴러 떨어진) 공의 운동을 찍어, 공의 위치를 <b>수평(x)</b>과 <b>수직(y)</b> 두 방향으로 나누어 분석한다. 수평 방향은 <b>속도가 일정한 운동(등속 운동)</b>, 수직 방향은 <b>가속도가 일정한 운동(등가속도 운동, 자유낙하와 같음)</b>임을 확인한다.</p>
             </div>
-            <button id="btn-extract">영상 로드 및 추출</button>
-            <button id="btn-reset">🔄 초기화</button>
-        </div>
+            <div class="step-next"><button data-go="theory">다음: 2. 이론 →</button></div>
+        </section>
 
-        <div id="status-msg">1단계: 동영상 파일을 선택하고 '영상 로드 및 추출'을 누르세요.</div>
-        <div id="loading-overlay">영상을 추출하고 있습니다... <span id="progress-text"></span></div>
+        <!-- ===== 2. 이론 ===== -->
+        <section class="step-panel" data-step="theory" role="tabpanel" hidden>
+            <h2>2. 이론</h2>
+            <h3>자유낙하</h3>
+            <p>공기 저항을 무시하면 떨어지는 물체는 중력만 받아 일정한 가속도 g 로 빨라진다. 처음 속도가 0 이면 떨어진 거리 y 는</p>
+            <p class="formula">y = ½ g t²</p>
+            <p>이다. 기록을 시작한 순간 이미 움직이고 있었다면 y = y₀ + v₀t + ½gt² 이 되므로, 측정값을 <b>2차 함수 y = a + bt + ct²</b> 로 맞추고 <b>g = 2c</b> 로 구한다. 같은 시간 간격 Δt 마다 움직인 거리는 g·Δt² 씩 일정하게 늘어난다.</p>
 
-        <!-- 단계 2: 프레임 네비게이션 및 물체 선택 -->
-        <div class="slider-controls" id="track-controls" style="display:none;">
-            <div class="control-group">
-                <label for="step-slider">다중섬광 프레임 간격:</label>
-                <input type="range" id="step-slider" min="1" max="15" value="2">
-                <span id="step-val">2</span>
+            <h3>다중섬광사진</h3>
+            <p>어두운 곳에서 일정한 시간 간격으로 섬광(플래시)을 터뜨리며 한 장에 여러 번 찍으면, 움직이는 물체의 위치가 한 사진에 여러 개 찍힌다. 이 페이지에서는 영상의 프레임(1 초에 FPS 장)을 겹쳐 같은 사진을 만든다.</p>
+            <ul>
+                <li>프레임 사이 시간: Δt = 1 ÷ FPS (30 fps 이면 약 0.033 초). '다중섬광 프레임 간격'을 k 로 하면 사진 속 공 사이 시간은 k ÷ FPS 이다.</li>
+                <li>합성할 때 각 자리에서 <b>더 어두운 색</b>을 남기므로, <b>밝은 배경 앞의 어두운 공</b>이 잘 보인다.</li>
+                <li>화면의 길이(픽셀)를 실제 길이로 바꾸려면 기준 길이가 필요하다: 실제 길이(mm) = 픽셀 수 × (mm/px).</li>
+            </ul>
+
+            <h3>포물선 운동의 분해</h3>
+            <p>수평으로 던진 공은 수평 방향으로는 힘을 받지 않고(공기 저항 무시), 수직 방향으로는 중력만 받는다. 두 방향의 운동은 서로 영향을 주지 않으므로 따로 볼 수 있다.</p>
+            <p class="formula">수평: x = vₓ t  (속도 일정 → x–t 그래프는 직선)<br>수직: y = v_y0 t − ½ g t²  (위쪽 +, y–t 그래프는 포물선)</p>
+            <p>두 식에서 t 를 없애면 궤적 y–x 도 포물선이 된다.</p>
+            <div class="step-next"><button class="prev" data-go="purpose">← 1. 목적</button><button data-go="materials">다음: 3. 준비물 →</button></div>
+        </section>
+
+        <!-- ===== 3. 준비물 ===== -->
+        <section class="step-panel" data-step="materials" role="tabpanel" hidden>
+            <h2>3. 준비물</h2>
+            <table class="simple">
+                <thead><tr><th>준비물</th><th>설명</th></tr></thead>
+                <tbody>
+                    <tr><td>스마트폰</td><td>일반 영상(30·60 fps) 또는 고속 영상(120·240 fps). 프레임이 많을수록 점을 많이 찍을 수 있다.</td></tr>
+                    <tr><td>삼각대(휴대폰 거치대)</td><td>촬영하는 동안 화면이 흔들리지 않게 고정</td></tr>
+                    <tr><td>공</td><td>배경보다 어두운 색의 작은 공(탁구공·고무공 등)</td></tr>
+                    <tr><td>자(1 m 자 또는 줄자)</td><td>화면 속 길이를 실제 길이로 바꾸는 기준. 공이 움직이는 면과 같은 거리에 세운다.</td></tr>
+                    <tr><td>밝은 배경</td><td>흰 벽·흰 종이·전지 등. 그림자가 적고 밝을수록 좋다.</td></tr>
+                    <tr data-mode="projectile" hidden><td>책상·경사면</td><td>공을 수평으로 굴려 떨어뜨릴 곳</td></tr>
+                    <tr><td>PC 또는 스마트폰 브라우저</td><td>영상을 올려 분석 (영상 파일은 기기 밖으로 보내지 않음)</td></tr>
+                </tbody>
+            </table>
+            <div class="box warn">재생할 때 느리게 보이는 '슬로 모션' 영상은 파일 속 시간이 늘어나 있어 g 가 맞지 않게 나온다. 실제 속도로 재생되는 영상을 쓴다.</div>
+            <div class="step-next"><button class="prev" data-go="theory">← 2. 이론</button><button data-go="procedure">다음: 4. 과정 →</button></div>
+        </section>
+
+        <!-- ===== 4. 과정 ===== -->
+        <section class="step-panel" data-step="procedure" role="tabpanel" hidden>
+            <h2>4. 과정</h2>
+            <h3>① 촬영하기</h3>
+            <ol>
+                <li>휴대폰을 삼각대에 고정하고, 화면이 운동하는 면과 나란하도록(정면에서) 놓는다.</li>
+                <li>자를 공이 움직일 자리와 같은 거리에 세워 화면에 함께 찍히게 한다.</li>
+                <li data-mode="free-fall">공을 가만히 놓아 떨어뜨리고, 공이 화면 위에서 아래까지 지나가도록 찍는다.</li>
+                <li data-mode="projectile" hidden>공을 책상 끝에서 수평으로 굴려 떨어뜨리고, 떨어지는 포물선 전체가 화면에 들어오게 찍는다.</li>
+                <li>영상은 짧게(몇 초) 자른다. 이 페이지는 처음부터 최대 150 프레임까지만 꺼낸다.</li>
+            </ol>
+            <h3>② 영상 올리기</h3>
+            <ol>
+                <li>5. 데이터 단계에서 동영상 파일을 고르고, 찍은 영상의 FPS(1 초에 찍힌 장 수)를 넣는다.</li>
+                <li>'영상 로드 및 추출'을 누르고 프레임을 다 꺼낼 때까지 기다린다.</li>
+            </ol>
+            <h3>③ 기준 길이 정하기</h3>
+            <ol>
+                <li>'자 실제 길이'에 화면 속 자의 길이(mm)를 넣는다.</li>
+                <li>'📏 기준 길이 재기'를 누르고 화면에서 자의 양 끝을 차례로 누르면 mm/px 값이 자동으로 들어간다. (직접 숫자로 넣어도 된다.)</li>
+            </ol>
+            <h3>④ 점 찍기</h3>
+            <ol>
+                <li>'수동 선택 시작'을 누르고 프레임마다 물체 중심을 누른다. 누르면 다음 프레임으로 넘어간다.</li>
+                <li>모바일에서는 길게 눌러 확대 화면을 보며 손가락을 움직인 뒤 떼면 그 자리가 선택된다. 화면을 좌우로 밀면 프레임을 넘긴다.</li>
+                <li>잘못 찍었으면 '↩️ 취소'(마지막 점) 또는 '🗑️ 초기화'(모든 점)를 누른다. 같은 프레임을 다시 누르면 그 점을 바꾼다.</li>
+                <li>점을 다 찍으면 '✓ 합성 실행'을 눌러 다중섬광사진을 만들고, 6. 결과에서 그래프와 맞춤 결과를 본다. 'CSV 다운로드'로 측정값을 받을 수 있다.</li>
+            </ol>
+            <div class="step-next"><button class="prev" data-go="materials">← 3. 준비물</button><button data-go="data">다음: 5. 데이터 →</button></div>
+        </section>
+
+        <!-- ===== 5. 데이터 ===== -->
+        <section class="step-panel" data-step="data" role="tabpanel" hidden>
+            <h2>5. 데이터 <small class="note" id="data-mode-label">(자유낙하)</small></h2>
+
+            <!-- 영상 로드 -->
+            <div class="controls">
+                <input type="file" id="video-upload" accept="video/*">
+                <div class="control-group">
+                    <label for="fps-input">영상 FPS:</label>
+                    <input type="number" id="fps-input" value="30" min="1" max="240">
+                </div>
+                <button id="btn-extract">영상 로드 및 추출</button>
+                <button id="btn-reset">🔄 초기화</button>
             </div>
-            <div class="control-group">
-                <label for="pixel-to-mm">픽셀→실제 길이:</label>
-                <input type="number" id="pixel-to-mm" value="1" step="0.01" min="0.01">
-                <span>mm/px</span>
+
+            <div id="status-msg">1단계: 동영상 파일을 선택하고 '영상 로드 및 추출'을 누르세요.</div>
+            <div id="loading-overlay">영상을 추출하고 있습니다... <span id="progress-text"></span></div>
+
+            <!-- 프레임 간격·기준 길이·물체 선택 -->
+            <div class="slider-controls" id="track-controls" style="display:none;">
+                <div class="control-group">
+                    <label for="step-slider">다중섬광 프레임 간격:</label>
+                    <input type="range" id="step-slider" min="1" max="15" value="2">
+                    <span id="step-val">2</span>
+                </div>
+                <div class="control-group">
+                    <label for="ref-length-mm">자 실제 길이:</label>
+                    <input type="number" id="ref-length-mm" value="1000" step="1" min="1">
+                    <span>mm</span>
+                    <button id="btn-calibrate" type="button">📏 기준 길이 재기</button>
+                </div>
+                <div class="control-group">
+                    <label for="pixel-to-mm">픽셀→실제 길이:</label>
+                    <input type="number" id="pixel-to-mm" value="1" step="0.01" min="0.01">
+                    <span>mm/px</span>
+                </div>
+                <div id="calib-info">기준 길이를 재지 않으면 1 px = 1 mm 로 계산합니다.</div>
+                <button id="btn-manual-track">수동 선택 시작</button>
+                <button id="btn-strobo" style="background-color: var(--c-success);">✓ 합성 실행</button>
+                <button id="btn-csv" style="display:none; background-color: var(--c-success);">📊 CSV 다운로드</button>
             </div>
-            <button id="btn-manual-track">수동 선택 시작</button>
-            <button id="btn-strobo" style="background-color: #28a745;">✓ 합성 실행</button>
-            <button id="btn-csv" style="display:none; background-color: #28a745;">📊 CSV 다운로드</button>
-        </div>
 
-        <div id="tracking-info">선택된 점: <span id="selected-count">0</span>개</div>
-        <div class="notice">※ 캔버스 위의 물체 중심을 클릭하여 선택하세요. 모바일에서는 길게 눌러 확대 선택이 가능합니다.</div>
+            <div id="tracking-info">선택된 점: <span id="selected-count">0</span>개</div>
+            <div class="notice">※ 캔버스 위의 물체 중심을 클릭하여 선택하세요. 모바일에서는 길게 눌러 확대 선택이 가능합니다.</div>
 
-        <!-- 비디오 및 캔버스 -->
-        <div id="video-container">
-            <video id="video" playsinline preload="auto"></video>
-            <canvas id="canvas" width="640" height="480"></canvas>
-            <div class="zoom-overlay" id="zoom-overlay" style="display:none;">
-                <canvas id="zoom-canvas" width="220" height="220"></canvas>
+            <!-- 비디오 및 캔버스 -->
+            <div id="video-container">
+                <video id="video" playsinline preload="auto"></video>
+                <canvas id="canvas" width="640" height="480"></canvas>
+                <div class="zoom-overlay" id="zoom-overlay" style="display:none;">
+                    <canvas id="zoom-canvas" width="220" height="220"></canvas>
+                </div>
             </div>
-        </div>
 
-        <!-- 프레임 네비게이션 (canvas 바로 아래) -->
-        <div class="frame-nav" id="frame-nav-controls" style="display:none;">
-            <button id="btn-prev-frame">⬅️ 이전</button>
-            <div>
-                <label for="frame-input">프레임:</label>
-                <input type="number" id="frame-input" value="1" min="1">
-            </div>
-            <span id="frame-total">/ 0</span>
-            <button id="btn-next-frame">다음 ➡️</button>
-            <button id="btn-undo-point">↩️ 취소</button>
-            <button id="btn-clear-points">🗑️ 초기화</button>
-        </div>
-
-        <!-- 합성된 다중섬광사진 -->
-        <div id="strobo-container">
-            <h2>합성된 다중섬광사진</h2>
-            <canvas id="canvas-strobo"></canvas><br>
-            <button id="btn-download-strobo" style="margin-top: 10px; background-color: #17a2b8;">🖼️ 사진 다운로드</button>
-        </div>
-
-        <!-- 자유낙하/2차원 운동 그래프 -->
-        <div class="chart-container" id="chart-wrapper">
-            <h2 id="chart-title">자유낙하 t-y 그래프</h2>
-            <canvas id="chart"></canvas>
-        </div>
-
-        <!-- 2차원 운동 3개 그래프 -->
-        <div class="chart-container" id="projectile-charts" style="display:none;">
-            <h2>2차원 운동 분석</h2>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
+            <!-- 프레임 네비게이션 (canvas 바로 아래) -->
+            <div class="frame-nav" id="frame-nav-controls" style="display:none;">
+                <button id="btn-prev-frame">⬅️ 이전</button>
                 <div>
-                    <h3>X-t 그래프</h3>
-                    <canvas id="chart-x-t"></canvas>
+                    <label for="frame-input">프레임:</label>
+                    <input type="number" id="frame-input" value="1" min="1">
+                </div>
+                <span id="frame-total">/ 0</span>
+                <button id="btn-next-frame">다음 ➡️</button>
+                <button id="btn-undo-point">↩️ 취소</button>
+                <button id="btn-clear-points">🗑️ 초기화</button>
+            </div>
+
+            <!-- 측정값 표 -->
+            <h3>측정값 표</h3>
+            <p class="note" id="table-note">t 는 첫 프레임부터 지난 시간, x·y 는 화면 왼쪽 위를 원점으로 한 위치(아래가 +)입니다.</p>
+            <div class="table-wrap">
+                <table class="simple" id="data-table">
+                    <thead><tr><th>번호</th><th>t (s)</th><th>x (mm)</th><th>y (mm)</th></tr></thead>
+                    <tbody id="data-table-body"><tr><td colspan="4" style="text-align:center">아직 찍은 점이 없습니다.</td></tr></tbody>
+                </table>
+            </div>
+
+            <!-- 합성된 다중섬광사진 -->
+            <div id="strobo-container">
+                <h2>합성된 다중섬광사진</h2>
+                <canvas id="canvas-strobo"></canvas>
+                <button id="btn-download-strobo" style="background-color: var(--c-info);">🖼️ 사진 다운로드</button>
+                <button id="btn-go-result" data-go="result">📈 6. 결과에서 그래프 보기 →</button>
+            </div>
+
+            <div class="step-next"><button class="prev" data-go="procedure">← 4. 과정</button><button data-go="result">다음: 6. 결과 →</button></div>
+        </section>
+
+        <!-- ===== 6. 결과 ===== -->
+        <section class="step-panel" data-step="result" role="tabpanel" hidden>
+            <h2>6. 결과</h2>
+            <p class="box" id="result-empty">아직 결과가 없습니다. 5. 데이터에서 점을 찍고 '✓ 합성 실행'을 누르세요.</p>
+
+            <div id="fit-result" class="fit-result" hidden></div>
+            <p class="note" id="fit-note" hidden></p>
+
+            <!-- 자유낙하 그래프 -->
+            <div class="chart-container" id="chart-wrapper">
+                <h3 id="chart-title">자유낙하 t-y 그래프</h3>
+                <canvas id="chart"></canvas>
+            </div>
+
+            <!-- 2차원 운동 3개 그래프 -->
+            <div class="chart-container" id="projectile-charts" style="display:none;">
+                <h3>2차원 운동 분석</h3>
+                <div class="chart-grid">
+                    <div>
+                        <h3>X-t 그래프</h3>
+                        <canvas id="chart-x-t"></canvas>
+                    </div>
+                    <div>
+                        <h3>Y-t 그래프</h3>
+                        <canvas id="chart-y-t"></canvas>
+                    </div>
                 </div>
                 <div>
-                    <h3>Y-t 그래프</h3>
-                    <canvas id="chart-y-t"></canvas>
+                    <h3>Y-X 궤적 (궤적)</h3>
+                    <canvas id="chart-y-x"></canvas>
                 </div>
             </div>
-            <div>
-                <h3>Y-X 궤적 (궤적)</h3>
-                <canvas id="chart-y-x"></canvas>
-            </div>
-        </div>
-    </div>
+            <div class="step-next"><button class="prev" data-go="data">← 5. 데이터</button><button data-go="conclusion">다음: 7. 결론 →</button></div>
+        </section>
+
+        <!-- ===== 7. 결론 ===== -->
+        <section class="step-panel" data-step="conclusion" role="tabpanel" hidden>
+            <h2>7. 결론</h2>
+            <h3>분석 질문</h3>
+            <ol data-mode="free-fall">
+                <li>t–y 그래프는 직선인가, 포물선인가? 그 모양이 뜻하는 운동은 무엇인가?</li>
+                <li>2차 함수 맞춤으로 구한 g 는 얼마인가? 9.8 m/s² 와 비교한 상대 오차 (|측정값 − 9.8| ÷ 9.8 × 100 %)는?</li>
+                <li>다중섬광사진에서 공 사이 거리는 시간이 지날수록 어떻게 변하는가? 같은 시간 간격의 거리 차이가 일정한지 확인해 보자.</li>
+                <li>맞춤식의 1차 항 b(처음 속도)가 0 이 아니라면 그 까닭은 무엇인가?</li>
+                <li>무거운 공과 가벼운 공으로 해 보면 g 가 달라질까? 예상하고 확인해 보자.</li>
+            </ol>
+            <ol data-mode="projectile" hidden>
+                <li>x–t 그래프는 직선인가? 직선 맞춤의 기울기(수평 속도 vₓ)와 R² 로 '수평 방향은 등속 운동'임을 말할 수 있는가?</li>
+                <li>y–t 그래프를 2차 함수로 맞춘 g 는 얼마인가? 자유낙하에서 구한 값(또는 9.8 m/s²)과 비교해 보자.</li>
+                <li>다중섬광사진에서 공 사이의 수평 간격과 수직 간격은 각각 시간에 따라 어떻게 변하는가?</li>
+                <li>같은 높이에서 가만히 떨어뜨린 공과 수평으로 던진 공은 어느 것이 먼저 바닥에 닿을까? 그 까닭을 수직 방향 운동으로 설명해 보자.</li>
+                <li>Y-X 궤적이 포물선이 되는 까닭을 두 방향의 식으로 설명해 보자.</li>
+            </ol>
+            <h3>오차 원인 점검</h3>
+            <ul class="checklist">
+                <li>자를 공이 움직이는 면과 같은 거리에 두었는가? (거리가 다르면 원근 때문에 mm/px 가 달라진다)</li>
+                <li>휴대폰이 기울지 않고 운동 면을 정면으로 보았는가? 화면 가장자리의 렌즈 휘어짐은 없는가?</li>
+                <li>영상 FPS 칸의 값이 실제 촬영 FPS 와 같은가? 슬로 모션 영상은 아닌가?</li>
+                <li>공이 빨라져 번진(흐려진) 프레임에서 중심을 정확히 찍었는가?</li>
+                <li>점을 빠뜨린 프레임은 없는가? 같은 프레임에 두 번 찍지는 않았는가?</li>
+                <li>공기 저항이 큰 가벼운 공(풍선·종이공 등)을 쓰지는 않았는가?</li>
+                <li>삼각대가 흔들리거나 촬영 중 화면이 움직이지 않았는가?</li>
+            </ul>
+            <div class="step-next"><button class="prev" data-go="result">← 6. 결과</button><button data-go="purpose">처음으로: 1. 목적</button></div>
+        </section>
+    </main>
 
     <script src="../js/free-fall-manual.js" defer></script>
 </body>

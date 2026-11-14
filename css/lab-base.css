@@ -1,0 +1,189 @@
+/* ========================================
+   센서 기반 실험실 — 모든 페이지 공통 기본값 (UI 통일성)
+   각 페이지는 이 파일을 "가장 먼저" 불러오고, 자기 CSS 에서 필요한 것만 덧씌운다.
+   색·글꼴·간격은 아래 변수(var(--이름))로만 쓴다. 규칙은 AGENTS.md 의 "UI 규칙" 참고.
+   ======================================== */
+
+:root {
+    /* 색: 흰 글자를 올려도 읽기 기준(대비 4.5:1)을 넘는 진하기 */
+    --c-primary: #1565c0;        /* 주 버튼·링크·선택된 탭 */
+    --c-primary-dark: #0d47a1;   /* 주 색 위에 마우스를 올렸을 때 */
+    --c-primary-soft: #eef5ff;   /* 주 색의 옅은 바탕 (설명 상자·선택된 칸) */
+    --c-success: #1e7e34;        /* 측정 시작·기록·저장 */
+    --c-danger: #c62828;         /* 삭제·중지·경고 숫자 */
+    --c-info: #0e7490;           /* 내려받기(CSV) */
+    --c-secondary: #5f6b7a;      /* 보조 버튼 */
+    --c-text: #1f2933;
+    --c-muted: #5f6b7a;          /* 설명 글 */
+    --c-bg: #f4f6f8;             /* 페이지 바탕 */
+    --c-card: #fff;              /* 카드 바탕 */
+    --c-line: #e3e7ec;           /* 표·카드 테두리 */
+    --c-fill: #f1f3f5;           /* 결과 칸·계산 상자 바탕 */
+    --c-ok-bg: #e6f4ea;   --c-ok-text: #1e6b34;
+    --c-warn-bg: #fff3cd; --c-warn-text: #7a5b00;
+    --c-err-bg: #fdecea;  --c-err-text: #8a1c1c;
+
+    /* 글꼴: 한글 글꼴을 이름으로 적어 기기마다 모양이 비슷하게 */
+    --font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, Consolas, "D2Coding", monospace;
+
+    /* 글자 크기 단계: 14 / 16 / 18 / 22px */
+    --fs-sm: .875rem;
+    --fs-base: 1rem;
+    --fs-h2: 1.125rem;
+    --fs-h1: 1.375rem;
+    --fs-reading: clamp(1.8rem, 7vw, 2.6rem);   /* 센서 '지금 값' 큰 숫자 */
+
+    /* 간격(4의 배수)·모서리·그림자 */
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px;
+    --r-ctl: 6px;      /* 버튼·입력칸 */
+    --r-card: 10px;    /* 카드 */
+    --shadow: 0 2px 6px rgba(0, 0, 0, .08);
+
+    /* 페이지 폭: 단계형 실험은 읽기 좋게, 한 화면형 센서 측정은 넓게 */
+    --w-step: 860px;
+    --w-dash: 1200px;
+    --chart-h: clamp(240px, 40vh, 420px);
+    --tap: 44px;       /* 손가락으로 누르기 좋은 최소 높이 */
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--c-text);
+    background: var(--c-bg);
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--c-primary); }
+a:hover { color: var(--c-primary-dark); }
+
+button, select, input, textarea { font-family: inherit; }
+/* 표 안의 작은 버튼(삭제 등)은 줄 높이를 지키려고 제외 */
+:where(button, select):not(td *, th *) { min-height: var(--tap); }
+button:disabled { cursor: not-allowed; }
+
+/* 키보드로 움직일 때 지금 어디에 있는지 잘 보이게 */
+:focus-visible { outline: 3px solid var(--c-primary); outline-offset: 2px; }
+
+/* 숫자가 바뀌어도 자리가 흔들리지 않게 (측정값·결과) */
+.num, td, .results b, .sensor-readout p { font-variant-numeric: tabular-nums; }
+
+/* 표 머리 줄의 제목과 버튼이 좁은 화면에서 서로 밀어내지 않게 */
+.table-header { flex-wrap: wrap; gap: var(--sp-2); }
+
+/* ---------- 고르기 단추 묶음 (예: 측정할 센서 고르기) ----------
+   <nav class="seg"><a href="…" aria-current="page">…</a><a href="…">…</a></nav> */
+.seg {
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--sp-1);
+    margin: var(--sp-3) 0 var(--sp-2); padding: var(--sp-1);
+    background: var(--c-fill); border-radius: var(--r-card);
+}
+.seg a {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    min-height: var(--tap); padding: var(--sp-1) var(--sp-2); border-radius: 8px;
+    color: var(--c-text); font-weight: 600; font-size: var(--fs-sm); text-decoration: none;
+}
+.seg a small { font-weight: 400; font-size: .75rem; color: var(--c-muted); }
+.seg a:hover { background: rgba(255, 255, 255, .6); color: var(--c-primary); }
+.seg a[aria-current="page"] { background: var(--c-card); color: var(--c-primary); box-shadow: var(--shadow); }
+.note { color: var(--c-muted); font-size: var(--fs-sm); }
+
+/* ---------- 단계형 실험: 보고서 순서 7단계 탭 (플랑크 상수 페이지 모양, js/lab-ui.js 의 LabUI.initSteps) ----------
+   <nav class="steps" role="tablist" aria-label="실험 단계">
+     <button role="tab" data-step="purpose"><b>1</b><span>목적</span></button> … 7개
+   </nav>
+   <section class="step-panel" data-step="purpose">…<div class="step-next"><button data-go="theory">다음: 2. 이론 →</button></div></section>
+   단계 이름(고정): 1 목적 · 2 이론 · 3 준비물 · 4 과정 · 5 데이터 · 6 결과 · 7 결론 */
+.steps {
+    position: sticky; top: 0; z-index: 10;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-1);
+    margin: 0 0 var(--sp-2); padding: 6px 0; background: var(--c-bg);
+}
+@media (min-width: 640px) { .steps { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+.steps button {
+    min-width: 0; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: var(--sp-1);
+    padding: 7px 2px; margin: 0; background: var(--c-card); color: var(--c-text);
+    border: 1px solid var(--c-line); border-radius: 8px; font-size: .82rem; font-weight: 500; cursor: pointer;
+}
+.steps button b {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 18px; height: 18px; border-radius: 50%; background: #e9ecef; color: var(--c-text); font-size: .75rem;
+}
+.steps button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 이미 본 단계는 번호 대신 ✓ */
+.steps button.done:not([aria-selected="true"]) b { background: var(--c-ok-bg); color: var(--c-ok-text); font-size: 0; }
+.steps button.done:not([aria-selected="true"]) b::before { content: "✓"; font-size: .75rem; }
+.steps button[aria-selected="true"] { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+.steps button[aria-selected="true"] b { background: #fff; color: var(--c-primary); }
+.step-next { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-2); margin-top: var(--sp-4); }
+.step-next [data-go]:last-child { margin-left: auto; }
+
+/* ---------- 한 화면형 센서 측정 (실험 이름 없이 센서 값을 보는 페이지) ----------
+   위에서부터: 연결·상태 띠(.dash-bar, 위에 붙어 있음) → 큰 숫자(.dash-readouts) → 그래프(.dash-chart)
+   → 기록·회차·CSV(.dash-more 안의 <details>) → 펌웨어·준비 안내(<details>)
+   넓은 화면(900px 이상)에서는 숫자를 왼쪽 세로 줄, 그래프를 오른쪽에 두어 스크롤 없이 함께 보인다.
+   <main class="dash">
+     <div class="dash-bar"><span class="dash-status" role="status">연결 대기</span> 단추들…</div>
+     <div class="dash-grid">
+       <div class="dash-readouts"><div class="dash-card"><span class="label">온도</span><span class="value num">--</span><span class="unit">°C</span></div>…</div>
+       <div class="dash-chart"><canvas></canvas></div>
+     </div>
+     <div class="dash-more"><details>…</details></div>
+   </main> */
+.dash { max-width: var(--w-dash); margin: 0 auto; }
+.dash h1 { font-size: var(--fs-h1); margin: var(--sp-2) 0; }
+.dash-bar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+    margin: var(--sp-2) 0 var(--sp-3); padding: var(--sp-2) var(--sp-3);
+    background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); box-shadow: var(--shadow);
+}
+/* 휴대폰: 단추가 여러 줄로 감겨 띠가 높아지므로 위에 붙이지 않는다 (숫자·그래프 자리를 지킴) */
+@media (max-width: 639px) { .dash-bar { position: static; } }
+.dash-bar .dash-status { flex: 1 1 100%; font-weight: 600; font-size: var(--fs-sm); }
+@media (min-width: 640px) { .dash-bar .dash-status { flex-basis: 200px; } }
+.dash-bar button, .dash-bar select { flex: 0 0 auto; width: auto; }
+.dash-grid { display: grid; gap: var(--sp-3); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) { .dash-grid { grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr); } }
+.dash-readouts { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+@media (min-width: 900px) { .dash-readouts { grid-template-columns: minmax(0, 1fr); } }
+.dash-card {
+    display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--sp-1);
+    padding: var(--sp-2) var(--sp-3); background: var(--c-card);
+    border: 1px solid var(--c-line); border-radius: var(--r-card);
+}
+.dash-card .label { flex: 1 1 100%; color: var(--c-muted); font-size: var(--fs-sm); font-weight: 600; }
+.dash-card .value { font-size: var(--fs-reading); font-weight: 700; line-height: 1.15; color: var(--c-primary); font-variant-numeric: tabular-nums; }
+.dash-card .unit { color: var(--c-muted); font-size: var(--fs-sm); }
+.dash-chart {
+    position: relative; height: var(--chart-h); min-width: 0;
+    padding: var(--sp-2); background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card);
+}
+.dash-more { margin-top: var(--sp-3); }
+.dash details, .dash-more details {
+    margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3);
+    background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card);
+}
+.dash details > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+
+/* ---------- 크게 보기 (교실 프로젝터용, Alt+B 로 켜고 끔: js/lab-ui.js) ---------- */
+html.big-view body { zoom: 1.35; }
+
+.lab-toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    z-index: 9999; padding: 10px 16px; border-radius: 999px;
+    background: rgba(31, 41, 51, .92); color: #fff; font-size: var(--fs-sm); white-space: nowrap;
+    box-shadow: var(--shadow); pointer-events: none;
+    opacity: 0; transition: opacity .2s;
+}
+.lab-toast.show { opacity: 1; }
+
+@media print {
+    html.big-view body { zoom: 1; }
+    .lab-toast { display: none; }
+}

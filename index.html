@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/lab-base.css">
+    <script src="js/lab-ui.js"></script>
     <meta name="description" content="센서 기반 실험실 - 가속도, 환경, 조도, 자외선, VOC 측정">
     <title>센서 기반 실험실</title>
     <link rel="stylesheet" href="css/style.css">
@@ -35,11 +37,11 @@
             font-weight: bold;
         }
         .role-teacher {
-            background-color: #28a745;
+            background-color: var(--c-success);
             color: white;
         }
         .role-student {
-            background-color: #17a2b8;
+            background-color: var(--c-info);
             color: white;
         }
         .auth-btn {
@@ -59,11 +61,11 @@
             background-color: #357ae8;
         }
         .btn-logout {
-            background-color: #dc3545;
+            background-color: var(--c-danger);
             color: white;
         }
         .btn-logout:hover {
-            background-color: #c82333;
+            background-color: var(--c-danger);
         }
         .btn-mode {
             background-color: #6f42c1;
@@ -82,7 +84,7 @@
         }
         .records-section h3 {
             margin-top: 0;
-            color: #007BFF;
+            color: var(--c-primary);
         }
         .experiment-list {
             list-style: none;
@@ -113,7 +115,7 @@
         }
         .exp-details {
             font-size: 0.9em;
-            color: #6c757d;
+            color: var(--c-secondary);
             background: #f8f9fa;
             padding: 8px 12px;
             border-radius: 4px;
@@ -143,9 +145,7 @@
         <h2>프로젝트 목록</h2>
         <ul class="project-list">
             <li><a href="projects/accelerometer-lab.html">➡️ 가속도계 데이터 분석 (Thonny)</a></li>
-            <li><a href="projects/environment-lab.html">➡️ 환경 센서 실시간 모니터 (VOC Index 포함)</a></li>
-            <li><a href="projects/light-lab.html">➡️ 조도 센서 측정 (TSL2591)</a></li>
-            <li><a href="projects/uv-lab.html">➡️ 자외선 센서 측정 (LTR390)</a></li>
+            <li><a href="projects/environment-lab.html">➡️ 환경 센서 측정 (온도·습도·기압·VOC·조도·자외선)</a></li>
             <li><a href="projects/free-fall.html">➡️ 자유낙하 궤적 분석 (스마트폰 영상)</a></li>
             <li><a href="projects/phone-accelerometer.html">➡️ 스마트폰 가속도 센서 실험</a></li>
             <li><a href="projects/malus-law.html">➡️ 말루스 법칙 실험 (스마트폰 카메라)</a></li>
@@ -161,7 +161,7 @@
         <div id="customSection" style="display:none;">
             <h2>선생님이 만든 실험</h2>
             <ul class="project-list" id="customList"></ul>
-            <p id="customNotice" style="color:#6c757d;"></p>
+            <p id="customNotice" style="color:var(--c-secondary);"></p>
             <p id="customTeacherTools" style="display:none;">
                 <a class="auth-btn btn-mode" style="text-decoration:none; display:inline-block;" href="projects/custom-lab.html?edit=new">➕ 새 실험 만들기</a>
                 <a class="auth-btn btn-mode" style="text-decoration:none; display:inline-block;" href="projects/board-setup.html">🔢 센서 보드 번호 정하기</a>
@@ -362,7 +362,7 @@
             const expList = document.getElementById('experimentsList');
             if (!auth || !currentUser || !expList) return;
             expList.style.display = 'block';
-            expList.innerHTML = '<p style="color:#6c757d;">내 실험 기록을 불러오는 중...</p>';
+            expList.innerHTML = '<p style="color:var(--c-secondary);">내 실험 기록을 불러오는 중...</p>';
 
             try {
                 const snap = await db.collection('experiments')
@@ -370,14 +370,14 @@
                     .get();
 
                 if (snap.empty) {
-                    expList.innerHTML = '<p style="color:#6c757d;">아직 저장된 실험 기록이 없습니다. 실험 페이지에서 데이터를 저장해보세요!</p>';
+                    expList.innerHTML = '<p style="color:var(--c-secondary);">아직 저장된 실험 기록이 없습니다. 실험 페이지에서 데이터를 저장해보세요!</p>';
                     return;
                 }
 
                 renderExperiments(snap, false);
             } catch (e) {
                 console.error('Load experiments error:', e);
-                expList.innerHTML = '<p style="color:#dc3545;">실험 기록 불러오기 실패: ' + e.message + '</p>';
+                expList.innerHTML = '<p style="color:var(--c-danger);">실험 기록 불러오기 실패: ' + e.message + '</p>';
             }
         }
 
@@ -385,20 +385,20 @@
             const expList = document.getElementById('experimentsList');
             if (!auth || !currentUser || !expList) return;
             expList.style.display = 'block';
-            expList.innerHTML = '<p style="color:#6c757d;">전체 학생의 제출 데이터를 불러오는 중...</p>';
+            expList.innerHTML = '<p style="color:var(--c-secondary);">전체 학생의 제출 데이터를 불러오는 중...</p>';
 
             try {
                 const snap = await db.collection('experiments').get();
 
                 if (snap.empty) {
-                    expList.innerHTML = '<p style="color:#6c757d;">제출된 학생 실험 기록이 없습니다.</p>';
+                    expList.innerHTML = '<p style="color:var(--c-secondary);">제출된 학생 실험 기록이 없습니다.</p>';
                     return;
                 }
 
                 renderExperiments(snap, true);
             } catch (e) {
                 console.error('Teacher dashboard load error:', e);
-                expList.innerHTML = '<p style="color:#dc3545;">학생 기록 불러오기 실패: ' + e.message + '</p>';
+                expList.innerHTML = '<p style="color:var(--c-danger);">학생 기록 불러오기 실패: ' + e.message + '</p>';
             }
         }
 
@@ -432,10 +432,10 @@
                     <li class="experiment-item">
                         <div class="experiment-header">
                             <div>
-                                <strong style="font-size:1.05em; color:#007BFF;">${expName}</strong>
+                                <strong style="font-size:1.05em; color:var(--c-primary);">${expName}</strong>
                                 ${studentLabel}
                             </div>
-                            <span style="font-size:0.85em; color:#6c757d;">🕒 ${dateStr}</span>
+                            <span style="font-size:0.85em; color:var(--c-secondary);">🕒 ${dateStr}</span>
                         </div>
                         <div class="exp-details">
                             ${detailSummary}

@@ -1,5 +1,5 @@
 // 말루스 법칙 실험: 스마트폰 카메라(또는 촬영한 사진)로 각도별 밝기를 측정하고 분석한다.
-// 탭: 접해보기(malus-tutorial.js) → 측정하기 → 분석하기, 설정(자동화 켜고 끄기)
+// 보고서 순서 7단계(js/lab-ui.js 의 LabUI.initSteps): 1 목적 · 2 이론 · 3 준비물 · 4 과정(예측·계획·판단 기준은 malus-tutorial.js, 자동화 설정) · 5 데이터(측정) · 6 결과(분석) · 7 결론(결론·내보내기)
 (function () {
     'use strict';
     const M = window.MalusMath;
@@ -24,10 +24,11 @@
         frozenView: null,    // 끄는 동안 화면이 따라 움직이지 않도록 고정한 보기 영역
         refPos: null,        // 이번 회차 첫 측정 때 빛 번짐 위치 (카메라 움직임 감지용)
         run: 1,              // 현재 측정 회차
-        models: [],          // 분석하기에서 학생이 고른 비교 모델
+        models: [],          // 6. 결과에서 학생이 고른 비교 모델
         residModel: null,    // 잔차·정규화에 쓸 모델
         normView: 'both',    // 정규화 전/후 보기
-        tab: 'explore'
+        tab: 'purpose',      // 지금 보고 있는 단계 (LabUI.initSteps 가 정함)
+        oldTab: null         // 예전 4탭 화면에서 저장해 둔 탭 (한 번만 새 단계로 옮김)
     };
 
     // ---------- 설정 (자동화 켜고 끄기) ----------
@@ -74,7 +75,7 @@
                 ch: $('sel-channel').value, gamma: $('sel-gamma').value,
                 angle: $('angle').value, frames: $('frames').value,
                 zoom: state.zoom, refPos: state.refPos, run: state.run,
-                models: state.models, residModel: state.residModel, normView: state.normView, tab: state.tab
+                models: state.models, residModel: state.residModel, normView: state.normView
             }));
         } catch (e) { /* 저장소를 쓸 수 없어도 동작에는 영향 없음 */ }
     }
@@ -93,7 +94,7 @@
             if (Array.isArray(d.models)) state.models = d.models.filter(k => M.MODELS[k]);
             if (d.residModel && M.MODELS[d.residModel]) state.residModel = d.residModel;
             if (d.normView) state.normView = d.normView;
-            if (d.tab) state.tab = d.tab;
+            if (d.tab) state.oldTab = d.tab;
             // 이전 버전에서 저장된 점: 회차가 없으면 1회차, 자동 결측은 사유를 붙인다
             state.points.forEach(p => {
                 if (p.run == null) p.run = 1;
@@ -525,7 +526,7 @@
     // ---------- 화면 갱신 ----------
     function render() {
         renderMeasure();
-        if (state.tab === 'analyze') renderAnalysis();
+        if (state.tab === 'result' || state.tab === 'conclusion') renderAnalysis();
         refreshButtons();
     }
 
@@ -541,9 +542,7 @@
         const darkTxt = pl.plan.dark === 'none' ? '배경은 빼지 않음' : '배경을 재서 뺌';
         $('plan-banner').innerHTML = pl.started
             ? '📋 <b>내 계획</b>: 각도 ' + pl.angles.length + '개 × ' + pl.repeats + '번 · ' + darkTxt
-            : '📋 접해보기에서 계획을 세우지 않아 <b>기본 계획</b>(0°~180°, 15° 간격, 1번)으로 측정합니다. <button class="secondary" data-goto="explore">📘 계획 세우러 가기</button>';
-        const go = $('plan-banner').querySelector('[data-goto]');
-        if (go) go.onclick = () => showTab('explore');
+            : '📋 <b>4. 과정</b>에서 계획을 세우지 않아 <b>기본 계획</b>(0°~180°, 15° 간격, 1번)으로 측정합니다. <button class="secondary" data-go="procedure">📘 계획 세우러 가기</button>';
         $('dark-row').hidden = pl.plan.dark === 'none';
 
         const prog = M.planProgress(pl.angles, state.points, state.run);
@@ -887,17 +886,17 @@
     $('btn-copy-code').onclick = () => copyText($('gs-code').textContent, '코드 복사됨', $('gs-status'));
     $('btn-copy-report').onclick = () => copyText(reportText(), '복사됨 — 보고서나 과제 칸에 붙여넣으세요.', $('report-status'));
 
-    // ---------- 탭 ----------
-    function showTab(name) {
-        state.tab = name;
-        document.querySelectorAll('.tab').forEach(b => { const on = b.dataset.tab === name; b.classList.toggle('active', on); b.setAttribute('aria-selected', on); });
-        document.querySelectorAll('.tab-panel').forEach(p => { p.hidden = p.dataset.panel !== name; });
-        save();
-        if (name === 'explore' && T) T.redraw();
+    // ---------- 7단계 ----------
+    // 단계를 옮길 때: 과정이면 예측 그래프를 다시 그리고, 결과·결론이면 분석을 다시 그린다
+    function onStep(step) {
+        state.tab = step;
+        if (step === 'procedure' && T) T.redraw();
         render();
-        window.scrollTo(0, 0);
     }
-    document.querySelectorAll('.tab').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
+    // 예전 4탭 화면의 마지막 탭 → 새 단계 (새 단계 기록이 아직 없을 때 한 번만)
+    const OLD_TAB = { explore: 'procedure', measure: 'data', analyze: 'result', settings: 'procedure' };
+    let steps = null;
+    function showStep(step) { if (steps) steps.show(step, true); }
 
     // ---------- 설정 화면 ----------
     function renderSettings() {
@@ -965,10 +964,10 @@
         $(id).value = notes[key] || '';
         $(id).oninput = e => { notes[key] = e.target.value; saveNotes(); };
     });
-    // 블루투스 키보드·리모컨의 Enter/Space 로도 기록한다 (측정하기 탭에서만). 각도 칸에서는 Enter 로 기록한다.
+    // 블루투스 키보드·리모컨의 Enter/Space 로도 기록한다 (5. 데이터 단계에서만). 각도 칸에서는 Enter 로 기록한다.
     // 버튼·링크·다른 입력칸에 포커스가 있으면 그 요소의 원래 동작(삭제, 결측 등)을 그대로 둔다.
     document.addEventListener('keydown', e => {
-        if (state.tab !== 'measure') return;
+        if (state.tab !== 'data') return;
         if (e.key !== 'Enter' && e.key !== ' ') return;
         if (e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
         const t = e.target || {};
@@ -979,21 +978,27 @@
     });
     window.addEventListener('resize', render);
 
-    // 접해보기에서 "이 계획으로 측정 시작" → 측정하기 탭으로 이동, 첫 계획 각도로 맞춘다
+    // 4. 과정의 "이 계획으로 측정 시작" → 5. 데이터 단계로 이동, 첫 계획 각도로 맞춘다
     if (T) {
         T.onStart(() => {
             const pl = plan();
             const next = M.nextPlannedAngle(M.planProgress(pl.angles, state.points, state.run), pl.repeats, pl.angles[0]);
             $('angle').value = next != null ? next : pl.angles[0];
             $('rec-status').textContent = '계획대로 측정을 시작하세요. 먼저 카메라를 켜고 측정 영역을 맞춥니다.';
-            showTab('measure');
+            showStep('data');
         });
-        T.onChange(() => { if (state.tab !== 'explore') render(); });
+        T.onChange(() => { if (state.tab !== 'procedure') render(); });
     }
 
     load();
     setZoom(state.zoom);
     renderSettings();
-    showTab(state.tab);
+    let hasStepRecord = false;
+    try { hasStepRecord = localStorage.getItem('lab-steps:malus-law') != null; } catch (e) { /* 무시 */ }
+    steps = window.LabUI && LabUI.initSteps({
+        key: 'malus-law',
+        start: !hasStepRecord && OLD_TAB[state.oldTab] && !location.hash ? OLD_TAB[state.oldTab] : undefined,
+        onShow: onStep
+    });
     requestAnimationFrame(frame);
 })();

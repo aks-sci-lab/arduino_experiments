@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     'use strict';
     const mode = document.body.dataset.sensor;
+    if (mode === 'environment') return; // 합친 환경 페이지의 온도·습도·기압·VOC 화면
     const config = SensorDefinitions.definitions[mode];
     if (!config) throw new Error('지원하지 않는 센서 페이지입니다.');
     const displayFields = config.fields.filter(([key]) => key === config.key);

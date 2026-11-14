@@ -8,7 +8,7 @@ const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 test('메인 화면에 복구한 센서 링크와 말루스 링크를 함께 유지한다', () => {
     const html = read('index.html');
     for (const page of [
-        'accelerometer-lab', 'environment-lab', 'light-lab', 'uv-lab',
+        'accelerometer-lab', 'environment-lab',
         'free-fall', 'phone-accelerometer', 'malus-law'
     ]) {
         assert.ok(html.includes(`href="projects/${page}.html"`), page);

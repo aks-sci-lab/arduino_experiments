@@ -4,9 +4,9 @@
 
 가속도 실험 페이지: https://aks-sci-lab.web.app/projects/accelerometer-lab.html
 
-조도: https://aks-sci-lab.web.app/projects/light-lab.html
+조도: https://aks-sci-lab.web.app/projects/environment-lab.html?sensor=light (환경 실험 페이지에서 '조도'를 골라도 됨)
 
-자외선: https://aks-sci-lab.web.app/projects/uv-lab.html
+자외선: https://aks-sci-lab.web.app/projects/environment-lab.html?sensor=uv (예전 주소 light-lab.html·uv-lab.html 은 이 주소로 넘어감)
 
 VOC Index는 환경 실험 페이지에 포함됩니다. 이전 VOC 회차 보관: https://aks-sci-lab.web.app/projects/voc-lab.html?legacy=1
 

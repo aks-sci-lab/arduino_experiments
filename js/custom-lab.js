@@ -215,7 +215,14 @@
         document.title = def.title + ' | 센서 기반 실험실';
         $('title').textContent = def.title;
         $('description').textContent = def.description;
-        $('descCard').hidden = !def.description.trim();
+        const useSteps = def.layout === 'steps' && !view.readOnly;   // 제출 내용 보기는 늘 한 화면
+        $('descHeading').textContent = useSteps ? '🎯 목적 · 실험 안내' : '📖 실험 안내';
+        $('descCard').hidden = !useSteps && !def.description.trim();
+        M.STEP_TEXTS.forEach(k => {
+            const text = def.stepTexts[k] || '';
+            $(k + 'Text').textContent = text;
+            $(k + 'Card').hidden = !useSteps && !text.trim();
+        });
         sensor.fields = M.sensorFields(def.sensor);
         if (sensor.fields.length) sensor.rate = M.SENSORS[def.sensor.mode].rates[0][0];
         if (!view.readOnly) {
@@ -240,6 +247,45 @@
         loaded = true;
         refreshGraph();
         setupSensor();
+        if (useSteps) arrangeSteps();
+    }
+
+    // ---------- 7단계 화면: 카드를 보고서 순서의 단계로 나눠 담는다 (카드·id 는 그대로) ----------
+    const STEP_CARDS = {
+        purpose: ['descCard', 'studentCard'],
+        theory: ['theoryCard'],
+        materials: ['materialsCard'],
+        procedure: ['procedureCard'],
+        data: ['sensorCard', 'tableCard'],
+        result: ['graphCard'],
+        conclusion: ['questionCard', 'submitCard']
+    };
+    const STEP_NAMES = { purpose: '1. 목적', theory: '2. 이론', materials: '3. 준비물', procedure: '4. 과정', data: '5. 데이터', result: '6. 결과', conclusion: '7. 결론' };
+    let stepsArranged = false;
+    function arrangeSteps() {
+        if (stepsArranged) return;
+        stepsArranged = true;
+        const order = Object.keys(STEP_CARDS);
+        const anchor = $('teacherLinks');
+        const note = text => el('div', { className: 'card' }, [el('p', { className: 'step-empty', textContent: text })]);
+        order.forEach((step, i) => {
+            const panel = el('section', { className: 'step-panel' });
+            panel.dataset.step = step;
+            // 칸을 먼저 페이지에 붙여야 옮긴 카드를 $(id) 로 다시 찾을 수 있다
+            anchor.parentNode.insertBefore(panel, anchor);
+            STEP_CARDS[step].forEach(id => panel.appendChild($(id)));
+            if (M.STEP_TEXTS.includes(step) && !(view.def.stepTexts[step] || '').trim()) {
+                $(step + 'Text').replaceChildren(el('p', { className: 'step-empty', textContent: '선생님이 이 단계에 따로 적은 내용이 없습니다. 다음 단계로 넘어가세요.' }));
+            }
+            if (step === 'result' && $('graphCard').hidden) panel.appendChild(note('이 실험에는 그래프가 없습니다. 5. 데이터의 표를 보고 7. 결론으로 넘어가세요.'));
+            if (step === 'conclusion' && $('questionCard').hidden) panel.insertBefore(note('측정한 결과로 알게 된 점을 정리한 뒤 제출하세요.'), panel.firstChild);
+            const nav = el('div', { className: 'step-next no-print' });
+            if (i > 0) { const b = el('button', { textContent: '← 이전' }); b.dataset.go = order[i - 1]; nav.appendChild(b); }
+            if (i < order.length - 1) { const b = el('button', { className: 'primary', textContent: '다음: ' + STEP_NAMES[order[i + 1]] + ' →' }); b.dataset.go = order[i + 1]; nav.appendChild(b); }
+            panel.appendChild(nav);
+        });
+        $('stepNav').hidden = false;
+        LabUI.initSteps({ key: 'custom-lab:' + expId, onShow: step => { if (step === 'result') refreshGraph(); } });
     }
 
     // ---------- 센서 (실험 설정에서 센서 기능을 고른 경우) ----------
@@ -659,7 +705,7 @@
                 // 제출 시점의 실험 설정과 값을 그대로 담아, 나중에 실험을 고치거나 지워도 제출 내용을 볼 수 있게 한다
                 customJson: JSON.stringify({
                     v: 1,
-                    def: { title: d.title, description: d.description, columns: d.columns, questions: d.questions, xCol: d.xCol, yCol: d.yCol, fit: d.fit, sensor: d.sensor },
+                    def: { title: d.title, description: d.description, columns: d.columns, questions: d.questions, xCol: d.xCol, yCol: d.yCol, fit: d.fit, sensor: d.sensor, layout: d.layout, stepTexts: d.stepTexts },
                     series: sensor.series.t.length ? thin.series : undefined,
                     seriesThinned: thin.thinned ? sensor.series.t.length : undefined,
                     rows: view.rows.filter(r => r.some(c => String(c).trim() !== '')),
@@ -796,6 +842,11 @@
     function fillEditor(def) {
         $('edTitle').value = def.title;
         $('edDesc').value = def.description;
+        document.querySelectorAll('input[name=edLayout]').forEach(r => { r.checked = r.value === def.layout; });
+        $('edTheory').value = def.stepTexts.theory;
+        $('edMaterials').value = def.stepTexts.materials;
+        $('edProcedure').value = def.stepTexts.procedure;
+        renderEdLayout();
         ed.columns = def.columns.map(c => ({ name: c.name, unit: c.unit }));
         ed.questions = def.questions.slice();
         renderEdColumns();
@@ -813,13 +864,27 @@
             columns: ed.columns, questions: ed.questions,
             xCol: +$('edX').value || 0, yCol: +$('edY').value || 0,
             fit: $('edFit').value, published: $('edPublished').checked,
-            sensor: { mode: $('edSensorMode').value, fields: ed.sensorFields }
+            sensor: { mode: $('edSensorMode').value, fields: ed.sensorFields },
+            layout: edLayout(),
+            stepTexts: { theory: $('edTheory').value, materials: $('edMaterials').value, procedure: $('edProcedure').value }
         };
+    }
+    function edLayout() {
+        const r = document.querySelector('input[name=edLayout]:checked');
+        return r ? r.value : 'single';
+    }
+    function renderEdLayout() {
+        const steps = edLayout() === 'steps';
+        $('edStepTexts').hidden = !steps;
+        $('edDescLabel').textContent = steps
+            ? '실험 안내 = 1. 목적 (실험 목표와 하는 일, 줄바꿈 그대로 보임)'
+            : '실험 안내 (목표·준비물·과정 등, 줄바꿈 그대로 보임)';
     }
     let editorBound = false;
     function bindEditor() {
         if (editorBound) return;
         editorBound = true;
+        document.querySelectorAll('input[name=edLayout]').forEach(r => r.addEventListener('change', renderEdLayout));
         const modeSel = $('edSensorMode');
         modeSel.appendChild(el('option', { value: 'none', textContent: '사용 안 함' }));
         Object.keys(M.SENSORS).forEach(k => modeSel.appendChild(el('option', { value: k, textContent: M.SENSORS[k].label })));
