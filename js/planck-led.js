@@ -2,6 +2,7 @@
 (function () {
     'use strict';
     const P = window.PlanckMath;
+    const PCL = window.PlanckCloud;         // 조 공유 (보내기·불러오기·CSV 불러오기)
     const $ = id => document.getElementById(id);
     const STORE_KEY = 'planck-led-v1';
 
@@ -19,8 +20,17 @@
         ivY: 'auto', ivYmin: '', ivYmax: '', // I–V 그래프 세로축: 'auto' | 'manual' | 'log'
         bat: '4.5', iMax: '10', // bat: 건전지 전압 (V, 사용자가 자유롭게 입력)
         tab: 'purpose',        // 보고 있는 탭
-        draft: { v: '', i: '', vr: '', gv: '' } // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
+        draft: { v: '', i: '', vr: '', gv: '' }, // 기록 버튼을 누르기 전 입력 칸 값 (새로고침해도 남도록)
+        // 조 공유: 조 코드, 이 노트북 번호, 자동 불러오기, 이미 보낸 줄 id
+        share: { group: '', ban: '', jo: '', device: '', auto: true, sent: [] }
     };
+    function fixShare() {
+        const sh = Object.assign({ group: '', ban: '', jo: '', device: '', auto: true, sent: [] }, state.share);
+        if (!/^[A-Za-z0-9_-]{4,20}$/.test(sh.device)) sh.device = PCL.newDeviceId();
+        if (!Array.isArray(sh.sent)) sh.sent = [];
+        sh.auto = sh.auto !== false;
+        state.share = sh;
+    }
 
     function defaultLeds() {
         return P.LED_PRESETS.map(p => ({ id: p.key, key: p.key, name: p.name, lambda: p.lambda, on: p.on, fit: true, iv: [], glow: [] }));
@@ -52,10 +62,14 @@
             if (state.manualIMode !== 'meter') state.manualIMode = 'resistor';
             if (state.vrUnit !== 'mV') state.vrUnit = 'V';
             if (state.rMeas == null) state.rMeas = '';
-            state.leds.forEach(l => { l.iv = Array.isArray(l.iv) ? l.iv : []; l.glow = Array.isArray(l.glow) ? l.glow : []; if (l.fit == null) l.fit = true; });
+            state.leds.forEach(l => {
+                l.iv = Array.isArray(l.iv) ? l.iv : []; l.glow = Array.isArray(l.glow) ? l.glow : []; if (l.fit == null) l.fit = true;
+                if (!l.ext || typeof l.ext !== 'object') l.ext = {};
+            });
         } else {
             state.leds = defaultLeds();
         }
+        fixShare();
     }
 
     // ---------- 도우미 ----------
@@ -65,7 +79,9 @@
     const usedLeds = () => state.leds.filter(l => l.on);
     const current = () => state.leds.find(l => l.id === state.sel) || null;
     const methodKey = m => (m || state.method) === 'glow' ? 'glow' : state.curMode;
-    const thr = (led, m) => P.thresholdOf(led, methodKey(m), { iMin: state.iMin, iRef: state.iRef });
+    // 다른 노트북·CSV 에서 불러온 값(led.ext)까지 합친 LED 로 계산한다
+    const view = led => PCL.merged(led);
+    const thr = (led, m) => P.thresholdOf(view(led), methodKey(m), { iMin: state.iMin, iRef: state.iRef });
     const color = led => P.wavelengthColor(led.lambda);
     const methodName = m => m === 'glow' ? '빛 기준' : (state.curMode === 'current' ? '전류 기준(기준 전류)' : '전류 기준');
 
@@ -187,14 +203,14 @@
         if (!e.target.dataset.del) return;
         const tr = e.target.closest('tr');
         const led = state.leds.find(l => l.id === tr.dataset.id); if (!led) return;
-        const n = led.iv.length + led.glow.length;
+        const n = led.iv.length + led.glow.length + PCL.extCount(led);
         if (n && !confirm(led.name + ' LED 의 측정값 ' + n + '개도 함께 지워집니다. 삭제할까요?')) return;
         state.leds = state.leds.filter(l => l !== led);
         save(); renderAll();
     });
     $('btn-add-led').addEventListener('click', () => {
         const id = 'led' + Date.now().toString(36);
-        state.leds.push({ id, key: null, name: 'LED ' + (state.leds.length + 1), lambda: 560, on: true, fit: true, iv: [], glow: [] });
+        state.leds.push({ id, key: null, name: 'LED ' + (state.leds.length + 1), lambda: 560, on: true, fit: true, iv: [], glow: [], ext: {} });
         state.sel = id;
         save(); renderAll();
     });
@@ -204,7 +220,7 @@
         const used = usedLeds();
         if (!used.some(l => l.id === state.sel)) state.sel = used.length ? used[0].id : null;
         $('sel-led').innerHTML = used.map(l => {
-            const n = state.method === 'glow' ? l.glow.length : l.iv.length;
+            const v = view(l), n = state.method === 'glow' ? v.glow.length : v.iv.length;
             return '<option value="' + esc(l.id) + '"' + (l.id === state.sel ? ' selected' : '') + '>' + esc(l.name) + ' (' + l.lambda + ' nm)' + (n ? ' · ' + n + '개' : '') + '</option>';
         }).join('');
         document.querySelectorAll('input[name=method]').forEach(r => { r.checked = r.value === state.method; });
@@ -251,18 +267,23 @@
             $('thr-out').innerHTML = '<b>' + esc(led.name) + '</b> 문턱 전압 V₀ = <b>' + t.v0.toFixed(3) + ' V</b>' + '<span class="note">' + extra + '</span>';
         }
 
+        // 불러온 값은 📥 표시, 삭제 단추 대신 출처 (지우려면 5. 데이터 위 '조 공유'의 '불러온 값 지우기')
+        const extRows = (key) => Object.keys(led.ext || {}).flatMap(k => (led.ext[k][key] || []).map(p => ({ p, from: led.ext[k].label || k })));
+        const fromCell = from => '<td class="note" title="' + esc(from) + '에서 불러옴">📥</td>';
         if (glow) {
             $('meas-head').innerHTML = '<tr><th>회</th><th>빛이 보인 V<sub>LED</sub> (V)</th><th></th></tr>';
-            $('meas-body').innerHTML = led.glow.map((v, k) =>
-                '<tr><td>' + (k + 1) + '</td><td>' + v.toFixed(3) + '</td><td><button class="secondary" data-del-glow="' + k + '">삭제</button></td></tr>').join('');
+            const all = led.glow.map((v, k) => ({ p: v, k })).concat(extRows('glow'));
+            $('meas-body').innerHTML = all.map(({ p, k, from }, n) =>
+                '<tr><td>' + (n + 1) + '</td><td>' + p.toFixed(3) + '</td>' +
+                (from ? fromCell(from) : '<td><button class="secondary" data-del-glow="' + k + '">삭제</button></td>') + '</tr>').join('');
         } else {
-            const hasVr = led.iv.some(p => p.vr != null);
+            const hasVr = view(led).iv.some(p => p.vr != null);
             $('meas-head').innerHTML = '<tr><th>번호</th><th>V<sub>LED</sub> (V)</th>' + (hasVr ? '<th>V<sub>R</sub> (mV)</th>' : '') + '<th>전류 I (mA)</th><th></th></tr>';
             // 기록 순서와 상관없이 전압 순으로 보여 준다
-            const rows = led.iv.map((p, k) => ({ p, k })).sort((a, b) => a.p.v - b.p.v);
+            const rows = led.iv.map((p, k) => ({ p, k })).concat(extRows('iv')).sort((a, b) => a.p.v - b.p.v);
             const usedMark = state.curMode === 'extrapolate' ? (p => p.i >= state.iMin) : (() => false);
-            $('meas-body').innerHTML = rows.map(({ p, k }, n) =>
-                '<tr><td>' + (n + 1) + (usedMark(p) ? ' ●' : '') + '</td><td>' + p.v.toFixed(3) + '</td>' + (hasVr ? '<td>' + (p.vr != null ? (p.vr * 1000).toFixed(2) : '–') + '</td>' : '') + '<td>' + p.i.toFixed(4) + '</td><td><button class="secondary" data-del-iv="' + k + '">삭제</button></td></tr>').join('');
+            $('meas-body').innerHTML = rows.map(({ p, k, from }, n) =>
+                '<tr><td>' + (n + 1) + (usedMark(p) ? ' ●' : '') + '</td><td>' + p.v.toFixed(3) + '</td>' + (hasVr ? '<td>' + (p.vr != null ? (p.vr * 1000).toFixed(2) : '–') + '</td>' : '') + '<td>' + p.i.toFixed(4) + '</td>' + (from ? fromCell(from) : '<td><button class="secondary" data-del-iv="' + k + '">삭제</button></td>') + '</tr>').join('');
         }
         $('chart-iv').hidden = glow;
         $('row-ivy').hidden = glow;
@@ -270,7 +291,7 @@
         $('sel-ivy').value = state.ivY;
         $('ivy-manual').hidden = state.ivY !== 'manual';
         $('iv-note').hidden = glow;
-        drawIV(glow ? null : led, t);
+        drawIV(glow ? null : view(led), t);
     }
 
     // 고정 저항 값 (Ω): 측정 탭에 잰 값이 있으면 그것, 없으면 회로 탭에서 고른 값
@@ -398,7 +419,7 @@
         state.ivY = e.target.value;
         // 직접 정하기로 바꿀 때 빈 칸이면 지금 보이는 범위로 채워 준다
         if (state.ivY === 'manual' && !state.ivYmax) {
-            const led = current(), top = led && led.iv.length ? Math.max(...led.iv.map(p => p.i)) : 0;
+            const led = current() && view(current()), top = led && led.iv.length ? Math.max(...led.iv.map(p => p.i)) : 0;
             state.ivYmin = '0'; state.ivYmax = String(Number((top > 0 ? top * 1.15 : 0.1).toPrecision(2)));
             $('ivy-min').value = state.ivYmin; $('ivy-max').value = state.ivYmax;
         }
@@ -430,8 +451,12 @@
     $('btn-clear-led').addEventListener('click', () => {
         const led = current(); if (!led) return;
         const glow = state.method === 'glow';
-        if (!confirm(led.name + ' LED 의 ' + (glow ? '빛 기준' : '전류 기준(I–V)') + ' 기록을 지울까요?')) return;
+        if (!confirm(led.name + ' LED 의 ' + (glow ? '빛 기준' : '전류 기준(I–V)') + ' 기록을 지울까요?' + (PCL.extCount(led) ? ' (다른 노트북에서 불러온 값도 지웁니다. 자동 불러오기가 켜져 있으면 다시 들어옵니다)' : ''))) return;
         if (glow) led.glow = []; else led.iv = [];
+        Object.keys(led.ext || {}).forEach(k => {
+            led.ext[k][glow ? 'glow' : 'iv'] = [];
+            if (!led.ext[k].iv.length && !led.ext[k].glow.length) delete led.ext[k];
+        });
         save(); renderAll();
     });
     $('sel-led').addEventListener('change', e => { state.sel = e.target.value; $('iv-warn').hidden = true; save(); renderAll(); });
@@ -662,12 +687,14 @@
         document.body.appendChild(a); a.click(); a.remove();
     }
     $('btn-csv').addEventListener('click', () => {
-        const rows = ['led,wavelength_nm,frequency_1e14Hz,method,voltage_V,current_mA,resistor_voltage_V,resistor_ohm,source'];
+        // 다른 노트북·파일에서 불러온 값도 함께 (from 칸에 출처, 내가 잰 값은 빈칸)
+        const rows = ['led,wavelength_nm,frequency_1e14Hz,method,voltage_V,current_mA,resistor_voltage_V,resistor_ohm,source,from'];
         const q = s => '"' + String(s).replace(/"/g, '""') + '"';
         for (const l of state.leds) {
             const f = (P.freqOf(l.lambda) / 1e14).toFixed(4);
-            for (const p of l.iv) rows.push([q(l.name), l.lambda, f, 'current', p.v, p.i, p.vr != null ? p.vr : '', p.r != null ? p.r : '', p.src === 'sensor' ? 'sensor' : 'multimeter'].join(','));
-            for (const v of l.glow) rows.push([q(l.name), l.lambda, f, 'glow', v, '', '', '', 'eye'].join(','));
+            for (const p of view(l).iv) rows.push([q(l.name), l.lambda, f, 'current', p.v, p.i, p.vr != null ? p.vr : '', p.r != null ? p.r : '', p.src === 'sensor' ? 'sensor' : 'multimeter', q(p.from || '')].join(','));
+            for (const v of l.glow) rows.push([q(l.name), l.lambda, f, 'glow', v, '', '', '', 'eye', ''].join(','));
+            for (const k of Object.keys(l.ext || {})) for (const v of l.ext[k].glow || []) rows.push([q(l.name), l.lambda, f, 'glow', v, '', '', '', 'eye', q(l.ext[k].label || k)].join(','));
         }
         download('planck-led.csv', rows.join('\n'), 'text/csv');
     });
@@ -691,7 +718,7 @@
     });
     $('btn-clear-all').addEventListener('click', () => {
         if (!confirm('모든 LED 의 측정값을 지울까요? (LED 목록과 파장은 남습니다)')) return;
-        state.leds.forEach(l => { l.iv = []; l.glow = []; });
+        state.leds.forEach(l => { l.iv = []; l.glow = []; l.ext = {}; });
         save(); renderAll();
     });
 
@@ -741,12 +768,171 @@
         $('concl-sum').innerHTML = html;
     }
 
+    // ---------- 조 공유: 선생님 시트로 보내기 · 같은 조 다른 노트북에서 불러오기 ----------
+    // 서버는 스마트폰 진자와 같은 Apps Script. 어느 시트인지: 링크의 ?s=스크립트ID > 이 브라우저 기억 > js/pendulum-config.js 기본
+    const PCF = window.PendulumCloud;
+    const CFG = window.PENDULUM_CONFIG || {};
+    let STORE = null; try { STORE = window.localStorage; } catch (e) { STORE = null; }
+    const SERVER = PCF ? PCF.resolveServer(location.search, CFG.appsScriptUrl || '', STORE, true) : { url: '', from: 'none' };
+    const LIST_URL = SERVER.url ? SERVER.url + (SERVER.url.indexOf('?') >= 0 ? '&' : '?') + 'exp=' + PCL.EXP : '';
+    const share = { busy: false, lastOk: null, fails: 0, timer: null };
+    const timeText = d => d ? d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+    function setShareStatus(html, err) {
+        $('sh-status').innerHTML = html; $('sh-status').classList.toggle('err', !!err);
+    }
+    function groupOk() { return !!PCF && PCF.isGroupCode(state.share.group); }
+    function renderShare() {
+        const sh = state.share;
+        if (document.activeElement !== $('sh-group')) $('sh-group').value = sh.group;
+        if (document.activeElement !== $('sh-ban')) $('sh-ban').value = sh.ban;
+        if (document.activeElement !== $('sh-jo')) $('sh-jo').value = sh.jo;
+        $('sh-auto').checked = sh.auto;
+        const ok = groupOk();
+        ['sh-send', 'sh-pull', 'btn-send2'].forEach(id => { $(id).disabled = !ok || share.busy; });
+        const ext = state.leds.reduce((n, l) => n + PCL.extCount(l), 0);
+        $('sh-clear').disabled = !ext;
+        $('share-sum').textContent = ok ? '— 조 ' + sh.group + (ext ? ' · 불러온 값 ' + ext + '개' : '') : '— 조 코드 없음';
+        $('sh-server').textContent = !SERVER.url ? '⚠ 선생님 설정이 아직 안 되어 보내기·불러오기를 쓸 수 없습니다. CSV 로 주고받으세요.'
+            : '보낼 곳: ' + (SERVER.from === 'link' ? '링크로 받은 선생님 시트' : SERVER.from === 'saved' ? '이 브라우저가 기억한 선생님 시트' : '사이트 기본 선생님 시트') +
+              ' (스마트폰 진자와 같은 시트의 planck 탭) · 이 노트북: ' + PCL.deviceLabel(sh.device);
+        if (!ok && !$('sh-status').textContent) setShareStatus('반·조를 넣고 <b>🎲 새 조 코드 만들기</b>를 누르거나, 같은 조 노트북의 조 코드를 넣으세요.');
+        scheduleShare();
+    }
+    function setGroup(code) {
+        const g = PCF.normalizeGroup(code);
+        if (g !== state.share.group) { state.share.group = g; state.share.sent = []; }
+        if (PCF.isGroupCode(g)) { const p = PCF.groupParts(g); state.share.ban = String(p.ban); state.share.jo = String(p.jo); }
+        save();
+        setShareStatus('');
+        renderShare();
+        if (groupOk() && state.share.auto) pull(true);
+    }
+    $('sh-group').addEventListener('change', e => setGroup(e.target.value));
+    // 다 치면(형식이 맞으면) 바로 연결
+    $('sh-group').addEventListener('input', e => { const g = PCF && PCF.normalizeGroup(e.target.value); if (g && PCF.isGroupCode(g) && g !== state.share.group) setGroup(g); });
+    $('sh-ban').addEventListener('input', e => { state.share.ban = e.target.value; save(); });
+    $('sh-jo').addEventListener('input', e => { state.share.jo = e.target.value; save(); });
+    $('sh-make').addEventListener('click', () => {
+        if (!PCF) return;
+        const code = PCF.makeGroupCode(state.share.ban, state.share.jo);
+        if (!code) { setShareStatus('반과 조를 1~99 사이 숫자로 넣으세요.', true); return; }
+        if (groupOk() && state.share.group !== code && !confirm('지금 조 코드(' + state.share.group + ')를 새 코드로 바꿀까요? 같은 조의 다른 노트북에도 새 코드를 넣어야 합니다.')) return;
+        setGroup(code);
+        setShareStatus('조 코드 <b>' + esc(code) + '</b> 를 만들었습니다. 같은 조의 다른 노트북에 이 코드를 넣으세요.');
+    });
+    $('sh-auto').addEventListener('change', e => { state.share.auto = e.target.checked; save(); renderShare(); if (state.share.auto) pull(true); });
+
+    async function send(statusEl) {
+        if (!groupOk() || share.busy) return;
+        const cur = fitFor('current', false).res, gl = fitFor('glow', false).res;
+        const b = PCL.buildPayloads({
+            group: state.share.group, device: state.share.device, leds: state.leds, sent: state.share.sent,
+            v0: (led, m) => { const t = thr(led, m); return t.error ? null : t.v0; },
+            summary: {
+                hCurrent: cur ? cur.h / 1e-34 : null, errorPct: cur ? cur.errorPct : null, r2: cur ? cur.fit.r2 : null,
+                hGlow: gl ? gl.h / 1e-34 : null
+            },
+            curMode: state.curMode, iMin: state.iMin
+        }, PCF.isGroupCode);
+        const show = (html, err) => { setShareStatus(html, err); if (statusEl) { statusEl.innerHTML = html; } };
+        if (b.error) { show('⚠ ' + esc(b.error), true); return; }
+        share.busy = true; renderShare();
+        let done = 0, fail = null;
+        for (const pl of b.payloads) {
+            show('📤 보내는 중… (' + (done + 1) + '/' + b.payloads.length + ')');
+            const r = await PCF.save(SERVER.url, pl);
+            if (!r.ok) { fail = r; break; }
+            done++;
+            if (!state.share.sent.includes(pl.id)) state.share.sent.push(pl.id);
+        }
+        share.busy = false;
+        save();
+        if (fail) show('⚠ 보내지 못했습니다: ' + esc(fail.error) + (done ? ' (' + done + '개는 보냄)' : '') + '<br>다시 눌러 보고, 계속 안 되면 6. 실험 결과의 <b>CSV 다운로드</b> 파일을 선생님께 내세요.', true);
+        else show('✅ LED ' + done + '개의 측정값을 선생님 시트로 보냈습니다 (' + timeText(new Date()) + '). 같은 조의 다른 노트북에서 📥 불러오기를 누르면 합쳐집니다.');
+        renderShare();
+    }
+    $('sh-send').addEventListener('click', () => send());
+    $('btn-send2').addEventListener('click', () => {
+        if (!groupOk()) { $('send2-status').textContent = '먼저 5. 데이터 수집 맨 위 \'👥 조 공유\'에서 조 코드를 정하세요.'; return; }
+        send($('send2-status'));
+    });
+
+    let pulling = false;
+    async function pull(quiet) {
+        if (!groupOk() || pulling || !SERVER.url) { if (!SERVER.url && !quiet) setShareStatus('⚠ 선생님 설정이 아직 안 되었습니다. CSV 로 주고받으세요.', true); return; }
+        pulling = true;
+        if (!quiet) setShareStatus('📥 불러오는 중…');
+        const group = state.share.group;
+        const r = await PCF.list(LIST_URL, group);
+        pulling = false;
+        if (group !== state.share.group) return;    // 그 사이 조 코드를 바꿈
+        if (!r.ok) {
+            share.fails++;
+            setShareStatus('⚠ 불러오지 못했습니다: ' + esc(r.error) + (share.lastOk ? ' (마지막 성공 ' + timeText(share.lastOk) + ')' : '') + '<br>계속 안 되면 CSV 파일로 주고받으세요.', true);
+            scheduleShare();
+            return;
+        }
+        share.fails = 0; share.lastOk = new Date();
+        const entries = PCL.entriesFromServer(r.items, state.share.device);
+        const res = PCL.applyEntries(state.leds, entries, () => 'x' + Date.now().toString(36) + Math.floor(Math.random() * 1000));
+        const others = new Set((r.items || []).map(x => String(x.device)).filter(d => d !== state.share.device)).size;
+        if (res.changed) { save(); renderAll(); }
+        setShareStatus((res.changed ? '🆕 다른 노트북의 값을 표에 합쳤습니다' : '🟢 연결됨') +
+            ' · 같은 조의 다른 노트북 ' + others + '대, 불러온 값 ' + res.points + '개' + (res.newLeds ? ', 새 LED ' + res.newLeds + '개' : '') +
+            ' <span class="note">(마지막 확인 ' + timeText(share.lastOk) + (state.share.auto ? ', ' + pollSec() + '초마다 확인' : '') + ')</span>');
+        renderShare();
+    }
+    $('sh-pull').addEventListener('click', () => pull(false));
+    const pollSec = () => Math.max(3, Number(CFG.pollSeconds) || 5) * (share.fails >= 3 ? 3 : 1);
+    // 자동 불러오기: 데이터·결과·결론 탭을 보고 있고 창이 보일 때만
+    function scheduleShare() {
+        clearTimeout(share.timer); share.timer = null;
+        if (!state.share.auto || !groupOk() || !SERVER.url) return;
+        share.timer = setTimeout(() => {
+            if (!document.hidden && ['data', 'result', 'conclusion'].includes(state.tab)) pull(true); else scheduleShare();
+        }, pollSec() * 1000);
+    }
+
+    $('sh-csv').addEventListener('change', async e => {
+        const files = Array.from(e.target.files || []);
+        e.target.value = '';
+        const msgs = [];
+        let changed = false;
+        for (const f of files) {
+            const r = PCL.parseCsv(await f.text());
+            if (r.error) { msgs.push('⚠ ' + esc(f.name) + ': ' + esc(r.error)); continue; }
+            // 이 노트북에서 잰 값과 똑같은 점은 빼고 (내가 받은 CSV 를 다시 불러온 경우)
+            r.entries.forEach(en => {
+                const led = PCL.findLed(state.leds, null, en.name, en.lambda);
+                if (!led) return;
+                en.iv = en.iv.filter(p => !led.iv.some(q => q.v === p.v && Math.abs(q.i - p.i) < 1e-9));
+                en.glow = en.glow.filter(v => !led.glow.includes(v));
+            });
+            const res = PCL.applyEntries(state.leds, r.entries.map(en => Object.assign(en, { src: 'f:' + f.name, label: '파일 ' + f.name })),
+                () => 'x' + Date.now().toString(36) + Math.floor(Math.random() * 1000));
+            changed = changed || res.changed;
+            msgs.push('✅ ' + esc(f.name) + ': 측정값 ' + res.points + '개를 합쳤습니다' + (res.newLeds ? ' (새 LED ' + res.newLeds + '개)' : '') + '.');
+        }
+        if (changed) { save(); renderAll(); }
+        setShareStatus(msgs.join('<br>'), msgs.some(m => m.startsWith('⚠')));
+    });
+    $('sh-clear').addEventListener('click', () => {
+        const n = state.leds.reduce((k, l) => k + PCL.extCount(l), 0);
+        if (!n || !confirm('다른 노트북·CSV 에서 불러온 값 ' + n + '개를 이 노트북에서 지울까요? (이 노트북에서 잰 값과 선생님 시트는 그대로입니다)' +
+            (state.share.auto ? '\n자동 불러오기는 끕니다.' : ''))) return;
+        state.leds.forEach(l => { l.ext = {}; });
+        state.share.auto = false;
+        save(); renderAll();
+        setShareStatus('불러온 값을 지웠습니다. 다시 합치려면 📥 불러오기를 누르세요.');
+    });
+
     function renderAll() {
         renderSetup();
         renderLeds();
         renderMeasure();
         renderResults();
         renderConclusion();
+        renderShare();
     }
 
     // ---------- 입력 중인 값 ----------
@@ -787,7 +973,9 @@
 
     load();
     applyControls();
+    if (!groupOk()) $('share-box').open = true;
     showTab(state.tab);
+    if (groupOk() && state.share.auto) pull(true);
     // 같은 브라우저의 다른 창(탭)에서 바꾼 내용을 따라간다. 그렇지 않으면 이 창이 저장할 때 다른 창의 기록을 덮어쓴다.
     window.addEventListener('storage', e => {
         if (e.key !== STORE_KEY) return;
