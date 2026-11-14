@@ -68,3 +68,41 @@
 .pd-table th { position: sticky; top: 0; background: var(--c-fill); text-align: center; }
 .pd-table td:first-child { text-align: center; }
 .pd-help li { margin: var(--sp-1) 0; font-size: var(--fs-sm); }
+
+.pd-link { margin: 0 0 var(--sp-3); padding: var(--sp-2) var(--sp-3); background: var(--c-ok-bg); color: var(--c-ok-text); border-radius: var(--r-card); }
+.pd-link .note { margin: var(--sp-1) 0 0; color: inherit; }
+.pd-link.err { background: var(--c-err-bg); color: var(--c-err-text); }
+.pd-link.warn { background: var(--c-warn-bg); color: var(--c-warn-text); }
+
+/* ---------- 분석 화면 (projects/pendulum-report.html, 단계형) ---------- */
+.pd-steps-page { max-width: var(--w-step); margin: 0 auto; }
+.pd-steps-page h1 { font-size: var(--fs-h1); margin: var(--sp-2) 0; }
+.pd-formula { font-family: var(--font-mono); background: var(--c-fill); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); overflow-x: auto; }
+.pd-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
+.pd-qr-wrap { display: grid; gap: var(--sp-3); grid-template-columns: minmax(0, 1fr); align-items: center; }
+@media (min-width: 640px) { .pd-qr-wrap { grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); } }
+.pd-qr { background: #fff; border-radius: var(--r-card); padding: var(--sp-2); max-width: 300px; width: 100%; justify-self: center; }
+.pd-qr svg, .pd-bigqr svg { width: 100%; height: auto; display: block; }
+.pd-code { font-size: var(--fs-reading); font-weight: 700; color: var(--c-primary); letter-spacing: .04em; }
+.pd-url { word-break: break-all; }
+.pd-conn { margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-card); background: var(--c-fill); font-weight: 600; font-size: var(--fs-sm); }
+.pd-conn.ok { background: var(--c-ok-bg); color: var(--c-ok-text); }
+.pd-conn.new { background: var(--c-primary-soft); color: var(--c-primary-dark); }
+.pd-conn.err { background: var(--c-err-bg); color: var(--c-err-text); }
+.pd-conn.warn { background: var(--c-warn-bg); color: var(--c-warn-text); }
+.pd-table tr.off td { color: var(--c-muted); text-decoration: line-through; }
+.pd-table tr.fresh td { background: var(--c-primary-soft); }
+.pd-table td input[type="checkbox"] { width: 20px; height: 20px; }
+.pd-table td button { font-size: var(--fs-sm); padding: 2px 8px; min-height: 0; }
+.pd-import { margin-top: var(--sp-3); }
+.pd-drop {
+    display: flex; align-items: center; justify-content: center; min-height: 72px; padding: var(--sp-3); text-align: center;
+    border: 2px dashed var(--c-line); border-radius: var(--r-card); background: var(--c-fill); cursor: pointer; font-size: var(--fs-sm);
+}
+.pd-drop.over { border-color: var(--c-primary); background: var(--c-primary-soft); }
+.pd-fit-chart { height: clamp(260px, 45vh, 420px); }
+.pd-bigqr {
+    position: fixed; inset: 0; z-index: 100; background: #fff; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: var(--sp-3); padding: var(--sp-4);
+}
+.pd-bigqr #bigQrImg { width: min(80vh, 90vw); }
