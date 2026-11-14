@@ -348,6 +348,12 @@
             measuredAt: state.measuredAt ? state.measuredAt.toISOString() : ''
         });
         if (built.error) { linkMsg('⚠️ ' + esc(built.error), 'warn'); if (/줄 길이/.test(built.error)) $('cL').focus(); return; }
+        // L 과 T 가 서로 맞는지: 크게 어긋나면 L 을 잘못 적었을 수 있으니 한 번 확인
+        var chk = PM.lengthCheck(Number(conditions().L), state.result.T);
+        if (!chk.ok && !confirm('줄 길이 L = ' + conditions().L + ' m 인데, 잰 주기 T = ' + fmt(state.result.T, 3) + ' s 는 길이 약 ' +
+            fmt(chk.impliedL, 2) + ' m 진자의 주기예요.\nL 을 잘못 적지 않았는지 확인하세요.\n\n그래도 이대로 보낼까요?')) {
+            linkMsg('보내지 않았어요. 실험 조건의 줄 길이 L 을 확인하고 다시 누르세요.', 'warn'); $('cL').focus(); return;
+        }
         state.sending = true; updateSendState();
         $('btnSend').textContent = '⏳ 보내는 중…';
         linkMsg('보내는 중이에요… (몇 초 걸려요)');
@@ -436,9 +442,11 @@
         showCalib(state.calib);
         state.samples = PM.simulate(opts);
         state.source = 'simulation'; state.measuredAt = new Date(); newMeasurement();
-        // 실험 조건 칸이 비어 있으면 시뮬레이션 값으로 채움
-        if (!$('cL').value) $('cL').value = L.toFixed(2);
-        if (!$('cAmp').value) $('cAmp').value = amp;
+        // 시뮬레이션의 L·진폭이 곧 이 측정의 조건 (다르게 남으면 노트북에 엉뚱한 L 로 보내짐)
+        var changed = $('cL').value && Math.abs(Number($('cL').value) - L) > 1e-9;
+        $('cL').value = L.toFixed(2);
+        $('cAmp').value = amp;
+        if (changed) warn('실험 조건의 줄 길이 L 을 시뮬레이션 값(' + L.toFixed(2) + ' m)으로 바꿨어요.');
         saveCond();
         setStatus('🧪 시뮬레이션 데이터 (' + state.samples.length + '개)');
         recompute();

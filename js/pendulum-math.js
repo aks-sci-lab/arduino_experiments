@@ -327,6 +327,16 @@
         return res;
     }
 
+    /* 적은 줄 길이 L 과 잰 주기 T 가 서로 맞는지 (보내기 전 확인용)
+       T 로 거꾸로 구한 길이 L_T = g·T²/4π² 는 폰 무게중심까지 더해져 L 보다 조금 긴 게 보통이다.
+       L_T/L 이 0.85~1.35 를 벗어나면 L 을 잘못 적었을 가능성이 크다. */
+    function lengthCheck(L, T, g) {
+        g = g || G_REF;
+        if (!(L > 0) || !(T > 0)) return { ok: false, impliedL: NaN, ratio: NaN };
+        var impliedL = g * T * T / (4 * Math.PI * Math.PI), ratio = impliedL / L;
+        return { ok: ratio >= 0.85 && ratio <= 1.35, impliedL: impliedL, ratio: ratio };
+    }
+
     // ---------- 2단계용: T²–L 직선 ----------
     function leastSquares(xs, ys) {
         var n = xs.length;
@@ -429,6 +439,6 @@
         mean: mean, std: std, median: median, rms: rms, theoryPeriod: theoryPeriod,
         simulate: simulate, column: column, movingAverage: movingAverage, risingCrossings: risingCrossings,
         pickAxis: pickAxis, autoSmooth: autoSmooth, analyze: analyze, fft: fft, dominantFrequency: dominantFrequency, calibrate: calibrate,
-        leastSquares: leastSquares, fitT2L: fitT2L, toCsv: toCsv, parseCsv: parseCsv
+        lengthCheck: lengthCheck, leastSquares: leastSquares, fitT2L: fitT2L, toCsv: toCsv, parseCsv: parseCsv
     };
 });
