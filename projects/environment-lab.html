@@ -61,10 +61,10 @@
 <body>
     <main class="dash">
         <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
-        <nav class="seg sensor-switch" aria-label="측정할 센서 고르기">
-            <a href="environment-lab.html" data-mode="environment">🌡️ 환경<small>온도·습도·기압·VOC</small></a>
-            <a href="environment-lab.html?sensor=light" data-mode="light">💡 조도<small>TSL2591</small></a>
-            <a href="environment-lab.html?sensor=uv" data-mode="uv">☀️ 자외선<small>LTR390</small></a>
+        <nav class="seg pick sensor-switch" aria-label="측정할 센서 고르기">
+            <a href="environment-lab.html" data-mode="environment"><span class="ic" aria-hidden="true">🌡️</span>환경<small>온도·습도·기압·VOC</small></a>
+            <a href="environment-lab.html?sensor=light" data-mode="light"><span class="ic" aria-hidden="true">💡</span>조도<small>TSL2591</small></a>
+            <a href="environment-lab.html?sensor=uv" data-mode="uv"><span class="ic" aria-hidden="true">☀️</span>자외선<small>LTR390</small></a>
         </nav>
         <p class="note">센서 보드는 한 번에 한 가지만 측정합니다. 센서를 바꾸면 연결이 끊기니 다시 연결하세요.</p>
         <div id="envView">

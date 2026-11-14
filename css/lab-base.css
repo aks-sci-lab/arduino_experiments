@@ -95,6 +95,56 @@ button:disabled { cursor: not-allowed; }
 .seg a[aria-current="page"] { background: var(--c-card); color: var(--c-primary); box-shadow: var(--shadow); }
 .note { color: var(--c-muted); font-size: var(--fs-sm); }
 
+/* ---------- 고르기 카드 (사용자가 고른 기준 모양, 2026-11-14: 메인 화면 휴대폰 카드) ----------
+   그림(아이콘)이 위에 크게, 그 아래 굵은 파란 제목, 회색 한 줄 설명, 넉넉한 여백과 둥근 테두리.
+   실험·센서·종류를 "고르는" 화면은 모두 이 모양을 쓴다.
+   - 카드 목록: <div class="pick-grid"><a class="pick-card" href="…"><span class="ic">🌡️</span><b>제목</b><small>설명</small></a>…</div>
+     (휴대폰 2칸, 넓은 화면은 폭에 맞춰 3~5칸. 카드 안에 링크가 둘이면 <div class="pick-card"> + <span class="pick-links"><a>…</a><a>…</a></span>)
+   - 페이지 위 바꾸기 단추 줄: <nav class="seg pick"><a href="…" aria-current="page"><span class="ic">🌡️</span>환경<small>…</small></a>…</nav>
+     (버튼이면 aria-pressed="true" 가 고른 것) */
+.pick-grid { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr)); }
+.pick-card {
+    position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    min-height: var(--tap); padding: var(--sp-3) var(--sp-4); text-decoration: none; color: var(--c-text);
+    background: var(--c-card); border: 1px solid var(--c-line); border-radius: 14px;
+    transition: border-color .15s, box-shadow .15s;
+}
+a.pick-card:hover, .pick-card:has(a:hover) { border-color: var(--c-primary); box-shadow: var(--shadow); color: var(--c-text); }
+.pick-card .ic { font-size: 1.75rem; line-height: 1; margin-bottom: var(--sp-1); }
+.pick-card b { color: var(--c-primary); font-size: 1.05rem; font-weight: 700; line-height: 1.3; }
+.pick-card small { color: var(--c-muted); font-size: var(--fs-sm); line-height: 1.35; }
+.pick-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--sp-1); width: 100%; margin-top: auto; padding-top: var(--sp-2); }
+.pick-links a {
+    display: flex; align-items: center; justify-content: center; min-height: var(--tap); padding: 0 var(--sp-1); white-space: nowrap;
+    border: 1px solid var(--c-primary); border-radius: var(--r-ctl);
+    font-size: var(--fs-sm); font-weight: 600; text-decoration: none; color: var(--c-primary); background: var(--c-card);
+}
+.pick-links a:hover { background: var(--c-primary); color: #fff; }
+@media (max-width: 639px) {
+    .pick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+    .pick-card { padding: var(--sp-2) var(--sp-3); }
+    .pick-card .ic { font-size: 1.4rem; }
+    .pick-card b { font-size: .95rem; }
+    .pick-card small { font-size: .78rem; }
+    .pick-links a { padding: 0 var(--sp-2); font-size: .8rem; }
+}
+/* 바꾸기 단추 줄을 고르기 카드 모양으로 */
+.seg.pick { background: none; padding: 0; gap: var(--sp-2); }
+.seg.pick > a, .seg.pick > button {
+    align-items: flex-start; justify-content: flex-start; text-align: left; gap: 2px;
+    min-height: var(--tap); padding: var(--sp-2) var(--sp-3); margin: 0;
+    background: var(--c-card); color: var(--c-primary); border: 1px solid var(--c-line); border-radius: 14px;
+    font-size: .95rem; font-weight: 700; box-shadow: none; opacity: 1; cursor: pointer;
+}
+.seg.pick > button { display: flex; flex-direction: column; }
+.seg.pick .ic { font-size: 1.4rem; line-height: 1; margin-bottom: 2px; }
+.seg.pick small { display: block; font-weight: 400; font-size: .78rem; color: var(--c-muted); }
+.seg.pick > a:hover, .seg.pick > button:hover:not(:disabled) { border-color: var(--c-primary); background: var(--c-card); color: var(--c-primary); }
+.seg.pick > [aria-current="page"], .seg.pick > [aria-pressed="true"] {
+    border: 2px solid var(--c-primary); background: var(--c-primary-soft); color: var(--c-primary); box-shadow: none;
+    padding: calc(var(--sp-2) - 1px) calc(var(--sp-3) - 1px);
+}
+
 /* ---------- 단계형 실험: 보고서 순서 7단계 탭 (플랑크 상수 페이지 모양, js/lab-ui.js 의 LabUI.initSteps) ----------
    <nav class="steps" role="tablist" aria-label="실험 단계">
      <button role="tab" data-step="purpose"><b>1</b><span>목적</span></button> … 7개
@@ -193,9 +243,10 @@ div.subtab-next > button {
 @media (min-width: 900px) { .dash-grid { grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr); } }
 .dash-readouts { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 @media (min-width: 900px) { .dash-readouts { grid-template-columns: minmax(0, 1fr); } }
-/* 휴대폰: 숫자 카드를 작게 세 칸으로 놓아 그래프가 첫 화면에 들어오게 */
+/* 휴대폰: 숫자 카드를 작게 세 칸으로 놓아 그래프가 첫 화면에 들어오게 (4개면 2×2, 혼자 남는 줄이 없게) */
 @media (max-width: 639px) {
     .dash-readouts { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: var(--sp-1); }
+    .dash-readouts:has(> :nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .dash-card { padding: var(--sp-1) var(--sp-2); }
     .dash-card .value { font-size: clamp(1.35rem, 6vw, 1.8rem); }
     .dash-card .label { font-size: .78rem; }
