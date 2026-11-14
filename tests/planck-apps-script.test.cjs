@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { loadPlanckApp, renderPage, DIR } = require('./fake-planck-apps-script.cjs');
-const { build } = require('../tools/build-planck-apps-script.cjs');
+const { build, buildZip, zipTarget, ZIP_FILES } = require('../tools/build-planck-apps-script.cjs');
 const P = require('../js/planck-math.js');
 
 // 문턱 vt 위로 직선인 이상적 LED 측정점
@@ -21,6 +21,11 @@ function goodPayload(over) {
 test('PlanckMath.html 은 js/planck-math.js 와 같은 계산 코드 (자동 생성 파일이 최신)', () => {
     assert.equal(fs.readFileSync(path.join(DIR, 'PlanckMath.html'), 'utf8'), build(),
         'node tools/build-planck-apps-script.cjs 를 실행하세요');
+});
+
+test('내려받기 ZIP 이 최신이고, 폴더의 모든 파일을 편집기 파일 이름 그대로 담음', () => {
+    assert.deepEqual([...ZIP_FILES].sort(), fs.readdirSync(DIR).sort(), 'tools/build-planck-apps-script.cjs 의 ZIP_FILES 에 파일을 더하세요');
+    assert.ok(fs.readFileSync(zipTarget).equals(buildZip()), 'node tools/build-planck-apps-script.cjs 를 실행하세요');
 });
 
 test('학생 제출: LED 하나당 한 줄, 첫 줄은 열 이름, 응답에는 다른 학생 자료가 없음', () => {
@@ -95,10 +100,25 @@ test('교사 자료: 암호가 없으면 설정 안내, 틀리면 거절, 10번 
     assert.throws(() => app.ctx.teacherData('teacher-pw-12'), /맞지 않/);
     assert.throws(() => app.ctx.teacherData('teacher-pw-1234'), /맞지 않/);
     assert.equal(app.ctx.teacherLogin('teacher-pw-123').ok, true);
-    for (let k = 0; k < 7; k++) assert.throws(() => app.ctx.teacherLogin('x' + k), /맞지 않/);
+    for (let k = 0; k < 10; k++) assert.throws(() => app.ctx.teacherLogin('x' + k), /맞지 않/);  // 위에서 맞혀 횟수가 0 으로
     assert.throws(() => app.ctx.teacherLogin('teacher-pw-123'), /잠겼/);   // 맞는 암호도 잠긴 동안은 거절
     app.cache.clear();                                                    // 시간이 지나 캐시가 사라지면 다시 됨
     assert.equal(app.ctx.teacherLogin('teacher-pw-123').ok, true);
+});
+
+test('잠금 완화: 맞는 암호가 들어오면 틀린 횟수를 지우고, 스프레드시트 주인은 잠겨도 암호만 맞으면 들어감', () => {
+    const app = loadPlanckApp();
+    for (let k = 0; k < 9; k++) assert.throws(() => app.ctx.teacherLogin('x'), /맞지 않/);
+    assert.equal(app.ctx.teacherLogin('teacher-pw-123').ok, true);          // 9번째까지는 들어가고 횟수 초기화
+    for (let k = 0; k < 9; k++) assert.throws(() => app.ctx.teacherLogin('x'), /맞지 않/);
+    assert.equal(app.ctx.teacherLogin('teacher-pw-123').ok, true);          // 다시 9번 틀려도 아직 잠기지 않음
+    for (let k = 0; k < 10; k++) assert.throws(() => app.ctx.teacherLogin('x'), /맞지 않/);
+    assert.throws(() => app.ctx.teacherLogin('teacher-pw-123'), /잠겼/);    // 학생(주인 아님)은 잠김
+    app.state.owner = true;                                                 // 선생님 계정으로 연 브라우저
+    assert.throws(() => app.ctx.teacherLogin('x'), /맞지 않/);              // 주인이라도 암호는 필요
+    assert.equal(app.ctx.teacherData('teacher-pw-123').rows.length, 0);    // 잠금과 상관없이 들어가고
+    app.state.owner = false;
+    assert.equal(app.ctx.teacherLogin('teacher-pw-123').ok, true);          // 잠금도 풀림
 });
 
 test('교사 자료: 모든 줄을 글자·숫자로 돌려주고(날짜는 ISO 글자) 측정값 JSON 을 풀어 줌', () => {

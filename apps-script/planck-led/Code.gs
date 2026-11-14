@@ -28,7 +28,7 @@ var LIMITS = {
   glow: 20,          // 빛 기준 반복 수
   rows: 20000,       // 시트 전체 줄 수 한도 (넘으면 제출을 막아 시트가 무거워지지 않게)
   failLock: 10,      // 교사 암호를 이만큼 틀리면
-  lockSeconds: 600   // 이 시간(초) 동안 교사 화면을 잠근다
+  lockSeconds: 300   // 마지막으로 틀린 뒤 이 시간(초) 동안 교사 화면을 잠근다 (스프레드시트 주인은 잠겨도 들어감)
 };
 
 /* ---------------- 화면 ---------------- */
@@ -169,7 +169,10 @@ function teacherData(password) {
 function checkTeacher(password) {
   var cache = CacheService.getScriptCache();
   var fails = Number(cache.get('teacherFails') || 0);
-  if (fails >= LIMITS.failLock) throw new Error('암호가 여러 번 틀려 ' + Math.round(LIMITS.lockSeconds / 60) + '분 동안 잠겼습니다. 잠시 뒤 다시 하세요.');
+  // 학생 장난으로 선생님까지 막히지 않게: 스크립트 주인(선생님 구글 계정으로 로그인)은 잠금과 상관없이 암호만 맞으면 들어간다
+  if (fails >= LIMITS.failLock && !isOwner()) {
+    throw new Error('암호가 여러 번 틀려 ' + Math.round(LIMITS.lockSeconds / 60) + '분 동안 잠겼습니다. 잠시 뒤 다시 하거나, 스프레드시트를 만든 구글 계정으로 로그인한 브라우저에서 여세요.');
+  }
   var saved = PropertiesService.getScriptProperties().getProperty('TEACHER_PASSWORD');
   if (!saved || String(saved).length < 6) {
     throw new Error('교사 암호가 아직 정해지지 않았습니다. Apps Script 편집기 → 프로젝트 설정(⚙) → 스크립트 속성에 TEACHER_PASSWORD (6글자 이상)를 추가하세요.');
@@ -177,6 +180,20 @@ function checkTeacher(password) {
   if (!sameText(String(password || ''), String(saved))) {
     cache.put('teacherFails', String(fails + 1), LIMITS.lockSeconds);
     throw new Error('암호가 맞지 않습니다.');
+  }
+  if (fails) cache.remove('teacherFails');   // 맞는 암호가 들어오면 틀린 횟수를 지워 잠금을 바로 푼다
+}
+
+// 지금 화면을 연 사람이 이 스크립트의 주인(배포한 선생님)인가.
+// 웹앱은 '나'로 실행되므로 실행 계정(effective)은 늘 선생님이고, 연 사람(active)의 메일은 같은 계정일 때만 같다.
+// 다른 사람이면 구글이 메일을 빈칸으로 주므로 주인으로 보지 않는다. 확인할 수 없으면 주인이 아닌 것으로 본다.
+function isOwner() {
+  try {
+    var active = Session.getActiveUser().getEmail();
+    var effective = Session.getEffectiveUser().getEmail();
+    return !!active && active === effective;
+  } catch (err) {
+    return false;
   }
 }
 

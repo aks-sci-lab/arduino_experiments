@@ -17,11 +17,13 @@ function evaluateTemplate(text, ctx) {
     return out;
 }
 
-function loadPlanckApp({ password = 'teacher-pw-123' } = {}) {
+// owner: 화면을 연 사람이 스크립트 주인인가 (Session 흉내: 주인이면 두 메일이 같고, 아니면 연 사람 메일이 빈칸)
+function loadPlanckApp({ password = 'teacher-pw-123', owner = false } = {}) {
     const ss = makeSpreadsheet();
     const props = new Map();
     if (password != null) props.set('TEACHER_PASSWORD', password);
     const cache = new Map();
+    const state = { owner };
     let uuid = 0;
     const ctx = {
         SpreadsheetApp: { getActiveSpreadsheet: () => ss },
@@ -40,7 +42,11 @@ function loadPlanckApp({ password = 'teacher-pw-123' } = {}) {
             createHtmlOutputFromFile(name) { const c = read(name + '.html'); return { getContent: () => c }; }
         },
         LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
-        CacheService: { getScriptCache: () => ({ get: k => (cache.has(k) ? cache.get(k) : null), put: (k, v) => cache.set(k, String(v)) }) },
+        CacheService: { getScriptCache: () => ({ get: k => (cache.has(k) ? cache.get(k) : null), put: (k, v) => cache.set(k, String(v)), remove: k => cache.delete(k) }) },
+        Session: {
+            getActiveUser: () => ({ getEmail: () => (state.owner ? 'teacher@example.com' : '') }),
+            getEffectiveUser: () => ({ getEmail: () => 'teacher@example.com' })
+        },
         PropertiesService: { getScriptProperties: () => ({ getProperty: k => (props.has(k) ? props.get(k) : null) }) },
         Utilities: { getUuid: () => 'abcdef' + String(++uuid).padStart(2, '0') + '-0000-0000' },
         Date, JSON, Math, String, Number, Array, Object, RegExp, Error, isFinite
@@ -48,7 +54,7 @@ function loadPlanckApp({ password = 'teacher-pw-123' } = {}) {
     vm.createContext(ctx);
     vm.runInContext(read('Code.gs'), ctx);
     const sheet = () => ss.getSheetByName('제출');
-    return { ctx, ss, props, cache, sheet, rows: () => (sheet() ? sheet().rows : []) };
+    return { ctx, ss, props, cache, state, sheet, rows: () => (sheet() ? sheet().rows : []) };
 }
 
 // 브라우저에 넣을 가짜 google.script.run. window.__gasCall(함수 이름, 인자들) 이 { ok, value } 또는 { ok: false, message } 를 돌려준다.

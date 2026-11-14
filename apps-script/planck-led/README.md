@@ -1,5 +1,21 @@
 # LED 플랑크 상수 실험 — Google Apps Script 웹앱
 
+> **⬇ 한 번에 내려받기 (ZIP)**: https://github.com/aks-sci-lab/arduino_experiments/raw/main/apps-script/planck-led-appsscript.zip
+> (저장소 이름을 `sensor-lab` 으로 바꿔도 이 주소는 GitHub 이 새 주소로 넘겨 줍니다.)
+>
+> ZIP 을 풀면 `planck-led-appsscript` 폴더 안에 아래 파일이 있습니다. **이름이 Apps Script 편집기의 파일 이름과 똑같으니** 같은 이름의 파일에 그대로 붙여 넣으면 됩니다.
+>
+> | 파일 | Apps Script 편집기에서 | 내용 |
+> |---|---|---|
+> | `Code.gs` | 처음부터 있는 `Code.gs` | 서버 (화면 열기·제출 저장·교사 암호) |
+> | `Index.html` | ＋ → HTML → `Index` | 학생 화면 |
+> | `Teacher.html` | ＋ → HTML → `Teacher` | 선생님 화면 |
+> | `Common.html` | ＋ → HTML → `Common` | 공통 모양·그래프·CSV |
+> | `PlanckMath.html` | ＋ → HTML → `PlanckMath` | 플랑크 상수 계산 |
+> | `appsscript.json` | (선택) 매니페스트 | 시간대·웹앱 설정 |
+> | `README.md` | 붙여 넣지 않음 | 이 설명서 |
+> | `보고서.md` | 붙여 넣지 않음 | 과제 제출용 설명 문서 (목적·기능·사용 흐름·구조·시트·화면) |
+
 **무엇을 만들었나** — 고등학교 물리 'LED 로 플랑크 상수 구하기' 실험을 구글 Apps Script 웹앱으로 만들었습니다. 학생은 스마트폰 브라우저에서 조·이름을 적고, LED 마다 멀티미터로 잰 전압·전류(또는 고정 저항 전압)를 넣으면 웹앱이 바로 I–V 그래프와 **문턱 전압 V₀**(직선 연장 또는 빛 기준)를 구하고, 여러 LED 의 V₀–진동수 직선의 기울기로 **플랑크 상수 h 와 오차**를 계산합니다. **[제출]** 을 누르면 `google.script.run` 으로 구글 스프레드시트에 LED 하나당 한 줄(제출 시각 포함)이 저장됩니다. 선생님은 같은 웹앱 주소 끝에 `?page=teacher` 를 붙여 교사 암호로 들어가 **조별로 묶은 표·V₀–f 그래프·조 h·학생 h 평균**을 보고 CSV 로 내려받습니다.
 **사용 흐름** — 선생님이 스프레드시트에 스크립트를 붙여 배포 → 학생에게 웹앱 주소(QR) 배포 → 학생 측정·계산·제출 → 선생님 화면에서 조별 확인·CSV.
 **구조** — `Code.gs`(서버: 화면 열기·제출 검사와 저장·교사 암호 확인) / `Index.html`(학생 화면) / `Teacher.html`(선생님 화면) / `PlanckMath.html`(계산: 실험실 사이트의 `js/planck-math.js` 를 그대로 옮긴 것) / `Common.html`(공통 모양·그래프·CSV) / `appsscript.json`(설정). 외부 라이브러리 없이 그래프는 캔버스로 직접 그립니다.
@@ -38,6 +54,18 @@
 
 코드를 고친 뒤에는 **배포** → **배포 관리** → ✏️(수정) → **버전**: **새 버전** → **배포** 를 해야 학생 화면에 반영됩니다. 이렇게 하면 주소는 그대로입니다.
 
+### (선택) clasp 로 한 번에 올리기
+
+명령 창(터미널)에 익숙하면 복사·붙여 넣기 대신 구글의 clasp 도구로 파일을 한꺼번에 올릴 수 있습니다. Node.js 가 설치되어 있어야 합니다.
+
+1. https://script.google.com/home/usersettings 에서 **Google Apps Script API** 를 **사용** 으로 켭니다.
+2. 명령 창에서 `npm install -g @google/clasp` → `clasp login` (브라우저에서 내 계정 허용)
+3. ZIP 을 푼 `planck-led-appsscript` 폴더로 가서
+   `clasp create --type sheets --title "플랑크 상수 제출" --rootDir .`
+   → 새 스프레드시트와 거기에 붙은 스크립트가 만들어집니다.
+4. `clasp push` → `.gs`·`.html`·`appsscript.json` 이 올라갑니다(`.md` 는 올라가지 않음).
+5. 그다음은 위 2단계(교사 암호)와 3단계(배포)를 편집기에서 똑같이 합니다. `clasp open` 으로 편집기를 열 수 있습니다.
+
 ## 4. 학생에게 주소 나눠 주기
 
 - 복사한 웹 앱 URL 을 그대로 학생에게 보냅니다(클래스룸 글, QR 코드 등).
@@ -58,7 +86,7 @@
 
 ### 교사 화면 보호 방법을 '교사 암호' 로 고른 이유
 
-- **암호 방식(이 웹앱)**: 배포 1번, 주소 1개로 끝납니다. 선생님 자료를 주는 서버 함수(`teacherData`)가 매번 스크립트 속성의 암호와 비교하므로, 학생이 `?page=teacher` 주소를 알아도 암호 없이는 자료를 받을 수 없습니다. 암호는 코드에 적지 않아 코드를 공유·제출해도 드러나지 않고, 10번 틀리면 10분 동안 잠깁니다.
+- **암호 방식(이 웹앱)**: 배포 1번, 주소 1개로 끝납니다. 선생님 자료를 주는 서버 함수(`teacherData`)가 매번 스크립트 속성의 암호와 비교하므로, 학생이 `?page=teacher` 주소를 알아도 암호 없이는 자료를 받을 수 없습니다. 암호는 코드에 적지 않아 코드를 공유·제출해도 드러나지 않습니다. 10번 틀리면 5분 동안 잠기지만, 맞는 암호가 들어오면 틀린 횟수가 지워지고, **스프레드시트를 만든 선생님 구글 계정으로 로그인한 브라우저는 잠겨 있어도 암호만 맞으면 들어갑니다**(학생 장난으로 선생님이 막히지 않게). 이 확인 때문에 처음 승인할 때 '이메일 주소 보기' 권한도 묻습니다.
 - **'나만 접근' 배포를 따로 두는 방식**: 같은 프로젝트의 배포는 모두 같은 코드(`doGet`)를 쓰므로, 학생용 배포(모든 사용자)에서도 선생님 함수가 그대로 열려 있게 됩니다. 막으려면 별도 프로젝트로 나누고 같은 시트를 다루게 해야 해서, 처음 쓰는 분에게 단계가 많고 실수하기 쉽습니다.
 
 ## 시트 열 구조 ('제출' 시트, 첫 제출 때 자동으로 생김)
@@ -94,5 +122,5 @@
 
 ## 개발자용: 고치고 시험하기
 
-- `PlanckMath.html` 은 사이트의 `js/planck-math.js` 로 자동 생성합니다. 계산을 고치면 `js/planck-math.js` 를 고친 뒤 `node tools/build-planck-apps-script.cjs`.
+- `PlanckMath.html` 은 사이트의 `js/planck-math.js` 로, `../planck-led-appsscript.zip` 은 이 폴더 파일들로 자동 생성합니다. 이 폴더나 `js/planck-math.js` 를 고친 뒤 `node tools/build-planck-apps-script.cjs` 를 실행하세요(시험이 최신인지 확인).
 - 시험: `node --test tests/planck-apps-script.test.cjs` (서버: 가짜 Apps Script 로 Code.gs 실행), `node --test tests/planck-apps-script-ui.test.cjs` (화면: Playwright 로 390px·1366px, `google.script.run` 을 가짜로 바꿔 Code.gs 와 연결). 실제 Apps Script 배포는 시험하지 못합니다.
