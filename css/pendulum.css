@@ -1,0 +1,70 @@
+/* 스마트폰 진자 — 측정 화면 (공통 css/lab-base.css 위에 덧씌움, 색·간격은 변수만) */
+.pendulum { padding: var(--sp-3) var(--sp-4); }
+.pendulum .lead { margin: 0 0 var(--sp-3); color: var(--c-muted); font-size: var(--fs-sm); }
+.pendulum h2 { font-size: var(--fs-h2); margin: 0 0 var(--sp-2); }
+
+.pendulum button {
+    font-size: var(--fs-base); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl);
+    border: 1px solid var(--c-line); background: var(--c-card); color: var(--c-text); cursor: pointer;
+}
+.pendulum button:disabled { opacity: .55; }
+.pendulum .btn-primary { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+.pendulum .btn-danger { background: var(--c-danger); border-color: var(--c-danger); color: #fff; }
+.pendulum .btn-info { background: var(--c-info); border-color: var(--c-info); color: #fff; }
+.pendulum .btn-success { background: var(--c-success); border-color: var(--c-success); color: #fff; }
+
+.pd-safety {
+    margin: 0 0 var(--sp-3); padding: var(--sp-3) var(--sp-4);
+    background: var(--c-warn-bg); color: var(--c-warn-text); border-radius: var(--r-card);
+}
+.pd-safety ul { margin: 0; padding-left: 1.2em; }
+.pd-safety li { margin: 2px 0; }
+
+.pd-howto { margin: 0 0 var(--sp-3); padding: var(--sp-2) var(--sp-3) var(--sp-2) 2em; background: var(--c-primary-soft); border-radius: var(--r-card); font-size: var(--fs-sm); }
+.pd-howto li { margin: 2px 0; }
+
+.pd-card {
+    margin: var(--sp-3) 0; padding: var(--sp-3);
+    background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card);
+}
+.pd-form { display: grid; gap: var(--sp-2) var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: var(--sp-2); }
+.pd-form label { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); font-weight: 600; color: var(--c-muted); min-width: 0; }
+.pd-form .wide { grid-column: 1 / -1; }
+.pd-form input, .pd-form select {
+    min-height: var(--tap); padding: var(--sp-1) var(--sp-2); font-size: var(--fs-base); color: var(--c-text);
+    border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-card); width: 100%;
+}
+.pd-form .pd-check { flex-direction: row; align-items: center; gap: var(--sp-2); min-height: var(--tap); }
+.pd-form .pd-check input { width: 22px; min-height: 22px; height: 22px; }
+
+.pd-msg { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-card); font-size: var(--fs-sm); }
+.pd-msg.warn { background: var(--c-warn-bg); color: var(--c-warn-text); }
+.pd-msg.err { background: var(--c-err-bg); color: var(--c-err-text); }
+
+.pd-calib {
+    display: flex; align-items: center; gap: var(--sp-3); margin: 0 0 var(--sp-3); padding: var(--sp-3);
+    background: var(--c-primary-soft); border: 2px solid var(--c-primary); border-radius: var(--r-card);
+}
+.pd-calib p { margin: 0; font-weight: 600; }
+.pd-count { font-size: var(--fs-reading); font-weight: 700; color: var(--c-primary); min-width: 1.5em; text-align: center; }
+.pd-calib.go { background: var(--c-ok-bg); border-color: var(--c-success); }
+.pd-calib.go .pd-count { color: var(--c-success); }
+
+.pd-charts { display: grid; gap: var(--sp-2); min-width: 0; }
+.pd-charts .dash-chart { height: clamp(200px, 30vh, 320px); }
+.pd-key::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #e8590c; vertical-align: middle; }
+
+.pd-result { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); background: var(--c-fill); border-radius: var(--r-card); }
+.pd-result .big { font-size: var(--fs-h1); font-weight: 700; color: var(--c-primary); }
+.pd-result ul { margin: var(--sp-1) 0 0; padding-left: 1.2em; }
+.pd-result .warn { color: var(--c-warn-text); }
+.pd-explain { margin: var(--sp-2) 0; font-size: var(--fs-sm); }
+.pd-explain summary { cursor: pointer; font-weight: 600; color: var(--c-primary); min-height: var(--tap); display: flex; align-items: center; }
+
+.pd-table-wrap { max-height: 320px; overflow: auto; border: 1px solid var(--c-line); border-radius: var(--r-ctl); }
+.pd-table-wrap.tall { max-height: 420px; }
+.pd-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.pd-table th, .pd-table td { padding: 4px 8px; border-bottom: 1px solid var(--c-line); text-align: right; white-space: nowrap; }
+.pd-table th { position: sticky; top: 0; background: var(--c-fill); text-align: center; }
+.pd-table td:first-child { text-align: center; }
+.pd-help li { margin: var(--sp-1) 0; font-size: var(--fs-sm); }
