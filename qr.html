@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/lab-base.css">
+    <script src="js/lab-ui.js"></script>
     <title>QR 코드로 접속 | 센서 기반 실험실</title>
     <style>
         /* 교실 프로젝터·인쇄용: QR 을 크게, 글자는 굵게 */
-        :root { --c-primary: #1565c0; --c-text: #222; --c-muted: #555; --c-line: #d0d7e2; }
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif; color: var(--c-text); background: #fff; }
+        /* 색·글꼴은 공통 css/lab-base.css 의 변수, 바탕만 흰색(프로젝터·인쇄용) */
+        body { background: #fff; }
         main { max-width: 760px; margin: 0 auto; padding: 16px; text-align: center; }
         h1 { font-size: 1.5em; margin: 8px 0 4px; }
         .tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; margin: 12px 0; }

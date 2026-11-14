@@ -149,6 +149,8 @@ summary { cursor: pointer; font-weight: 600; }
 .top h1 { font-size: 1.15rem; margin: 0; }
 .account { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
 button.small { padding: 5px 10px; font-size: 0.8rem; }
+/* 로그인 단추는 손가락으로 누르기 좋게 (실험실 공통 규칙: 44px) */
+.account button { min-height: 44px; padding: 8px 14px; font-size: 0.9rem; }
 .tabs { display: flex; gap: 4px; overflow-x: auto; margin-top: 8px; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tabs button[role="tab"] {
