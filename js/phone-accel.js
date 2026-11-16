@@ -13,7 +13,6 @@ const btnStop = document.getElementById('btn-stop');
 const btnDownload = document.getElementById('btn-download');
 const btnCrop = document.getElementById('btn-crop');
 const btnResetData = document.getElementById('btn-reset-data');
-const btnCloudSubmit = document.getElementById('btn-cloud-submit');
 const selectionStatus = document.getElementById('selection-status');
 const timeRangeSpan = document.getElementById('time-range');
 const recordStatusEl = document.getElementById('record-status');
@@ -160,7 +159,6 @@ function handleMotion(event) {
     btnCrop.disabled = false;
     btnResetData.disabled = false;
     btnDownload.disabled = false;
-    if (btnCloudSubmit) btnCloudSubmit.disabled = false;
     updateTimeRangeDisplay();
 }
 
@@ -192,7 +190,7 @@ async function startRecording() {
     selectionMode = 0;
     cropStartMs = null;
     cropEndMs = null;
-    accChart.data.datasets.forEach(ds => ds.data = []);
+    accChart.data.datasets.slice(0, 3).forEach(ds => ds.data = []);   // 4번째부터는 📥 불러온 기록 겹쳐 보기
     accChart.update('none');
 
     window.addEventListener('devicemotion', handleMotion);
@@ -202,7 +200,6 @@ async function startRecording() {
     btnDownload.disabled = true;
     btnCrop.disabled = true;
     btnResetData.disabled = true;
-    if (btnCloudSubmit) btnCloudSubmit.disabled = true;
     recordStatusEl.textContent = '🔴 기록 중... (센서 신호 대기)';
     recordStatusEl.style.color = 'var(--c-danger)';
     sensorWarningEl.style.display = 'none';
@@ -227,7 +224,8 @@ function stopRecording() {
     btnStop.disabled = true;
     recordStatusEl.textContent = `⏸ 대기 중 (샘플 ${samples.length}개 기록됨)`;
     recordStatusEl.style.color = 'var(--c-muted)';
-    if (btnCloudSubmit) btnCloudSubmit.disabled = samples.length === 0;
+    saveLast();
+    notifyChange();
 }
 
 function downloadCSV() {
@@ -265,6 +263,8 @@ function cropToSelection() {
     if (filtered.length === 0) return alert('선택된 구간에 데이터가 없습니다.');
     samples = filtered;
     rebuildChartDataFromSamples();
+    saveLast();
+    notifyChange();
     selectionMode = 0;
     cropStartMs = null;
     cropEndMs = null;
@@ -275,6 +275,8 @@ function resetDataToOriginal() {
     if (!originalSamples) return alert('복원할 원본 데이터가 없습니다.');
     samples = originalSamples.slice();
     rebuildChartDataFromSamples();
+    saveLast();
+    notifyChange();
     selectionMode = 0;
     cropStartMs = null;
     cropEndMs = null;
@@ -348,15 +350,51 @@ btnCrop.addEventListener('click', cropToSelection);
 btnResetData.addEventListener('click', resetDataToOriginal);
 accChartCanvasEl.addEventListener('click', onChartClick);
 
+/* 마지막 기록을 이 기기에 남김 (새로고침해도 보이고, 👥 조 공유로 다시 보낼 수 있게). 200개라 작다 */
+const LAST_KEY = 'phone-accel:last';
+function saveLast() {
+    try {
+        localStorage.setItem(LAST_KEY, JSON.stringify({ samples: samples.map(s => ({ t: s.t, rel: s.rel, ax: s.ax, ay: s.ay, az: s.az })),
+            original: originalSamples ? originalSamples.map(s => ({ t: s.t, rel: s.rel, ax: s.ax, ay: s.ay, az: s.az })) : null }));
+    } catch (e) { /* 저장 불가: 이 화면에서만 */ }
+}
+function loadLast() {
+    try {
+        const d = JSON.parse(localStorage.getItem(LAST_KEY) || 'null');
+        const ok = a => Array.isArray(a) && a.every(s => s && [s.rel, s.ax, s.ay, s.az].every(Number.isFinite));
+        if (!d || !ok(d.samples) || !d.samples.length) return;
+        samples = d.samples.slice(-MAX_SAMPLES);
+        originalSamples = ok(d.original) && d.original.length ? d.original : null;
+        rebuildChartDataFromSamples();
+        btnDownload.disabled = false;
+        btnResetData.disabled = !originalSamples;
+        recordStatusEl.textContent = `⏸ 지난 기록 (샘플 ${samples.length}개)`;
+    } catch (e) { /* 깨진 값은 무시 */ }
+}
+// 기록이 바뀌었음을 조 공유 스크립트(js/phone-accel-share.js)에 알림
+const changeListeners = [];
+function notifyChange() { changeListeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
+
 (function init() {
     accChart.data.datasets.forEach(ds => { ds.data = []; });
     accChart.update('none');
+    loadLast();
     updateTimeRangeDisplay();
     updateSelectionStatus();
 })();
 
-// Expose read-only access for the Firebase cloud-submit script (phone-accel-cloud.js)
+// 👥 조 공유 스크립트(js/phone-accel-share.js)가 쓰는 창구
 window.__phoneAccel = {
     getSamples: () => samples,
-    getRange
+    isRecording: () => recording,
+    getRange,
+    onChange: fn => changeListeners.push(fn),
+    // 📥 불러온 기록 겹쳐 보기: [{ label, points: [{ x: ms, y: g }] }] (앞 3개 Ax·Ay·Az 는 그대로)
+    setOverlays(list) {
+        const colors = ['#8e44ad', '#d35400', '#16a085', '#7f8c8d', '#c0392b', '#2c3e50'];
+        accChart.data.datasets.length = 3;
+        (list || []).forEach((o, i) => accChart.data.datasets.push({ label: o.label, data: o.points, borderColor: colors[i % colors.length],
+            borderWidth: 1.5, borderDash: [5, 4], tension: 0.15, pointRadius: 0, fill: false }));
+        accChart.update('none');
+    }
 };

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <link rel="stylesheet" href="../css/class-share.css">
     <meta name="description" content="자유낙하 궤적 분석 & 다중섬광사진 - 수동 객체 선택 방식">
     <title>자유낙하 다중섬광사진 및 수동 궤적 분석</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" defer></script>
@@ -50,6 +51,7 @@
             padding: var(--sp-2) var(--sp-3);
             margin: var(--sp-3) 0;
         }
+        #group-table tr.muted td { color: var(--c-muted); }
         .box.warn { background: var(--c-warn-bg); color: var(--c-warn-text); border-left-color: var(--c-warn-text); }
         table.simple { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
         table.simple th, table.simple td { border: 1px solid var(--c-line); padding: 6px 8px; text-align: left; vertical-align: top; }
@@ -176,6 +178,8 @@
 <body>
     <main class="container">
         <h1>자유낙하 및 2차원 운동 분석</h1>
+        <!-- 수업 참여 띠 (?c=수업코드 일 때만): js/class-share.js 가 채움 -->
+        <div id="class-bar-mount"></div>
         <p class="note">스마트폰 영상에서 물체의 중심을 직접 골라 다중섬광사진을 만들고, 위치–시간 그래프로 운동을 분석합니다.</p>
 
         <nav class="steps" role="tablist" aria-label="실험 단계">
@@ -281,6 +285,8 @@
         <!-- ===== 5. 데이터 ===== -->
         <section class="step-panel" data-step="data" role="tabpanel" hidden>
             <h2>5. 데이터 <small class="note" id="data-mode-label">(자유낙하)</small></h2>
+            <!-- 👥 조 공유 (구글 로그인 없이 조 코드로 선생님 시트에 보내기·같은 조 노트북에서 불러오기): js/class-share.js 가 채움 -->
+            <div id="share-mount"></div>
 
             <!-- 영상 로드 -->
             <div class="controls">
@@ -374,6 +380,19 @@
             <div id="fit-result" class="fit-result" hidden></div>
             <p class="note" id="fit-note" hidden></p>
 
+            <!-- 👥 조 결과 모아 보기: 내 결과 + 같은 조 다른 노트북에서 불러온 결과(📥) -->
+            <div id="group-results" class="box" hidden>
+                <h3>👥 조 결과 모아 보기</h3>
+                <p class="note">'✓ 합성 실행'을 하면 내 결과가 정해지고, 5. 데이터의 👥 조 공유에서 📤 보내면 선생님 시트와 같은 조 노트북에 갑니다. 📥 는 같은 조 다른 노트북에서 불러온 결과입니다(그래프에는 첫 점을 내 첫 점에 맞춰 점선으로 겹칩니다).</p>
+                <div class="table-wrap">
+                    <table class="simple" id="group-table">
+                        <thead><tr><th>누구</th><th>종류</th><th>점</th><th>g (m/s²)</th><th>오차 (%)</th><th>R²</th><th>vₓ (m/s)</th></tr></thead>
+                        <tbody id="group-table-body"></tbody>
+                    </table>
+                </div>
+                <p class="note" id="group-mean"></p>
+            </div>
+
             <!-- 자유낙하 그래프 -->
             <div class="chart-container" id="chart-wrapper">
                 <h3 id="chart-title">자유낙하 t-y 그래프</h3>
@@ -433,6 +452,12 @@
         </section>
     </main>
 
+    <!-- 조 공유: 선생님 구글 시트의 Apps Script (주소 js/pendulum-config.js, 링크의 ?s= 가 있으면 그것). 구글 로그인 없음 -->
+    <script src="../js/pendulum-config.js"></script>
+    <script src="../js/pendulum-cloud.js"></script>
+    <script src="../js/class-cloud.js"></script>
+    <script src="../js/class-share.js"></script>
+    <script src="../js/accelerometer-share.js"></script>
     <script src="../js/free-fall-manual.js" defer></script>
 </body>
 </html>
