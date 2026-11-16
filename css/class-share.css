@@ -21,3 +21,15 @@ select.cs-in { min-width: 84px; }
 .cs-check { min-height: var(--tap); }
 .cs-check input { width: 20px; height: 20px; }
 .cs-row:empty { display: none; }
+/* 📱 폰 연결: 폰 쪽 띠, 노트북 쪽 QR 창 */
+.cs-phone { border-left: 5px solid var(--c-success); }
+.cs-dlg { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; padding: var(--sp-3); }
+.cs-dlg[hidden] { display: none !important; }
+html.big-view .cs-dlg { zoom: calc(1 / 1.35); }
+.cs-dlg-in { background: var(--c-card); border-radius: var(--r-card); padding: var(--sp-4); width: min(520px, 100%); max-height: 100%; overflow: auto; text-align: center; }
+.cs-dlg-in h2 { margin: 0 0 var(--sp-2); font-size: var(--fs-h2); }
+.cs-qr { width: min(320px, 80vw, 55vh); margin: var(--sp-2) auto; background: #fff; }
+.cs-qr svg { width: 100%; height: auto; display: block; }
+.cs-link { font-size: var(--fs-sm); word-break: break-all; }
+.cs-dlg .cs-row { justify-content: center; }
+.cs-row:has(> [hidden]:only-child) { display: none; }

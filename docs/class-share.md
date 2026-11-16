@@ -83,6 +83,30 @@ const share = ClassShare.init({
 `js/class-cloud.js` 의 `EXPS` 에서 그 실험의 `ready` 를 `true` 로 바꿉니다. 그러면 교사 화면의 실험 고르기에서 '(페이지 연결 준비 중)' 이 사라집니다.
 시험: 그 실험의 `getItems`/`onIncoming` 을 Node 에서 시험하고, Playwright 로 노트북 두 대(같은 조 코드) → 보내기 → 다른 쪽 표에 합쳐짐, 375px 가로 스크롤 없음·단추 44px 을 확인합니다(가짜 서버: `tests/fake-apps-script.cjs` 의 `loadCodeGs()` 를 작은 HTTP 서버로 띄우고 `pendulum-config.js` 요청을 가로채 그 주소로).
 
+## 📱 폰 연결 (스마트폰으로 재는 실험: 폰 가속도·말루스·자유낙하 등)
+
+진자처럼 **노트북이 QR 을 보여 주고 → 폰이 찍어 측정 → 저장하면 노트북에 저절로** 들어오게 합니다. 서버 변경 없음(같은 공용 저장·목록).
+
+```js
+const share = ClassShare.init({
+    exp: 'phoneaccel', shareMount: '#share-mount', barMount: '#class-bar-mount',
+    phone: true,                              // 또는 { page: 'projects/폰용-페이지.html' } (기본은 같은 페이지)
+    onRole: role => {                         // 'phone' | 'laptop' — 폰이면 측정 화면만, 노트북이면 분석 화면 등
+        document.body.classList.toggle('is-phone', role === 'phone');
+    },
+    onPhoneData: n => { /* (선택) 노트북: 폰에서 새 측정 n개가 들어옴 — 표 탭으로 옮기기 등 */ },
+    getItems, onIncoming, getStep, getPoints   // 위와 같음
+});
+// 측정 하나를 저장할 때마다 (폰 화면이면 바로 보냄, 노트북이면 아무것도 안 함)
+saveRun(run); share.saved();
+```
+
+- **노트북**: 조 공유 칸(수업이면 수업 참여 띠에도)에 **📱 폰으로 측정하기** → 큰 QR·주소 복사. 주소 = 폰 페이지 + `?role=phone&group=조코드&s=시트ID`(수업이면 `&c=…&jo=…&num=…`, 이름 없음). 열면 자동 불러오기가 켜지고, 폰 측정이 들어오면 "🆕 폰에서 새 측정 N개" (QR 창에도)
+- **폰**(`role=phone`): 조 코드·수업 자리를 묻지 않음, 맨 위에 '📱 노트북과 연결됨 · 조 …' 띠, 조 공유 칸은 접힘, `share.saved()` 때 자동 보내기(실패하면 📤 다시 보내기·CSV 안내). 폰 저장은 노트북 화면과 따로(`class-share:<exp>:phone`), 기기 번호는 `p…` → 다른 화면에 '📱 폰 AB12' 로 보임
+- **하트비트**: 폰은 측정·보내기 때만, 단계 앞에 `phone-` → 교사 진행 보기에 '📱 측정 중'
+- 같은 기기로 노트북과 폰을 모두 쓰면 둘이 따로 기억합니다(시험할 때 편함)
+- `share.role()`·`share.isPhone()`·`share.openPhone()`·`share.phoneLink()` 도 있음
+
 ## 실험 이름 (`exp`)
 
 | exp | 실험 | 페이지 | 서버 저장 |
