@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
+    <title>수업 연결 (교사)</title>
+    <link rel="stylesheet" href="../css/class-teacher.css">
+    <!-- QR (qr.html·진자와 같은 판) -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" defer></script>
+</head>
+<body>
+<main class="ct-wrap">
+    <a class="back" href="../index.html">← 메인 페이지</a>
+    <h1>👩‍🏫 수업 연결 (교사)</h1>
+    <p class="note">구글 로그인 없이 씁니다. 선생님 구글 시트(Apps Script)에 수업을 만들면 조가 나뉘고, 학생은 QR 로 들어와 조·번호(이름 없음)를 고릅니다. 측정값은 조원과 선생님께 자동으로 공유되고, 여기서 진행 상황을 봅니다.</p>
+
+    <nav class="subtabs sticky" id="ctTabs" aria-label="수업 연결">
+        <button data-tab="sheet">① 시트 연결</button>
+        <button data-tab="make">② 수업 만들기</button>
+        <button data-tab="watch">③ 진행 보기</button>
+    </nav>
+
+    <!-- ① 시트 연결 -->
+    <div class="tab-panel" data-tab="sheet">
+        <section class="ct-card">
+            <h2>① 선생님 시트 연결</h2>
+            <p id="sheetNow" class="ct-status"></p>
+            <ol class="ct-steps">
+                <li>구글 시트에 <b>Apps Script</b>(진자·플랑크와 같은 코드)를 붙여 웹 앱으로 배포합니다. 처음이면 <a href="pendulum-setup.html">시트 만들기 자세한 안내</a>를 따라 하세요.</li>
+                <li>코드가 바뀌었다는 안내가 있으면 새 코드를 다시 붙여 넣고 <kbd>배포 관리</kbd> → 연필 → 버전 <b>새 버전</b> → <kbd>배포</kbd>. (수업 연결은 <b>4판</b> 이상이 필요해요)</li>
+                <li>웹 앱 주소(<code>https://script.google.com/macros/s/…/exec</code>)를 아래에 붙여 넣고 연결 시험을 누르세요. 이 브라우저가 기억합니다.</li>
+            </ol>
+            <label class="ct-field">웹 앱 주소
+                <input type="url" id="sheetUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+            </label>
+            <div class="ct-row">
+                <button id="btnConnect">🔌 연결 시험하고 기억하기</button>
+                <button id="btnTestNow" class="secondary">지금 시트 연결 시험</button>
+            </div>
+            <p id="sheetMsg" class="note" role="status" aria-live="polite"></p>
+        </section>
+    </div>
+
+    <!-- ② 수업 만들기 -->
+    <div class="tab-panel" data-tab="make">
+        <section class="ct-card">
+            <h2>② 수업 만들기</h2>
+            <div class="ct-grid3">
+                <label class="ct-field">반 <input type="number" id="inBan" min="1" max="99" inputmode="numeric" value="1"></label>
+                <label class="ct-field">학생 수 <input type="number" id="inN" min="1" max="60" inputmode="numeric" value="24"></label>
+                <label class="ct-field">조별 인원 <input type="number" id="inSize" min="1" max="10" inputmode="numeric" value="4"></label>
+            </div>
+            <label class="ct-field">실험
+                <select id="inExp"><option value="planck">💡 LED 로 플랑크 상수 측정</option></select>
+            </label>
+            <p id="preview" class="ct-preview"></p>
+            <div class="ct-row"><button id="btnCreate" class="good">✨ 수업 만들기</button></div>
+            <p id="createMsg" class="note" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="ct-card" id="classOut" hidden>
+            <h2>학생 연결 <span id="outTitle" class="note"></span></h2>
+            <div class="ct-join">
+                <div id="qr" class="ct-qr" aria-label="학생 연결 QR 코드"></div>
+                <div>
+                    <p class="note">학생은 QR 을 찍거나, 메인 페이지 → <b>학생으로 시작</b>에서 아래 수업 코드를 넣어요.</p>
+                    <p class="ct-code" id="outCode"></p>
+                    <p><a id="outLink" class="ct-link" target="_blank" rel="noopener"></a></p>
+                    <div class="ct-row">
+                        <button id="btnCopy" class="secondary">📋 주소 복사</button>
+                        <button id="btnBig" class="secondary">🔍 QR 크게</button>
+                        <button class="good" data-tab-go="watch">③ 진행 보기 →</button>
+                    </div>
+                    <p id="copyMsg" class="note"></p>
+                </div>
+            </div>
+            <details class="ct-key">
+                <summary>🔑 교사 열쇠 (다른 기기에서 이 수업을 볼 때)</summary>
+                <p>열쇠 <b class="ct-mono" id="outKey"></b> — 이 브라우저에는 저장되어 있어요. 다른 컴퓨터에서 보려면 그 컴퓨터의 이 화면에서 '수업 불러오기'에 수업 코드와 열쇠를 넣으세요. <b>학생에게 보여 주지 마세요.</b></p>
+            </details>
+        </section>
+
+        <section class="ct-card">
+            <h2>만든 수업</h2>
+            <div id="classList" class="ct-list"></div>
+            <details>
+                <summary>📥 다른 기기에서 만든 수업 불러오기</summary>
+                <div class="ct-grid3">
+                    <label class="ct-field">수업 코드 <input type="text" id="impCode" placeholder="예: 2-4821" inputmode="numeric" autocomplete="off"></label>
+                    <label class="ct-field">교사 열쇠 <input type="text" id="impKey" autocomplete="off" spellcheck="false"></label>
+                </div>
+                <div class="ct-row"><button id="btnImport" class="secondary">불러오기 (지금 연결한 시트에서)</button></div>
+                <p id="impMsg" class="note"></p>
+            </details>
+        </section>
+    </div>
+
+    <!-- ③ 진행 보기 -->
+    <div class="tab-panel" data-tab="watch">
+        <section class="ct-card">
+            <div class="ct-row">
+                <label class="ct-field ct-inline">수업 <select id="watchSel"></select></label>
+                <button id="btnRefresh" class="secondary">🔄 지금 새로 보기</button>
+            </div>
+            <p id="watchMsg" class="note" role="status" aria-live="polite"></p>
+            <div id="watchSum" class="ct-sum"></div>
+        </section>
+        <div id="groups" class="ct-groups"></div>
+        <section class="ct-card" id="detail" hidden>
+            <h2 id="detailTitle"></h2>
+            <div id="detailBody"></div>
+            <div class="ct-row"><button id="btnCloseDetail" class="secondary">닫기</button></div>
+        </section>
+    </div>
+</main>
+
+<!-- QR 크게 보기 -->
+<div id="bigQr" class="ct-bigqr" hidden role="dialog" aria-label="QR 크게 보기">
+    <div id="bigQrImg"></div>
+    <p class="ct-code" id="bigQrCode"></p>
+    <button id="btnBigClose">닫기</button>
+</div>
+
+<script src="../js/pendulum-config.js"></script>
+<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/class-cloud.js"></script>
+<script src="../js/class-teacher.js"></script>
+</body>
+</html>

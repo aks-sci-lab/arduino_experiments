@@ -12,6 +12,20 @@
 <div class="wrap">
     <a class="back" href="../index.html">← 메인 페이지</a>
     <h1>💡 LED 로 플랑크 상수 측정</h1>
+    <!-- 수업 참여: 주소에 ?c=수업코드 가 있을 때만 (선생님 '수업 연결' 화면의 QR) -->
+    <div id="class-bar" class="card class-bar" hidden>
+        <div id="class-info"><b>🏫 수업 참여</b> <span class="note">불러오는 중…</span></div>
+        <div class="row" id="class-pick" hidden>
+            <label>조 <select id="cl-jo"></select></label>
+            <label>번호 <select id="cl-num"></select></label>
+            <button id="cl-join" class="good">참여하기</button>
+        </div>
+        <div class="row" id="class-joined" hidden>
+            <span id="cl-me"></span>
+            <button id="cl-change" class="secondary">조·번호 바꾸기</button>
+        </div>
+        <div id="class-msg" class="note" role="status" aria-live="polite"></div>
+    </div>
     <nav class="tabs" role="tablist">
         <button role="tab" data-tab="purpose"><b>1</b><span>목적</span></button>
         <button role="tab" data-tab="theory"><b>2</b><span>이론</span></button>
@@ -736,6 +750,7 @@
 <script src="../js/pendulum-config.js"></script>
 <script src="../js/pendulum-cloud.js"></script>
 <script src="../js/planck-cloud.js"></script>
+<script src="../js/class-cloud.js"></script>
 <script src="../js/planck-led.js"></script>
 </body>
 </html>

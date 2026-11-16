@@ -848,7 +848,7 @@
         share.busy = false;
         save();
         if (fail) show('⚠ 보내지 못했습니다: ' + esc(fail.error) + (done ? ' (' + done + '개는 보냄)' : '') + '<br>다시 눌러 보고, 계속 안 되면 6. 실험 결과의 <b>CSV 다운로드</b> 파일을 선생님께 내세요.', true);
-        else show('✅ LED ' + done + '개의 측정값을 선생님 시트로 보냈습니다 (' + timeText(new Date()) + '). 같은 조의 다른 노트북에서 📥 불러오기를 누르면 합쳐집니다.');
+        else { show('✅ LED ' + done + '개의 측정값을 선생님 시트로 보냈습니다 (' + timeText(new Date()) + '). 같은 조의 다른 노트북에서 📥 불러오기를 누르면 합쳐집니다.'); classBeat(true); }
         renderShare();
     }
     $('sh-send').addEventListener('click', () => send());
@@ -926,6 +926,91 @@
         setShareStatus('불러온 값을 지웠습니다. 다시 합치려면 📥 불러오기를 누르세요.');
     });
 
+    // ---------- 수업 참여 (?c=수업코드, 선생님 '수업 연결' 화면의 QR) ----------
+    // 조·번호(이름 없음)를 고르면 그 조의 조 코드가 조 공유에 들어가고 자동 불러오기가 켜진다.
+    // 단계를 바꿀 때·보낼 때·1분마다 선생님 시트에 '신호'(보고 있는 단계·잰 점 수·보냄 여부)를 보낸다.
+    const CC = window.ClassCloud;
+    const CLASS_CODE = CC ? CC.readClassParam(location.search) : '';
+    const CLASS_KEY = 'planck-class:v1';
+    const cls = { info: null, me: null, lastBeat: 0, timer: null, pending: null };
+    function loadMe() {
+        let d = null;
+        try { d = JSON.parse(localStorage.getItem(CLASS_KEY) || 'null'); } catch (e) { d = null; }
+        return d && d.c === CLASS_CODE && d.jo && d.num ? d : null;
+    }
+    function saveMe() { try { localStorage.setItem(CLASS_KEY, JSON.stringify(cls.me)); } catch (e) { /* 저장 불가 */ } }
+    function myPoints() { return state.leds.reduce((n, l) => n + l.iv.length + l.glow.length, 0); }
+    function classBeat(force) {
+        if (!CLASS_CODE || !cls.me || !cls.info || !SERVER.url) return;
+        const now = Date.now(), wait = 5000 - (now - cls.lastBeat);
+        // 탭을 빨리 넘길 때 너무 자주 보내지 않게: 5초 안이면 조금 뒤에 마지막 단계로 한 번만 보낸다
+        if (!force && wait > 0) { if (!cls.pending) cls.pending = setTimeout(() => { cls.pending = null; classBeat(true); }, wait); return; }
+        clearTimeout(cls.pending); cls.pending = null;
+        cls.lastBeat = now;
+        CC.heartbeat(SERVER.url, { classCode: CLASS_CODE, jo: cls.me.jo, num: cls.me.num, step: state.tab, points: myPoints(), submitted: state.share.sent.length > 0, device: state.share.device })
+            .then(r => { $('class-msg').innerHTML = r.ok ? '' : '⚠ 선생님께 진행 상황을 보내지 못했습니다: ' + esc(r.error); });
+    }
+    function renderClass() {
+        if (!CLASS_CODE) return;
+        const info = cls.info, me = cls.me;
+        $('class-bar').hidden = false;
+        if (!info) return;
+        const exp = CC.EXPS[info.exp];
+        $('class-info').innerHTML = '<b>🏫 ' + esc(info.ban) + '반 수업</b> <span class="note">수업 코드 ' + esc(info.classCode) + (exp && info.exp !== 'planck' ? ' · ⚠ 이 수업은 ' + esc(exp.name) + ' 수업입니다' : '') + '</span>';
+        $('class-pick').hidden = !!me; $('class-joined').hidden = !me;
+        if (me) {
+            const g = CC.groupFor(info, me.jo);
+            $('cl-me').innerHTML = '나: <b>' + esc(me.jo) + '조 ' + esc(me.num) + '번</b> <span class="note">· 조 코드 ' + esc(g ? g.code : '') + ' · 측정값은 조원·선생님과 자동으로 나눠요</span>';
+            return;
+        }
+        $('cl-jo').innerHTML = '<option value="">조 고르기</option>' + info.groups.map(g => '<option value="' + g.jo + '">' + g.jo + '조 (' + g.size + '명)</option>').join('');
+        fillNums();
+    }
+    function fillNums() {
+        const g = cls.info && CC.groupFor(cls.info, $('cl-jo').value);
+        $('cl-num').innerHTML = g ? Array.from({ length: g.size }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '번</option>').join('') : '<option value="">–</option>';
+        $('cl-join').disabled = !g;
+    }
+    function applyMe() {
+        const g = CC.groupFor(cls.info, cls.me.jo);
+        if (!g) return;
+        state.share.auto = true;
+        if (state.share.group !== g.code) setGroup(g.code); else { save(); renderShare(); pull(true); }
+        classBeat(true);
+        clearInterval(cls.timer);
+        cls.timer = setInterval(() => { if (!document.hidden) classBeat(true); }, 60000);
+    }
+    async function startClass() {
+        if (!CLASS_CODE) return;
+        $('class-bar').hidden = false;
+        if (!SERVER.url) { $('class-msg').textContent = '⚠ 선생님 시트 주소가 없습니다. 선생님이 보여 준 QR 로 다시 들어오세요.'; return; }
+        const r = await CC.joinInfo(SERVER.url, CLASS_CODE);
+        if (!r.ok) {
+            $('class-info').innerHTML = '<b>🏫 수업 참여</b>';
+            $('class-msg').innerHTML = '⚠ ' + esc(r.error) + '<br>수업 없이 측정은 그대로 할 수 있고, 조 공유에 조 코드를 직접 넣어도 됩니다.';
+            return;
+        }
+        cls.info = r;
+        cls.me = loadMe();
+        if (cls.me && !CC.groupFor(r, cls.me.jo)) cls.me = null;
+        renderClass();
+        if (cls.me) applyMe();
+    }
+    $('cl-jo').addEventListener('change', fillNums);
+    $('cl-join').addEventListener('click', () => {
+        const jo = Number($('cl-jo').value), num = Number($('cl-num').value);
+        if (!jo || !num) return;
+        cls.me = { c: CLASS_CODE, jo, num };
+        saveMe(); renderClass(); applyMe();
+        $('class-msg').textContent = '✅ ' + jo + '조 ' + num + '번으로 참여했습니다.';
+    });
+    $('cl-change').addEventListener('click', () => {
+        if (!confirm('조·번호를 다시 고를까요? (이 노트북에서 잰 값은 그대로 남습니다)')) return;
+        cls.me = null; clearInterval(cls.timer);
+        try { localStorage.removeItem(CLASS_KEY); } catch (e) { /* 저장 불가 */ }
+        renderClass();
+    });
+
     function renderAll() {
         renderSetup();
         renderLeds();
@@ -952,6 +1037,7 @@
         save();
         renderAll();   // 숨겨져 있던 그래프는 보일 때 크기에 맞춰 다시 그린다
         if (scroll) window.scrollTo(0, 0);
+        classBeat();   // 수업 참여 중이면 선생님께 지금 단계를 알림
     }
     document.querySelectorAll('.tabs button, [data-go]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab || b.dataset.go, true)));
 
@@ -975,7 +1061,8 @@
     applyControls();
     if (!groupOk()) $('share-box').open = true;
     showTab(state.tab);
-    if (groupOk() && state.share.auto) pull(true);
+    if (groupOk() && state.share.auto && !CLASS_CODE) pull(true);
+    startClass();
     // 같은 브라우저의 다른 창(탭)에서 바꾼 내용을 따라간다. 그렇지 않으면 이 창이 저장할 때 다른 창의 기록을 덮어쓴다.
     window.addEventListener('storage', e => {
         if (e.key !== STORE_KEY) return;

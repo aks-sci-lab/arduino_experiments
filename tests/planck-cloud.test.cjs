@@ -147,5 +147,5 @@ test('Apps Script: planck 값 검사 (형식·범위·크기), 진자 목록에�
     assert.equal(app.ss.getSheetByName('planck').rows[1][18], '[[1.9,2,null,null,1]]');
     assert.equal(app.get({ action: 'list', group: '2-3-5376' }).items.length, 0, '진자 measurements 는 비어 있음');
     assert.match(app.get({ action: 'raw', exp: 'planck', group: '2-3-5376', id: 'nab12cd-red' }).error, /알 수 없는/);
-    assert.equal(app.get({ action: 'ping' }).version, 3);
+    assert.ok(app.get({ action: 'ping' }).version >= 3);
 });

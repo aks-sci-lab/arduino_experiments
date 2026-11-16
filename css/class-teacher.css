@@ -1,0 +1,65 @@
+/* 수업 연결 (교사) — projects/class-teacher.html. 색·간격은 lab-base.css 의 변수만 */
+.ct-wrap { max-width: var(--w-dash); margin: 0 auto; padding: var(--sp-3); }
+.ct-wrap h1 { font-size: var(--fs-h1); margin: var(--sp-1) 0 var(--sp-2); }
+.ct-wrap h2 { font-size: var(--fs-h2); margin: 0 0 var(--sp-2); }
+.back { display: inline-block; font-size: var(--fs-sm); min-height: 32px; }
+.ct-card { background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-4); margin-bottom: var(--sp-3); box-shadow: var(--shadow); }
+.ct-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin: var(--sp-2) 0; }
+.ct-steps { padding-left: 20px; font-size: var(--fs-sm); line-height: 1.7; }
+.ct-steps kbd { background: var(--c-fill); border: 1px solid var(--c-line); border-radius: 4px; padding: 0 4px; font-family: inherit; }
+.ct-field { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-sm); font-weight: 600; margin: var(--sp-2) 0; }
+.ct-field.ct-inline { flex-direction: row; align-items: center; margin: 0; }
+.ct-field input, .ct-field select { min-height: var(--tap); padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); font-size: 1rem; font-weight: 400; width: 100%; max-width: 100%; background: #fff; }
+.ct-field.ct-inline select { width: auto; max-width: 70vw; }
+.ct-grid3 { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+.ct-wrap button { min-height: var(--tap); padding: var(--sp-2) var(--sp-4); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: .95rem; font-weight: 600; cursor: pointer; }
+.ct-wrap button:hover { background: var(--c-primary-dark); }
+.ct-wrap button.secondary { background: var(--c-secondary); }
+.ct-wrap button.good { background: var(--c-success); }
+.ct-wrap button.danger { background: var(--c-danger); }
+.ct-wrap button:disabled { opacity: .5; }
+.ct-status { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); background: var(--c-fill); font-size: var(--fs-sm); }
+.ct-status.ok { background: var(--c-ok-bg); color: var(--c-ok-text); }
+.ct-status.warn { background: var(--c-warn-bg); color: var(--c-warn-text); }
+.ct-preview { background: var(--c-primary-soft); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); }
+.err { color: var(--c-danger); }
+
+/* 학생 연결: QR + 코드 */
+.ct-join { display: grid; gap: var(--sp-3); grid-template-columns: minmax(0, 1fr); align-items: center; }
+@media (min-width: 640px) { .ct-join { grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); } }
+.ct-qr { background: #fff; border-radius: var(--r-card); padding: var(--sp-2); max-width: 300px; width: 100%; justify-self: center; }
+.ct-qr svg { width: 100%; height: auto; display: block; }
+.ct-code { font-size: clamp(2rem, 9vw, 3rem); font-weight: 800; letter-spacing: .04em; margin: var(--sp-1) 0; font-variant-numeric: tabular-nums; color: var(--c-primary); }
+.ct-link { font-size: var(--fs-sm); word-break: break-all; }
+.ct-mono { font-family: var(--font-mono); font-size: 1.1em; letter-spacing: .05em; }
+.ct-key { margin-top: var(--sp-2); }
+details > summary { cursor: pointer; font-weight: 600; min-height: var(--tap); display: flex; align-items: center; }
+.ct-list { display: grid; gap: var(--sp-2); }
+.ct-list .ct-item { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; justify-content: space-between; border: 1px solid var(--c-line); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3); }
+.ct-list .ct-item b { color: var(--c-primary); font-size: 1.1rem; }
+
+/* QR 크게 (진자 화면과 같은 모양) */
+.ct-bigqr { position: fixed; inset: 0; z-index: 1000; background: #fff; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; justify-items: center; align-items: center; gap: var(--sp-2); padding: var(--sp-3); }
+html.big-view .ct-bigqr { zoom: calc(1 / 1.35); }
+.ct-bigqr #bigQrImg { height: 100%; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.ct-bigqr #bigQrImg svg { height: 100%; width: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1; }
+.ct-bigqr button { min-height: var(--tap); padding: var(--sp-2) var(--sp-5); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: 1rem; }
+
+/* 진행 보기 */
+.ct-sum { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.ct-sum div { background: var(--c-fill); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); }
+.ct-sum b { display: block; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.ct-groups { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); margin-bottom: var(--sp-3); }
+.ct-group { background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-3); box-shadow: var(--shadow); }
+.ct-group h3 { font-size: 1rem; margin: 0 0 var(--sp-1); display: flex; justify-content: space-between; gap: var(--sp-2); }
+.ct-group .ct-sub { font-size: var(--fs-sm); color: var(--c-muted); margin: 0 0 var(--sp-2); }
+.ct-group .ct-sub.done { color: var(--c-ok-text); }
+.ct-wrap button.ct-mem { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: var(--sp-2); text-align: left; margin-top: var(--sp-1); padding: var(--sp-2) var(--sp-3); background: var(--c-fill); color: var(--c-text); font-weight: 400; font-size: var(--fs-sm); border-left: 5px solid var(--c-line); }
+.ct-wrap button.ct-mem:hover { background: var(--c-primary-soft); }
+.ct-wrap button.ct-mem b { font-weight: 700; }
+.ct-wrap button.ct-mem.active { border-left-color: var(--c-success); }
+.ct-wrap button.ct-mem.idle { border-left-color: var(--c-warn-text); background: var(--c-warn-bg); }
+.ct-wrap button.ct-mem.none { color: var(--c-muted); }
+.ct-mem .ct-mem-r { text-align: right; }
+.ct-detail-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.ct-detail-table th, .ct-detail-table td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--c-line); }

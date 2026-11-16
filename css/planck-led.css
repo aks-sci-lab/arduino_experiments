@@ -88,3 +88,8 @@ details.share[open] > summary { margin-bottom: 6px; }
 label.file-btn { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 14px; border-radius: 6px; background: var(--c-secondary); color: #fff; font-size: .95em; cursor: pointer; }
 label.file-btn:focus-within { outline: 3px solid var(--c-primary); outline-offset: 2px; }
 #sh-status.err { color: var(--c-danger); }
+/* 수업 참여 띠 (?c=수업코드) */
+.class-bar { border-left: 5px solid var(--c-primary); padding: 10px 14px; }
+.class-bar .row { margin: 6px 0; }
+.class-bar select { min-width: 84px; }
+.class-bar #cl-me { font-size: 1.05em; }
