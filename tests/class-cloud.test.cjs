@@ -92,7 +92,9 @@ test('Apps Script: 수업 만들기 값 검사', () => {
     assert.match(bad({ nStudents: 61 }), /학생 수/);
     assert.match(bad({ groupSize: 0 }), /조별 인원/);
     assert.match(bad({ nStudents: 2.5 }), /정수/);
-    assert.match(bad({ exp: 'pendulum' }), /수업 연결을 쓸 수 없습니다/);
+    assert.match(bad({ exp: 'nope' }), /수업 연결을 쓸 수 없습니다/);
+    assert.match(bad({ exp: 'custom:a b' }), /수업 연결을 쓸 수 없습니다/);
+    assert.equal(app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'custom:abcDEF_12' }).ok, true);
 });
 
 test('Apps Script: 학생 신호는 조·번호마다 한 줄 고쳐 쓰고, 없는 자리는 거절', () => {

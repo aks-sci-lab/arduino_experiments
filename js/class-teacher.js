@@ -162,16 +162,32 @@
     copyFile($('btnCopyManifest'), '../apps-script/appsscript.json', 'appsscript.json');
 
     // ---------- ② 수업 만들기 ----------
-    function inputs() { return { ban: Number($('inBan').value), nStudents: Number($('inN').value), groupSize: Number($('inSize').value), exp: $('inExp').value }; }
+    // 실험 고르기: js/class-cloud.js 의 EXPS 전체 + 선생님이 만든 실험(번호 넣기)
+    $('inExp').innerHTML = Object.keys(CC.EXPS).map(function (k) {
+        var e = CC.EXPS[k];
+        return '<option value="' + k + '">' + e.icon + ' ' + esc(e.name) + (e.ready ? '' : ' (페이지 연결 준비 중)') + '</option>';
+    }).join('') + '<option value="custom">👩‍🏫 선생님이 만든 실험…</option>';
+    function chosenExp() {
+        var v = $('inExp').value;
+        if (v !== 'custom') return v;
+        var id = $('inCustom').value.trim().replace(/^.*[?&]id=/, '').replace(/[&#].*$/, '');
+        return /^[A-Za-z0-9_-]{1,40}$/.test(id) ? 'custom:' + id : '';
+    }
+    function inputs() { return { ban: Number($('inBan').value), nStudents: Number($('inN').value), groupSize: Number($('inSize').value), exp: chosenExp() }; }
     function renderPreview() {
         var o = inputs(), g = CC.splitGroups(o.nStudents, o.groupSize);
-        var ok = g.length && o.ban >= 1 && o.ban <= 99 && o.ban % 1 === 0;
+        var ok = g.length && o.ban >= 1 && o.ban <= 99 && o.ban % 1 === 0 && !!o.exp;
         $('btnCreate').disabled = !ok;
+        $('customRow').hidden = $('inExp').value !== 'custom';
+        var e = o.exp && CC.expInfo(o.exp);
+        $('expNote').innerHTML = $('inExp').value === 'custom' && !o.exp ? '선생님이 만든 실험의 번호(또는 학생 화면 주소)를 넣어 주세요.'
+            : e && !e.ready ? '⚠️ 이 실험 페이지는 아직 수업 참여 띠를 붙이는 중이에요. 수업은 만들 수 있지만, 학생 화면에 조·번호 고르기가 아직 안 나올 수 있어요.' : '';
         $('preview').innerHTML = ok
             ? '👥 ' + o.nStudents + '명 → <b>' + g.length + '개 조</b>: ' + g.map(function (k, i) { return (i + 1) + '조 ' + k + '명'; }).join(', ')
             : '반(1~99), 학생 수(1~60), 조별 인원(1~10)을 정수로 넣어 주세요.';
     }
-    ['inBan', 'inN', 'inSize', 'inExp'].forEach(function (id) { $(id).addEventListener('input', renderPreview); });
+    ['inBan', 'inN', 'inSize', 'inExp', 'inCustom'].forEach(function (id) { $(id).addEventListener('input', renderPreview); });
+    $('inExp').addEventListener('change', renderPreview);
     $('btnCreate').addEventListener('click', async function () {
         if (state.busy) return;
         var o = inputs(), msg = $('createMsg');
@@ -199,7 +215,7 @@
         return qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true });
     }
     function showClass(c) {
-        var link = studentLink(c), e = CC.EXPS[c.exp];
+        var link = studentLink(c), e = CC.expInfo(c.exp);
         $('classOut').hidden = false;
         $('outTitle').textContent = '— ' + c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + c.nStudents + '명, ' + c.groups.length + '개 조';
         $('outCode').textContent = c.classCode;
@@ -225,7 +241,7 @@
         var el = $('classList');
         if (!state.classes.length) { el.innerHTML = '<p class="note">아직 만든 수업이 없어요.</p>'; return; }
         el.innerHTML = state.classes.map(function (c, i) {
-            var e = CC.EXPS[c.exp];
+            var e = CC.expInfo(c.exp);
             return '<div class="ct-item"><span><b>' + esc(c.classCode) + '</b> ' + esc(c.ban) + '반 · ' + esc(e ? e.name : c.exp) + ' · ' + esc(c.nStudents) + '명/' + esc(c.groups.length) + '조' +
                 '<br><span class="note">' + esc(new Date(c.created).toLocaleString('ko-KR')) + '</span></span>' +
                 '<span class="ct-row" style="margin:0"><button class="secondary" data-show="' + i + '">QR 보기</button><button data-watch="' + i + '">진행 보기</button>' +
@@ -292,9 +308,7 @@
             '<div>쉬는 중 (5분+)<b>' + s.idle + '</b></div>' +
             '<div>제출한 조<b>' + s.submittedGroups + ' / ' + s.groups.length + '</b></div>';
         $('groups').innerHTML = s.groups.map(function (g) {
-            var sub = g.sub, subTxt = sub && sub.rows
-                ? '📤 제출: LED ' + sub.rows + '개 (' + esc(sub.leds.join(', ')) + ')' + (sub.hCurrent !== '' && sub.hCurrent != null ? ' · h = ' + Number(sub.hCurrent).toFixed(2) + ' ×10⁻³⁴' + (sub.errorPct !== '' && sub.errorPct != null ? ' (' + (sub.errorPct >= 0 ? '+' : '') + Number(sub.errorPct).toFixed(1) + ' %)' : '') : '')
-                : '아직 제출 없음';
+            var sub = g.sub, subTxt = sub && sub.rows ? '📤 ' + esc(CC.submissionText(st.exp, sub)) : '아직 제출 없음';
             return '<section class="ct-group"><h3><span>' + esc(g.jo) + '조</span><span class="note">' + esc(g.code) + '</span></h3>' +
                 '<p class="ct-sub' + (sub && sub.rows ? ' done' : '') + '">' + subTxt + '</p>' +
                 g.members.map(function (m) {
@@ -321,7 +335,7 @@
             '<tr><th>마지막 활동</th><td>' + esc(new Date(x.lastSeen).toLocaleTimeString('ko-KR')) + ' (' + esc(CC.agoText(m.state.ago)) + ')</td></tr>' +
             '<tr><th>이 학생이 잰 점</th><td>' + (x.points == null ? '–' : esc(x.points) + '개') + '</td></tr>' +
             '<tr><th>선생님께 보냄</th><td>' + (x.submitted ? '✅ 보냄' : '아직') + '</td></tr>' +
-            '<tr><th>조 전체 제출</th><td>' + (g.sub && g.sub.rows ? 'LED ' + g.sub.rows + '개, 노트북 ' + g.sub.devices + '대' + (g.sub.lastSent ? ', 마지막 ' + esc(new Date(g.sub.lastSent).toLocaleTimeString('ko-KR')) : '') : '아직') + '</td></tr>' +
+            '<tr><th>조 전체 제출</th><td>' + (g.sub && g.sub.rows ? esc(CC.submissionText(st.exp, g.sub)) + ', 기기 ' + g.sub.devices + '대' + (g.sub.lastSent ? ', 마지막 ' + esc(new Date(g.sub.lastSent).toLocaleTimeString('ko-KR')) : '') : '아직') + '</td></tr>' +
             '</tbody></table>';
     }
     $('groups').addEventListener('click', function (e) {

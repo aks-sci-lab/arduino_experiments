@@ -364,6 +364,8 @@
         state.sending = false;
         if (res.ok) {
             state.sentKey = key;
+            state.sentCount = (state.sentCount || 0) + 1;
+            if (classShare) classShare.beat(true);
             $('btnSend').textContent = '✅ 보냄';
             $('btnSend').disabled = true;
             linkMsg('✅ 노트북으로 보냈어요: L = ' + esc(conditions().L) + ' m, T = ' + fmt(state.result.T, 3) + ' s. 노트북 표에 곧 나타나요. 다른 길이로 또 재려면 L 을 바꾸고 ▶ 측정 시작!');
@@ -373,10 +375,11 @@
             linkMsg('❌ 보내지 못했어요: ' + esc(res.error) + '<br>인터넷 연결을 확인하고 다시 눌러 보세요. 계속 안 되면 <b>CSV 저장</b>으로 파일을 옮겨 노트북에서 불러오세요.', 'err');
         }
     }
-    function setupLink() {
+    // given: 수업 참여(?c=)로 정해진 조 코드. 없으면 주소의 ?group= (노트북 화면 QR)
+    function setupLink(given) {
         var m = /[?&]group=([^&#]*)/.exec(location.search);
-        if (!m || !PC) return;
-        var code = PC.normalizeGroup(decodeURIComponent(m[1]));
+        if ((!m && !given) || !PC) return;
+        var code = given || PC.normalizeGroup(decodeURIComponent(m[1]));
         if (!PC.isGroupCode(code)) { warn('주소의 조 코드(' + code + ')가 올바르지 않아요. 노트북 화면의 QR 을 다시 찍어 주세요.'); return; }
         state.group = code;
         $('linkGroup').textContent = code;
@@ -489,6 +492,7 @@
     function saveCond() { save(COND_KEY, conditions()); }
 
     // ---------- 시작 ----------
+    var classShare = null;
     function init() {
         restoreFields();
         Object.keys(COND_FIELDS).forEach(function (id) { $(id).addEventListener('input', saveCond); });
@@ -502,6 +506,18 @@
         $('btnSend').addEventListener('click', sendToLaptop);
         ['cL', 'cAmp', 'cNote'].forEach(function (id) { $(id).addEventListener('input', updateSendState); });
         setupLink();
+        // 수업 참여 (?c=수업코드): 조·번호를 고르면 그 조 코드로 '노트북으로 보내기'가 켜짐 (공통 부품 js/class-share.js)
+        if (window.ClassShare && window.ClassCloud && ClassCloud.readClassParam(location.search)) {
+            classShare = ClassShare.init({
+                exp: 'pendulum',
+                getStep: function () { var b = document.querySelector('#pdTabs [aria-selected="true"]'); return b ? b.dataset.tab : ''; },
+                getPoints: function () { return state.sentCount || 0; },
+                getSubmitted: function () { return (state.sentCount || 0) > 0; },
+                onGroup: function (g) { if (state.group !== g) { setupLink(g); updateSendState(); } }
+            });
+            var tabsNav = $('pdTabs');
+            if (tabsNav) tabsNav.addEventListener('click', function () { classShare.stepChanged(); });
+        }
         $('dataDetails').addEventListener('toggle', renderDataTable);
         if (typeof DeviceMotionEvent === 'undefined') warn('이 기기·브라우저에는 동작 센서가 없어요. 폰으로 열거나, 아래 "🧪 시뮬레이션"으로 연습하세요.');
         if (typeof Chart === 'undefined') warn('그래프 도구를 불러오지 못했어요(인터넷 연결 확인). 계산과 CSV 저장은 그대로 돼요.');

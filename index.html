@@ -286,13 +286,13 @@
             var server = PC.resolveServer(location.search, (window.PENDULUM_CONFIG || {}).appsScriptUrl || '', store, true);
             msg.className = 'note'; msg.textContent = '⏳ 수업을 찾는 중…';
             var r = await CC.joinInfo(server.url, code);
-            var exp = r.ok && CC.EXPS[r.exp];
+            var exp = r.ok && CC.expInfo(r.exp);
             if (!exp) {
                 msg.className = 'note join-err';
                 msg.textContent = '⚠️ ' + (r.ok ? '이 화면에서 열 수 없는 실험이에요.' : r.error) + ' 선생님 화면의 QR 을 찍어 들어오세요 (선생님마다 시트가 달라 코드만으로는 못 찾을 수 있어요).';
                 return;
             }
-            location.href = exp.page + '?c=' + encodeURIComponent(code) + (server.id && server.from !== 'default' ? '&s=' + encodeURIComponent(server.id) : '');
+            location.href = exp.page + (exp.page.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(code) + (server.id && server.from !== 'default' ? '&s=' + encodeURIComponent(server.id) : '');
         });
     })();
     </script>

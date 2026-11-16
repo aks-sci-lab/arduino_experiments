@@ -34,11 +34,16 @@
  *   POST { action: 'rollback', key }          → 업데이트 전 배포 버전으로 되돌리기
  *   데이터 시트는 건드리지 않는다. 받을 주소는 요청 값으로 바꿀 수 없다.
  *
+ *   실험 공용 저장(6판부터, 플랑크·진자 밖의 모든 실험: 화면 부품 js/class-share.js 가 씀):
+ *   POST { action: 'save', exp: 'idealgas'|…|'custom:실험id', id, group, device, title, n, summary: {이름: 숫자·짧은 글}, data: 'JSON 글자', sentAt }
+ *        → submissions 시트에 한 줄 (같은 실험·조·id 면 고쳐 씀, data 는 45,000자씩 6칸까지)
+ *   GET  ?action=list&exp=idealgas&group=2-3-4821  → 그 조가 보낸 줄 (data 포함)
+ *
  * 개인정보: 학생 이름·학번·이메일은 받지도 저장하지도 않는다. 조 코드로만 구분한다.
  * 4단계(보고서·AI)용 시트 reports·ai_logs·quiz 는 만들어 두기만 한다.
  */
 
-var VERSION = 5;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠
+var VERSION = 6;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠  6: 모든 실험 공용 저장(submissions 시트)·수업에 모든 실험
 // 스스로 업데이트: 코드는 이 고정 주소에서만 받는다 (요청 값으로 바꿀 수 없음)
 var SITE = 'https://aks-sci-lab.web.app/apps-script/';
 var SCRIPT_API = 'https://script.googleapis.com/v1/projects/';
@@ -63,11 +68,20 @@ var SHEETS = {
   // 수업 연결: 선생님이 만든 수업 하나 = 한 줄. groups 는 [{ jo, code, size }] JSON, keyHash 는 교사 열쇠의 SHA-256
   classes: ['timestamp', 'classCode', 'ban', 'nStudents', 'groupSize', 'exp', 'groups', 'keyHash'],
   // 학생 진행: 수업·조·번호마다 한 줄 (이름 없음). step 은 보고 있는 단계, lastSeen 은 마지막 신호 시각
-  progress: ['timestamp', 'classCode', 'groupCode', 'jo', 'num', 'step', 'points', 'submitted', 'lastSeen', 'device', 'exp']
+  progress: ['timestamp', 'classCode', 'groupCode', 'jo', 'num', 'step', 'points', 'submitted', 'lastSeen', 'device', 'exp'],
+  // 실험 공용 저장(6판): 플랑크·진자 밖의 실험. 조의 노트북 한 대가 보낸 측정 하나 = 한 줄 (exp 칸으로 실험을 나눔)
+  submissions: ['timestamp', 'exp', 'groupCode', 'title', 'n', 'summary', 'device', 'id', 'sentAt', 'data', 'data2', 'data3', 'data4', 'data5', 'data6']
 };
 var DEVICE_RE = /^[A-Za-z0-9_-]{4,20}$/;
 var CLASS_RE = /^\d{1,2}-\d{4}$/;                 // 반-4자리 (예: 2-4821)
-var CLASS_EXPS = { planck: true };                 // 수업으로 쓸 수 있는 실험 (나중에 진자 등 추가)
+// 수업으로 쓸 수 있는 실험 (js/class-cloud.js 의 EXPS 와 같게). 'custom:<실험 id>' 는 선생님이 만든 실험
+var GENERIC_EXPS = { idealgas: 1, accel: 1, env: 1, light: 1, uv: 1, phoneaccel: 1, malus: 1, eminduction: 1, freefall: 1, nano: 1 };
+var CLASS_EXPS = { planck: 1, pendulum: 1 };
+Object.keys(GENERIC_EXPS).forEach(function (k) { CLASS_EXPS[k] = 1; });
+var CUSTOM_EXP_RE = /^custom:[A-Za-z0-9_-]{1,40}$/;
+function isClassExp(e) { return !!CLASS_EXPS[e] || CUSTOM_EXP_RE.test(e); }
+function isGenericExp(e) { return !!GENERIC_EXPS[e] || CUSTOM_EXP_RE.test(e); }
+var DATA_CELLS = 6, SUMMARY_KEYS = 20;
 var STEP_RE = /^[a-z0-9_-]{1,20}$/;
 var MAX_CLASSES = 500;
 var PLANCK_POINTS = 500;                          // LED 하나·기준 하나에 받는 점 수 한도
@@ -80,6 +94,11 @@ function doGet(e) {
     var group = cleanGroup(p.group);
     if (p.exp === 'planck') {
       if (p.action === 'list') return json({ ok: true, group: group, items: listPlanck(group) });
+      throw new Error('알 수 없는 요청입니다.');
+    }
+    if (p.exp && p.exp !== 'pendulum') {
+      if (!isGenericExp(String(p.exp))) throw new Error('알 수 없는 실험입니다.');
+      if (p.action === 'list') return json({ ok: true, group: group, exp: String(p.exp), items: listSubmissions(String(p.exp), group) });
       throw new Error('알 수 없는 요청입니다.');
     }
     if (p.action === 'list') return json({ ok: true, group: group, items: listGroup(group) });
@@ -100,6 +119,7 @@ function doPost(e) {
     if (bodyText.length > MAX_BODY) throw new Error('보낸 내용이 너무 큽니다.');
     var body = JSON.parse(bodyText);
     if (body.action === 'save' && body.exp === 'planck') return json(savePlanck(body));
+    if (body.action === 'save' && body.exp && body.exp !== 'pendulum') return json(saveSubmission(body));
     if (body.action === 'claimAdmin') return json(claimAdmin());
     if (body.action === 'update') return json(selfUpdate(body));
     if (body.action === 'rollback') return json(rollback(body));
@@ -371,7 +391,7 @@ function createClass(b) {
   var size = numIn(b.groupSize, 1, 10, '조별 인원');
   if (ban % 1 || n % 1 || size % 1) throw new Error('반·학생 수·조별 인원은 정수로 넣어 주세요.');
   var exp = String(b.exp || '');
-  if (!CLASS_EXPS[exp]) throw new Error('이 실험은 아직 수업 연결을 쓸 수 없습니다.');
+  if (!isClassExp(exp)) throw new Error('이 실험은 아직 수업 연결을 쓸 수 없습니다.');
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -391,7 +411,7 @@ function createClass(b) {
     var groups = splitGroups(n, size).map(function (k, i) { return { jo: i + 1, code: ban + '-' + (i + 1) + '-' + four, size: k }; });
     var key = Utilities.getUuid().replace(/-/g, '').slice(0, 12);
     var rec = {
-      timestamp: new Date(), classCode: text(code, 10), ban: ban, nStudents: n, groupSize: size, exp: text(exp, 20),
+      timestamp: new Date(), classCode: text(code, 10), ban: ban, nStudents: n, groupSize: size, exp: text(exp, 50),
       groups: text(JSON.stringify(groups), CELL_MAX), keyHash: text(hashKey(key), 80)
     };
     sh.appendRow(SHEETS.classes.map(function (k) { return rec[k] === undefined ? '' : rec[k]; }));
@@ -423,7 +443,7 @@ function heartbeat(b) {
     submitted: b.submitted ? 1 : 0,
     lastSeen: new Date(),
     device: text(DEVICE_RE.test(device) ? device : '', 20),
-    exp: text(cls.exp, 20)
+    exp: text(cls.exp, 50)
   };
   var row = SHEETS.progress.map(function (k) { return rec[k] === undefined ? '' : rec[k]; });
   var lock = LockService.getScriptLock();
@@ -461,9 +481,9 @@ function classStatus(b) {
   });
   // 조별 제출 요약 (플랑크: planck 시트에서 그 조 코드의 줄)
   var subs = {};
-  cls.groups.forEach(function (g) { subs[g.code] = { code: g.code, jo: g.jo, rows: 0, leds: [], devices: 0, lastSent: '', hCurrent: '', errorPct: '' }; });
+  cls.groups.forEach(function (g) { subs[g.code] = { code: g.code, jo: g.jo, rows: 0, labels: [], leds: [], devices: 0, lastSent: '', hCurrent: '', errorPct: '', summary: null }; });
+  var devs = {};
   if (cls.exp === 'planck') {
-    var devs = {};
     allRows(sheet('planck'), 'planck').forEach(function (r) {
       var gc = String(r[idx('groupCode', 'planck')]), s = subs[gc];
       if (!s) return;
@@ -471,6 +491,7 @@ function classStatus(b) {
       if (!nPts) return;
       s.rows++;
       s.leds.push(String(r[idx('led', 'planck')]));
+      s.labels.push(String(r[idx('led', 'planck')]));
       (devs[gc] = devs[gc] || {})[String(r[idx('device', 'planck')])] = true;
       var sent = String(r[idx('sentAt', 'planck')]);
       if (sent >= s.lastSent) {
@@ -478,8 +499,29 @@ function classStatus(b) {
         if (r[idx('h_current_e-34', 'planck')] !== '') { s.hCurrent = Number(r[idx('h_current_e-34', 'planck')]); s.errorPct = r[idx('error_pct', 'planck')] === '' ? '' : Number(r[idx('error_pct', 'planck')]); }
       }
     });
-    Object.keys(devs).forEach(function (gc) { subs[gc].devices = Object.keys(devs[gc]).length; });
+  } else if (cls.exp === 'pendulum') {
+    allRows(sheet('measurements')).forEach(function (r) {
+      var gc = String(r[idx('groupCode')]), s = subs[gc];
+      if (!s) return;
+      s.rows++;
+      s.labels.push('L ' + r[idx('L')] + ' m');
+      (devs[gc] = devs[gc] || {})[String(r[idx('device')] || 'phone')] = true;
+      var at = String(r[idx('measuredAt')] || '');
+      if (at >= s.lastSent) { s.lastSent = at; s.summary = { L: Number(r[idx('L')]), T: Number(r[idx('T_mean')]) }; }
+    });
+  } else if (isGenericExp(cls.exp)) {
+    allRows(sheet('submissions'), 'submissions').forEach(function (r) {
+      if (!same(r[idx('exp', 'submissions')], cls.exp)) return;
+      var gc = String(r[idx('groupCode', 'submissions')]), s = subs[gc];
+      if (!s || !Number(r[idx('n', 'submissions')])) return;
+      s.rows++;
+      s.labels.push(String(r[idx('title', 'submissions')]));
+      (devs[gc] = devs[gc] || {})[String(r[idx('device', 'submissions')])] = true;
+      var sent = String(r[idx('sentAt', 'submissions')]);
+      if (sent >= s.lastSent) { s.lastSent = sent; s.summary = parseSummary(r[idx('summary', 'submissions')]); }
+    });
   }
+  Object.keys(devs).forEach(function (gc) { subs[gc].devices = Object.keys(devs[gc]).length; });
   var out = publicClass(cls);
   out.now = new Date().toISOString();
   out.students = students;
@@ -619,4 +661,76 @@ function rollback(b) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// ---------- 실험 공용 저장 (6판): submissions 시트 ----------
+// summary: 교사 화면·시트에서 바로 볼 숫자 몇 개 ({ g: 9.79, err: 0.2 } 처럼, 이름 20개까지, 값은 숫자 또는 40자 글)
+function cleanSummary(v) {
+  if (v == null || v === '') return {};
+  if (typeof v !== 'object' || Array.isArray(v)) throw new Error('요약(summary) 형식이 올바르지 않습니다.');
+  var keys = Object.keys(v);
+  if (keys.length > SUMMARY_KEYS) throw new Error('요약(summary) 항목이 너무 많습니다.');
+  var out = {};
+  keys.forEach(function (k) {
+    if (!/^[A-Za-z0-9_가-힣 .()-]{1,30}$/.test(k)) throw new Error('요약 이름이 올바르지 않습니다.');
+    var x = v[k];
+    if (typeof x === 'number') { if (!isFinite(x)) throw new Error('요약 값이 올바르지 않습니다.'); out[k] = x; }
+    else if (x == null) out[k] = null;
+    else out[k] = String(x).replace(/[\u0000-\u001f]/g, ' ').slice(0, 40);
+  });
+  return out;
+}
+function parseSummary(cell) { try { var o = JSON.parse(String(cell || '{}')); return o && typeof o === 'object' ? o : {}; } catch (err) { return {}; } }
+
+function saveSubmission(b) {
+  var exp = String(b.exp || '');
+  if (!isGenericExp(exp)) throw new Error('알 수 없는 실험입니다.');
+  var group = cleanGroup(b.group);
+  var id = String(b.id || '');
+  if (!ID_RE.test(id)) throw new Error('측정 번호(id)가 올바르지 않습니다.');
+  var device = String(b.device || '');
+  if (!DEVICE_RE.test(device)) throw new Error('노트북 번호가 올바르지 않습니다.');
+  var data = b.data == null ? '' : String(b.data);
+  if (data.length > CELL_MAX * DATA_CELLS) throw new Error('보낸 자료가 너무 큽니다 (' + (CELL_MAX * DATA_CELLS) + '자까지).');
+  var rec = {
+    timestamp: new Date(), exp: text(exp, 50), groupCode: text(group, 20),
+    title: text(String(b.title == null ? '' : b.title).trim() || '측정', 60),
+    n: numIn(b.n, 0, 100000, '점 수'),
+    summary: text(JSON.stringify(cleanSummary(b.summary)), 2000),
+    device: text(device, 20), id: text(id, 40), sentAt: text(b.sentAt, 40)
+  };
+  for (var k = 0; k < DATA_CELLS; k++) rec[k ? 'data' + (k + 1) : 'data'] = text(data.slice(k * CELL_MAX, (k + 1) * CELL_MAX), CELL_MAX);
+  var row = SHEETS.submissions.map(function (c) { return rec[c] === undefined ? '' : rec[c]; });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = sheet('submissions');
+    var rows = allRows(sh, 'submissions'), mine = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (!same(r[idx('exp', 'submissions')], exp) || !same(r[idx('groupCode', 'submissions')], group)) continue;
+      if (same(r[idx('id', 'submissions')], id)) { sh.getRange(i + 2, 1, 1, row.length).setValues([row]); return { ok: true, id: id, updated: true }; }
+      mine++;
+    }
+    if (mine >= MAX_ROWS_PER_GROUP) throw new Error('이 조가 보낸 줄이 너무 많습니다(' + MAX_ROWS_PER_GROUP + '개). 선생님께 알려 주세요.');
+    sh.appendRow(row);
+    return { ok: true, id: id, updated: false };
+  } finally {
+    lock.releaseLock();
+  }
+}
+function listSubmissions(exp, group) {
+  var iso = function (v) { return v instanceof Date ? v.toISOString() : v; };
+  return allRows(sheet('submissions'), 'submissions').filter(function (r) {
+    return same(r[idx('exp', 'submissions')], exp) && same(r[idx('groupCode', 'submissions')], group);
+  }).map(function (r) {
+    var data = '';
+    for (var k = 0; k < DATA_CELLS; k++) data += String(r[idx(k ? 'data' + (k + 1) : 'data', 'submissions')] || '');
+    return {
+      exp: exp, group: group, id: String(r[idx('id', 'submissions')]), device: String(r[idx('device', 'submissions')]),
+      title: String(r[idx('title', 'submissions')]), n: Number(r[idx('n', 'submissions')]) || 0,
+      summary: parseSummary(r[idx('summary', 'submissions')]), sentAt: String(iso(r[idx('sentAt', 'submissions')]) || ''),
+      timestamp: iso(r[idx('timestamp', 'submissions')]), data: data
+    };
+  });
 }

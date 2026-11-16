@@ -1,0 +1,23 @@
+/* 수업 참여 · 조 공유 공통 부품 (js/class-share.js). 어느 실험 페이지에 넣어도 같은 모양이 되게 단추·입력 칸 모양을 스스로 정한다 */
+.cs-card { background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-3) var(--sp-4); margin: 0 0 var(--sp-3); box-shadow: var(--shadow); font-size: .95rem; line-height: 1.5; color: var(--c-text); }
+.cs-bar { border-left: 5px solid var(--c-primary); }
+.cs-share > summary { cursor: pointer; font-weight: 700; min-height: var(--tap); display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); }
+.cs-share[open] > summary { margin-bottom: var(--sp-2); }
+.cs-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin: var(--sp-2) 0; }
+.cs-row label { display: inline-flex; align-items: center; gap: 6px; font-size: .92rem; }
+.cs-note { color: var(--c-muted); font-size: var(--fs-sm); font-weight: 400; }
+.cs-err { color: var(--c-danger); }
+.cs-in { min-height: var(--tap); padding: 6px 8px; border: 1px solid #c5ccd3; border-radius: var(--r-ctl); font-size: 1rem; background: #fff; color: var(--c-text); }
+.cs-num { width: 70px; }
+.cs-code { width: 9em; letter-spacing: .03em; }
+select.cs-in { min-width: 84px; }
+.cs-btn { display: inline-flex; align-items: center; min-height: var(--tap); padding: 8px 14px; border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: .95rem; font-weight: 600; cursor: pointer; text-decoration: none; }
+.cs-btn:hover { background: var(--c-primary-dark); color: #fff; }
+.cs-btn.secondary { background: var(--c-secondary); }
+.cs-btn.good { background: var(--c-success); }
+.cs-btn.danger { background: var(--c-danger); }
+.cs-btn:disabled { opacity: .45; cursor: default; }
+.cs-file:focus-within { outline: 3px solid var(--c-primary); outline-offset: 2px; }
+.cs-check { min-height: var(--tap); }
+.cs-check input { width: 20px; height: 20px; }
+.cs-row:empty { display: none; }

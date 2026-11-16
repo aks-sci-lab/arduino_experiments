@@ -85,8 +85,12 @@
                 <label class="ct-field">조별 인원 <input type="number" id="inSize" min="1" max="10" inputmode="numeric" value="4"></label>
             </div>
             <label class="ct-field">실험
-                <select id="inExp"><option value="planck">💡 LED 로 플랑크 상수 측정</option></select>
+                <select id="inExp"></select>
             </label>
+            <label class="ct-field" id="customRow" hidden>선생님이 만든 실험의 번호 (주소 <code>custom-lab.html?id=</code> 뒤의 글자)
+                <input type="text" id="inCustom" autocomplete="off" spellcheck="false" placeholder="예: aB3xY9…">
+            </label>
+            <p id="expNote" class="note"></p>
             <p id="preview" class="ct-preview"></p>
             <div class="ct-row"><button id="btnCreate" class="good">✨ 수업 만들기</button></div>
             <p id="createMsg" class="note" role="status" aria-live="polite"></p>

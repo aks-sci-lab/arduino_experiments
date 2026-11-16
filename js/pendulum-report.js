@@ -314,6 +314,7 @@
     }
 
     // ---------- 시작 ----------
+    var classShare = null;
     function init() {
         if (!SERVER.url) $('cfgWarn').hidden = false;
         showServer();
@@ -352,10 +353,24 @@
         $('btnManual').addEventListener('click', addManual);
         $('btnTableCsv').addEventListener('click', tableCsv);
 
-        window.LabUI && LabUI.initSteps({ key: 'pendulum-report', onShow: function (step) { if (step === 'result') renderFit(); } });
+        window.LabUI && LabUI.initSteps({ key: 'pendulum-report', onShow: function (step) {
+            state.step = step;
+            if (step === 'result') renderFit();
+            if (classShare) classShare.stepChanged();
+        } });
         var m = /[?&]group=([^&#]*)/.exec(location.search);
         var code = m ? PC.normalizeGroup(decodeURIComponent(m[1])) : load(GROUP_KEY, null);
         if (code && PC.isGroupCode(code)) setGroup(code); else render();
+        // 수업 참여 (?c=수업코드): 조·번호를 고르면 그 조의 조 코드로 연결 (공통 부품 js/class-share.js, 조 공유 칸은 이 화면의 것을 그대로 씀)
+        if (window.ClassShare && window.ClassCloud && ClassCloud.readClassParam(location.search)) {
+            classShare = ClassShare.init({
+                exp: 'pendulum',
+                getStep: function () { return state.step || ''; },
+                getPoints: function () { return state.items.length; },
+                getSubmitted: function () { return state.items.length > 0; },
+                onGroup: function (g) { if (state.group !== g) setGroup(g); }
+            });
+        }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

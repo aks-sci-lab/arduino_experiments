@@ -17,12 +17,34 @@
     var IDLE_MS = 5 * 60 * 1000;   // 이만큼 신호가 없으면 '쉬는 중'
 
     // 실험별 페이지와 단계 이름
+    // 실험별 페이지와 단계 이름. 서버 Code.gs 의 CLASS_EXPS 와 같게 둔다.
+    //   ready: 그 페이지가 '?c=' 수업 참여(js/class-share.js)를 붙였는지. 실험 페이지를 붙인 세션이 true 로 바꾼다 (docs/class-share.md)
+    //   'custom:<실험 id>' 는 선생님이 만든 실험 (projects/custom-lab.html?id=…)
+    var STEPS7 = { purpose: '1 목적', theory: '2 이론', materials: '3 준비물', procedure: '4 과정', data: '5 데이터', result: '6 결과', conclusion: '7 결론' };
+    var DASH = { live: '측정 중', record: '기록', more: '안내' };
     var EXPS = {
-        planck: {
-            name: 'LED 로 플랑크 상수 측정', page: 'projects/planck-led.html',
-            steps: { purpose: '1 목적', theory: '2 이론', materials: '3 준비물', procedure: '4 과정', data: '5 데이터', result: '6 결과', conclusion: '7 결론' }
-        }
+        planck: { name: 'LED 로 플랑크 상수 측정', icon: '💡', page: 'projects/planck-led.html', steps: STEPS7, ready: true },
+        pendulum: { name: '스마트폰 진자 (노트북 분석)', icon: '⏱️', page: 'projects/pendulum-report.html', steps: STEPS7, ready: true },
+        idealgas: { name: '이상기체 상태 방정식 검증', icon: '🎈', page: 'projects/ideal-gas.html', steps: STEPS7, ready: false },
+        malus: { name: '말루스 법칙 실험', icon: '🕶️', page: 'projects/malus-law.html', steps: STEPS7, ready: false },
+        eminduction: { name: '전자기 유도 전압·전류 측정', icon: '🧲', page: 'projects/em-induction.html', steps: STEPS7, ready: false },
+        freefall: { name: '자유낙하 궤적 분석', icon: '🏀', page: 'projects/free-fall.html', steps: STEPS7, ready: false },
+        env: { name: '환경 센서 (온도·습도·기압·VOC)', icon: '🌡️', page: 'projects/environment-lab.html', steps: DASH, ready: false },
+        light: { name: '조도 센서', icon: '🔆', page: 'projects/environment-lab.html?sensor=light', steps: DASH, ready: false },
+        uv: { name: '자외선 센서', icon: '🟣', page: 'projects/environment-lab.html?sensor=uv', steps: DASH, ready: false },
+        accel: { name: '가속도계 데이터 분석', icon: '📐', page: 'projects/accelerometer-lab.html', steps: DASH, ready: false },
+        nano: { name: '아두이노 Nano 33 BLE Sense', icon: '🔷', page: 'projects/arduino-nano-lab.html', steps: DASH, ready: false },
+        phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: false }
     };
+    var CUSTOM_RE = /^custom:([A-Za-z0-9_-]{1,40})$/;
+    // 실험 정보 (선생님이 만든 실험 'custom:<id>' 도)
+    function expInfo(exp) {
+        if (EXPS[exp]) return EXPS[exp];
+        var m = CUSTOM_RE.exec(String(exp || ''));
+        if (m) return { name: '선생님이 만든 실험 (' + m[1] + ')', icon: '👩‍🏫', page: 'projects/custom-lab.html?id=' + m[1], steps: STEPS7, ready: false, custom: true };
+        return null;
+    }
+    function isExp(exp) { return !!expInfo(exp); }
 
     function normalizeClass(s) {
         return String(s == null ? '' : s)
@@ -45,9 +67,9 @@
 
     // 학생 링크: 실험 페이지?c=수업코드&s=스크립트ID (s 가 없으면 학생 쪽은 사이트 기본 시트)
     function studentUrl(origin, exp, classCode, scriptId) {
-        var e = EXPS[exp];
+        var e = expInfo(exp);
         if (!e || !isClassCode(classCode)) return '';
-        return String(origin || '').replace(/\/+$/, '') + '/' + e.page + '?c=' + encodeURIComponent(classCode) + (scriptId ? '&s=' + encodeURIComponent(scriptId) : '');
+        return String(origin || '').replace(/\/+$/, '') + '/' + e.page + (e.page.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(classCode) + (scriptId ? '&s=' + encodeURIComponent(scriptId) : '');
     }
     function readClassParam(search) {
         var m = /[?&]c=([^&#]*)/.exec(search || '');
@@ -71,8 +93,24 @@
         return Math.floor(s / 3600) + '시간 전';
     }
     function stepName(exp, step) {
-        var e = EXPS[exp];
+        var e = expInfo(exp);
         return (e && e.steps[step]) || (step ? step : '–');
+    }
+    // 교사 화면: 조 하나의 제출 요약 한 줄 (실험마다 단위가 달라 이름은 실험이 정한 summary 이름 그대로)
+    function submissionText(exp, sub) {
+        if (!sub || !sub.rows) return '아직 제출 없음';
+        var labels = (sub.labels && sub.labels.length ? sub.labels : sub.leds || []);
+        var list = labels.slice(0, 6).join(', ') + (labels.length > 6 ? ' 외 ' + (labels.length - 6) + '개' : '');
+        if (exp === 'planck') {
+            var h = sub.hCurrent !== '' && sub.hCurrent != null ? ' · h = ' + Number(sub.hCurrent).toFixed(2) + ' ×10⁻³⁴' +
+                (sub.errorPct !== '' && sub.errorPct != null ? ' (' + (sub.errorPct >= 0 ? '+' : '') + Number(sub.errorPct).toFixed(1) + ' %)' : '') : '';
+            return '제출: LED ' + sub.rows + '개 (' + list + ')' + h;
+        }
+        var sm = sub.summary && typeof sub.summary === 'object' ? Object.keys(sub.summary).slice(0, 4).map(function (k) {
+            var v = sub.summary[k];
+            return k + ' ' + (typeof v === 'number' ? Number(v.toPrecision(4)) : v);
+        }).join(', ') : '';
+        return '제출: ' + sub.rows + '개 (' + list + ')' + (sm ? ' · ' + sm : '');
     }
     /* classStatus 응답 → 조별 카드 자료
        돌려주는 값: { groups: [{ jo, code, size, members: [{ num, st, state }], sub }], joined, total, active, idle, submittedGroups } */
@@ -156,11 +194,12 @@
     }
 
     return {
+        expInfo: expInfo, isExp: isExp, STEPS7: STEPS7,
         CLASS_RE: CLASS_RE, MIN_VERSION: MIN_VERSION, UPDATE_VERSION: UPDATE_VERSION, IDLE_MS: IDLE_MS, EXPS: EXPS,
         claimAdmin: claimAdmin, update: update, rollback: rollback, updatePlan: updatePlan,
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
-        studentState: studentState, agoText: agoText, stepName: stepName, summarize: summarize,
+        studentState: studentState, submissionText: submissionText, agoText: agoText, stepName: stepName, summarize: summarize,
         parseResponse: parseResponse, ping: ping, createClass: createClass, joinInfo: joinInfo, heartbeat: heartbeat, classStatus: classStatus
     };
 });

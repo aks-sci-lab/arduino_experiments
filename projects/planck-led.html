@@ -7,25 +7,14 @@
     <script src="../js/lab-ui.js"></script>
     <title>LED 로 플랑크 상수 측정</title>
     <link rel="stylesheet" href="../css/planck-led.css">
+    <link rel="stylesheet" href="../css/class-share.css">
 </head>
 <body>
 <div class="wrap">
     <a class="back" href="../index.html">← 메인 페이지</a>
     <h1>💡 LED 로 플랑크 상수 측정</h1>
-    <!-- 수업 참여: 주소에 ?c=수업코드 가 있을 때만 (선생님 '수업 연결' 화면의 QR) -->
-    <div id="class-bar" class="card class-bar" hidden>
-        <div id="class-info"><b>🏫 수업 참여</b> <span class="note">불러오는 중…</span></div>
-        <div class="row" id="class-pick" hidden>
-            <label>조 <select id="cl-jo"></select></label>
-            <label>번호 <select id="cl-num"></select></label>
-            <button id="cl-join" class="good">참여하기</button>
-        </div>
-        <div class="row" id="class-joined" hidden>
-            <span id="cl-me"></span>
-            <button id="cl-change" class="secondary">조·번호 바꾸기</button>
-        </div>
-        <div id="class-msg" class="note" role="status" aria-live="polite"></div>
-    </div>
+    <!-- 수업 참여 띠 (?c=수업코드 일 때만): js/class-share.js 가 채움 -->
+    <div id="class-bar-mount"></div>
     <nav class="tabs" role="tablist">
         <button role="tab" data-tab="purpose"><b>1</b><span>목적</span></button>
         <button role="tab" data-tab="theory"><b>2</b><span>이론</span></button>
@@ -535,32 +524,8 @@
 
     <!-- 5. 데이터 수집 -->
     <section class="panel" data-tab="data" hidden>
-    <details class="card share" id="share-box">
-        <summary>👥 조 공유: 선생님께 보내기 · 다른 노트북에서 불러오기 <span id="share-sum" class="note"></span></summary>
-        <p class="note">같은 조 노트북 여러 대가 같은 <b>조 코드</b>를 넣으면, 한 노트북이 보낸 측정값을 다른 노트북에서 불러와 표에 합칩니다. 보낸 값은 선생님 구글 시트에도 저장됩니다. 이름·학번은 보내지 않습니다.</p>
-        <div class="row">
-            <label>반 <input type="number" id="sh-ban" min="1" max="99" inputmode="numeric" style="width:70px"></label>
-            <label>조 <input type="number" id="sh-jo" min="1" max="99" inputmode="numeric" style="width:70px"></label>
-            <button id="sh-make" class="secondary">🎲 새 조 코드 만들기</button>
-        </div>
-        <div class="row">
-            <label>조 코드 <input type="text" id="sh-group" placeholder="예: 2-3-4821" inputmode="numeric" autocomplete="off" style="width:9em"></label>
-            <span class="note">같은 조의 다른 노트북에는 이 코드를 그대로 넣으세요.</span>
-        </div>
-        <div class="row">
-            <button id="sh-send" class="good">📤 선생님께 보내기</button>
-            <button id="sh-pull" class="secondary">📥 불러오기</button>
-            <label><input type="checkbox" id="sh-auto"> 몇 초마다 자동으로 불러오기</label>
-        </div>
-        <div id="sh-status" class="note" role="status" aria-live="polite"></div>
-        <div class="row">
-            <label class="file-btn secondary">📂 CSV 불러오기<input type="file" id="sh-csv" accept=".csv,text/csv" multiple hidden></label>
-            <button id="sh-clear" class="danger">불러온 값 지우기</button>
-        </div>
-        <p class="note">표에서 📥 표시는 다른 노트북·CSV 에서 불러온 값입니다(삭제는 그 값을 잰 노트북에서). 이 노트북에서 직접 잰 값만 보내므로, 값을 잰 노트북마다 한 번씩 보내세요. 다시 보내면 같은 줄을 고쳐 씁니다.<br>
-        학교 인터넷에서 보내기가 안 되면: <b>6. 실험 결과 → CSV 다운로드</b> 파일을 다른 노트북으로 옮겨 위 <b>📂 CSV 불러오기</b>로 합치고, 선생님께는 CSV 파일로 내세요.</p>
-        <p class="note" id="sh-server"></p>
-    </details>
+    <!-- 👥 조 공유: js/class-share.js 가 채움 -->
+    <div id="share-mount"></div>
     <div class="card">
         <h2>5. 데이터 수집</h2>
         <div class="methods">
@@ -751,6 +716,7 @@
 <script src="../js/pendulum-cloud.js"></script>
 <script src="../js/planck-cloud.js"></script>
 <script src="../js/class-cloud.js"></script>
+<script src="../js/class-share.js"></script>
 <script src="../js/planck-led.js"></script>
 </body>
 </html>
