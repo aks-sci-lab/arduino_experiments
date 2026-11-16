@@ -132,7 +132,10 @@
         if (!r.ok) {
             $('btnUpdate').disabled = $('btnRollback').disabled = false;
             msg.className = 'note err';
-            msg.textContent = '⚠️ ' + r.error + (/관리 열쇠가 맞지/.test(r.error) ? '' : ' — 안 되면 아래 "손으로 업데이트하는 법"을 따라 하세요.');
+            // 서버(8판부터)가 준 원래 오류 문구를 그대로 보여 준다. 권한 안내가 들어 있으면 손으로 하는 법도 펼쳐 둔다
+            var permHint = /권한 확인 창/.test(r.error);
+            msg.textContent = '⚠️ ' + r.error + (/관리 열쇠가 맞지/.test(r.error) || permHint ? '' : ' — 안 되면 아래 "손으로 업데이트하는 법"을 따라 하세요.');
+            if (permHint || !/관리 열쇠가 맞지/.test(r.error)) $('updManual').open = true;
             if (/관리 열쇠가 맞지/.test(r.error)) { var m = adminMap(); delete m[server.url]; try { STORE.setItem(ADMIN_KEY, JSON.stringify(m)); } catch (e) { /* 무시 */ } $('updKeyRow').hidden = false; renderAdmin(); }
             return;
         }
