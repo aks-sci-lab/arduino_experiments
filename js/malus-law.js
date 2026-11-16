@@ -1,9 +1,11 @@
 // 말루스 법칙 실험: 스마트폰 카메라(또는 촬영한 사진)로 각도별 밝기를 측정하고 분석한다.
-// 보고서 순서 7단계(js/lab-ui.js 의 LabUI.initSteps): 1 목적 · 2 이론 · 3 준비물 · 4 과정(예측·계획·판단 기준은 malus-tutorial.js, 자동화 설정) · 5 데이터(측정) · 6 결과(분석) · 7 결론(결론·내보내기)
+// 보고서 순서 7단계(js/lab-ui.js 의 LabUI.initSteps): 1 목적 · 2 이론 · 3 준비물 · 4 과정(예측·계획·판단 기준은 malus-tutorial.js, 자동화 설정) · 5 데이터(조 공유·측정) · 6 결과(분석, 📥 불러온 값 포함) · 7 결론(결론·선생님께 보내기·다른 내보내기)
 (function () {
     'use strict';
     const M = window.MalusMath;
     const T = window.MalusTutorial;
+    const MS = window.MalusShare;
+    let share = null;    // 조 공유 (아래 '조 공유'에서 ClassShare.init)
     const $ = id => document.getElementById(id);
     const STORE_KEY = 'malus-law-v1';
     const SETTINGS_KEY = 'malus-law-settings-v1';
@@ -19,6 +21,8 @@
         size: 100,           // 측정 영역 한 변 (원본 픽셀)
         dark: null,          // { value, ch, gamma }
         points: [],
+        ext: {},             // 같은 조 다른 노트북이 보낸 값 (조 공유, js/malus-share.js). 내 기록과 따로 둔다
+        share: null,         // 조 공유 상태 (조 코드·노트북 번호·보낸 것, js/class-share.js 가 정함)
         busy: false,
         zoom: false,         // 측정 영역 근처만 확대해서 보기
         frozenView: null,    // 끄는 동안 화면이 따라 움직이지 않도록 고정한 보기 영역
@@ -75,7 +79,8 @@
                 ch: $('sel-channel').value, gamma: $('sel-gamma').value,
                 angle: $('angle').value, frames: $('frames').value,
                 zoom: state.zoom, refPos: state.refPos, run: state.run,
-                models: state.models, residModel: state.residModel, normView: state.normView
+                models: state.models, residModel: state.residModel, normView: state.normView,
+                ext: state.ext, share: state.share
             }));
         } catch (e) { /* 저장소를 쓸 수 없어도 동작에는 영향 없음 */ }
     }
@@ -94,6 +99,8 @@
             if (Array.isArray(d.models)) state.models = d.models.filter(k => M.MODELS[k]);
             if (d.residModel && M.MODELS[d.residModel]) state.residModel = d.residModel;
             if (d.normView) state.normView = d.normView;
+            if (d.ext && typeof d.ext === 'object') state.ext = d.ext;
+            if (d.share && typeof d.share === 'object') state.share = d.share;
             if (d.tab) state.oldTab = d.tab;
             // 이전 버전에서 저장된 점: 회차가 없으면 1회차, 자동 결측은 사유를 붙인다
             state.points.forEach(p => {
@@ -473,14 +480,17 @@
     }
 
     // ---------- 데이터 ----------
-    function intensity(p) { return p.raw - darkFor(p.ch, p.gamma); }
+    function intensity(p) { return p.ext ? p.y : p.raw - darkFor(p.ch, p.gamma); }
+    // 분석·표·내보내기에 쓰는 모든 점: 내가 잰 점(먼저, 순서 그대로) + 📥 불러온 점(회차 101, 102 …)
+    function allPoints() { return MS ? state.points.concat(MS.extPoints(state.ext)) : state.points; }
+    const runName = p => p.ext ? '📥 ' + p.label : p.run + '회차';
 
     const RUN_COLORS = ['#1c64f2', '#e8590c', '#2f9e44', '#ae3ec9', '#f08c00', '#0c8599', '#c92a2a', '#5c940d'];
     const runColor = run => RUN_COLORS[(run - 1) % RUN_COLORS.length];
     const MODEL_DASH = { cos2: [], cos: [9, 5], linear: [3, 4] };
 
     function pointsI() {
-        return state.points.map(p => ({ run: p.run, theta: p.theta, y: intensity(p), sd: p.sd, excluded: !!p.excluded, moved: !!p.moved, sat: p.sat }));
+        return allPoints().map(p => ({ run: p.run, theta: p.theta, y: intensity(p), sd: p.sd, excluded: !!p.excluded, moved: !!p.moved, sat: p.sat }));
     }
     function flags() { return M.flagSuspicious(pointsI(), criteria()); }
     // 잔차·정규화·내보내기에 쓰는 모델. 학생이 아직 고르지 않았으면 null
@@ -528,6 +538,7 @@
         renderMeasure();
         if (state.tab === 'result' || state.tab === 'conclusion') renderAnalysis();
         refreshButtons();
+        if (share) share.render();
     }
 
     function refreshButtons() {
@@ -577,8 +588,9 @@
         $('chan-warn').hidden = !locked;
         $('dark-txt').textContent = state.dark ? '배경 = ' + state.dark.value.toFixed(5) + ' (' + state.dark.ch.toUpperCase() + ', ' + state.dark.gamma + ')' : '배경 미측정';
         $('btn-dark-clear').hidden = !state.dark;
-        const none = state.points.length === 0;
-        $('btn-csv').disabled = $('btn-clear').disabled = $('btn-copy').disabled = $('btn-gs').disabled = $('btn-gs-oauth').disabled = none;
+        const none = allPoints().length === 0;
+        $('btn-csv').disabled = $('btn-copy').disabled = $('btn-gs').disabled = $('btn-gs-oauth').disabled = none;
+        $('btn-clear').disabled = state.points.length === 0;
     }
 
     function renderAnalysis() {
@@ -591,19 +603,23 @@
         $('crit-summary').innerHTML = '<b>측정 전에 정한 의심 기준:</b> ' + (crit.join(', ') || '없음') + (c.note ? ' · 그 밖의 기준: ' + escapeHtml(c.note) : '') +
             '<br>⚠ 표시는 기준에 걸린 값입니다. 뺄 값은 <b>결측</b>을 누르고 이유를 적으세요.';
         $('tbody').innerHTML = '';
-        state.points.forEach((p, i) => {
+        const all = allPoints();
+        all.forEach((p, i) => {
             const tr = document.createElement('tr');
-            if (p.excluded) tr.className = 'excluded';
-            tr.innerHTML = '<td><span class="run-dot" style="background:' + runColor(p.run) + '"></span>' + p.run + '</td><td>' + p.theta + '°</td><td>' +
+            tr.className = (p.excluded ? 'excluded' : '') + (p.ext ? ' ext' : '');
+            // 불러온 값은 보낸 노트북에서 고친다 (여기서는 결측·삭제 단추 없음)
+            tr.innerHTML = '<td><span class="run-dot" style="background:' + runColor(p.run) + '"></span>' + (p.ext ? '📥 ' + escapeHtml(p.label) : p.run) + '</td><td>' + p.theta + '°</td><td>' +
                 pts[i].y.toFixed(4) + '</td><td>' + (fl[i].length ? '<span class="flag">⚠ ' + fl[i].join(', ') + '</span>' : '') + '</td><td class="reason">' +
-                escapeHtml(p.reason || '') + '</td><td class="acts"><button class="secondary">' + (p.excluded ? '복원' : '결측') + '</button> <button class="danger">삭제</button></td>';
-            const [bEx, bDel] = tr.querySelectorAll('button');
-            bEx.onclick = () => setExcluded(p, !p.excluded);
-            bDel.onclick = () => deletePoint(p);
+                escapeHtml(p.reason || '') + '</td><td class="acts">' + (p.ext ? '<span class="note">불러온 값</span>' : '<button class="secondary">' + (p.excluded ? '복원' : '결측') + '</button> <button class="danger">삭제</button>') + '</td>';
+            if (!p.ext) {
+                const [bEx, bDel] = tr.querySelectorAll('button');
+                bEx.onclick = () => setExcluded(p, !p.excluded);
+                bDel.onclick = () => deletePoint(p);
+            }
             $('tbody').appendChild(tr);
         });
-        const nEx = state.points.filter(p => p.excluded).length;
-        $('cnt').textContent = '(' + state.points.length + '개' + (nEx ? ', 결측 ' + nEx + '개' : '') + ')';
+        const nEx = all.filter(p => p.excluded).length, nExt = all.length - state.points.length;
+        $('cnt').textContent = '(' + all.length + '개' + (nExt ? ', 📥 불러온 값 ' + nExt + '개' : '') + (nEx ? ', 결측 ' + nEx + '개' : '') + ')';
 
         // 2. 모델 비교
         $('model-list').innerHTML = '';
@@ -793,7 +809,7 @@
     function exportRows() {
         const pts = pointsI(), fl = flags(), km = analysisModel();
         const an = km ? M.analyzeRuns(pts, km) : null;
-        return state.points.map((p, i) => {
+        return allPoints().map((p, i) => {
             const q = an ? an.norm[i] : null;
             return { p, i, I: pts[i].y, q, flag: fl[i].join(' / '), model: km ? M.MODELS[km].label : '' };
         });
@@ -802,10 +818,12 @@
     function downloadCsv() {
         // 결측치는 정규화 칸을 비워 둔다 (스프레드시트·분석 프로그램에서 빈 칸 = 결측)
         const csvCell = v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v;
-        const rows = ['run,theta_deg,intensity,model,normalized,model_shape,excluded,reason,suspicious,std,raw_mean,dark,saturated_fraction,channel,gamma,edge_ratio,drift_px'];
+        // source: me = 이 노트북, 그 밖은 조 공유로 불러온 노트북 (불러온 값은 원값·배경·채널 칸이 비어 있음)
+        const rows = ['run,theta_deg,intensity,model,normalized,model_shape,excluded,reason,suspicious,std,raw_mean,dark,saturated_fraction,channel,gamma,edge_ratio,drift_px,source'];
         exportRows().forEach(({ p, I, q, flag, model }) => {
-            rows.push([p.run, p.theta, I, model, q ? q.n : '', q ? q.x : '', p.excluded ? 1 : 0, p.reason || '', flag, p.sd, p.raw, p.raw - I, p.sat, p.ch, p.gamma,
-                p.edge != null ? p.edge.toFixed(3) : '', p.drift != null ? p.drift : ''].map(csvCell).join(','));
+            rows.push([p.ext ? p.label : p.run, p.theta, I, model, q ? q.n : '', q ? q.x : '', p.excluded ? 1 : 0, p.reason || '', flag, p.sd,
+                p.ext ? '' : p.raw, p.ext ? '' : p.raw - I, p.sat, p.ext ? '' : p.ch, p.ext ? '' : p.gamma,
+                p.edge != null ? p.edge.toFixed(3) : '', p.drift != null ? p.drift : '', p.ext ? p.from : 'me'].map(csvCell).join(','));
         });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\n')], { type: 'text/csv' }));
@@ -829,9 +847,11 @@
         lines.push('', '■ 이상한 값 판단 기준 (측정 전에 정함)');
         lines.push([c.move && '빛 위치 이동', c.sat && '포화 픽셀', c.repeat && ('반복값 ' + c.repeatPct + '% 넘게 차이')].filter(Boolean).join(', ') || '없음');
         if (c.note) lines.push('그 밖의 기준: ' + c.note);
-        const ex = state.points.filter(p => p.excluded);
+        const ex = allPoints().filter(p => p.excluded);
         lines.push('', '■ 결측 처리 (' + ex.length + '개)');
-        ex.forEach(p => lines.push('- ' + p.run + '회차 ' + p.theta + '°: ' + (p.reason || '(사유 없음)')));
+        ex.forEach(p => lines.push('- ' + runName(p) + ' ' + p.theta + '°: ' + (p.reason || '(사유 없음)')));
+        const nExt = allPoints().length - state.points.length;
+        if (nExt) lines.push('', '■ 조 공유로 불러온 값: ' + nExt + '개 (' + [...new Set(MS.extPoints(state.ext).map(p => p.label))].join(', ') + ')');
         lines.push('', '■ 모델 비교');
         const pts = pointsI();
         if (!state.models.length) lines.push('(모델을 고르지 않음)');
@@ -846,11 +866,12 @@
     }
 
     // ---------- 구글 스프레드시트 ----------
-    const GS_HEADER = ['시각', '이름/조', '회차', '각도(°)', '밝기 I', '분석 모델', '정규화 (I−B)/A', '모델 모양 f(θ−θ₀)', '결측', '결측 사유', '의심', '표준편차', '원값', '배경', '포화비율', '채널', '감마'];
+    const GS_HEADER = ['시각', '이름/조', '회차', '각도(°)', '밝기 I', '분석 모델', '정규화 (I−B)/A', '모델 모양 f(θ−θ₀)', '결측', '결측 사유', '의심', '표준편차', '원값', '배경', '포화비율', '채널', '감마', '출처'];
     function sheetRows() {
         const t = new Date().toLocaleString('ko-KR'), name = $('gs-name').value.trim();
         return exportRows().map(({ p, I, q, flag, model }) =>
-            [t, name, p.run, p.theta, I, model, q ? q.n : '', q ? q.x : '', p.excluded ? '결측' : '', p.reason || '', flag, p.sd, p.raw, p.raw - I, p.sat, p.ch, p.gamma]);
+            [t, name, p.ext ? p.label : p.run, p.theta, I, model, q ? q.n : '', q ? q.x : '', p.excluded ? '결측' : '', p.reason || '', flag, p.sd,
+                p.ext ? '' : p.raw, p.ext ? '' : p.raw - I, p.sat, p.ext ? '' : p.ch, p.ext ? '' : p.gamma, p.ext ? p.from : '이 노트북']);
     }
     window.__malus = { header: GS_HEADER, rows: sheetRows };
     async function copyText(text, okMsg, el) {
@@ -874,7 +895,7 @@
         try {
             // text/plain + no-cors: 사전 요청(CORS preflight) 없이 보내며, 응답은 읽을 수 없다.
             await fetch(url, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ header: GS_HEADER, rows: sheetRows() }) });
-            $('gs-status').textContent = state.points.length + '행 전송 요청 완료 — 시트에서 확인하세요.';
+            $('gs-status').textContent = allPoints().length + '행 전송 요청 완료 — 시트에서 확인하세요.';
         } catch (e) { $('gs-status').textContent = '전송 실패: ' + e.message; }
     }
     try {
@@ -892,6 +913,7 @@
         state.tab = step;
         if (step === 'procedure' && T) T.redraw();
         render();
+        if (share) share.stepChanged();
     }
     // 예전 4탭 화면의 마지막 탭 → 새 단계 (새 단계 기록이 아직 없을 때 한 번만)
     const OLD_TAB = { explore: 'procedure', measure: 'data', analyze: 'result', settings: 'procedure' };
@@ -991,6 +1013,34 @@
     }
 
     load();
+
+    // ---------- 조 공유 (수업 참여 띠 · 📤 선생님께 보내기 · 📥 불러오기, 구글 로그인 없음) ----------
+    // 주소에 ?c=수업코드 가 있으면 조·번호를 고르는 띠, 5. 데이터 맨 위에 조 공유 칸. 사용법: docs/class-share.md
+    if (window.ClassShare && MS) {
+        share = ClassShare.init({
+            exp: 'malus',
+            barMount: '#class-bar-mount', shareMount: '#share-mount',
+            csvHint: '6. 결과 → CSV 다운로드',
+            sendButtons: ['#btn-send2'],
+            store: { load: () => state.share, save: o => { state.share = o; save(); } },
+            getItems: () => MS.buildItems(state.points, intensity, $('sel-channel').value, $('sel-gamma').value),
+            onIncoming: items => {
+                const r = MS.applyIncoming(state.ext, items);
+                if (r.changed) { state.ext = r.ext; save(); render(); }
+                return r.changed;
+            },
+            getStep: () => state.tab,
+            getPoints: () => state.points.length,
+            pollWhen: () => ['data', 'result', 'conclusion'].includes(state.tab),
+            incomingCount: () => MS.extCount(state.ext),
+            clearIncoming: () => { state.ext = {}; save(); render(); }
+        });
+    }
+    $('btn-send2').onclick = () => {
+        if (!share) { $('send2-status').textContent = '조 공유를 불러오지 못했습니다. 6. 결과의 CSV 다운로드를 쓰세요.'; return; }
+        if (!share.group()) { $('send2-status').textContent = '먼저 5. 데이터 맨 위 \'👥 조 공유\'에서 조 코드를 정하세요.'; return; }
+        share.send('#send2-status');
+    };
     setZoom(state.zoom);
     renderSettings();
     let hasStepRecord = false;
