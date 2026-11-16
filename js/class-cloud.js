@@ -1,0 +1,152 @@
+/* 수업 연결 — 교사·학생 모두 구글 로그인 없이 (브라우저·Node 공용)
+   - 수업 코드: 반-4자리 (예: 2-4821). 조 코드는 반-조-같은 4자리 (예: 2-3-4821) → 기존 조 공유가 그대로 동작
+   - 서버는 선생님 시트의 Apps Script(apps-script/Code.gs 4판): createClass·joinInfo·heartbeat·classStatus
+   - 교사 열쇠는 POST 본문으로만 보낸다 (주소에 남지 않게). 학생은 이름 없이 '3조 2번' 으로만
+   - 요청은 미리보기 요청이 생기지 않는 단순 요청 (GET, 또는 Content-Type: text/plain 인 POST)
+   화면: projects/class-teacher.html(js/class-teacher.js), 학생 쪽은 projects/planck-led.html, 메인 index.html
+   시험: tests/class-cloud.test.cjs */
+(function (root, factory) {
+    if (typeof module === 'object' && module.exports) module.exports = factory();
+    else root.ClassCloud = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+    'use strict';
+
+    var CLASS_RE = /^\d{1,2}-\d{4}$/;
+    var MIN_VERSION = 4;           // 수업 연결을 쓰려면 Apps Script 가 4판 이상
+    var IDLE_MS = 5 * 60 * 1000;   // 이만큼 신호가 없으면 '쉬는 중'
+
+    // 실험별 페이지와 단계 이름
+    var EXPS = {
+        planck: {
+            name: 'LED 로 플랑크 상수 측정', page: 'projects/planck-led.html',
+            steps: { purpose: '1 목적', theory: '2 이론', materials: '3 준비물', procedure: '4 과정', data: '5 데이터', result: '6 결과', conclusion: '7 결론' }
+        }
+    };
+
+    function normalizeClass(s) {
+        return String(s == null ? '' : s)
+            .replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+            .replace(/[‐-―－~·.\/_ ]/g, '-').replace(/\s+/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+    function isClassCode(s) { return CLASS_RE.test(String(s || '')); }
+
+    // 학생 수를 조별 인원에 맞춰 고르게: 26명·4명 → [4,4,4,4,4,3,3] (서버 Code.gs 의 splitGroups 와 같음)
+    function splitGroups(n, size) {
+        n = Math.round(Number(n)); size = Math.round(Number(size));
+        if (!(n >= 1 && n <= 60) || !(size >= 1 && size <= 10)) return [];
+        var k = Math.ceil(n / size), base = Math.floor(n / k), extra = n % k, out = [];
+        for (var i = 0; i < k; i++) out.push(base + (i < extra ? 1 : 0));
+        return out;
+    }
+    function groupFor(info, jo) {
+        return ((info && info.groups) || []).filter(function (g) { return Number(g.jo) === Number(jo); })[0] || null;
+    }
+
+    // 학생 링크: 실험 페이지?c=수업코드&s=스크립트ID (s 가 없으면 학생 쪽은 사이트 기본 시트)
+    function studentUrl(origin, exp, classCode, scriptId) {
+        var e = EXPS[exp];
+        if (!e || !isClassCode(classCode)) return '';
+        return String(origin || '').replace(/\/+$/, '') + '/' + e.page + '?c=' + encodeURIComponent(classCode) + (scriptId ? '&s=' + encodeURIComponent(scriptId) : '');
+    }
+    function readClassParam(search) {
+        var m = /[?&]c=([^&#]*)/.exec(search || '');
+        var c = m ? normalizeClass(decodeURIComponent(m[1])) : '';
+        return isClassCode(c) ? c : '';
+    }
+
+    // 교사 화면: 학생 한 명의 상태 (now 는 서버 시각 기준, 컴퓨터 시계가 달라도 맞게)
+    function studentState(st, nowIso) {
+        if (!st) return { joined: false, label: '아직 안 들어옴', cls: 'none' };
+        var now = Date.parse(nowIso), seen = Date.parse(st.lastSeen);
+        var ago = Number.isFinite(now) && Number.isFinite(seen) ? Math.max(0, now - seen) : null;
+        var idle = ago != null && ago > IDLE_MS;
+        return { joined: true, ago: ago, idle: idle, label: idle ? '쉬는 중' : '활동 중', cls: idle ? 'idle' : 'active' };
+    }
+    function agoText(ms) {
+        if (ms == null) return '';
+        var s = Math.round(ms / 1000);
+        if (s < 60) return s + '초 전';
+        if (s < 3600) return Math.floor(s / 60) + '분 전';
+        return Math.floor(s / 3600) + '시간 전';
+    }
+    function stepName(exp, step) {
+        var e = EXPS[exp];
+        return (e && e.steps[step]) || (step ? step : '–');
+    }
+    /* classStatus 응답 → 조별 카드 자료
+       돌려주는 값: { groups: [{ jo, code, size, members: [{ num, st, state }], sub }], joined, total, active, idle, submittedGroups } */
+    function summarize(status) {
+        var by = {};
+        (status.students || []).forEach(function (s) { by[s.jo + '-' + s.num] = s; });
+        var subs = {};
+        (status.submissions || []).forEach(function (s) { subs[s.code] = s; });
+        var out = { groups: [], joined: 0, total: 0, active: 0, idle: 0, submittedGroups: 0 };
+        (status.groups || []).forEach(function (g) {
+            var members = [];
+            for (var n = 1; n <= Number(g.size); n++) {
+                var st = by[g.jo + '-' + n] || null, state = studentState(st, status.now);
+                members.push({ num: n, st: st, state: state });
+                out.total++;
+                if (state.joined) { out.joined++; if (state.idle) out.idle++; else out.active++; }
+            }
+            var sub = subs[g.code] || null;
+            if (sub && sub.rows > 0) out.submittedGroups++;
+            out.groups.push({ jo: g.jo, code: g.code, size: g.size, members: members, sub: sub });
+        });
+        return out;
+    }
+
+    // ---------- 요청 (fetchImpl 은 시험에서 가짜로 바꿈) ----------
+    function parseResponse(text) {
+        var j;
+        try { j = typeof text === 'string' ? JSON.parse(text) : text; }
+        catch (e) {
+            return { ok: false, error: /<html/i.test(String(text)) ? '서버가 로그인 화면을 보냈습니다. 웹 앱의 액세스를 "모든 사용자"로 배포했는지 확인하세요.' : '서버 응답을 읽지 못했습니다.' };
+        }
+        if (!j || typeof j !== 'object') return { ok: false, error: '서버 응답이 비어 있습니다.' };
+        if (!j.ok) return { ok: false, error: String(j.error || '서버 오류') };
+        return j;
+    }
+    function request(url, init, fetchImpl, ms) {
+        var f = fetchImpl || (typeof fetch === 'function' ? fetch : null);
+        if (!url) return Promise.resolve({ ok: false, error: '선생님 시트가 아직 연결되지 않았습니다 (Apps Script 주소 없음).', noConfig: true });
+        if (!f) return Promise.resolve({ ok: false, error: '이 브라우저는 서버에 연결할 수 없습니다.' });
+        return new Promise(function (resolve) {
+            var done = false;
+            var t = setTimeout(function () { if (!done) { done = true; resolve({ ok: false, error: '서버에 연결하지 못했습니다 (시간 초과).', network: true }); } }, ms || 15000);
+            f(url, init).then(function (res) { return res.text(); }).then(function (txt) {
+                if (done) return; done = true; clearTimeout(t); resolve(parseResponse(txt));
+            }, function (e) {
+                if (done) return; done = true; clearTimeout(t); resolve({ ok: false, error: '서버에 연결하지 못했습니다 (' + (e && e.message || e) + ').', network: true });
+            });
+        });
+    }
+    function getQ(url, params, fetchImpl) {
+        if (!url) return request('', null, fetchImpl);
+        var q = Object.keys(params).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
+        return request(url + (url.indexOf('?') >= 0 ? '&' : '?') + q, { method: 'GET', redirect: 'follow' }, fetchImpl);
+    }
+    function post(url, body, fetchImpl, ms) {
+        return request(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' }, fetchImpl, ms || 30000);
+    }
+    function ping(url, fetchImpl) { return getQ(url, { action: 'ping', _: Date.now() }, fetchImpl); }
+    function createClass(url, o, fetchImpl) {
+        return post(url, { action: 'createClass', ban: Number(o.ban), nStudents: Number(o.nStudents), groupSize: Number(o.groupSize), exp: o.exp }, fetchImpl);
+    }
+    function joinInfo(url, classCode, fetchImpl) { return getQ(url, { action: 'joinInfo', 'class': classCode, _: Date.now() }, fetchImpl); }
+    function heartbeat(url, o, fetchImpl) {
+        return post(url, {
+            action: 'heartbeat', 'class': o.classCode, jo: Number(o.jo), num: Number(o.num), step: String(o.step || ''),
+            points: Number.isFinite(Number(o.points)) ? Number(o.points) : '', submitted: !!o.submitted, device: o.device || ''
+        }, fetchImpl, 15000);
+    }
+    function classStatus(url, classCode, key, fetchImpl) { return post(url, { action: 'classStatus', 'class': classCode, key: key }, fetchImpl, 20000); }
+
+    return {
+        CLASS_RE: CLASS_RE, MIN_VERSION: MIN_VERSION, IDLE_MS: IDLE_MS, EXPS: EXPS,
+        normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
+        studentUrl: studentUrl, readClassParam: readClassParam,
+        studentState: studentState, agoText: agoText, stepName: stepName, summarize: summarize,
+        parseResponse: parseResponse, ping: ping, createClass: createClass, joinInfo: joinInfo, heartbeat: heartbeat, classStatus: classStatus
+    };
+});

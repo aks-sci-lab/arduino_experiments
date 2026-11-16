@@ -1,0 +1,57 @@
+name: Deploy Firestore rules
+
+# firestore.rules 가 바뀐 채로 main 에 반영되면 Firebase(web-experiment-f9b24)의 Firestore 보안 규칙을 자동으로 게시한다.
+# (예전에는 선생님이 콘솔 '규칙' 탭에 붙여 넣고 '게시'를 눌렀음)
+# 사이트 배포와 같은 키(저장소 Secret FIREBASE_SERVICE_ACCOUNT)를 쓴다. 키가 없으면 건너뛴다.
+# 권한이 없다는 오류가 나면: docs/DEPLOY.md 의 'Firestore 보안 규칙' (서비스 계정에 'Firebase Rules 관리자' 역할 추가)
+# Actions 탭 → 이 워크플로 → Run workflow 로 손으로 다시 게시할 수도 있다.
+
+on:
+  push:
+    branches: [main]
+    paths: [firestore.rules]
+  workflow_dispatch:
+
+concurrency:
+  group: firestore-rules
+  cancel-in-progress: false
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check deploy key
+        id: key
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::notice::FIREBASE_SERVICE_ACCOUNT 가 없어 규칙 게시를 건너뜁니다. docs/DEPLOY.md 를 참고하세요."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout code
+        if: steps.key.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        if: steps.key.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Publish firestore.rules
+        if: steps.key.outputs.ready == 'true'
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT: ${{ vars.FIREBASE_PROJECT_ID || 'web-experiment-f9b24' }}
+        run: |
+          # 키는 작업 컴퓨터의 임시 파일에만 두고 끝나면 지운다 (로그에 내용이 나오지 않음)
+          KEY="$RUNNER_TEMP/sa.json"
+          printf '%s' "$SA" > "$KEY"
+          trap 'rm -f "$KEY"' EXIT
+          export GOOGLE_APPLICATION_CREDENTIALS="$KEY"
+          npx --yes firebase-tools@13.29.1 deploy --only firestore:rules --project "$PROJECT" --non-interactive
+          echo "::notice::Firestore 규칙을 게시했습니다 ($PROJECT). 콘솔 → Firestore → 규칙 탭의 기록에서 확인할 수 있어요."

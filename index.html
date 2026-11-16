@@ -146,11 +146,45 @@
         #customList li { margin: 0; }
         .records-section { margin-top: 0; }
         .auth-btn { min-height: var(--tap); }
+        /* 교사/학생 고르기 (기준 고르기 카드 모양, 단추로 쓴 카드도 같게) */
+        .role-pick { margin-bottom: var(--sp-3); }
+        button.pick-card { font: inherit; text-align: left; cursor: pointer; width: 100%; justify-content: flex-start; color: var(--c-text); border: 1px solid var(--c-line); padding: var(--sp-3) var(--sp-4); }
+        button.pick-card:hover, button.pick-card[aria-expanded="true"] { border-color: var(--c-primary); box-shadow: var(--shadow); }
+        .role-pick .pick-card { min-height: 110px; }
+        .join-box { border: 2px solid var(--c-primary); border-radius: var(--r-card); padding: var(--sp-3); margin-bottom: var(--sp-3); background: var(--c-primary-soft); }
+        .join-row { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); flex-wrap: wrap; }
+        .join-row input { flex: 1 1 140px; min-width: 0; min-height: var(--tap); font-size: 1.3rem; padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); letter-spacing: .05em; }
+        .join-row button { min-height: var(--tap); }
+        .admin-box { margin: 0 0 var(--sp-3); }
+        .admin-box .auth-bar { margin: var(--sp-2) 0; }
+        .join-err { color: var(--c-danger); }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- 구글 로그인 및 사용자 인증 상태 바 -->
+
+        <div class="home-head">
+            <h1>센서 기반 실험실</h1>
+            <a class="auth-btn btn-mode" style="text-decoration:none;" href="qr.html">📱 QR 코드로 휴대폰에서 열기</a>
+        </div>
+        <!-- 교사·학생 모두 구글 로그인 없이 시작 (수업 연결). 구글 로그인은 '사이트 관리' 안에 -->
+        <h2 class="group-title">어떻게 시작할까요? <small>로그인 없이</small></h2>
+        <div class="pick-grid role-pick">
+            <a class="pick-card" href="projects/class-teacher.html"><span class="ic" aria-hidden="true">👩‍🏫</span><b>교사로 시작</b><small>조 나누기 · 수업 QR · 진행 보기</small></a>
+            <button type="button" class="pick-card" id="roleStudent" aria-expanded="false" aria-controls="joinBox"><span class="ic" aria-hidden="true">🧑‍🎓</span><b>학생으로 시작</b><small>선생님이 알려 준 수업 코드 넣기</small></button>
+        </div>
+        <form id="joinBox" class="join-box" hidden>
+            <label for="joinCode"><b>수업 코드</b> <span class="note">(예: 2-4821, 선생님 화면에 크게 보여요. QR 을 찍었다면 넣지 않아도 돼요)</span></label>
+            <div class="join-row">
+                <input type="text" id="joinCode" inputmode="numeric" autocomplete="off" placeholder="2-4821">
+                <button type="submit" class="auth-btn btn-google">들어가기</button>
+            </div>
+            <p id="joinMsg" class="note" role="status" aria-live="polite"></p>
+        </form>
+
+        <!-- 구글 로그인 및 사용자 인증 상태 바: 사이트 관리(선생님)용. 새 실험 만들기·기록 보기에 쓴다 -->
+        <details class="home-help admin-box" id="adminBox">
+        <summary id="adminSum">🔐 사이트 관리 (선생님) · 구글 로그인</summary>
         <div class="auth-bar">
             <div id="userInfo" class="user-status">🔒 구글 로그인이 필요합니다</div>
             <div style="display:flex; gap:8px; align-items:center;">
@@ -159,11 +193,7 @@
                 <button id="signOutBtn" class="auth-btn btn-logout" onclick="signOut()" style="display:none;">로그아웃</button>
             </div>
         </div>
-
-        <div class="home-head">
-            <h1>센서 기반 실험실</h1>
-            <a class="auth-btn btn-mode" style="text-decoration:none;" href="qr.html">📱 QR 코드로 휴대폰에서 열기</a>
-        </div>
+        </details>
         <p class="note">수행할 실험을 고르세요. 저장한 기록은 '📁 기록' 탭에서 봅니다.</p>
 
         <!-- 실험 목록과 기록을 탭으로 나눠 길게 스크롤하지 않게 (공통 부품 .subtabs) -->
@@ -235,6 +265,38 @@
     </div>
     <script>LabUI.initTabs('#homeTabs', { key: 'home' });</script>
 
+    <!-- 학생으로 시작: 수업 코드 → 선생님 시트에서 실험을 찾아 그 실험 페이지로 (?c=코드) -->
+    <script src="js/pendulum-config.js"></script>
+    <script src="js/pendulum-cloud.js"></script>
+    <script src="js/class-cloud.js"></script>
+    <script>
+    (function () {
+        var btn = document.getElementById('roleStudent'), box = document.getElementById('joinBox'), msg = document.getElementById('joinMsg');
+        btn.addEventListener('click', function () {
+            box.hidden = !box.hidden; btn.setAttribute('aria-expanded', String(!box.hidden));
+            if (!box.hidden) document.getElementById('joinCode').focus();
+        });
+        box.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            var CC = window.ClassCloud, PC = window.PendulumCloud;
+            var code = CC.normalizeClass(document.getElementById('joinCode').value);
+            if (!CC.isClassCode(code)) { msg.className = 'note join-err'; msg.textContent = '수업 코드는 "반-숫자 4개" 모양이에요 (예: 2-4821).'; return; }
+            var store = null; try { store = window.localStorage; } catch (err) { store = null; }
+            // 이 브라우저가 기억한 선생님 시트(QR 로 한 번 들어온 적이 있으면), 없으면 사이트 기본 시트
+            var server = PC.resolveServer(location.search, (window.PENDULUM_CONFIG || {}).appsScriptUrl || '', store, true);
+            msg.className = 'note'; msg.textContent = '⏳ 수업을 찾는 중…';
+            var r = await CC.joinInfo(server.url, code);
+            var exp = r.ok && CC.EXPS[r.exp];
+            if (!exp) {
+                msg.className = 'note join-err';
+                msg.textContent = '⚠️ ' + (r.ok ? '이 화면에서 열 수 없는 실험이에요.' : r.error) + ' 선생님 화면의 QR 을 찍어 들어오세요 (선생님마다 시트가 달라 코드만으로는 못 찾을 수 있어요).';
+                return;
+            }
+            location.href = exp.page + '?c=' + encodeURIComponent(code) + (server.id && server.from !== 'default' ? '&s=' + encodeURIComponent(server.id) : '');
+        });
+    })();
+    </script>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
@@ -286,6 +348,8 @@
         }
 
         function updateUIForUser() {
+            const adminSum = document.getElementById('adminSum');
+            if (adminSum) adminSum.textContent = currentUser ? '🔐 사이트 관리 (선생님) · 로그인됨' : '🔐 사이트 관리 (선생님) · 구글 로그인';
             const userInfo = document.getElementById('userInfo');
             const signInBtn = document.getElementById('signInBtn');
             const signOutBtn = document.getElementById('signOutBtn');

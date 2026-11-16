@@ -9,7 +9,8 @@ const vm = require('node:vm');
 function sheetValue(x) {
     if (typeof x !== 'string') return x;
     if (x.startsWith("'")) return x.slice(1);
-    if (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(x) || /^\d{4}-\d{2}-\d{2}T/.test(x)) {
+    // 수업 코드 '2-4821' 처럼 두 부분이어도 (2074년 2월 같은) 날짜로 바뀐다
+    if (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(x) || /^\d{1,4}[-/.]\d{1,4}$/.test(x) || /^\d{4}-\d{2}-\d{2}T/.test(x)) {
         const d = new Date(x);
         return isNaN(d) ? new Date(0) : d;
     }
@@ -61,6 +62,12 @@ function loadCodeGs() {
             createTextOutput(text) { return { text, setMimeType() { return this; }, getContent() { return text; } }; }
         },
         LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+        // 수업 연결(4판): 교사 열쇠 만들기·해시. 진짜처럼 부호 있는 바이트 배열을 돌려준다
+        Utilities: {
+            DigestAlgorithm: { SHA_256: 'SHA_256' }, Charset: { UTF_8: 'UTF_8' },
+            computeDigest(alg, str) { return Array.from(new Int8Array(require('node:crypto').createHash('sha256').update(String(str), 'utf8').digest())); },
+            getUuid() { return require('node:crypto').randomUUID(); }
+        },
         Date, JSON, Math, String, Number, Array, Object, RegExp, isFinite
     };
     vm.createContext(ctx);
