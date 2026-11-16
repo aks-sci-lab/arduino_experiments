@@ -66,7 +66,7 @@
         const rows = pts.map(q => {
             const vol = q.v + dead, T = kelvin(q.t), pv = q.p * vol;
             // kPa × mL = 10³ Pa × 10⁻⁶ m³ = 10⁻³ J
-            return { v: q.v, p: q.p, t: q.t, dir: q.dir, vol, T, pv, pvt: pv / T, mol: pv * 1e-3 / (R_GAS * T) };
+            return { v: q.v, p: q.p, t: q.t, dir: q.dir, from: q.from, vol, T, pv, pvt: pv / T, mol: pv * 1e-3 / (R_GAS * T) };
         });
         const pv = rows.map(r => r.pv), pvt = rows.map(r => r.pvt), ts = rows.map(r => r.t);
         const res = {
@@ -97,7 +97,7 @@
         const rows = pts.map(q => {
             const T = kelvin(q.t);
             // kPa × L = 10³ Pa × 10⁻³ m³ = 1 J
-            return { t: q.t, p: q.p, s: q.s, T, pt: q.p / T, mol: vol ? q.p * vol / (R_GAS * T) : null };
+            return { t: q.t, p: q.p, s: q.s, from: q.from, T, pt: q.p / T, mol: vol ? q.p * vol / (R_GAS * T) : null };
         });
         const ts = rows.map(r => r.t), pt = rows.map(r => r.pt);
         const res = {

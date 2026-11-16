@@ -102,13 +102,13 @@ test('메인 화면에 이상기체 실험 링크가 있고 페이지의 로컬 
     assert.doesNotMatch(html, /Pico 2 W/i);
 });
 
-test('제출 문서는 현재 Firestore 규칙이 요구하는 칸을 모두 채운다', () => {
+// 2026-11-16: 학생 제출은 조 공유(구글 로그인 없음)로 바꿈. 예전 보고서는 ?report= 로 읽기만 한다
+test('학생 화면은 Firestore 에 쓰지 않고, 예전 보고서(?report=)만 읽는다', () => {
     const js = fs.readFileSync(path.join(__dirname, '..', 'js', 'ideal-gas.js'), 'utf8');
-    const rules = fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf8');
-    const m = rules.match(/match \/experiments\/\{docId\}[\s\S]*?hasAll\(\[([^\]]+)\]\)/);
-    const keys = m[1].split(',').map(s => s.trim().replace(/'/g, ''));
-    const add = js.slice(js.indexOf(".collection('experiments').add({"));
-    const body = add.slice(0, add.indexOf('});'));
-    for (const k of keys) assert.match(body, new RegExp('\\b' + k + ':'), k);
-    assert.match(body, /stargazingSample: \[\]/);
+    const html = fs.readFileSync(path.join(__dirname, '..', 'projects', 'ideal-gas.html'), 'utf8');
+    assert.doesNotMatch(js, /collection\([^)]*\)\s*\.(add|doc\([^)]*\)\s*\.(set|update|delete))\(/);
+    assert.match(js, /collection\('experiments'\)\.doc\(reportId\)\.get\(\)/);
+    assert.doesNotMatch(html, /firebasejs/, '학생 화면을 열 때 로그인 도구를 불러오지 않음');
+    assert.match(html, /js\/class-share\.js/);
+    assert.match(js, /exp: 'idealgas'/);
 });

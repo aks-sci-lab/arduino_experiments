@@ -7,11 +7,14 @@
     <script src="../js/lab-ui.js"></script>
     <title>이상기체 상태 방정식 검증</title>
     <link rel="stylesheet" href="../css/ideal-gas.css">
+    <link rel="stylesheet" href="../css/class-share.css">
 </head>
 <body>
 <div class="wrap">
     <a class="back" href="../index.html">← 메인 페이지</a>
     <h1>🎈 이상기체 상태 방정식 검증 (감압 용기)</h1>
+    <!-- 수업 참여 띠 (?c=수업코드 일 때만): js/class-share.js 가 채움 -->
+    <div id="class-bar-mount"></div>
     <nav class="tabs" role="tablist">
         <button role="tab" data-tab="purpose"><b>1</b><span>목표</span></button>
         <button role="tab" data-tab="theory"><b>2</b><span>이론</span></button>
@@ -21,7 +24,7 @@
         <button role="tab" data-tab="result"><b>6</b><span>결과</span></button>
         <button role="tab" data-tab="conclusion"><b>7</b><span>결론·검토</span></button>
     </nav>
-    <div id="store-warn" class="warn" hidden>⚠️ 이 브라우저에서는 측정값과 글을 저장할 수 없습니다(사생활 보호 모드 등). 새로고침하거나 창을 닫으면 사라지므로, 끝나면 <b>7. 결론 및 검토</b> 탭에서 바로 제출하세요.</div>
+    <div id="store-warn" class="warn" hidden>⚠️ 이 브라우저에서는 측정값과 글을 저장할 수 없습니다(사생활 보호 모드 등). 새로고침하거나 창을 닫으면 사라지므로, 측정이 끝나면 <b>👥 조 공유</b>로 선생님께 보내고 <b>6. 결과</b> 탭에서 CSV 로 받아 두세요.</div>
 
     <!-- 1. 실험 목표 -->
     <section class="panel" data-tab="purpose">
@@ -38,7 +41,7 @@
             <b>실험 1</b>에서는 손 펌프로 공기를 빼면서 주사기 속 공기의 부피를 읽고, <b>실험 2</b>에서는 용기를 데우고 식히면서 압력 변화를 자동으로 기록합니다.
         </div>
         <p class="note">관련 개념: 기체 분자 운동, 압력, 절대 온도, 보일 법칙, 샤를 법칙, 몰과 아보가드로 수, 최소제곱법</p>
-        <p class="note">이 페이지의 탭 순서는 실험 보고서 순서와 같습니다. 각 탭에 쓴 글과 측정값은 이 브라우저에 자동 저장되고, 마지막 <b>7. 결론 및 검토</b> 탭에서 보고서로 제출합니다.</p>
+        <p class="note">이 페이지의 탭 순서는 실험 보고서 순서와 같습니다. 각 탭에 쓴 글과 측정값은 이 브라우저에 자동 저장됩니다. 측정값은 <b>5. 데이터</b> 탭 맨 위 <b>👥 조 공유</b>로 같은 조 노트북·선생님과 나누고(로그인 없음), 보고서는 <b>7. 결론 및 검토</b> 탭에서 인쇄(PDF 저장)합니다.</p>
 
         <h3>실험 전 예상해 보기 (가설)</h3>
         <div class="qa">
@@ -263,6 +266,8 @@
 
     <!-- 5. 데이터 수집 -->
     <section class="panel" data-tab="data" hidden>
+    <!-- 👥 조 공유: js/class-share.js 가 채움 -->
+    <div id="share-mount"></div>
     <div class="card">
         <h2>5. 데이터 수집</h2>
         <div class="row">
@@ -382,7 +387,7 @@
             <span id="copy-status" class="note"></span>
         </div>
         <div class="row"><button id="btn-clear-all" class="danger">모든 측정값 지우기</button></div>
-        <p class="note">측정값과 쓴 글은 이 브라우저에 자동 저장되어 페이지를 다시 열어도 남아 있습니다. 다른 기기와는 공유되지 않으니, 끝나면 7번 탭에서 제출하세요.</p>
+        <p class="note">측정값과 쓴 글은 이 브라우저에 자동 저장되어 페이지를 다시 열어도 남아 있습니다. 다른 노트북과 나누거나 선생님께 내려면 5. 데이터 탭 맨 위 <b>👥 조 공유</b>를 쓰세요. 학교 인터넷에서 보내기가 안 되면 이 CSV 파일을 옮기고, 받은 노트북은 조 공유의 📂 CSV 불러오기로 합칩니다.</p>
         <div class="row next"><button class="good" data-go="conclusion">다음: 7. 결론 및 검토 →</button></div>
     </div>
     </section>
@@ -434,7 +439,7 @@
             <textarea data-text="a5"></textarea>
         </div>
 
-        <h3>제출 전 점검</h3>
+        <h3>내기 전 점검</h3>
         <ul class="check-list">
             <li>가설(1번 탭)과 결과 정리(6번 탭)를 썼다.</li>
             <li>PV 평균과 변동(%), 절대 영도 추정값과 오차율을 결론에 썼다.</li>
@@ -444,20 +449,20 @@
     </div>
 
     <div class="card" id="submit-card">
-        <h2>📤 보고서 제출</h2>
-        <div class="row"><label>학번 <input type="text" id="st-id" data-student="id" size="8" inputmode="numeric" placeholder="20105"></label>
-            <label>이름 <input type="text" id="st-name" data-student="name" size="8" placeholder="홍길동"></label></div>
-        <div class="row"><label>모둠원 <input type="text" id="st-members" data-student="members" size="22" placeholder="함께 실험한 친구 이름"></label></div>
+        <h2>📤 선생님께 내기</h2>
         <div class="row">
-            <span id="login-status" class="note">로그인 상태 확인 중…</span>
-            <button id="btn-login" class="secondary" hidden>구글 로그인</button>
-        </div>
-        <div class="row">
-            <button id="btn-submit" class="good">📤 보고서 제출</button>
+            <button id="btn-send2" class="good">📤 측정값 선생님께 보내기</button>
             <button id="btn-print" class="secondary">🖨️ 보고서 미리보기·인쇄</button>
         </div>
-        <div id="submit-status" class="note"></div>
-        <p class="note">제출하면 측정값·그래프 계산 결과·쓴 글이 함께 저장되고, 선생님이 메인 페이지에서 보고서를 볼 수 있습니다. 고쳐서 다시 제출하면 새 보고서가 하나 더 저장됩니다 (가장 최근 것이 위에 보입니다). 인쇄 창에서 'PDF 로 저장'을 고르면 파일로도 받을 수 있습니다.</p>
+        <div id="send2-status" class="note" role="status" aria-live="polite"></div>
+        <p class="note"><b>측정값</b>은 5. 데이터 탭 맨 위 <b>👥 조 공유</b>의 조 코드로 선생님 구글 시트에 보내집니다 (구글 로그인 없음, 이름·학번은 보내지 않음). 값을 잰 노트북마다 한 번씩 보내세요.<br>
+            <b>보고서(쓴 글)</b>는 보내지 않습니다. 미리보기에서 인쇄하거나, 인쇄 창에서 'PDF 로 저장'을 골라 선생님이 정한 방법으로 내세요.</p>
+        <details class="print-who">
+            <summary>인쇄할 보고서에 넣을 학번·이름 (이 노트북에만 저장)</summary>
+            <div class="row"><label>학번 <input type="text" id="st-id" data-student="id" size="8" inputmode="numeric" placeholder="20105"></label>
+                <label>이름 <input type="text" id="st-name" data-student="name" size="8" placeholder="홍길동"></label></div>
+            <div class="row"><label>모둠원 <input type="text" id="st-members" data-student="members" size="22" placeholder="함께 실험한 친구 이름"></label></div>
+        </details>
     </div>
     </section>
 
@@ -470,12 +475,15 @@
         <div id="rv-body" class="report"></div>
     </div>
 </div>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
 <script src="../js/pico-ble.js?v=setup-v3"></script>
 <script src="../js/ideal-gas-math.js"></script>
+<!-- 조 공유: 스마트폰 진자·플랑크와 같은 선생님 Apps Script (주소 js/pendulum-config.js, 링크의 ?s= 가 있으면 그것) -->
+<script src="../js/pendulum-config.js"></script>
+<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/class-cloud.js"></script>
+<script src="../js/class-share.js"></script>
+<script src="../js/ideal-gas-share.js"></script>
 <script src="../js/ideal-gas.js"></script>
 </body>
 </html>
