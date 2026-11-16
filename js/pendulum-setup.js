@@ -135,6 +135,16 @@
             catch (e) { $('code').closest('details').open = true; alert('복사가 막혀 있어요. 펼쳐진 코드를 직접 선택해 복사하세요.'); }
             setTimeout(function () { $('btnCopyCode').textContent = '📋 코드 복사'; }, 1500);
         });
+        // 매니페스트(appsscript.json): 권한 목록·시간대. 5판부터 스스로 업데이트에 필요
+        $('btnCopyManifest').addEventListener('click', async function () {
+            try {
+                var r = await fetch('../apps-script/appsscript.json', { cache: 'no-store' });
+                if (!r.ok) throw new Error(r.status);
+                await navigator.clipboard.writeText(await r.text());
+                $('btnCopyManifest').textContent = '✅ 복사했어요';
+            } catch (e) { window.open('../apps-script/appsscript.json', '_blank'); }
+            setTimeout(function () { $('btnCopyManifest').textContent = '📋 appsscript.json 복사'; }, 1500);
+        });
         $('btnSave').addEventListener('click', testAndSave);
         $('url').addEventListener('keydown', function (e) { if (e.key === 'Enter') testAndSave(); });
         $('btnCopyLink').addEventListener('click', async function () {

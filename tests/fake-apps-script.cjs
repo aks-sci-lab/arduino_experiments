@@ -53,8 +53,14 @@ function makeSpreadsheet() {
     };
 }
 
-function loadCodeGs() {
+// opts.code: Code.gs 대신 시험할 코드 글자, opts.fetch(url, params) → { code, body(문자열 또는 Buffer) }: 가짜 인터넷
+//   (스스로 업데이트 5판: 사이트 파일·Apps Script API). 부른 순서는 돌려주는 값의 fetches 에 쌓인다
+function loadCodeGs(opts) {
+    opts = opts || {};
     const ss = makeSpreadsheet();
+    const fetches = [];
+    const store = new Map();
+    const scriptId = opts.scriptId || 'SCRIPT_ID_FAKE_0123456789abcdef';
     const ctx = {
         SpreadsheetApp: { getActiveSpreadsheet: () => ss },
         ContentService: {
@@ -65,15 +71,44 @@ function loadCodeGs() {
         // 수업 연결(4판): 교사 열쇠 만들기·해시. 진짜처럼 부호 있는 바이트 배열을 돌려준다
         Utilities: {
             DigestAlgorithm: { SHA_256: 'SHA_256' }, Charset: { UTF_8: 'UTF_8' },
-            computeDigest(alg, str) { return Array.from(new Int8Array(require('node:crypto').createHash('sha256').update(String(str), 'utf8').digest())); },
+            // 글자(UTF-8) 또는 바이트 배열(부호 있는 값, getContent() 결과) 모두 받음
+            computeDigest(alg, v) {
+                const buf = Array.isArray(v) ? Buffer.from(v.map(x => (x + 256) % 256)) : Buffer.from(String(v), 'utf8');
+                return Array.from(new Int8Array(require('node:crypto').createHash('sha256').update(buf).digest()));
+            },
             getUuid() { return require('node:crypto').randomUUID(); }
+        },
+        PropertiesService: {
+            getScriptProperties: () => ({
+                getProperty: k => (store.has(k) ? store.get(k) : null),
+                setProperty: (k, v) => { store.set(k, String(v)); },
+                deleteProperty: k => { store.delete(k); }
+            })
+        },
+        ScriptApp: {
+            getScriptId: () => scriptId,
+            getOAuthToken: () => 'TOKEN_FAKE',
+            getService: () => ({ getUrl: () => opts.serviceUrl || 'https://script.google.com/macros/s/DEPLOY_ID_FAKE/exec' })
+        },
+        UrlFetchApp: {
+            fetch(url, params) {
+                params = params || {};
+                fetches.push({ url, method: (params.method || 'get').toLowerCase(), payload: params.payload, headers: params.headers || {} });
+                const r = opts.fetch ? opts.fetch(url, params) : { code: 404, body: '' };
+                const buf = Buffer.isBuffer(r.body) ? r.body : Buffer.from(String(r.body == null ? '' : r.body), 'utf8');
+                return {
+                    getResponseCode: () => r.code,
+                    getContent: () => Array.from(new Int8Array(buf)),
+                    getContentText: () => buf.toString('utf8')
+                };
+            }
         },
         Date, JSON, Math, String, Number, Array, Object, RegExp, isFinite
     };
     vm.createContext(ctx);
-    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8'), ctx);
+    vm.runInContext(opts.code != null ? opts.code : fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8'), ctx);
     return {
-        ss,
+        ss, fetches, props: store,
         get(params) { return JSON.parse(ctx.doGet({ parameter: params }).getContent()); },
         post(body) {
             const contents = typeof body === 'string' ? body : JSON.stringify(body);

@@ -63,3 +63,10 @@ html.big-view .ct-bigqr { zoom: calc(1 / 1.35); }
 .ct-mem .ct-mem-r { text-align: right; }
 .ct-detail-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .ct-detail-table th, .ct-detail-table td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--c-line); }
+
+/* 서버 판 확인·업데이트 띠 */
+.ct-update { border-left: 5px solid var(--c-success); }
+.ct-update.warn { border-left-color: var(--c-warn-text); background: var(--c-warn-bg); }
+.ct-update h2 { margin-bottom: var(--sp-1); }
+.ct-manual { margin-top: var(--sp-2); }
+.ct-update .ct-field.ct-inline input { width: 13em; max-width: 60vw; }

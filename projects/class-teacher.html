@@ -16,6 +16,33 @@
     <h1>👩‍🏫 수업 연결 (교사)</h1>
     <p class="note">구글 로그인 없이 씁니다. 선생님 구글 시트(Apps Script)에 수업을 만들면 조가 나뉘고, 학생은 QR 로 들어와 조·번호(이름 없음)를 고릅니다. 측정값은 조원과 선생님께 자동으로 공유되고, 여기서 진행 상황을 봅니다.</p>
 
+    <!-- 서버(Apps Script) 판 확인: 사이트의 apps-script/release.json 과 비교 → 업데이트·되돌리기 -->
+    <section class="ct-card ct-update" id="updBox" hidden>
+        <h2 id="updTitle"></h2>
+        <p id="updText" class="note"></p>
+        <div class="ct-row" id="updKeyRow" hidden>
+            <label class="ct-field ct-inline">관리 열쇠 <input type="text" id="updKey" autocomplete="off" spellcheck="false" placeholder="처음 연결한 컴퓨터에서 확인"></label>
+        </div>
+        <div class="ct-row">
+            <button id="btnUpdate" class="good" hidden>🔄 업데이트</button>
+            <button id="btnRollback" class="secondary" hidden>↩ 이전 판으로 되돌리기</button>
+        </div>
+        <p id="updMsg" class="note" role="status" aria-live="polite"></p>
+        <details class="ct-manual" id="updManual">
+            <summary>손으로 업데이트하는 법 (처음 5판으로 바꿀 때 · 단추가 안 될 때)</summary>
+            <ol class="ct-steps">
+                <li><a href="https://script.google.com/home/usersettings" target="_blank" rel="noopener">Apps Script 설정</a>에서 <b>Google Apps Script API</b> 를 <b>사용</b>으로 켜요 (다음부터 단추로 업데이트하려면 필요, 한 번만).</li>
+                <li>선생님 시트 → <kbd>확장 프로그램</kbd> → <kbd>Apps Script</kbd> → <kbd>Code.gs</kbd> 내용을 모두 지우고 새 코드를 붙여 넣어요.
+                    <div class="ct-row"><button id="btnCopyCode" class="secondary">📋 Code.gs 복사</button></div></li>
+                <li>왼쪽 ⚙ <kbd>프로젝트 설정</kbd> → <b>"appsscript.json" 매니페스트 파일을 편집기에 표시</b> 켜기 → 편집기에 생긴 <kbd>appsscript.json</kbd> 내용을 모두 지우고 붙여 넣어요.
+                    <div class="ct-row"><button id="btnCopyManifest" class="secondary">📋 appsscript.json 복사</button></div></li>
+                <li>저장(<kbd>Ctrl</kbd>+<kbd>S</kbd>) → <kbd>배포</kbd> → <kbd>배포 관리</kbd> → ✏️ → 버전 <b>새 버전</b> → <kbd>배포</kbd> → 권한 확인 창이 나오면 <b>고급 → (안전하지 않음)으로 이동 → 허용</b> (새 권한: 스스로 업데이트용).</li>
+                <li>여기서 <b>지금 시트 연결 시험</b>을 누르면 새 판이 보여요. 주소는 그대로예요.</li>
+            </ol>
+            <p id="copyCodeMsg" class="note"></p>
+        </details>
+    </section>
+
     <nav class="subtabs sticky" id="ctTabs" aria-label="수업 연결">
         <button data-tab="sheet">① 시트 연결</button>
         <button data-tab="make">② 수업 만들기</button>
@@ -29,7 +56,7 @@
             <p id="sheetNow" class="ct-status"></p>
             <ol class="ct-steps">
                 <li>구글 시트에 <b>Apps Script</b>(진자·플랑크와 같은 코드)를 붙여 웹 앱으로 배포합니다. 처음이면 <a href="pendulum-setup.html">시트 만들기 자세한 안내</a>를 따라 하세요.</li>
-                <li>코드가 바뀌었다는 안내가 있으면 새 코드를 다시 붙여 넣고 <kbd>배포 관리</kbd> → 연필 → 버전 <b>새 버전</b> → <kbd>배포</kbd>. (수업 연결은 <b>4판</b> 이상이 필요해요)</li>
+                <li>서버 코드가 새로 나오면 이 화면 맨 위에 안내가 떠요. <b>5판부터는 🔄 업데이트 단추</b>로 끝나고, 4판 이하는 처음 한 번만 손으로 바꿔요(수업 연결은 <b>4판</b>, 스스로 업데이트는 <b>5판</b> 이상).</li>
                 <li>웹 앱 주소(<code>https://script.google.com/macros/s/…/exec</code>)를 아래에 붙여 넣고 연결 시험을 누르세요. 이 브라우저가 기억합니다.</li>
             </ol>
             <label class="ct-field">웹 앱 주소
@@ -40,6 +67,11 @@
                 <button id="btnTestNow" class="secondary">지금 시트 연결 시험</button>
             </div>
             <p id="sheetMsg" class="note" role="status" aria-live="polite"></p>
+            <details class="ct-key" id="adminBox" hidden>
+                <summary>🔑 관리 열쇠 (서버 업데이트용)</summary>
+                <p>이 시트의 관리 열쇠 <b class="ct-mono" id="adminKey"></b> — 이 브라우저에 저장되어 있어요. 다른 컴퓨터에서 업데이트하려면 그 컴퓨터의 업데이트 칸에 넣으세요. <b>학생에게 보여 주지 마세요.</b>
+                잃어버리면 Apps Script 편집기 ⚙ 프로젝트 설정 → 스크립트 속성에서 <code>ADMIN_KEY_HASH</code> 를 지우고 다시 연결하면 새로 만들어져요.</p>
+            </details>
         </section>
     </div>
 
