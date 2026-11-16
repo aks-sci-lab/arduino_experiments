@@ -51,6 +51,8 @@
         .in-list label { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); overflow-wrap: anywhere; }
         .in-list input { width: 20px; height: 20px; }
         .in-list .sm { color: var(--c-muted); font-size: var(--fs-sm); }
+        .in-list li.on b { color: var(--c-primary); }
+        .in-list li.new { background: var(--c-warn-bg); }
     </style>
 </head>
 <body>
@@ -98,11 +100,18 @@
         </div>
 
         <div class="dash-more">
+            <!-- 🗂 내 회차: 시작 → 중지 한 번이 회차 하나 (js/phone-accel.js) -->
+            <details id="runs-box" class="panel" open hidden>
+                <summary>🗂 내 회차 <span id="runs-sum" class="note"></span></summary>
+                <p class="note">'▶ 시작 → ■ 중지' 한 번이 회차 하나로 이 기기에 남습니다. 구간을 자르면 그 회차가 고쳐집니다. 👥 조 공유의 📤 보내기로 보냅니다(폰으로 연결했으면 위 📱 띠에서 보낼 회차를 고릅니다).</p>
+                <ul id="run-list" class="in-list"></ul>
+            </details>
+
             <!-- 👥 조 공유 (구글 로그인 없이 조 코드로 선생님 시트에 보내기·같은 조 기기에서 불러오기): js/class-share.js 가 채움 -->
             <div id="share-mount"></div>
             <details id="in-box" class="panel" hidden>
                 <summary>📥 같은 조에서 불러온 기록 <span id="in-sum" class="note"></span></summary>
-                <p class="note">같은 조의 다른 기기가 📤 보낸 기록입니다. 체크하면 그래프에 크기 |a| 를 점선으로 겹쳐 봅니다. 내 기록과는 따로 두므로 내 CSV·보내기에는 들어가지 않습니다.</p>
+                <p class="note">같은 조의 다른 기기(📱 폰으로 연결한 폰 포함)가 📤 보낸 기록입니다. 체크하면 그래프에 크기 |a| 를 점선으로 겹쳐 보고, 📈 보기를 누르면 그 기록을 그래프에 크게 띄워 구간을 골라 볼 수 있습니다. 내 회차와는 따로 두므로 내 보내기에는 들어가지 않습니다.</p>
                 <ul id="in-list" class="in-list"></ul>
             </details>
 

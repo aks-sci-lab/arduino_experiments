@@ -185,6 +185,8 @@ async function startRecording() {
     }
 
     sessionStart = null;
+    currentRunId = newRunId();   // 시작 → 중지 = 회차 하나
+    viewLabel = '';
     samples = [];
     originalSamples = null;
     selectionMode = 0;
@@ -224,8 +226,7 @@ function stopRecording() {
     btnStop.disabled = true;
     recordStatusEl.textContent = `⏸ 대기 중 (샘플 ${samples.length}개 기록됨)`;
     recordStatusEl.style.color = 'var(--c-muted)';
-    saveLast();
-    notifyChange();
+    storeRun();
 }
 
 function downloadCSV() {
@@ -263,8 +264,7 @@ function cropToSelection() {
     if (filtered.length === 0) return alert('선택된 구간에 데이터가 없습니다.');
     samples = filtered;
     rebuildChartDataFromSamples();
-    saveLast();
-    notifyChange();
+    storeRun();
     selectionMode = 0;
     cropStartMs = null;
     cropEndMs = null;
@@ -275,8 +275,7 @@ function resetDataToOriginal() {
     if (!originalSamples) return alert('복원할 원본 데이터가 없습니다.');
     samples = originalSamples.slice();
     rebuildChartDataFromSamples();
-    saveLast();
-    notifyChange();
+    storeRun();
     selectionMode = 0;
     cropStartMs = null;
     cropEndMs = null;
@@ -350,35 +349,110 @@ btnCrop.addEventListener('click', cropToSelection);
 btnResetData.addEventListener('click', resetDataToOriginal);
 accChartCanvasEl.addEventListener('click', onChartClick);
 
-/* 마지막 기록을 이 기기에 남김 (새로고침해도 보이고, 👥 조 공유로 다시 보낼 수 있게). 200개라 작다 */
-const LAST_KEY = 'phone-accel:last';
+/* 회차: '시작 → 중지' 한 번이 회차 하나 (구간을 자르거나 되돌리면 그 회차를 고침). 이 기기에 남아 새로고침해도 보이고,
+   👥 조 공유에서 골라 보낸다. 지금 화면의 기록(마지막 회차 또는 📈 보기로 띄운 기록)도 따로 남긴다 */
+const LAST_KEY = 'phone-accel:last', RUNS_KEY = 'phone-accel:runs';
+let runs = [];             // [{ id, num, title, at, samples: [{ rel, ax, ay, az }] }]
+let currentRunId = null;   // 지금 화면이 어느 회차인지 (불러온 기록을 보고 있으면 null)
+let viewLabel = '';        // 📈 보기로 띄운 다른 기기 기록의 이름
+const slim = list => list.map(s => ({ t: s.t, rel: s.rel, ax: s.ax, ay: s.ay, az: s.az }));
+const okSamples = a => Array.isArray(a) && a.every(s => s && [s.rel, s.ax, s.ay, s.az].every(Number.isFinite));
+function newRunId() { return 'r' + Date.now().toString(36); }
+function saveRuns() { try { localStorage.setItem(RUNS_KEY, JSON.stringify(runs)); } catch (e) { /* 저장 불가: 이 화면에서만 */ } }
 function saveLast() {
     try {
-        localStorage.setItem(LAST_KEY, JSON.stringify({ samples: samples.map(s => ({ t: s.t, rel: s.rel, ax: s.ax, ay: s.ay, az: s.az })),
-            original: originalSamples ? originalSamples.map(s => ({ t: s.t, rel: s.rel, ax: s.ax, ay: s.ay, az: s.az })) : null }));
+        localStorage.setItem(LAST_KEY, JSON.stringify({ samples: slim(samples), original: originalSamples ? slim(originalSamples) : null, runId: currentRunId, view: viewLabel }));
     } catch (e) { /* 저장 불가: 이 화면에서만 */ }
 }
+// 지금 기록을 회차에 넣거나 고치고 알림
+function storeRun() {
+    let changedRun = false;
+    if (currentRunId && samples.length) {
+        let r = runs.find(x => x.id === currentRunId);
+        if (!r) {
+            const num = runs.reduce((m, x) => Math.max(m, x.num || 0), 0) + 1;
+            r = { id: currentRunId, num, title: num + '회', at: new Date().toISOString() };
+            runs.push(r);
+        }
+        r.samples = slim(samples);
+        changedRun = true;
+        saveRuns();
+    }
+    saveLast();
+    renderRunList();
+    notifyChange(changedRun);
+}
+function deleteRun(id) {
+    runs = runs.filter(r => r.id !== id);
+    if (currentRunId === id) currentRunId = null;
+    saveRuns(); saveLast(); renderRunList();
+    notifyChange(false);
+}
+// 회차나 다른 기기 기록을 그래프에 띄움 (label 이 있으면 다른 기기 기록: 고쳐도 내 회차가 되지 않음)
+function showSamples(list, runId, label) {
+    if (recording) return;
+    samples = slim(list).slice(-MAX_SAMPLES);
+    originalSamples = null;
+    currentRunId = runId || null;
+    viewLabel = label || '';
+    selectionMode = 0; cropStartMs = null; cropEndMs = null;
+    rebuildChartDataFromSamples();
+    updateSelectionStatus();
+    btnDownload.disabled = !samples.length;
+    btnResetData.disabled = true;
+    const r = runs.find(x => x.id === currentRunId);
+    recordStatusEl.textContent = viewLabel ? `📈 보는 중: ${viewLabel} (샘플 ${samples.length}개)` : `⏸ ${r ? r.title : '지난 기록'} (샘플 ${samples.length}개)`;
+    recordStatusEl.style.color = 'var(--c-muted)';
+    saveLast();
+    renderRunList();
+}
+// 🗂 내 회차 목록 (폰 연결 화면에서는 조 공유 띠가 회차 고르기를 맡으므로 숨김)
+let runListHidden = false;
+function renderRunList() {
+    const box = document.getElementById('runs-box'), ul = document.getElementById('run-list');
+    if (!box || !ul) return;
+    box.hidden = runListHidden || !runs.length;
+    document.getElementById('runs-sum').textContent = runs.length ? '— ' + runs.length + '개' : '';
+    ul.innerHTML = runs.map(r => `<li${r.id === currentRunId ? ' class="on"' : ''}><b>${r.title}</b><span class="sm">샘플 ${r.samples.length}개 · ${new Date(r.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>` +
+        `<button type="button" data-view="${r.id}">📈 보기</button><button type="button" class="btn-danger" data-del="${r.id}" aria-label="${r.title} 지우기">🗑</button></li>`).join('');
+}
+document.getElementById('run-list')?.addEventListener('click', e => {
+    const v = e.target.closest('[data-view]'), d = e.target.closest('[data-del]');
+    if (v) { const r = runs.find(x => x.id === v.dataset.view); if (r) showSamples(r.samples, r.id); }
+    if (d) { const r = runs.find(x => x.id === d.dataset.del); if (r && confirm(`'${r.title}' 회차를 지울까요?`)) deleteRun(r.id); }
+});
 function loadLast() {
     try {
+        const saved = JSON.parse(localStorage.getItem(RUNS_KEY) || 'null');
+        if (Array.isArray(saved)) runs = saved.filter(r => r && typeof r.id === 'string' && okSamples(r.samples) && r.samples.length);
         const d = JSON.parse(localStorage.getItem(LAST_KEY) || 'null');
-        const ok = a => Array.isArray(a) && a.every(s => s && [s.rel, s.ax, s.ay, s.az].every(Number.isFinite));
-        if (!d || !ok(d.samples) || !d.samples.length) return;
+        if (!d || !okSamples(d.samples) || !d.samples.length) return;
         samples = d.samples.slice(-MAX_SAMPLES);
-        originalSamples = ok(d.original) && d.original.length ? d.original : null;
+        originalSamples = okSamples(d.original) && d.original.length ? d.original : null;
+        viewLabel = typeof d.view === 'string' ? d.view : '';
+        currentRunId = typeof d.runId === 'string' ? d.runId : null;
+        // 예전 판(회차 없이 마지막 기록 하나)은 그 기록을 1회로 (조 공유 id 'rec' 그대로라 예전에 보낸 줄을 고쳐 씀)
+        if (!runs.length && !viewLabel && d.runId === undefined) {
+            runs.push({ id: 'rec', num: 1, title: '1회', at: new Date().toISOString(), samples: slim(samples) });
+            currentRunId = 'rec';
+            saveRuns();
+        }
         rebuildChartDataFromSamples();
         btnDownload.disabled = false;
         btnResetData.disabled = !originalSamples;
-        recordStatusEl.textContent = `⏸ 지난 기록 (샘플 ${samples.length}개)`;
+        const r = runs.find(x => x.id === currentRunId);
+        recordStatusEl.textContent = viewLabel ? `📈 보는 중: ${viewLabel} (샘플 ${samples.length}개)` : `⏸ ${r ? r.title : '지난 기록'} (샘플 ${samples.length}개)`;
     } catch (e) { /* 깨진 값은 무시 */ }
 }
-// 기록이 바뀌었음을 조 공유 스크립트(js/phone-accel-share.js)에 알림
+// 기록이 바뀌었음을 조 공유 스크립트(js/phone-accel-share.js)에 알림 (runChanged: 회차가 새로 생기거나 바뀜)
 const changeListeners = [];
-function notifyChange() { changeListeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
+function notifyChange(runChanged) { changeListeners.forEach(fn => { try { fn(!!runChanged); } catch (e) { console.error(e); } }); }
 
 (function init() {
     accChart.data.datasets.forEach(ds => { ds.data = []; });
     accChart.update('none');
     loadLast();
+    renderRunList();
     updateTimeRangeDisplay();
     updateSelectionStatus();
 })();
@@ -386,6 +460,10 @@ function notifyChange() { changeListeners.forEach(fn => { try { fn(); } catch (e
 // 👥 조 공유 스크립트(js/phone-accel-share.js)가 쓰는 창구
 window.__phoneAccel = {
     getSamples: () => samples,
+    getRuns: () => runs,
+    deleteRun,
+    showSamples,
+    hideRunList(on) { runListHidden = !!on; renderRunList(); },
     isRecording: () => recording,
     getRange,
     onChange: fn => changeListeners.push(fn),
