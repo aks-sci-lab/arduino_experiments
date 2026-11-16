@@ -4,6 +4,7 @@
    - 모바일 터치 확대 선택
    - 픽셀-실제 길이 보정 (자 양 끝을 눌러 mm/px 재기)
    - 측정값 표, 2차 함수·직선 맞춤으로 g·수평 속도 계산
+   - 👥 조 공유(js/class-share.js): 내 결과를 선생님 시트·같은 조 노트북으로, 받은 결과는 6. 결과의 '조 결과 모아 보기'
    ======================================== */
 
 const fileInput = document.getElementById('video-upload');
@@ -90,6 +91,7 @@ function setAnalysisMode(mode, save) {
         try { localStorage.setItem(MODE_KEY, mode); } catch (e) { /* 저장 불가: 이 화면에서만 적용 */ }
     }
     renderDataTable();
+    if (typeof renderGroupResults === 'function') renderGroupResults();
     if (analysisDone && dataPoints.length > 0 && typeof Chart !== 'undefined') drawGraph();
 }
 
@@ -693,7 +695,7 @@ btnStrobo.addEventListener('click', () => {
     analysisDone = true;
     document.getElementById('result-empty').hidden = true;
     renderDataTable();
-    drawGraph();
+    drawGraph(true);
     btnCsv.style.display = 'inline-block';
     stroboContainer.scrollIntoView({ behavior: 'smooth' });
 });
@@ -702,7 +704,8 @@ btnStrobo.addEventListener('click', () => {
    그래프 및 데이터 내보내기
    ======================================== */
 
-function drawGraph() {
+// record: '✓ 합성 실행'으로 부를 때만 true → 그 결과를 👥 조 공유로 보낼 '내 결과'로 정한다 (종류만 바꿔 다시 그릴 때는 그대로)
+function drawGraph(record) {
     chartWrapper.style.display = 'block';
     const ctxChart = document.getElementById('chart').getContext('2d');
 
@@ -729,6 +732,7 @@ function drawGraph() {
             { label: '처음 속도 b', value: `${fmt(fit.coef[1] / 1000, 3)} m/s` },
             { label: '결정계수 R²', value: fmt(fit.r2, 4) }
         ] : [], (fit ? '' : '맞춤에는 점이 4개 이상 필요합니다. ') + calibNote);
+        if (record) setMine('free-fall', rows, pixelToMm, { g, r2: fit ? fit.r2 : null, errPct: g === null ? null : Math.abs(g - 9.8) / 9.8 * 100 });
         const scatterData = dataPoints.map(dp => ({
             x: (dp.time - startTime).toFixed(4),
             y: (dp.y * pixelToMm).toFixed(2)
@@ -755,7 +759,7 @@ function drawGraph() {
                     showLine: true,
                     borderDash: [6, 4],
                     pointRadius: 0
-                }]
+                }].concat(incomingDatasets('free-fall', rows, r => ({ x: r.t, y: r.y })))
             },
             options: {
                 responsive: true,
@@ -804,6 +808,7 @@ function drawGraph() {
             items.push({ label: 'y–t 결정계수 R²', value: fmt(fitY.r2, 4) });
         }
         showFitResult(items, (fitY ? '' : '맞춤에는 점이 4개 이상 필요합니다. ') + calibNote);
+        if (record) setMine('projectile', rows, pixelToMm, { g: gY, r2: fitY ? fitY.r2 : null, errPct: gY === null ? null : Math.abs(gY - 9.8) / 9.8 * 100, vx: fitX ? fitX.coef[1] / 1000 : null });
 
         // 상대 좌표 계산 (첫 점을 원점으로, 화면 좌표계 반대)
         const scatterDataXT = dataPoints.map(dp => ({
@@ -848,7 +853,7 @@ function drawGraph() {
                     showLine: true,
                     borderDash: [6, 4],
                     pointRadius: 0
-                }]
+                }].concat(incomingDatasets('projectile', rows, r => ({ x: r.t, y: r.x })))
             },
             options: {
                 responsive: true,
@@ -886,7 +891,7 @@ function drawGraph() {
                     showLine: true,
                     borderDash: [6, 4],
                     pointRadius: 0
-                }]
+                }].concat(incomingDatasets('projectile', rows, r => ({ x: r.t, y: r.y })))
             },
             options: {
                 responsive: true,
@@ -933,6 +938,85 @@ function drawGraph() {
             }
         });
     }
+}
+
+/* ========================================
+   👥 조 공유 (js/class-share.js, docs/class-share.md) — 구글 로그인 없이 조 코드로
+   - 보낼 것: '✓ 합성 실행'으로 정한 내 결과 (자유낙하·2차원 운동 각각 한 줄, 이 브라우저에 남아 새로고침해도 다시 보낼 수 있음)
+   - 받은 것: 같은 조 다른 노트북의 결과 → 6. 결과의 '조 결과 모아 보기' 표 + 그래프에 점선
+   ======================================== */
+const MINE_KEY = 'free-fall:mine', IN_KEY = 'free-fall:incoming';
+const readJson = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
+const writeJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 저장 불가 */ } };
+let mine = readJson(MINE_KEY, {});          // { 'free-fall': { mode, rows, mmPerPx, fit }, projectile: … }
+let incomingFF = readJson(IN_KEY, {});      // { '노트북:id': { from, title, n, summary, mode, rows } }
+let share = null, currentStep = 'purpose';
+
+function setMine(mode, rows, mmPerPx, fit) {
+    if (!rows.length) return;
+    mine[mode] = { mode, rows: rows.slice().sort((a, b) => a.t - b.t).map(r => ({ t: r.t, x: r.x, y: r.y })), mmPerPx, fit };
+    writeJson(MINE_KEY, mine);
+    renderGroupResults();
+    if (share) { share.render(); share.stepChanged(); }
+}
+function shareItems() {
+    return ['free-fall', 'projectile'].filter(m => mine[m] && mine[m].rows && mine[m].rows.length).map(m => AccelShare.freeFallItem(mine[m]));
+}
+// 받은 결과를 그래프에 겹칠 점선 (첫 점을 내 첫 점에 맞춤)
+function incomingDatasets(mode, myRows, pick) {
+    const colors = ['#8e44ad', '#d35400', '#16a085', '#c0392b', '#2c3e50'];
+    const sorted = myRows.slice().sort((a, b) => a.t - b.t);
+    const base = sorted.length ? pick(sorted[0]) : { x: 0, y: 0 };
+    return Object.values(incomingFF).filter(it => it.mode === mode && it.rows.length).map((it, i) => {
+        const p0 = pick(it.rows[0]);
+        const c = colors[i % colors.length];
+        return { label: '📥 ' + it.from, data: it.rows.map(r => { const p = pick(r); return { x: p.x - p0.x + base.x, y: p.y - p0.y + base.y }; }),
+            borderColor: c, backgroundColor: c, showLine: true, borderDash: [4, 4], pointRadius: 3, fill: false };
+    });
+}
+function renderGroupResults() {
+    const box = document.getElementById('group-results');
+    if (!box) return;
+    const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const num = (v, d) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : '-';
+    const list = [];
+    ['free-fall', 'projectile'].forEach(m => { if (mine[m]) list.push({ who: '나', mode: m, n: mine[m].rows.length, s: AccelShare.freeFallSummary(m, mine[m].rows.length, mine[m].fit) }); });
+    Object.values(incomingFF).forEach(it => list.push({ who: '📥 ' + it.from, mode: it.mode, n: it.rows.length, s: it.summary || {} }));
+    box.hidden = !list.length;
+    document.getElementById('group-table-body').innerHTML = list.map(r =>
+        `<tr${r.mode === currentAnalysisMode ? '' : ' class="muted"'}><td>${esc(r.who)}</td><td>${esc(AccelShare.FF_MODES[r.mode] || r.mode)}</td><td>${r.n}</td>` +
+        `<td>${num(r.s.g, 2)}</td><td>${num(r.s['오차(퍼센트)'], 1)}</td><td>${num(r.s.R2, 4)}</td><td>${num(r.s.vx, 3)}</td></tr>`).join('');
+    const gs = list.filter(r => r.mode === currentAnalysisMode && typeof r.s.g === 'number' && isFinite(r.s.g)).map(r => r.s.g);
+    document.getElementById('group-mean').textContent = gs.length > 1
+        ? `${AccelShare.FF_MODES[currentAnalysisMode]} g 의 평균: ${(gs.reduce((a, b) => a + b, 0) / gs.length).toFixed(2)} m/s² (${gs.length}개 결과)` : '';
+}
+function initShare() {
+    if (!window.ClassShare || !window.AccelShare) return null;
+    try {
+        return ClassShare.init({
+            exp: 'freefall',
+            barMount: '#class-bar-mount', shareMount: '#share-mount',
+            csvHint: '5. 데이터 → 📊 CSV 다운로드',
+            getItems: shareItems,
+            onIncoming: items => {
+                const r = AccelShare.replaceIncoming(incomingFF, items, it => AccelShare.freeFallFromData(it.data));
+                if (!r.changed) return false;
+                incomingFF = r.store;
+                writeJson(IN_KEY, incomingFF);
+                renderGroupResults();
+                if (analysisDone && dataPoints.length > 0 && typeof Chart !== 'undefined') drawGraph();
+                return true;
+            },
+            incomingCount: () => Object.keys(incomingFF).length,
+            clearIncoming: () => {
+                incomingFF = {}; writeJson(IN_KEY, incomingFF); renderGroupResults();
+                if (analysisDone && dataPoints.length > 0 && typeof Chart !== 'undefined') drawGraph();
+            },
+            getStep: () => currentStep,
+            getPoints: () => dataPoints.length || shareItems().reduce((n, it) => n + it.n, 0),
+            pollWhen: () => ['data', 'result', 'conclusion'].includes(currentStep)
+        });
+    } catch (e) { console.error('조 공유 준비 실패', e); return null; }
 }
 
 btnDownloadStrobo.addEventListener('click', () => {
@@ -990,10 +1074,14 @@ btnReset.addEventListener('click', () => { location.reload(); });
     try { savedMode = localStorage.getItem(MODE_KEY) || 'free-fall'; } catch (e) { /* 저장 불가 */ }
     setAnalysisMode(savedMode, false);
 
+    share = initShare();
+    renderGroupResults();
     if (window.LabUI && LabUI.initSteps) {
         LabUI.initSteps({
             key: 'free-fall',
             onShow: step => {
+                currentStep = step;
+                if (share) share.stepChanged();
                 if (step === 'result') {
                     [chartInstance, window.chartXT, window.chartYT, window.chartYX].forEach(c => {
                         if (c) c.resize();

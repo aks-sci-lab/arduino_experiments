@@ -6,9 +6,10 @@ const vm = require('node:vm');
 const EnvironmentProtocol = require('../js/environment-protocol.js');
 const AccelerometerProtocol = require('../js/accelerometer-protocol.js');
 const PicoBLE = require('../js/pico-ble.js');
+const AccelShare = require('../js/accelerometer-share.js');
 
 function page({ failCommand, bluetooth = true, stopTail = [] } = {}) {
-    const elements = new Map(), commands = [], errors = [], submitted = [];
+    const elements = new Map(), commands = [], errors = [], shareOpts = {};
     let chart, watchdog, clock = 0, batchSequence = 0;
     class Element {
         constructor() {
@@ -84,15 +85,11 @@ function page({ failCommand, bluetooth = true, stopTail = [] } = {}) {
             setItem: (key, value) => storage.set(key, value),
             removeItem: key => storage.delete(key)
         },
-        window: { isSecureContext: true, addEventListener() {} },
+        AccelShare,
+        // 조 공유 부품은 따로 시험(class-share.test.cjs). 여기서는 페이지가 넘기는 getItems·onIncoming 만 본다
+        window: { isSecureContext: true, addEventListener() {}, AccelShare,
+            ClassShare: { init: o => { Object.assign(shareOpts, o); return { render() {}, stepChanged() {} }; } } },
         navigator: bluetooth ? { bluetooth: { requestDevice: async () => device } } : {},
-        firebase: {
-            initializeApp() {},
-            auth: () => ({ onAuthStateChanged: fn => fn({ uid: 'student', email: 'student@example.com' }) }),
-            firestore: Object.assign(() => ({ collection: () => ({ add: async doc => submitted.push(doc) }) }), {
-                FieldValue: { serverTimestamp: () => 'server timestamp' }
-            })
-        },
         Chart: class {
             constructor(_, config) {
                 Object.assign(this, config);
@@ -113,7 +110,7 @@ function page({ failCommand, bluetooth = true, stopTail = [] } = {}) {
     const html = fs.readFileSync(path.join(__dirname, '..', 'projects', 'accelerometer-lab.html'), 'utf8');
     vm.runInContext([...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1], context);
     return {
-        element, commands, storage, errors, submitted, device,
+        element, commands, storage, errors, shareOpts, device,
         get chart() { return chart; },
         click: id => element(id).listeners.click(),
         tick: ms => { clock += ms; watchdog(); },
@@ -138,7 +135,7 @@ function page({ failCommand, bluetooth = true, stopTail = [] } = {}) {
     };
 }
 
-test('Pico connect/start/binary samples/stop, local saving and cloud summary', async () => {
+test('Pico connect/start/binary samples/stop, local saving and 조 공유 보낼 것·받은 것', async () => {
     const app = page();
     await app.click('connectBleButton');
     assert.deepEqual(app.commands, ['STOP', 'SET_IMU_RATE:100']);
@@ -154,10 +151,29 @@ test('Pico connect/start/binary samples/stop, local saving and cloud summary', a
     app.click('saveTrialButton');
     assert.equal(Object.values(JSON.parse(app.storage.get('accelerometer_trials')))[0].data.length, 3);
     assert.equal(Object.values(JSON.parse(app.storage.get('accelerometer_trials')))[0].data[0][1], 8);
-    await app.click('saveCloudButton');
-    assert.equal(app.submitted.length, 1);
-    assert.equal(app.submitted[0].trialsCount, 1);
-    assert.match(app.submitted[0].dataSummary, /3/);
+    // 조 공유: 저장한 회차 = 한 줄 (현재 측정이 그 회차와 같으면 따로 보내지 않음), 구글 로그인 없음
+    assert.equal(app.shareOpts.exp, 'accel');
+    let items = app.shareOpts.getItems();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].title, 'IMU trial');
+    assert.match(items[0].id, /^t\d+$/);
+    assert.equal(items[0].n, 3);
+    assert.equal(items[0].summary['점'], 3);
+    assert.deepEqual(items[0].data.cols, ['t', 'x', 'y', 'z']);
+    assert.deepEqual(items[0].data.rows[0], [0, 8, -4, 0]);
+    assert.equal(app.shareOpts.getStep(), 'record');
+    assert.equal(app.shareOpts.getPoints(), 3);
+    // 다른 노트북이 보낸 회차 → 따로 보관, 같은 것을 다시 받으면 바뀐 것 없음
+    const other = [{ id: 't99', device: 'nzz9999', from: '노트북 9999', title: '<b>B조</b>', n: 2, summary: { '최대 a (g)': 1.2 }, sentAt: 's1',
+        data: { cols: ['t', 'x', 'y', 'z'], rows: [[0, 0, 0, 1], [0.01, 0, 0, 1.2]] } }];
+    assert.equal(app.shareOpts.onIncoming(other), true);
+    assert.equal(app.shareOpts.onIncoming(other), false);
+    assert.equal(app.shareOpts.incomingCount(), 1);
+    assert.equal(Object.keys(JSON.parse(app.storage.get('accelerometer_incoming')))[0], 'nzz9999:t99');
+    assert.equal(Object.keys(JSON.parse(app.storage.get('accelerometer_trials'))).length, 1, '내 회차와 섞이지 않음');
+    assert.equal(app.shareOpts.getItems().length, 1, '받은 회차는 다시 보내지 않음');
+    app.shareOpts.clearIncoming();
+    assert.equal(app.shareOpts.incomingCount(), 0);
     app.click('cropButton');
     assert.deepEqual(Array.from(app.chart.data.datasets[0].data, p => p.x), [0, 0.01]);
     app.device.gatt.disconnect();

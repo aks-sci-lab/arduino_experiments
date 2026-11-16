@@ -1,3 +1,5 @@
+// 2026-11-16: 스마트폰 가속도 페이지는 이 파일을 더 불러오지 않는다 (구글 로그인 제출 → 조 공유 js/phone-accel-share.js).
+// Firebase 설정값의 기준 파일로 AGENTS.md 가 가리키므로 지우지 않고 남겨 둔다.
 // Firebase Cloud DB submission for the phone accelerometer experiment.
 // Reuses the same Firebase project as index.html; if a student is already
 // signed in with Google on the main page, that auth session is shared here
