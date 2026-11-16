@@ -129,10 +129,93 @@
         return message.replace(/^Pico: /, '보드: ');
     }
 
+    // ---------- 회차(측정 한 번) · 조 공유 ----------
+    const SHARE_POINTS = 1500;   // 조 공유·저장 때 한 회차에 담는 최대 점 수 (고르게 줄임)
+
+    function mean(list, key) {
+        let sum = 0, n = 0;
+        for (const s of list) if (Number.isFinite(s[key])) { sum += s[key]; n++; }
+        return n ? sum / n : null;
+    }
+    function fixed(value, digits) { return Number.isFinite(value) ? Number(value.toFixed(digits)) : null; }
+
+    function runTitle(mode, no) {
+        return (mode === 'imu' ? '가속도 ' : '환경 ') + no + '회';
+    }
+
+    // 교사 진행 보기·회차 표에 보일 숫자 (앞 4개가 교사 화면에 보임)
+    function runSummary(mode, samples) {
+        const list = samples || [];
+        const duration = list.length > 1 ? list[list.length - 1].time - list[0].time : 0;
+        if (mode === 'imu') {
+            let max = null;
+            for (const s of list) if (Number.isFinite(s.total) && (max === null || s.total > max)) max = s.total;
+            return { '평균 크기(g)': fixed(mean(list, 'total'), 3), '최대 크기(g)': fixed(max, 3), '시간(s)': fixed(duration, 1), '점': list.length };
+        }
+        return { '온도(C)': fixed(mean(list, 'temp'), 2), '습도(퍼센트)': fixed(mean(list, 'humidity'), 1), '기압(kPa)': fixed(mean(list, 'pressure'), 3), '시간(s)': fixed(duration, 1) };
+    }
+
+    // 회차 → 보낼·저장할 자료 (짧게: 숫자 배열, 점은 고르게 줄임)
+    function packRun(mode, samples) {
+        const config = MODES[mode];
+        if (!config) throw new Error('알 수 없는 측정 종류입니다: ' + mode);
+        const keys = config.fields.map(f => f.key).filter(k => k !== 'total');
+        const digits = config.fields.filter(f => f.key !== 'total').map(f => f.digits + 1);
+        const rows = thin(samples || [], SHARE_POINTS).map(s => [fixed(s.time, 3), ...keys.map((k, i) => fixed(s[k], digits[i]))]);
+        return { v: 1, mode, keys, n: (samples || []).length, rows };
+    }
+
+    // 받은 자료 → 회차 점들. 모양이 틀리면 null
+    function unpackRun(data) {
+        if (!data || data.v !== 1 || !MODES[data.mode] || !Array.isArray(data.rows) || !Array.isArray(data.keys)) return null;
+        const expected = MODES[data.mode].fields.map(f => f.key).filter(k => k !== 'total');
+        if (data.keys.join() !== expected.join()) return null;
+        const samples = [];
+        for (const row of data.rows) {
+            if (!Array.isArray(row) || row.length !== expected.length + 1 || !row.every(x => x === null || Number.isFinite(x))) return null;
+            const s = { time: row[0] };
+            expected.forEach((k, i) => { s[k] = row[i + 1] === null ? NaN : row[i + 1]; });
+            if (data.mode === 'imu') s.total = Math.hypot(s.x, s.y, s.z);
+            samples.push(s);
+        }
+        return { mode: data.mode, samples, n: Number.isSafeInteger(data.n) ? data.n : samples.length };
+    }
+
+    // 내 회차들 → 조 공유로 보낼 것 (ClassShare getItems)
+    function shareItems(runs) {
+        return (runs || []).filter(r => r.samples && r.samples.length).map(r => ({
+            id: r.id, title: runTitle(r.mode, r.no), n: r.n || r.samples.length,
+            summary: r.summary || runSummary(r.mode, r.samples), data: packRun(r.mode, r.samples)
+        }));
+    }
+
+    // 같은 조 다른 노트북이 보낸 것 → 받은 회차 모음(Map, 열쇠 = 노트북-id)에 합침. 바뀌었으면 true
+    // 받은 목록에 없는 회차는 보낸 노트북이 지운 것이라 뺀다 (목록은 늘 그 조 전체)
+    function mergeIncoming(store, items) {
+        let changed = false;
+        const seen = new Set();
+        for (const it of items || []) {
+            const run = unpackRun(it.data);
+            if (!run) continue;
+            const key = it.device + '-' + it.id;
+            seen.add(key);
+            const old = store.get(key);
+            if (old && old.sentAt === it.sentAt) continue;
+            store.set(key, { key, id: it.id, device: it.device, from: it.from, mode: run.mode, title: it.title || runTitle(run.mode, '?'),
+                samples: run.samples, n: run.n, summary: it.summary || runSummary(run.mode, run.samples), sentAt: it.sentAt, incoming: true });
+            changed = true;
+        }
+        for (const [key, run] of store) {
+            if (!seen.has(key)) { store.delete(key); changed = true; }
+        }
+        return changed;
+    }
+
     const api = {
         SERVICE_UUID, TX_UUID, CMD_UUID, ACCEL_UUID, NAME_PREFIX, STALE_MS, MAX_SAMPLES, MAX_CHART_POINTS,
         MODES, isNanoName, rateCommands, validateBoard, makeValidator, environmentSample,
-        toCsv, thin, isStale, friendlyError
+        toCsv, thin, isStale, friendlyError,
+        SHARE_POINTS, runTitle, runSummary, packRun, unpackRun, shareItems, mergeIncoming
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.NanoSense = api;
