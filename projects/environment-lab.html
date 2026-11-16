@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <link rel="stylesheet" href="../css/class-share.css">
     <title>환경 센서 실시간 모니터</title>
 
     <script data-role="sensor-mode">
@@ -51,7 +52,7 @@
         }
         button:not(:disabled):hover { filter: brightness(.9); }
         button:where(#connectBleButton, #connectButton, .btn-primary, #saveTrialButton) { background: var(--c-primary); border-color: var(--c-primary); }
-        button:where(#recordButton, #saveCloudButton) { background: var(--c-success); border-color: var(--c-success); }
+        button:where(#recordButton) { background: var(--c-success); border-color: var(--c-success); }
         button:where(#downloadButton, .btn-info) { background: var(--c-info); border-color: var(--c-info); }
         button:where(#clearTrialsButton, .btn-danger) { background: var(--c-danger); border-color: var(--c-danger); }
         button:where(.btn-secondary, #disconnectButton) { background: var(--c-secondary); border-color: var(--c-secondary); }
@@ -67,6 +68,7 @@
             <a href="environment-lab.html?sensor=uv" data-mode="uv"><span class="ic" aria-hidden="true">☀️</span>자외선<small>LTR390</small></a>
         </nav>
         <p class="note">센서 보드는 한 번에 한 가지만 측정합니다. 센서를 바꾸면 연결이 끊기니 다시 연결하세요.</p>
+        <div id="class-bar-mount"></div>
         <div id="envView">
         <h1>환경 센서 실시간 모니터</h1>
 
@@ -135,14 +137,15 @@
                     </table>
                 </div>
             </details>
-            <details>
-                <summary>🗂 회차 저장·Cloud 제출</summary>
+            <details class="share-details">
+                <summary>🗂 회차 저장·👥 조 공유</summary>
                 <ul id="trial-list" class="trial-list"></ul>
                 <div class="row">
                     <button id="saveTrialButton" class="btn-primary" disabled>현재 측정 저장</button>
-                    <button id="saveCloudButton">☁️ Cloud DB에 제출</button>
                     <button id="clearTrialsButton" class="btn-danger">모든 회차 삭제</button>
                 </div>
+                <p class="note">저장한 회차와 현재 측정을 같은 조 노트북·선생님께 보낼 수 있습니다. 다른 노트북에서 받은 회차는 📥 로 표시되고 그래프에 함께 그려집니다.</p>
+                <div id="share-mount"></div>
             </details>
         </div>
 
@@ -162,7 +165,7 @@
             <p>PC/Android Chrome·Edge와 Bluetooth가 필요합니다. iPhone/iPad Safari·Firefox는 지원하지 않습니다.
                 Pico의 Wi-Fi 설정은 필요 없습니다. 연결 중 실시간 값이 표시되며, 측정 시작부터 로그를 기록합니다.
                 통합 측정에는 최신 main.py와 extra_sensors.py로 교체 후 재시작이 필요합니다.
-                센서는 1초마다 읽고 선택한 간격으로 기록합니다. Cloud 제출은 측정값 전체가 아닌 요약만 저장합니다.</p>
+                센서는 1초마다 읽고 선택한 간격으로 기록합니다. 조 공유로 보내면 회차의 측정값(점이 많으면 고르게 2000개까지)과 요약이 선생님 시트에 저장됩니다.</p>
             <p>검색이 안 되면 최신 main.py를 다시 저장하고 <strong>Thonny → 보기 → 셸</strong>에서 F5로 실행하세요.
                 5초마다 <code>[STATUS] ... BLE=ADVERTISING</code>이 나오면 검색 대기 상태입니다.
                 <code>[FATAL]</code>은 실행 오류, <code>[STOP]</code>은 정지 상태입니다.
@@ -207,13 +210,12 @@
                 <summary>📋 데이터 기록 (표)</summary>
                 <div class="table-container"><table><thead><tr id="tableHead"><th>시간 (s)</th></tr></thead><tbody id="historyTbody"></tbody></table></div>
             </details>
-            <details>
-                <summary>🗂 회차 저장·Cloud 제출</summary>
+            <details class="share-details">
+                <summary>🗂 회차 저장·👥 조 공유</summary>
                 <div class="row"><button id="saveTrialButton" disabled>현재 회차 저장</button><button id="clearTrialsButton">모든 회차 삭제</button></div>
                 <ul id="trialList"></ul>
-                <p id="authNotice" class="note">메인 페이지에서 Google 로그인 후 Cloud 제출이 가능합니다.</p>
-                <p class="note">로컬 회차와 CSV에는 원시 값·보조 데이터도 보관하며, Cloud에는 회차 수·샘플 수 요약만 제출합니다.</p>
-                <button id="saveCloudButton">Cloud에 요약 제출</button>
+                <p class="note">저장한 회차와 현재 측정을 같은 조 노트북·선생님께 보낼 수 있습니다. 다른 노트북에서 받은 회차는 📥 로 표시되고 그래프에 함께 그려집니다. CSV 에는 원시 값·보조 데이터도 모두 들어갑니다.</p>
+                <div id="share-mount"></div>
             </details>
         </div>
         <details class="firmware-guide">
@@ -237,82 +239,40 @@
         (function () {
             var mode = window.SENSOR_MODE || 'environment';
             document.body.dataset.sensor = mode;
+            // 수업 링크(?c=수업코드&s=시트)로 들어왔으면 센서를 바꿔도 수업이 이어지게 주소에 붙인다
+            var here = new URLSearchParams(location.search);
             document.querySelectorAll('.sensor-switch a').forEach(function (a) {
                 if (a.dataset.mode === mode) a.setAttribute('aria-current', 'page');
+                ['c', 's'].forEach(function (k) {
+                    if (!here.get(k)) return;
+                    var u = new URL(a.getAttribute('href'), location.href);
+                    u.searchParams.set(k, here.get(k));
+                    a.setAttribute('href', u.pathname.split('/').pop() + u.search);
+                });
             });
-            if (mode === 'environment') return;
-            document.getElementById('envView').replaceWith(document.getElementById('singleSensorView').content.cloneNode(true));
+            if (mode !== 'environment') document.getElementById('envView').replaceWith(document.getElementById('singleSensorView').content.cloneNode(true));
+            // 수업 참여 중이면 조 공유 칸이 든 접기를 처음부터 연다
+            if (here.get('c')) document.querySelectorAll('.share-details').forEach(function (d) { d.open = true; });
         })();
     </script>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <!-- 수업 참여·조 공유 (구글 로그인 없이, 선생님 시트로): docs/class-share.md -->
+    <script src="../js/pendulum-config.js"></script>
+    <script src="../js/pendulum-cloud.js"></script>
+    <script src="../js/class-cloud.js"></script>
+    <script src="../js/class-share.js"></script>
+    <script src="../js/environment-share.js?v=share-v1"></script>
     <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
     <script src="../js/pico-ble.js?v=setup-v3"></script>
     <script src="../js/sensor-definitions.js?v=voc-index-v3"></script>
     <script src="../js/voc-index.js?v=official-v1"></script>
     <script src="../js/environment-metrics.js?v=env-voc-v1"></script>
-    <script src="../js/sensor-lab.js?v=merged-v1"></script>
+    <script src="../js/sensor-lab.js?v=share-v1"></script>
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         // 조도·자외선을 고른 화면에서는 js/sensor-lab.js 가 맡는다
         if (['light', 'uv'].includes(document.body.dataset && document.body.dataset.sensor)) return;
-        // Firebase Config
-        const firebaseConfig = {
-            projectId: "web-experiment-f9b24",
-            appId: "1:718758606428:web:e11ed8d0b64a471ee65899",
-            storageBucket: "web-experiment-f9b24.firebasestorage.app",
-            apiKey: "AIzaSyCYVme6ZP-iyspRmHTtuUSsKXe7K_D0vJQ",
-            authDomain: "web-experiment-f9b24.firebaseapp.com",
-            messagingSenderId: "718758606428"
-        };
-        let auth = null, db = null, currentUser = null;
-        try {
-            if (typeof firebase !== 'undefined') {
-                firebase.initializeApp(firebaseConfig);
-                auth = firebase.auth();
-                db = firebase.firestore();
-                auth.onAuthStateChanged(user => { currentUser = user; });
-            }
-        } catch (e) { console.error('Firebase init error', e); }
-
-        const saveCloudButton = document.getElementById('saveCloudButton');
-        if (saveCloudButton) {
-            saveCloudButton.addEventListener('click', async () => {
-                if (!auth || !currentUser) {
-                    return alert('실험 데이터를 제출하려면 메인 페이지에서 구글 로그인이 필요합니다.');
-                }
-                if (Object.keys(savedTrials).length === 0 && recordedData.length === 0) {
-                    return alert('저장할 측정 데이터가 없습니다.');
-                }
-                try {
-                    saveCloudButton.disabled = true;
-                    saveCloudButton.textContent = '제출 중...';
-                    const trialsCount = Object.keys(savedTrials).length;
-                    const doc = {
-                        userId: currentUser.uid,
-                        userEmail: currentUser.email,
-                        experimentName: '환경 센서 실시간 모니터',
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        tab: 'environment-lab',
-                        trialsCount: trialsCount,
-                        dataSummary: `회차 ${trialsCount}개 / 현재 샘플 ${recordedData.length}개`,
-                        weatherSample: {},
-                        stargazingSample: []
-                    };
-                    await db.collection('experiments').add(doc);
-                    alert('✅ Cloud DB에 성공적으로 제출되었습니다!');
-                } catch (e) {
-                    alert('❌ 제출 실패: ' + e.message);
-                } finally {
-                    saveCloudButton.disabled = false;
-                    saveCloudButton.textContent = '☁️ Cloud DB에 제출';
-                }
-            });
-        }
         const connectBleButton = document.getElementById('connectBleButton');
         const disconnectBleButton = document.getElementById('disconnectBleButton');
         const statusSpan = document.getElementById('status');
@@ -352,6 +312,8 @@
         let isRecording = false;
         let savedTrials = {};
         let envIntervalMs = 1000;
+        let envShare = null;                 // 조 공유 (js/environment-share.js), 없으면 null
+        const hiddenIncoming = new Set();    // 그래프에서 끈 📥 불러온 회차
 
         const UART_SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
         const UART_TX_CHAR_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
@@ -415,6 +377,29 @@
         });
         copyAndGoButton.addEventListener('click', copyDataAndOpenLink);
 
+        // 조 공유: 저장한 회차 + 현재 측정을 보내고, 같은 조 다른 노트북의 회차를 📥 로 받아 그래프에 함께 그린다
+        if (typeof EnvironmentShare !== 'undefined') {
+            envShare = EnvironmentShare.attach({
+                exp: 'env',
+                csvHint: '맨 위 CSV 저장',
+                cols: ['time', 'temp', 'humidity', 'pressure', 'vaporPressure', 'vocIndex'],
+                digits: { time: 2, temp: 2, humidity: 2, pressure: 3, vaporPressure: 4, vocIndex: 0 },
+                get: (p, c) => p[c],
+                summary: EnvironmentShare.summaryEnv,
+                toPoint: o => o,
+                mine: () => [
+                    ...Object.values(savedTrials).map(t => ({ id: t.id, title: t.name, points: t.data || [] })),
+                    { id: 'current', title: '현재 측정', points: recordedData }
+                ],
+                csvHeaders: { 'Time (s)': 'time', 'Temperature (C)': 'temp', 'Humidity (%RH)': 'humidity', 'Pressure (kPa)': 'pressure', 'VaporPressure (kPa)': 'vaporPressure', 'VOC Index': 'vocIndex' },
+                onChange: () => { renderTrialList(); redrawChart(); },
+                getStep: () => (isRecording || bleDevice?.gatt.connected) ? 'live' : (recordedData.length || Object.keys(savedTrials).length ? 'record' : 'more'),
+                getPoints: () => recordedData.length + Object.values(savedTrials).reduce((n, t) => n + (t.data ? t.data.length : 0), 0)
+            });
+            if (envShare) { renderTrialList(); redrawChart(); }
+        }
+        const shareStep = () => { if (envShare) envShare.stepChanged(); };
+
         async function connectBLE() {
             if (connecting) return;
             connecting = true;
@@ -473,6 +458,7 @@
                 if (recordButton.disabled) statusSpan.textContent = `연결됨: ${device.name} — 센서 데이터 대기 중`;
                 connectBleButton.style.display = 'none';
                 disconnectBleButton.style.display = 'inline-block';
+                shareStep();
             } catch(error) {
                 if (bleDevice?.gatt.connected) bleDevice.gatt.disconnect();
                 onDisconnected();
@@ -509,6 +495,7 @@
             connectBleButton.style.display = 'inline-block';
             disconnectBleButton.style.display = 'none';
             recordButton.disabled = true;
+            shareStep();
         }
         
         async function handleRateChange() {
@@ -553,6 +540,7 @@
                 copyAndGoButton.disabled = !isDataPresent; 
             }
             renderTrialList();
+            shareStep();
         }
 
         function handleNotifications(event) {
@@ -620,6 +608,7 @@
                 savedTrials[trialId] = { name: trialName, id: trialId, data: JSON.parse(JSON.stringify(recordedData)) };
                 localStorage.setItem('env_sensor_trials', JSON.stringify(savedTrials));
                 renderTrialList();
+                shareStep();
             }
         }
 
@@ -642,6 +631,27 @@
                 trialList.appendChild(li);
             });
             
+            // 📥 같은 조 다른 노트북에서 불러온 회차 (내 회차와 따로, 지우기는 조 공유 칸의 '불러온 값 지우기')
+            if (envShare) envShare.list().forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'incoming';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'incoming-checkbox';
+                cb.id = 'in-' + item.key.replace(/[^A-Za-z0-9_-]/g, '_');
+                cb.dataset.key = item.key;
+                cb.checked = !hiddenIncoming.has(item.key);
+                cb.addEventListener('change', () => {
+                    if (cb.checked) hiddenIncoming.delete(item.key); else hiddenIncoming.add(item.key);
+                    redrawChart();
+                });
+                const label = document.createElement('label');
+                label.htmlFor = cb.id;
+                label.textContent = `${item.name} (${item.n}개)`;
+                li.append(cb, ' ', label);
+                trialList.appendChild(li);
+            });
+
             trialList.querySelector('#currentTrialCheckbox').addEventListener('change', redrawChart);
             trialList.querySelectorAll('.trial-checkbox').forEach(cb => cb.addEventListener('change', redrawChart));
             trialList.querySelectorAll('.delete-trial-btn').forEach(btn => btn.addEventListener('click', (e) => {
@@ -717,6 +727,9 @@
                 if(savedTrials[cb.id]) { 
                     trialsToShow.push(savedTrials[cb.id]);
                 }
+            });
+            if (envShare) envShare.list().forEach(item => {
+                if (!hiddenIncoming.has(item.key)) trialsToShow.push({ id: item.key, name: item.name, data: item.points });
             });
             return trialsToShow;
         }
