@@ -43,7 +43,8 @@
         if (!n) return { '점': 0 };
         var sum = 0, max = 0;
         rows.forEach(function (r) { var a = Math.sqrt(r[1] * r[1] + r[2] * r[2] + r[3] * r[3]); sum += a; if (a > max) max = a; });
-        return { '점': n, '시간 (s)': round(rows[n - 1][0] - rows[0][0], 3), '평균 a (g)': round(sum / n, 3), '최대 a (g)': round(max, 3) };
+        // 앞의 것부터 폰 회차 목록(3개)·교사 진행 보기(4개)에 보이므로 중요한 숫자를 먼저
+        return { '최대 a (g)': round(max, 3), '평균 a (g)': round(sum / n, 3), '시간 (s)': round(rows[n - 1][0] - rows[0][0], 3), '점': n };
     }
     var ACCEL_COLS = ['t', 'x', 'y', 'z'], ACCEL_DIGITS = [4, 4, 4, 4];
     // 가속도 측정 하나 → class-share 의 item ({ id, title, n, summary, data })
@@ -72,18 +73,22 @@
     // fit: { g, r2, errPct, vx, vxR2 } (없는 값은 null)
     function freeFallSummary(mode, n, fit) {
         fit = fit || {};
-        var s = { '종류': FF_MODES[mode] || mode, '점': n };
+        // 앞의 것부터 폰 회차 목록(3개)·교사 진행 보기(4개)에 보이므로 g 를 먼저
+        var s = {};
         if (finite(fit.g)) s.g = round(fit.g, 3);
         if (finite(fit.errPct)) s['오차(퍼센트)'] = round(fit.errPct, 1);
         if (finite(fit.r2)) s.R2 = round(fit.r2, 4);
         if (finite(fit.vx)) s.vx = round(fit.vx, 3);
+        s['종류'] = FF_MODES[mode] || mode;
+        s['점'] = n;
         return s;
     }
-    // mine: { mode, rows: [{t,x,y}], mmPerPx, fit } → item
+    // mine: { mode, rows: [{t,x,y}], mmPerPx, fps, fit } → item
     function freeFallItem(mine) {
         var rows = (mine.rows || []).map(function (r) { return [r.t, r.x, r.y]; });
         var data = pack(rows, FF_COLS, FF_DIGITS);
         data.mode = mine.mode; data.mmPerPx = mine.mmPerPx;
+        if (isFinite(Number(mine.fps)) && Number(mine.fps) > 0) data.fps = Number(mine.fps);   // 영상 FPS (영상 자체는 셀 한도 때문에 보내지 않음)
         return { id: mine.mode === 'projectile' ? 'pj' : 'ff', title: (FF_MODES[mine.mode] || '측정') + ' ' + rows.length + '점', n: rows.length,
             summary: freeFallSummary(mine.mode, rows.length, mine.fit), data: data };
     }

@@ -49,6 +49,8 @@ test('자유낙하: 종류별 한 줄, 요약 g·오차·R²·vx, 받은 자료 
     assert.equal(ff.id, 'ff'); assert.equal(ff.n, 3); assert.equal(ff.title, '자유낙하 3점');
     assert.deepEqual(ff.summary, { '종류': '자유낙하', '점': 3, g: 9.812, '오차(퍼센트)': 0.1, R2: 0.9999 });
     assert.equal(ff.data.mode, 'free-fall'); assert.equal(ff.data.mmPerPx, 1.5);
+    assert.equal(ff.data.fps, undefined);
+    assert.equal(AS.freeFallItem({ mode: 'free-fall', rows, fps: 60 }).data.fps, 60, '영상 FPS 도 함께 (영상 자체는 보내지 않음)');
     Object.keys(ff.summary).forEach(k => assert.match(k, /^[A-Za-z0-9_가-힣 .()-]{1,30}$/, '서버 요약 이름 규칙: ' + k));
     const pj = AS.freeFallItem({ mode: 'projectile', rows, fit: { vx: 0.5 } });
     assert.equal(pj.id, 'pj'); assert.equal(pj.summary.vx, 0.5);

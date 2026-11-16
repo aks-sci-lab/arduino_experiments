@@ -92,7 +92,8 @@ function setAnalysisMode(mode, save) {
     }
     renderDataTable();
     if (typeof renderGroupResults === 'function') renderGroupResults();
-    if (analysisDone && dataPoints.length > 0 && typeof Chart !== 'undefined') drawGraph();
+    if (viewRun && viewRun.mode !== mode) setViewRun(null);   // 다른 종류로 바꾸면 보던 회차는 내려놓음
+    if (((analysisDone && dataPoints.length > 0) || viewRun) && typeof Chart !== 'undefined') drawGraph();
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -223,6 +224,7 @@ btnExtract.addEventListener('click', () => {
 
     fps = parseInt(fpsInput.value) || 30;
     frameInterval = 1 / fps;
+    videoTag = Date.now().toString(36);   // 새 영상 = 새 회차
     frames = [];
     dataPoints = [];
     extractionTime = 0;
@@ -383,6 +385,8 @@ canvas.addEventListener('touchend', (event) => {
         return;
     }
     if (!isSelectingMode) return;
+    // 손가락으로 누른 뒤 브라우저가 흉내 내는 마우스 누름(mousedown·mouseup)을 막는다 — 막지 않으면 같은 점이 두 번 들어가 다음 프레임을 건너뜀
+    event.preventDefault();
     
     if (isLongPress) {
         const { x, y } = getCanvasCoordinates(event.changedTouches[0]);
@@ -709,11 +713,11 @@ function drawGraph(record) {
     chartWrapper.style.display = 'block';
     const ctxChart = document.getElementById('chart').getContext('2d');
 
-    if (dataPoints.length === 0) return;
-
-    const startTime = frames[0].time;
-    const pixelToMm = parseFloat(pixelToMmInput.value);
-    const rows = measuredRows();
+    // 그릴 점: 📈 보기로 고른 회차(내 회차·📥 받은 회차)가 있으면 그것, 아니면 지금 찍은 점
+    if (record) setViewRun(null);
+    const rows = (viewRun ? viewRun.rows : measuredRows()).slice().sort((a, b) => a.t - b.t);
+    if (rows.length === 0) return;
+    const pixelToMm = viewRun ? (Number(viewRun.mmPerPx) || 1) : parseFloat(pixelToMmInput.value);
     const ts = rows.map(r => r.t);
     const calibNote = Math.abs(pixelToMm - 1) < 1e-9
         ? '기준 길이를 재지 않아 1 px = 1 mm 로 계산했습니다. 5. 데이터에서 기준 길이를 재면 g 값이 맞게 나옵니다.'
@@ -732,11 +736,8 @@ function drawGraph(record) {
             { label: '처음 속도 b', value: `${fmt(fit.coef[1] / 1000, 3)} m/s` },
             { label: '결정계수 R²', value: fmt(fit.r2, 4) }
         ] : [], (fit ? '' : '맞춤에는 점이 4개 이상 필요합니다. ') + calibNote);
-        if (record) setMine('free-fall', rows, pixelToMm, { g, r2: fit ? fit.r2 : null, errPct: g === null ? null : Math.abs(g - 9.8) / 9.8 * 100 });
-        const scatterData = dataPoints.map(dp => ({
-            x: (dp.time - startTime).toFixed(4),
-            y: (dp.y * pixelToMm).toFixed(2)
-        }));
+        if (record) setRun('free-fall', rows, pixelToMm, { g, r2: fit ? fit.r2 : null, errPct: g === null ? null : Math.abs(g - 9.8) / 9.8 * 100 });
+        const scatterData = rows.map(r => ({ x: +r.t.toFixed(4), y: +r.y.toFixed(2) }));
 
         if (chartInstance) chartInstance.destroy();
         chartInstance = new Chart(ctxChart, {
@@ -789,10 +790,6 @@ function drawGraph(record) {
         document.getElementById('projectile-charts').style.display = 'block';
         chartWrapper.style.display = 'none';
         
-        const firstPoint = dataPoints[0];
-        const baseX = firstPoint.x;
-        const baseY = firstPoint.y;
-        
         // 맞춤: x–t 는 직선(수평 속도), y–t 는 2차 함수(위쪽 + 이므로 g = −2c)
         const fitX = polyFit(ts, rows.map(r => r.x), 1);
         const fitY = polyFit(ts, rows.map(r => r.y), 2);
@@ -808,23 +805,13 @@ function drawGraph(record) {
             items.push({ label: 'y–t 결정계수 R²', value: fmt(fitY.r2, 4) });
         }
         showFitResult(items, (fitY ? '' : '맞춤에는 점이 4개 이상 필요합니다. ') + calibNote);
-        if (record) setMine('projectile', rows, pixelToMm, { g: gY, r2: fitY ? fitY.r2 : null, errPct: gY === null ? null : Math.abs(gY - 9.8) / 9.8 * 100, vx: fitX ? fitX.coef[1] / 1000 : null });
+        if (record) setRun('projectile', rows, pixelToMm, { g: gY, r2: fitY ? fitY.r2 : null, errPct: gY === null ? null : Math.abs(gY - 9.8) / 9.8 * 100, vx: fitX ? fitX.coef[1] / 1000 : null });
 
         // 상대 좌표 계산 (첫 점을 원점으로, 화면 좌표계 반대)
-        const scatterDataXT = dataPoints.map(dp => ({
-            x: (dp.time - startTime).toFixed(4),
-            y: ((dp.x - baseX) * pixelToMm).toFixed(2)
-        }));
-        
-        const scatterDataYT = dataPoints.map(dp => ({
-            x: (dp.time - startTime).toFixed(4),
-            y: ((baseY - dp.y) * pixelToMm).toFixed(2)  // 위쪽이 +
-        }));
-        
-        const scatterDataYX = dataPoints.map(dp => ({
-            x: ((dp.x - baseX) * pixelToMm).toFixed(2),
-            y: ((baseY - dp.y) * pixelToMm).toFixed(2)
-        }));
+        // rows 는 이미 첫 점이 원점, 오른쪽·위쪽이 + (measuredRows)
+        const scatterDataXT = rows.map(r => ({ x: +r.t.toFixed(4), y: +r.x.toFixed(2) }));
+        const scatterDataYT = rows.map(r => ({ x: +r.t.toFixed(4), y: +r.y.toFixed(2) }));
+        const scatterDataYX = rows.map(r => ({ x: +r.x.toFixed(2), y: +r.y.toFixed(2) }));
         
         // 기존 차트 인스턴스 정리
         if (window.chartXT) window.chartXT.destroy();
@@ -945,32 +932,76 @@ function drawGraph(record) {
    - 보낼 것: '✓ 합성 실행'으로 정한 내 결과 (자유낙하·2차원 운동 각각 한 줄, 이 브라우저에 남아 새로고침해도 다시 보낼 수 있음)
    - 받은 것: 같은 조 다른 노트북의 결과 → 6. 결과의 '조 결과 모아 보기' 표 + 그래프에 점선
    ======================================== */
-const MINE_KEY = 'free-fall:mine', IN_KEY = 'free-fall:incoming';
+const RUNS_KEY = 'free-fall:runs', IN_KEY = 'free-fall:incoming';
 const readJson = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
 const writeJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 저장 불가 */ } };
-let mine = readJson(MINE_KEY, {});          // { 'free-fall': { mode, rows, mmPerPx, fit }, projectile: … }
+/* 회차: 영상 하나 × 실험 종류 하나 = 회차 하나 ('✓ 합성 실행'을 다시 누르면 그 회차를 고침, 새 영상을 열면 새 회차)
+   [{ id, num, title, at, mode, rows: [{t,x,y}], mmPerPx, fps, fit }] — 영상은 시트로 보낼 수 없어(셀 한도) 찍은 점·기준 길이·fps 만 */
+let ffRuns = readJson(RUNS_KEY, null);
+if (!Array.isArray(ffRuns)) {
+    // 예전 판: 종류마다 결과 하나(free-fall:mine) → 회차로 (조 공유 id 'ff'·'pj' 그대로라 예전에 보낸 줄을 고쳐 씀)
+    const old = readJson('free-fall:mine', {});
+    ffRuns = ['free-fall', 'projectile'].filter(m => old[m] && Array.isArray(old[m].rows) && old[m].rows.length)
+        .map((m, i) => ({ id: m === 'projectile' ? 'pj' : 'ff', num: i + 1, title: (i + 1) + '회 ' + AccelShare.FF_MODES[m], at: new Date().toISOString(), mode: m, rows: old[m].rows, mmPerPx: old[m].mmPerPx, fit: old[m].fit }));
+    writeJson(RUNS_KEY, ffRuns);
+}
+ffRuns = ffRuns.filter(r => r && typeof r.id === 'string' && AccelShare.FF_MODES[r.mode] && Array.isArray(r.rows) && r.rows.length);
 let incomingFF = readJson(IN_KEY, {});      // { '노트북:id': { from, title, n, summary, mode, rows } }
-let share = null, currentStep = 'purpose';
+let share = null, currentStep = 'purpose', steps = null, role = 'laptop';
+let videoTag = Date.now().toString(36);     // 지금 연 영상 (새 영상을 추출할 때 바뀜)
+let viewRun = null;                         // 📈 보기로 띄운 회차 { key, who, title, mode, rows, mmPerPx }
 
-function setMine(mode, rows, mmPerPx, fit) {
+function setRun(mode, rows, mmPerPx, fit) {
     if (!rows.length) return;
-    mine[mode] = { mode, rows: rows.slice().sort((a, b) => a.t - b.t).map(r => ({ t: r.t, x: r.x, y: r.y })), mmPerPx, fit };
-    writeJson(MINE_KEY, mine);
+    const id = 'v' + videoTag + (mode === 'projectile' ? 'p' : 'f');
+    let r = ffRuns.find(x => x.id === id);
+    if (!r) {
+        const num = ffRuns.reduce((m, x) => Math.max(m, x.num || 0), 0) + 1;
+        r = { id, num, title: num + '회 ' + AccelShare.FF_MODES[mode], at: new Date().toISOString(), mode };
+        ffRuns.push(r);
+    }
+    Object.assign(r, { rows: rows.slice().sort((a, b) => a.t - b.t).map(p => ({ t: p.t, x: p.x, y: p.y })), mmPerPx, fps, fit });
+    writeJson(RUNS_KEY, ffRuns);
     renderGroupResults();
-    if (share) { share.render(); share.stepChanged(); }
+    if (share) { share.saved(); share.render(); share.stepChanged(); }   // 폰: 회차 목록에 쌓임
+}
+function deleteRun(id) {
+    ffRuns = ffRuns.filter(r => r.id !== id);
+    writeJson(RUNS_KEY, ffRuns);
+    if (viewRun && viewRun.key === 'me:' + id) setViewRun(null);
+    renderGroupResults();
+    if (share) share.render();
 }
 function shareItems() {
-    return ['free-fall', 'projectile'].filter(m => mine[m] && mine[m].rows && mine[m].rows.length).map(m => AccelShare.freeFallItem(mine[m]));
+    return ffRuns.map(r => Object.assign(AccelShare.freeFallItem(r), { id: r.id, title: r.title, at: r.at }));
 }
-// 받은 결과를 그래프에 겹칠 점선 (첫 점을 내 첫 점에 맞춤)
+// 📈 보기: 고른 회차로 6. 결과의 그래프·맞춤을 다시 그림 (null 이면 지금 찍은 점으로)
+function setViewRun(v) {
+    viewRun = v;
+    const bar = document.getElementById('view-bar');
+    if (bar) {
+        bar.hidden = !v;
+        document.getElementById('view-who').textContent = v ? v.who + ' · ' + v.title : '';
+    }
+}
+function showRun(v) {
+    setViewRun(v);
+    if (v.mode !== currentAnalysisMode) setAnalysisMode(v.mode, false);   // 종류를 바꾸며 다시 그림
+    document.getElementById('result-empty').hidden = true;
+    if (typeof Chart !== 'undefined') drawGraph();
+    renderGroupResults();
+    if (steps) steps.show('result');
+}
+// 받은 결과를 그래프에 겹칠 점선 (첫 점을 지금 그래프의 첫 점에 맞춤, 보고 있는 회차는 빼고)
 function incomingDatasets(mode, myRows, pick) {
     const colors = ['#8e44ad', '#d35400', '#16a085', '#c0392b', '#2c3e50'];
     const sorted = myRows.slice().sort((a, b) => a.t - b.t);
     const base = sorted.length ? pick(sorted[0]) : { x: 0, y: 0 };
-    return Object.values(incomingFF).filter(it => it.mode === mode && it.rows.length).map((it, i) => {
+    return Object.keys(incomingFF).filter(k => incomingFF[k].mode === mode && incomingFF[k].rows.length && !(viewRun && viewRun.key === 'in:' + k)).map((k, i) => {
+        const it = incomingFF[k];
         const p0 = pick(it.rows[0]);
         const c = colors[i % colors.length];
-        return { label: '📥 ' + it.from, data: it.rows.map(r => { const p = pick(r); return { x: p.x - p0.x + base.x, y: p.y - p0.y + base.y }; }),
+        return { label: '📥 ' + it.from + ' ' + it.title, data: it.rows.map(r => { const p = pick(r); return { x: p.x - p0.x + base.x, y: p.y - p0.y + base.y }; }),
             borderColor: c, backgroundColor: c, showLine: true, borderDash: [4, 4], pointRadius: 3, fill: false };
     });
 }
@@ -980,16 +1011,30 @@ function renderGroupResults() {
     const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const num = (v, d) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : '-';
     const list = [];
-    ['free-fall', 'projectile'].forEach(m => { if (mine[m]) list.push({ who: '나', mode: m, n: mine[m].rows.length, s: AccelShare.freeFallSummary(m, mine[m].rows.length, mine[m].fit) }); });
-    Object.values(incomingFF).forEach(it => list.push({ who: '📥 ' + it.from, mode: it.mode, n: it.rows.length, s: it.summary || {} }));
+    ffRuns.forEach(r => list.push({ key: 'me:' + r.id, who: '나', title: r.title, mode: r.mode, rows: r.rows, mmPerPx: r.mmPerPx, n: r.rows.length, s: AccelShare.freeFallSummary(r.mode, r.rows.length, r.fit), mine: r.id }));
+    Object.keys(incomingFF).forEach(k => { const it = incomingFF[k]; list.push({ key: 'in:' + k, who: '📥 ' + it.from, title: it.title, mode: it.mode, rows: it.rows, mmPerPx: it.mmPerPx, n: it.rows.length, s: it.summary || {} }); });
     box.hidden = !list.length;
-    document.getElementById('group-table-body').innerHTML = list.map(r =>
-        `<tr${r.mode === currentAnalysisMode ? '' : ' class="muted"'}><td>${esc(r.who)}</td><td>${esc(AccelShare.FF_MODES[r.mode] || r.mode)}</td><td>${r.n}</td>` +
-        `<td>${num(r.s.g, 2)}</td><td>${num(r.s['오차(퍼센트)'], 1)}</td><td>${num(r.s.R2, 4)}</td><td>${num(r.s.vx, 3)}</td></tr>`).join('');
+    box._list = list;
+    document.getElementById('group-table-body').innerHTML = list.map((r, i) =>
+        `<tr class="${r.mode === currentAnalysisMode ? '' : 'muted'}${viewRun && viewRun.key === r.key ? ' on' : ''}"><td>${esc(r.who)}<br><small>${esc(r.title)}</small></td><td>${esc(AccelShare.FF_MODES[r.mode] || r.mode)}</td><td>${r.n}</td>` +
+        `<td>${num(r.s.g, 2)}</td><td>${num(r.s['오차(퍼센트)'], 1)}</td><td>${num(r.s.R2, 4)}</td><td>${num(r.s.vx, 3)}</td>` +
+        `<td class="acts"><button type="button" data-view="${i}">📈 보기</button>${r.mine && role !== 'phone' ? `<button type="button" class="del" data-del="${i}" aria-label="${esc(r.title)} 지우기">🗑</button>` : ''}</td></tr>`).join('');
     const gs = list.filter(r => r.mode === currentAnalysisMode && typeof r.s.g === 'number' && isFinite(r.s.g)).map(r => r.s.g);
     document.getElementById('group-mean').textContent = gs.length > 1
         ? `${AccelShare.FF_MODES[currentAnalysisMode]} g 의 평균: ${(gs.reduce((a, b) => a + b, 0) / gs.length).toFixed(2)} m/s² (${gs.length}개 결과)` : '';
 }
+document.getElementById('group-table-body').addEventListener('click', e => {
+    const list = document.getElementById('group-results')._list || [];
+    const v = e.target.closest('[data-view]'), d = e.target.closest('[data-del]');
+    if (v) { const r = list[Number(v.dataset.view)]; if (r) showRun({ key: r.key, who: r.who, title: r.title, mode: r.mode, rows: r.rows, mmPerPx: r.mmPerPx }); }
+    if (d) { const r = list[Number(d.dataset.del)]; if (r && r.mine && confirm(`'${r.title}' 회차를 지울까요? (보낸 회차면 다시 📤 보낼 때 선생님 시트에서도 빠집니다)`)) deleteRun(r.mine); }
+});
+document.getElementById('btn-view-mine').addEventListener('click', () => {
+    setViewRun(null);
+    renderGroupResults();
+    if (analysisDone && dataPoints.length > 0 && typeof Chart !== 'undefined') drawGraph();
+    else document.getElementById('result-empty').hidden = false;
+});
 function initShare() {
     if (!window.ClassShare || !window.AccelShare) return null;
     try {
@@ -997,23 +1042,37 @@ function initShare() {
             exp: 'freefall',
             barMount: '#class-bar-mount', shareMount: '#share-mount',
             csvHint: '5. 데이터 → 📊 CSV 다운로드',
+            phone: true,        // 노트북 '📱 폰으로 측정하기' → 폰에서 영상 찍기·점 찍기 → 고른 회차를 노트북으로
+            onRole: r => {
+                role = r;
+                document.body.classList.toggle('is-phone', r === 'phone');
+                if (steps && r === 'phone') steps.show('data');
+            },
+            deleteItem: id => deleteRun(id),
+            onPhoneData: () => { if (steps && currentStep !== 'result') steps.show('result'); },
             getItems: shareItems,
             onIncoming: items => {
-                const r = AccelShare.replaceIncoming(incomingFF, items, it => AccelShare.freeFallFromData(it.data));
+                const r = AccelShare.replaceIncoming(incomingFF, items, it => {
+                    const v = AccelShare.freeFallFromData(it.data);
+                    return v ? Object.assign(v, { mmPerPx: it.data && it.data.mmPerPx }) : null;
+                });
                 if (!r.changed) return false;
                 incomingFF = r.store;
                 writeJson(IN_KEY, incomingFF);
+                if (viewRun && viewRun.key.startsWith('in:') && !incomingFF[viewRun.key.slice(3)]) setViewRun(null);
                 renderGroupResults();
-                if (analysisDone && dataPoints.length > 0 && typeof Chart !== 'undefined') drawGraph();
+                if (((analysisDone && dataPoints.length > 0) || viewRun) && typeof Chart !== 'undefined') drawGraph();
                 return true;
             },
             incomingCount: () => Object.keys(incomingFF).length,
             clearIncoming: () => {
-                incomingFF = {}; writeJson(IN_KEY, incomingFF); renderGroupResults();
-                if (analysisDone && dataPoints.length > 0 && typeof Chart !== 'undefined') drawGraph();
+                incomingFF = {}; writeJson(IN_KEY, incomingFF);
+                if (viewRun && viewRun.key.startsWith('in:')) setViewRun(null);
+                renderGroupResults();
+                if (((analysisDone && dataPoints.length > 0) || viewRun) && typeof Chart !== 'undefined') drawGraph();
             },
             getStep: () => currentStep,
-            getPoints: () => dataPoints.length || shareItems().reduce((n, it) => n + it.n, 0),
+            getPoints: () => dataPoints.length || ffRuns.reduce((n, r) => n + r.rows.length, 0),
             pollWhen: () => ['data', 'result', 'conclusion'].includes(currentStep)
         });
     } catch (e) { console.error('조 공유 준비 실패', e); return null; }
@@ -1077,7 +1136,7 @@ btnReset.addEventListener('click', () => { location.reload(); });
     share = initShare();
     renderGroupResults();
     if (window.LabUI && LabUI.initSteps) {
-        LabUI.initSteps({
+        steps = LabUI.initSteps({
             key: 'free-fall',
             onShow: step => {
                 currentStep = step;
@@ -1089,5 +1148,6 @@ btnReset.addEventListener('click', () => { location.reload(); });
                 }
             }
         });
+        if (steps && role === 'phone') steps.show('data');   // 폰으로 연 화면은 바로 5. 데이터(영상 찍기·점 찍기)
     }
 })();
