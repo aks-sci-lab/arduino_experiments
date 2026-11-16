@@ -1,7 +1,10 @@
-// 이상기체 상태 방정식 실험: 감압 용기 속 피코 환경 센서(BME280)의 압력·온도로 보일 법칙과 샤를·게이뤼삭 법칙을 확인하고 보고서를 제출한다.
+// 이상기체 상태 방정식 실험: 감압 용기 속 피코 환경 센서(BME280)의 압력·온도로 보일 법칙과 샤를·게이뤼삭 법칙을 확인한다.
+// 측정값은 조 공유(js/class-share.js, 구글 로그인 없음)로 같은 조 노트북·선생님 시트와 나누고, 보고서는 인쇄(PDF)로 낸다.
+// 예전에 구글 로그인으로 제출한 보고서는 메인 '사이트 관리'의 기록 목록에서 ?report=문서id 로 계속 볼 수 있다.
 (function () {
     'use strict';
     const G = window.IdealGasMath;
+    const GS = window.IdealGasShare;
     const $ = id => document.getElementById(id);
     const STORE_KEY = 'ideal-gas-v1';
     const MAX_GAY = 1500;            // 실험 2 자동 기록 최대 개수 (제출 문서 크기 제한)
@@ -20,7 +23,8 @@
         draft: { v: '', p: '', t: '', gp: '', gt: '' },
         text: { hypo: '', result: '', concl: '', a1: '', a2: '', a3: '', a4: '', a5: '' },
         student: { id: '', name: '', members: '' },
-        submitted: ''            // 마지막 제출 시각 (표시용)
+        submitted: '',           // (예전) 마지막 구글 제출 시각 — 지금은 쓰지 않음
+        ext: {}                  // 다른 노트북·CSV 에서 불러온 값 { 출처: { from, sentAt, boyle, gay } } (js/ideal-gas-share.js)
     };
 
     // ---------- 저장 ----------
@@ -38,6 +42,11 @@
         for (const k of ['setup', 'draft', 'text', 'student']) Object.assign(state[k], d[k] || {});
         state.boyle = Array.isArray(d.boyle) ? d.boyle : [];
         state.gay = Array.isArray(d.gay) ? d.gay : [];
+        state.ext = {};
+        if (d.ext && typeof d.ext === 'object') for (const k of Object.keys(d.ext)) {
+            const e = d.ext[k] || {};
+            state.ext[k] = { from: String(e.from || k), sentAt: String(e.sentAt || ''), boyle: GS.cleanBoyle(e.boyle), gay: GS.cleanGay(e.gay) };
+        }
         if (state.method !== 'gay') state.method = 'boyle';
         if (state.dir !== 'up') state.dir = 'down';
     }
@@ -64,10 +73,7 @@
         };
     }
     // 실험 2 기록 → 시간(s) 붙인 점
-    function gayPoints(list) {
-        const t0 = list.length ? list[0].at : 0;
-        return list.map(q => ({ s: (q.at - t0) / 1000, t: q.t, p: q.p }));
-    }
+    const gayPoints = GS.gayPoints;
     function analyses(d) {
         const su = setupNums(d.setup);
         return {
@@ -76,7 +82,10 @@
             ga: G.gayLussacAnalysis(d.gayPts, { volume: su.vol })
         };
     }
-    const current = () => analyses({ setup: state.setup, boyle: state.boyle, gayPts: gayPoints(state.gay) });
+    // 내 기록 + 다른 노트북·CSV 에서 불러온 값 (불러온 점에는 from 이 붙음)
+    const current = () => { const c = GS.combined(state); return analyses({ setup: state.setup, boyle: c.boyle, gayPts: c.gay }); };
+    const mine = () => analyses({ setup: state.setup, boyle: state.boyle, gayPts: gayPoints(state.gay) });
+    const fromTag = f => f ? '<span class="from-tag">📥 ' + esc(f) + '</span>' : '';
 
     // ---------- 그래프 (Canvas) ----------
     // o.pts: [{x, y, color, hollow, r}], o.lines: [{pts, color, dash, width, y2}], o.vlines: [{x, color}]
@@ -160,7 +169,7 @@
         drawChart(cv, {
             xmin, xmax, ymin: 0, ymax,
             xl: ba.dead ? 'V (mL, 눈금 + 숨은 부피)' : 'V (mL)', yl: 'P (kPa)', lines,
-            pts: ba.rows.map(r => ({ x: r.vol, y: r.p, color: DIR_COLOR[r.dir] || DIR_COLOR.down }))
+            pts: ba.rows.map(r => ({ x: r.vol, y: r.p, color: DIR_COLOR[r.dir] || DIR_COLOR.down, hollow: !!r.from }))
         });
     }
     function drawVinv(cv, ba) {
@@ -178,13 +187,13 @@
         drawChart(cv, {
             xmin: 0, xmax, ymin, ymax: Math.max(...ys) * 1.12, xd: 4,
             xl: '1/P (1/kPa)', yl: 'V (mL)', lines,
-            pts: ba.rows.map(r => ({ x: 1 / r.p, y: r.vol, color: DIR_COLOR[r.dir] || DIR_COLOR.down }))
+            pts: ba.rows.map(r => ({ x: 1 / r.p, y: r.vol, color: DIR_COLOR[r.dir] || DIR_COLOR.down, hollow: !!r.from }))
         });
     }
     function drawPT(cv, ga, extend) {
         if (!ga) { drawChart(cv, { xmin: 10, xmax: 50, ymin: 60, ymax: 80, xl: '온도 t (°C)', yl: 'P (kPa)', empty: '실험 2 기록이 없습니다' }); return; }
         const r = ga.rows.length > 400 ? 2.5 : ga.rows.length > 100 ? 3.5 : 5;
-        const pts = ga.rows.map(q => ({ x: q.t, y: q.p, color: '#dc3545', r }));
+        const pts = ga.rows.map(q => ({ x: q.t, y: q.p, color: '#dc3545', r, hollow: !!q.from }));
         const lines = [], vlines = [];
         let xmin, xmax, ymin, ymax;
         const fitOk = ga.fit && ga.fit.slope > 0;
@@ -207,7 +216,7 @@
         if (!ba) return '<p class="note">실험 1 기록이 없습니다.</p>';
         return '<div class="tbl-wrap" style="max-height:none"><table class="sum-table"><thead><tr><th>#</th><th>과정</th><th>눈금 (mL)</th>' +
             (ba.dead ? '<th>V (mL)</th>' : '') + '<th>P (kPa)</th><th>t (°C)</th><th>PV (kPa·mL)</th><th>PV/T (kPa·mL/K)</th></tr></thead><tbody>' +
-            ba.rows.map((r, i) => '<tr><td>' + (i + 1) + '</td><td class="dir-' + (r.dir || 'down') + '">' + dirName(r.dir) + '</td><td>' + fx(r.v, 1) + '</td>' +
+            ba.rows.map((r, i) => '<tr><td>' + (i + 1) + '</td><td class="dir-' + (r.dir || 'down') + '">' + dirName(r.dir) + fromTag(r.from) + '</td><td>' + fx(r.v, 1) + '</td>' +
                 (ba.dead ? '<td>' + fx(r.vol, 1) + '</td>' : '') + '<td>' + fx(r.p, 2) + '</td><td>' + fx(r.t, 1) + '</td><td>' + fx(r.pv, 0) + '</td><td>' + fx(r.pvt, 3) + '</td></tr>').join('') +
             '<tr><td colspan="' + (ba.dead ? 6 : 5) + '"><b>평균 ± 표준편차</b></td><td><b>' + fx(ba.pvMean, 0) + ' ± ' + fx(ba.pvSd, 0) + '</b></td><td><b>' + fx(ba.pvtMean, 3) + '</b></td></tr>' +
             '</tbody></table></div>';
@@ -220,7 +229,7 @@
         if (n <= maxRows) for (let i = 0; i < n; i++) idx.push(i);
         else for (let k = 0; k < maxRows; k++) idx.push(Math.round(k * (n - 1) / (maxRows - 1)));
         return '<div class="tbl-wrap" style="max-height:none"><table class="sum-table"><thead><tr><th>#</th><th>시간 (s)</th><th>t (°C)</th><th>T (K)</th><th>P (kPa)</th><th>P/T (kPa/K)</th></tr></thead><tbody>' +
-            idx.map(i => { const r = ga.rows[i]; return '<tr><td>' + (i + 1) + '</td><td>' + fx(r.s, 0) + '</td><td>' + fx(r.t, 2) + '</td><td>' + fx(r.T, 2) + '</td><td>' + fx(r.p, 3) + '</td><td>' + fx(r.pt, 4) + '</td></tr>'; }).join('') +
+            idx.map(i => { const r = ga.rows[i]; return '<tr><td>' + (i + 1) + fromTag(r.from) + '</td><td>' + fx(r.s, 0) + '</td><td>' + fx(r.t, 2) + '</td><td>' + fx(r.T, 2) + '</td><td>' + fx(r.p, 3) + '</td><td>' + fx(r.pt, 4) + '</td></tr>'; }).join('') +
             '</tbody></table></div>' + (n > maxRows ? '<p class="note">전체 ' + n + '개 중 ' + maxRows + '개를 고르게 골라 보였습니다. 계산에는 모두 씁니다.</p>' : '');
     }
     function boyleResults(ba) {
@@ -512,11 +521,17 @@
             '<tr><td>' + (i + 1) + '</td><td class="dir-' + q.dir + '">' + dirName(q.dir) + '</td><td>' + fx(q.v, 1) + '</td><td>' + fx(q.p, 2) + '</td><td>' + fx(q.t, 1) + '</td><td>' + fx(q.p * (q.v + setupNums(state.setup).dead), 0) +
             '</td><td class="acts"><button class="danger" data-del-b="' + i + '">삭제</button></td></tr>').join('') ||
             '<tr><td colspan="7" class="note">아직 기록이 없습니다.</td></tr>';
+        // 다른 노트북·CSV 에서 불러온 값 (삭제는 '👥 조 공유'의 '불러온 값 지우기')
+        const ex = GS.combined({ boyle: [], gay: [], ext: state.ext });
+        $('boyle-body').innerHTML += ex.boyle.map((q, i) =>
+            '<tr class="ext-row"><td>' + (state.boyle.length + i + 1) + '</td><td class="dir-' + q.dir + '">' + dirName(q.dir) + fromTag(q.from) + '</td><td>' + fx(q.v, 1) + '</td><td>' + fx(q.p, 2) + '</td><td>' + fx(q.t, 1) + '</td><td>' + fx(q.p * (q.v + setupNums(state.setup).dead), 0) +
+            '</td><td></td></tr>').join('');
         const gp = gayPoints(state.gay);
         $('gay-body').innerHTML = gp.map((q, i) => ({ q, i })).reverse().map(({ q, i }) =>
             '<tr><td>' + (i + 1) + '</td><td>' + fx(q.s, 0) + '</td><td>' + fx(q.t, 2) + '</td><td>' + fx(q.p, 3) + '</td><td>' + fx(q.p / G.kelvin(q.t), 4) +
             '</td><td class="acts"><button class="danger" data-del-g="' + i + '">삭제</button></td></tr>').join('') ||
             '<tr><td colspan="6" class="note">아직 기록이 없습니다.</td></tr>';
+        if (ex.gay.length) $('gay-body').innerHTML += '<tr class="ext-row"><td colspan="6">📥 불러온 값 ' + ex.gay.length + '개 (' + esc([...new Set(ex.gay.map(q => q.from))].join(', ')) + ') — 그래프·결과에 함께 씁니다</td></tr>';
         if (ga) {
             $('gay-msg').textContent = (autoTimer ? '⏺ 자동 기록 중 · ' : '') + ga.rows.length + '개 기록, 온도 ' + fx(ga.tMin, 1) + ' ~ ' + fx(ga.tMax, 1) + ' °C (폭 ' + fx(ga.tMax - ga.tMin, 1) + ' °C)' +
                 (ga.tMax - ga.tMin < 15 ? ' — 15 °C 이상이 되도록 더 데우거나 식혀 보세요.' : ' ✅');
@@ -554,8 +569,10 @@
     $('btn-csv').addEventListener('click', () => {
         const { ba, ga } = current();
         const rows = ['experiment,no,process,time_s,scale_volume_mL,air_volume_mL,pressure_kPa,temp_C,PV_kPa_mL,P_over_T_kPa_per_K,source'];
-        if (ba) ba.rows.forEach((r, i) => rows.push(['boyle', i + 1, r.dir || 'down', '', r.v, r.vol, r.p, r.t, r.pv.toFixed(2), '', state.boyle[i] ? state.boyle[i].src : ''].join(',')));
-        if (ga) ga.rows.forEach((r, i) => rows.push(['gay-lussac', i + 1, '', r.s.toFixed(1), '', '', r.p, r.t, '', r.pt.toFixed(5), state.gay[i] ? state.gay[i].src : ''].join(',')));
+        // source: sensor | hand | from:<불러온 출처> (CSV 로 다시 불러올 때 from: 줄은 빼서 겹치지 않게)
+        const srcOf = (r, list, i) => r.from ? 'from:' + String(r.from).replace(/[,\r\n]/g, ' ') : list[i] ? list[i].src : '';
+        if (ba) ba.rows.forEach((r, i) => rows.push(['boyle', i + 1, r.dir || 'down', '', r.v, r.vol, r.p, r.t, r.pv.toFixed(2), '', srcOf(r, state.boyle, i)].join(',')));
+        if (ga) ga.rows.forEach((r, i) => rows.push(['gay-lussac', i + 1, '', r.s.toFixed(1), '', '', r.p, r.t, '', r.pt.toFixed(5), srcOf(r, state.gay, i)].join(',')));
         download('ideal-gas.csv', rows.join('\n'), 'text/csv');
     });
     $('btn-copy').addEventListener('click', async () => {
@@ -579,8 +596,8 @@
         }
     });
     $('btn-clear-all').addEventListener('click', () => {
-        if (!confirm('실험 1·2 의 모든 측정값을 지울까요? (쓴 글은 남습니다)')) return;
-        stopAuto(); state.boyle = []; state.gay = []; save(); renderAll();
+        if (!confirm('실험 1·2 의 모든 측정값(불러온 값 포함)을 지울까요? (쓴 글은 남습니다)')) return;
+        stopAuto(); state.boyle = []; state.gay = []; state.ext = {}; save(); renderAll();
     });
     $('btn-clear-boyle').addEventListener('click', () => {
         if (!state.boyle.length || !confirm('실험 1 기록을 모두 지울까요?')) return;
@@ -592,13 +609,15 @@
     });
 
     // ---------- 보고서 (미리보기·인쇄·제출한 보고서 보기) ----------
+    // 보고서에 넣을 것 (내 기록 + 불러온 값)
     function snapshot() {
+        const c = GS.combined(state);
         return {
             v: 1,
             student: Object.assign({}, state.student),
             setup: Object.assign({}, state.setup),
-            boyle: state.boyle.map(q => ({ v: q.v, p: q.p, t: q.t, dir: q.dir, src: q.src })),
-            gay: gayPoints(state.gay).map((q, i) => ({ s: +q.s.toFixed(1), t: q.t, p: q.p, src: state.gay[i].src })),
+            boyle: c.boyle,
+            gay: c.gay.map(q => Object.assign({}, q, { s: +q.s.toFixed(1) })),
             text: Object.assign({}, state.text)
         };
     }
@@ -661,7 +680,55 @@
         showTab(state.tab);
     });
 
-    // ---------- 7. 제출 (Firebase: 메인 페이지와 같은 프로젝트·로그인) ----------
+    // ---------- 조 공유 · 수업 참여: 공통 부품 js/class-share.js (docs/class-share.md) ----------
+    // 구글 로그인 없이 조 코드로: 이 노트북이 직접 잰 실험 1·2 를 선생님 시트(공용 submissions)로 보내고,
+    // 같은 조 다른 노트북이 보낸 것은 state.ext 에 따로 두어 표·그래프·결과에 합친다 (js/ideal-gas-share.js)
+    let share = null;
+    const myPoints = () => state.boyle.length + state.gay.length;
+    function initShare() {
+        if (!window.ClassShare || !window.PendulumCloud || !window.ClassCloud) return null;
+        return window.ClassShare.init({
+            exp: 'idealgas',
+            barMount: '#class-bar-mount', shareMount: '#share-mount',
+            csvHint: '6. 결과 → CSV 다운로드',
+            sendButtons: ['#btn-send2'],
+            getStep: () => state.tab,
+            getPoints: myPoints,
+            pollWhen: () => ['data', 'result', 'conclusion'].includes(state.tab),
+            getItems() {
+                const { ba, ga } = mine();
+                return GS.buildItems({ boyle: state.boyle, gay: state.gay, dead: setupNums(state.setup).dead, ba, ga });
+            },
+            onIncoming(items) {
+                const changed = GS.applyIncoming(state.ext, items);
+                if (changed) { save(); renderAll(); }
+                return changed;
+            },
+            async csvImport(files) {
+                const msgs = [];
+                let changed = false;
+                for (const f of files) {
+                    const r = GS.parseCsv(await f.text());
+                    if (r.error) { msgs.push('⚠ ' + esc(f.name) + ': ' + esc(r.error)); continue; }
+                    state.ext['f:' + f.name] = { from: '파일 ' + f.name, sentAt: new Date().toISOString(), boyle: r.boyle, gay: r.gay };
+                    changed = true;
+                    msgs.push('✅ ' + esc(f.name) + ': 실험 1 ' + r.boyle.length + '점, 실험 2 ' + r.gay.length + '점을 불러왔습니다.');
+                }
+                if (changed) { save(); renderAll(); }
+                return { html: msgs.join('<br>'), error: msgs.some(m => m.startsWith('⚠')) };
+            },
+            incomingCount: () => GS.extCount(state.ext),
+            clearIncoming() { state.ext = {}; save(); renderAll(); }
+        });
+    }
+    $('btn-send2').addEventListener('click', () => {
+        if (!share) { $('send2-status').textContent = '조 공유 기능을 불러오지 못했습니다. 6. 결과에서 CSV 를 받아 선생님께 내세요.'; return; }
+        if (!window.PendulumCloud.isGroupCode(share.group())) { $('send2-status').textContent = '먼저 5. 데이터 수집 맨 위 \'👥 조 공유\'에서 조 코드를 정하세요.'; return; }
+        share.send('#send2-status');
+    });
+
+    // ---------- 예전 보고서 보기 (?report=문서id, 메인 '사이트 관리' 기록 목록의 링크) ----------
+    // 2026-11-16 까지 구글 로그인으로 제출한 보고서. 학생에게는 로그인을 요구하지 않으므로, 이 주소로 열 때만 Firebase 를 불러온다.
     const firebaseConfig = {
         projectId: "web-experiment-f9b24",
         appId: "1:718758606428:web:e11ed8d0b64a471ee65899",
@@ -672,75 +739,30 @@
     };
     const reportId = new URLSearchParams(location.search).get('report');
     let auth = null, db = null, user = null;
-    try {
-        if (typeof firebase !== 'undefined') {
+    function loadScript(src) {
+        return new Promise((ok, fail) => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = () => fail(new Error('불러오지 못함: ' + src)); document.head.appendChild(sc); });
+    }
+    async function startReportView() {
+        try {
+            const base = 'https://www.gstatic.com/firebasejs/9.22.2/';
+            for (const f of ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js']) await loadScript(base + f);
             firebase.initializeApp(firebaseConfig);
             auth = firebase.auth();
             db = firebase.firestore();
-            auth.onAuthStateChanged(u => { user = u; renderLogin(); if (reportId) loadReport(); });
+            auth.onAuthStateChanged(u => { user = u; loadReport(); });
+        } catch (e) {
+            $('rv-body').innerHTML = '<div class="card"><p>❌ 로그인 도구를 불러오지 못했습니다: ' + esc(e.message) + '</p><p class="note">인터넷 연결을 확인하고 다시 여세요.</p></div>';
         }
-    } catch (e) { console.error('Firebase init error', e); }
-
-    function renderLogin() {
-        if (!auth) { $('login-status').textContent = '⚠️ 인터넷 연결 또는 로그인 도구를 불러오지 못해 제출할 수 없습니다. 인쇄(PDF 저장)를 이용하세요.'; $('btn-login').hidden = true; return; }
-        $('login-status').textContent = user ? '👤 ' + (user.displayName || user.email) + ' 로 제출합니다.' : '🔒 제출하려면 구글 로그인이 필요합니다.';
-        $('btn-login').hidden = !!user;
-        if (user && !state.student.name && user.displayName) { state.student.name = user.displayName; $('st-name').value = user.displayName; save(); }
-        if (state.submitted) $('submit-status').textContent = '✅ 마지막 제출: ' + state.submitted;
     }
     function signIn() {
         if (!auth) return;
         auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => alert('로그인 실패: ' + err.message));
     }
-    $('btn-login').addEventListener('click', signIn);
-
-    function summaryText(ba, ga) {
-        const parts = [(state.student.id || '') + ' ' + (state.student.name || '')];
-        parts.push(ba ? '실험1 ' + ba.rows.length + '점, PV 변동 ' + ba.pvCv.toFixed(1) + '%' : '실험1 없음');
-        parts.push(ga ? '실험2 ' + ga.rows.length + '점' + (ga.t0 != null ? ', 절대 영도 ' + ga.t0.toFixed(0) + '°C' : '') : '실험2 없음');
-        return parts.join(' · ');
-    }
-    $('btn-submit').addEventListener('click', async () => {
-        if (!auth) { alert('제출 기능을 불러오지 못했습니다. 인터넷 연결을 확인하거나 인쇄(PDF 저장)를 이용하세요.'); return; }
-        if (!user) { alert('먼저 구글 로그인을 하세요.'); signIn(); return; }
-        if (!state.student.id.trim() || !state.student.name.trim()) { alert('학번과 이름을 넣으세요.'); $(state.student.id.trim() ? 'st-name' : 'st-id').focus(); return; }
-        const { ba, ga } = current();
-        const missing = [];
-        if (!ba) missing.push('실험 1 측정값');
-        if (!ga) missing.push('실험 2 측정값');
-        if (!state.text.concl.trim()) missing.push('결론');
-        if (missing.length && !confirm(missing.join(', ') + ' 이(가) 비어 있습니다. 그래도 제출할까요?')) return;
-        const btn = $('btn-submit');
-        try {
-            btn.disabled = true; btn.textContent = '제출 중...';
-            await db.collection('experiments').add({
-                userId: user.uid,
-                userEmail: user.email,
-                userName: user.displayName || '',
-                experimentName: '이상기체 상태 방정식 검증 (감압 용기)',
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                tab: 'ideal-gas-law',
-                dataSummary: summaryText(ba, ga),
-                report: snapshot(),
-                // 현재 firestore.rules 가 요구하는 칸 (이 실험에서는 쓰지 않음)
-                weatherSample: {},
-                stargazingSample: []
-            });
-            state.submitted = new Date().toLocaleString('ko-KR');
-            save();
-            $('submit-status').textContent = '✅ 제출했습니다 (' + state.submitted + '). 메인 페이지의 기록 목록에서 확인할 수 있습니다.';
-        } catch (e) {
-            $('submit-status').textContent = '❌ 제출 실패: ' + e.message;
-        } finally {
-            btn.disabled = false; btn.textContent = '📤 보고서 제출';
-        }
-    });
-
-    // 메인 페이지 기록 목록의 '보고서 보기' 링크 (?report=문서 id): 본인 또는 선생님만 읽을 수 있다
+    // 본인 또는 선생님만 읽을 수 있다 (firestore.rules)
     async function loadReport() {
         document.body.classList.add('report-mode');
         if (!user) {
-            $('rv-body').innerHTML = '<div class="card"><p>🔒 보고서를 보려면 구글 로그인이 필요합니다.</p><button id="rv-login">구글 로그인</button></div>';
+            $('rv-body').innerHTML = '<div class="card"><p>🔒 예전에 제출한 보고서를 보려면 구글 로그인이 필요합니다 (선생님·제출한 학생).</p><button id="rv-login">구글 로그인</button></div>';
             $('rv-login').addEventListener('click', signIn);
             return;
         }
@@ -796,6 +818,7 @@
         renderData();
         renderResults();
         renderLive();
+        if (share) share.render();
     }
     function showTab(t, scroll) {
         if (!TABS.includes(t)) t = 'purpose';
@@ -805,6 +828,7 @@
         save();
         renderAll();   // 숨겨져 있던 그래프는 보일 때 크기에 맞춰 다시 그린다
         if (scroll) window.scrollTo(0, 0);
+        if (share) share.stepChanged();   // 수업 참여 중이면 선생님께 지금 단계를 알림
     }
     document.querySelectorAll('.tabs button, [data-go]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab || b.dataset.go, true)));
 
@@ -821,11 +845,12 @@
 
     load();
     applyControls();
-    renderLogin();
     if (reportId) {
         document.body.classList.add('report-mode');
         $('rv-body').innerHTML = '<div class="card"><p class="note">보고서를 불러오는 중…</p></div>';
+        startReportView();
     } else {
+        share = initShare();
         showTab(state.tab);
     }
     // 같은 브라우저의 다른 창(탭)에서 바꾼 내용을 따라간다. 그렇지 않으면 이 창이 저장할 때 다른 창의 기록을 덮어쓴다.
