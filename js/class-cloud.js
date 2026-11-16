@@ -25,23 +25,25 @@
     var EXPS = {
         planck: { name: 'LED 로 플랑크 상수 측정', icon: '💡', page: 'projects/planck-led.html', steps: STEPS7, ready: true },
         pendulum: { name: '스마트폰 진자 (노트북 분석)', icon: '⏱️', page: 'projects/pendulum-report.html', steps: STEPS7, ready: true },
-        idealgas: { name: '이상기체 상태 방정식 검증', icon: '🎈', page: 'projects/ideal-gas.html', steps: STEPS7, ready: false },
-        malus: { name: '말루스 법칙 실험', icon: '🕶️', page: 'projects/malus-law.html', steps: STEPS7, ready: false },
-        eminduction: { name: '전자기 유도 전압·전류 측정', icon: '🧲', page: 'projects/em-induction.html', steps: STEPS7, ready: false },
-        freefall: { name: '자유낙하 궤적 분석', icon: '🏀', page: 'projects/free-fall.html', steps: STEPS7, ready: false },
-        env: { name: '환경 센서 (온도·습도·기압·VOC)', icon: '🌡️', page: 'projects/environment-lab.html', steps: DASH, ready: false },
-        light: { name: '조도 센서', icon: '🔆', page: 'projects/environment-lab.html?sensor=light', steps: DASH, ready: false },
-        uv: { name: '자외선 센서', icon: '🟣', page: 'projects/environment-lab.html?sensor=uv', steps: DASH, ready: false },
-        accel: { name: '가속도계 데이터 분석', icon: '📐', page: 'projects/accelerometer-lab.html', steps: DASH, ready: false },
-        nano: { name: '아두이노 Nano 33 BLE Sense', icon: '🔷', page: 'projects/arduino-nano-lab.html', steps: DASH, ready: false },
-        phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: false }
+        idealgas: { name: '이상기체 상태 방정식 검증', icon: '🎈', page: 'projects/ideal-gas.html', steps: STEPS7, ready: true },
+        malus: { name: '말루스 법칙 실험', icon: '🕶️', page: 'projects/malus-law.html', steps: STEPS7, ready: true },
+        eminduction: { name: '전자기 유도 전압·전류 측정', icon: '🧲', page: 'projects/em-induction.html', steps: STEPS7, ready: true },
+        freefall: { name: '자유낙하 궤적 분석', icon: '🏀', page: 'projects/free-fall.html', steps: STEPS7, ready: true },
+        env: { name: '환경 센서 (온도·습도·기압·VOC)', icon: '🌡️', page: 'projects/environment-lab.html', steps: DASH, ready: true },
+        light: { name: '조도 센서', icon: '🔆', page: 'projects/environment-lab.html?sensor=light', steps: DASH, ready: true },
+        uv: { name: '자외선 센서', icon: '🟣', page: 'projects/environment-lab.html?sensor=uv', steps: DASH, ready: true },
+        accel: { name: '가속도계 데이터 분석', icon: '📐', page: 'projects/accelerometer-lab.html', steps: DASH, ready: true },
+        nano: { name: '아두이노 Nano 33 BLE Sense', icon: '🔷', page: 'projects/arduino-nano-lab.html', steps: DASH, ready: true },
+        phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: true }
     };
     var CUSTOM_RE = /^custom:([A-Za-z0-9_-]{1,40})$/;
+    var CUSTOM_STEPS = Object.assign({ live: '한 화면' }, STEPS7);
     // 실험 정보 (선생님이 만든 실험 'custom:<id>' 도)
     function expInfo(exp) {
         if (EXPS[exp]) return EXPS[exp];
         var m = CUSTOM_RE.exec(String(exp || ''));
-        if (m) return { name: '선생님이 만든 실험 (' + m[1] + ')', icon: '👩‍🏫', page: 'projects/custom-lab.html?id=' + m[1], steps: STEPS7, ready: false, custom: true };
+        // 한 화면 방식이면 단계 'live', 7단계 방식이면 STEPS7 (js/custom-lab.js)
+        if (m) return { name: '선생님이 만든 실험 (' + m[1] + ')', icon: '👩‍🏫', page: 'projects/custom-lab.html?id=' + m[1], steps: CUSTOM_STEPS, ready: true, custom: true };
         return null;
     }
     function isExp(exp) { return !!expInfo(exp); }
@@ -95,6 +97,24 @@
     function stepName(exp, step) {
         var e = expInfo(exp);
         return (e && e.steps[step]) || (step ? step : '–');
+    }
+    /* 선생님이 만든 실험이 학생에게 공개되었는지 (로그인 없이 Firestore 를 읽어 봄. 규칙: published == true 일 때만 누구나 읽기)
+       돌려주는 값: { state: 'public', title } | { state: 'hidden' }(비공개이거나 없는 번호) | { state: 'unknown', error }(인터넷 등) */
+    var FIRESTORE_DOC = 'https://firestore.googleapis.com/v1/projects/web-experiment-f9b24/databases/(default)/documents/customExperiments/';
+    var FIREBASE_KEY = 'AIzaSyCYVme6ZP-iyspRmHTtuUSsKXe7K_D0vJQ';   // 사이트 공개 웹 키 (index.html·js/phone-accel-cloud.js 와 같음)
+    function checkCustom(id, fetchImpl) {
+        var f = fetchImpl || (typeof fetch === 'function' ? fetch : null);
+        if (!/^[A-Za-z0-9_-]{1,40}$/.test(String(id || ''))) return Promise.resolve({ state: 'hidden' });
+        if (!f) return Promise.resolve({ state: 'unknown', error: '이 브라우저는 확인할 수 없어요.' });
+        return f(FIRESTORE_DOC + encodeURIComponent(id) + '?key=' + FIREBASE_KEY, { method: 'GET' }).then(function (res) {
+            if (res.status === 403 || res.status === 404) return { state: 'hidden' };
+            if (!res.ok) return { state: 'unknown', error: '확인하지 못했어요 (' + res.status + ').' };
+            return res.json().then(function (j) {
+                var fl = (j && j.fields) || {};
+                if (!(fl.published && fl.published.booleanValue === true)) return { state: 'hidden' };
+                return { state: 'public', title: fl.title && fl.title.stringValue || '' };
+            });
+        }, function (e) { return { state: 'unknown', error: '확인하지 못했어요 (' + (e && e.message || e) + ').' }; });
     }
     // 교사 화면: 조 하나의 제출 요약 한 줄 (실험마다 단위가 달라 이름은 실험이 정한 summary 이름 그대로)
     function submissionText(exp, sub) {
@@ -199,7 +219,7 @@
         claimAdmin: claimAdmin, update: update, rollback: rollback, updatePlan: updatePlan,
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
-        studentState: studentState, submissionText: submissionText, agoText: agoText, stepName: stepName, summarize: summarize,
+        studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
         parseResponse: parseResponse, ping: ping, createClass: createClass, joinInfo: joinInfo, heartbeat: heartbeat, classStatus: classStatus
     };
 });

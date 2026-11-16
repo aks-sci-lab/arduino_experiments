@@ -206,12 +206,14 @@
         async function send(statusEl) {
             var show = function (html, err) { setStatus(html, err); if (statusEl) $q(statusEl).innerHTML = html; };
             if (!groupOk()) { show('⚠ 먼저 조 코드를 정하세요' + (mount ? ' (👥 조 공유).' : '.'), true); return { ok: false }; }
-            if (run.busy) return { ok: false };
+            if (run.busy) { show('📤 이미 보내는 중이에요. 끝나면 결과가 여기에 나와요.'); return { ok: false, busy: true }; }
             run.busy = true; render();
+            // 불러오기가 도는 중이면 (조 코드를 넣은 직후 등) 끝날 때까지 기다렸다가 이어서 보낸다
+            if (run.pulling && run.pullDone) { show('📥 불러오는 중이라, 끝나면 바로 보낼게요…'); await run.pullDone; }
             var ctx = { url: SERVER.url, group: st.group, device: st.device, sent: st.sent.slice(), exp: exp,
                 progress: function (i, n) { show('📤 보내는 중… (' + i + '/' + n + ')'); } };
             var r = await (opts.send || defaultSend)(ctx);
-            run.busy = false;
+            run.busy = false; run.sentAt = Date.now();
             (r.ids || []).forEach(function (id) { if (st.sent.indexOf(id) < 0) st.sent.push(id); });
             if (r.ok && r.done === 0 && !(r.ids || []).length) { /* 아무것도 안 보냄 */ }
             saveSt();
@@ -234,20 +236,26 @@
         async function pull(quiet) {
             if (!groupOk() || run.pulling) return;
             if (!SERVER.url) { if (!quiet) setStatus('⚠ 선생님 설정이 아직 안 되었습니다. CSV 로 주고받으세요.', true); return; }
+            if (run.busy && quiet) { schedule(); return; }   // 보내는 중에는 자동 불러오기를 미룸
             run.pulling = true;
             if (!quiet) setStatus('📥 불러오는 중…');
-            var group = st.group;
-            var r = await (opts.pull || defaultPull)({ url: SERVER.url, group: group, device: st.device, exp: exp });
-            run.pulling = false;
+            var group = st.group, finish;
+            run.pullDone = new Promise(function (res) { finish = res; });
+            var r;
+            try { r = await (opts.pull || defaultPull)({ url: SERVER.url, group: group, device: st.device, exp: exp }); }
+            catch (e) { r = { ok: false, error: String(e && e.message || e) }; }
+            run.pulling = false; finish();
             if (group !== st.group) return;
+            // 보내기 결과를 막 보여 준 참이면(10초 안) 자동 불러오기가 그 글을 덮지 않게
+            var keepMsg = quiet && (run.busy || (run.sentAt && Date.now() - run.sentAt < 10000));
             if (!r.ok) {
                 run.fails++;
-                setStatus('⚠ 불러오지 못했습니다: ' + esc(r.error) + (run.lastOk ? ' (마지막 성공 ' + timeText(run.lastOk) + ')' : '') + '<br>계속 안 되면 CSV 파일로 주고받으세요.', true);
+                if (!keepMsg) setStatus('⚠ 불러오지 못했습니다: ' + esc(r.error) + (run.lastOk ? ' (마지막 성공 ' + timeText(run.lastOk) + ')' : '') + '<br>계속 안 되면 CSV 파일로 주고받으세요.', true);
                 schedule();
                 return;
             }
             run.fails = 0; run.lastOk = new Date();
-            setStatus((r.changed ? '🆕 다른 노트북의 값을 합쳤습니다' : '🟢 연결됨') + ' · 같은 조의 다른 노트북 ' + (r.others || 0) + '대, 불러온 값 ' + (r.points || 0) + '개' +
+            if (!keepMsg || r.changed) setStatus((r.changed ? '🆕 다른 노트북의 값을 합쳤습니다' : '🟢 연결됨') + ' · 같은 조의 다른 노트북 ' + (r.others || 0) + '대, 불러온 값 ' + (r.points || 0) + '개' +
                 (r.newItems ? ', 새 항목 ' + r.newItems + '개' : '') + ' <span class="cs-note">(마지막 확인 ' + timeText(run.lastOk) + (st.auto ? ', ' + pollSec() + '초마다 확인' : '') + ')</span>');
             render();
         }

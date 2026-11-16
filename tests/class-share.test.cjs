@@ -87,7 +87,7 @@ test('Apps Script 6판: 값 검사', () => {
     assert.match(bad({ device: '' }), /노트북/);
     assert.match(bad({ n: -1 }), /점 수/);
     assert.match(bad({ summary: [1, 2] }), /요약/);
-    assert.match(bad({ summary: { 'a=b': 1 } }), /요약 이름/);
+    assert.match(bad({ summary: { 'a|b': 1 } }), /요약 이름/);
     assert.match(bad({ summary: Object.fromEntries(Array.from({ length: 21 }, (_, i) => ['k' + i, i])) }), /너무 많습니다/);
     assert.match(app.get({ action: 'list', exp: 'nope', group: '2-3-5376' }).error, /알 수 없는 실험/);
     assert.match(app.get({ action: 'raw', exp: 'idealgas', group: '2-3-5376' }).error, /알 수 없는 요청/);
@@ -132,4 +132,31 @@ test('실험 목록: 서버와 같은 이름, 학생 링크(이미 ?가 있는 �
     assert.equal(CC.studentUrl('https://x', 'custom:abc_1', '2-4821'), 'https://x/projects/custom-lab.html?id=abc_1&c=2-4821');
     assert.equal(CC.expInfo('custom:bad id'), null);
     assert.equal(CC.readClassParam('?sensor=light&c=2-4821'), '2-4821');
+});
+
+test('7판: 요약 이름에 °·%·한글 허용, | 와 제어 문자·빈 이름만 막음', () => {
+    const app = loadCodeGs();
+    const ok = CS.buildPayloads(base()).payloads[0];
+    const r = app.post(Object.assign({}, ok, { summary: { '온도(°C)': 23.5, '습도(%)': 41, 'VOC Index': 100, 'ΔP/P': 0.01 } }));
+    assert.equal(r.ok, true, r.error);
+    assert.deepEqual(app.get({ action: 'list', exp: 'idealgas', group: '2-3-5376' }).items[0].summary, { '온도(°C)': 23.5, '습도(%)': 41, 'VOC Index': 100, 'ΔP/P': 0.01 });
+    const bad = o => app.post(Object.assign({}, ok, { summary: o })).error;
+    assert.match(bad({ 'a|b': 1 }), /요약 이름/);
+    assert.match(bad({ 'a\nb': 1 }), /요약 이름/);
+    assert.match(bad({ '  ': 1 }), /요약 이름/);
+    assert.match(bad({ ['x'.repeat(31)]: 1 }), /요약 이름/);
+    assert.ok(app.get({ action: 'ping' }).version >= 7);
+});
+
+test('선생님이 만든 실험 공개 확인: 공개·비공개(403)·없음(404)·인터넷', async () => {
+    const res = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+    let url = '';
+    const pub = await CC.checkCustom('abc_123', async u => { url = u; return res(200, { fields: { published: { booleanValue: true }, title: { stringValue: '빛의 굴절' } } }); });
+    assert.deepEqual(pub, { state: 'public', title: '빛의 굴절' });
+    assert.match(url, /^https:\/\/firestore\.googleapis\.com\/v1\/projects\/web-experiment-f9b24\/databases\/\(default\)\/documents\/customExperiments\/abc_123\?key=/);
+    assert.equal((await CC.checkCustom('abc', async () => res(403, {}))).state, 'hidden');
+    assert.equal((await CC.checkCustom('abc', async () => res(404, {}))).state, 'hidden');
+    assert.equal((await CC.checkCustom('abc', async () => res(200, { fields: { published: { booleanValue: false } } }))).state, 'hidden');
+    assert.equal((await CC.checkCustom('abc', async () => { throw new Error('Failed'); })).state, 'unknown');
+    assert.equal((await CC.checkCustom('bad id', async () => res(200, {}))).state, 'hidden');
 });

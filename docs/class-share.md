@@ -51,7 +51,7 @@ const share = ClassShare.init({
         id: r.id,                           // 이 노트북 안에서 겹치지 않는 영어·숫자 (서버 id = 노트북 번호 + 이 값)
         title: r.name,                      // 교사 화면·시트에 보일 이름 (예: '보일 1회')
         n: r.points.length,                 // 점 수 (0 이면 '지움'으로 보고 다른 노트북·교사 요약에서 빠짐)
-        summary: { k: r.k, R2: r.r2 },      // 바로 볼 숫자 몇 개 (이름 20개까지, 숫자 또는 40자 글)
+        summary: { k: r.k, R2: r.r2 },      // 바로 볼 숫자 몇 개 (이름 20개까지, 숫자 또는 40자 글). 이름은 1~30자 아무 글자('온도(°C)'·'습도(%)' 가능), '|' 만 안 됨 (서버 7판부터, 6판은 영어·숫자·한글·공백·.()-_ 만)
         data: { points: r.points }          // 다른 노트북이 그대로 합칠 자료 (JSON, 27만 자까지)
     })),
     // 같은 조 다른 노트북이 보낸 것. 내 기록과 따로 보관하고(출처별로 바꿔 쓰기), 바뀌었으면 true
@@ -70,6 +70,8 @@ const share = ClassShare.init({
 });
 ```
 
+- 보내기를 누를 때 불러오기가 돌고 있으면(조 코드를 넣은 직후 등) 끝날 때까지 기다렸다 이어서 보냅니다(7판과 함께 고친 부품). 보내는 동안 자동 불러오기는 미룹니다
+- 선생님이 만든 실험(`custom:<id>`)은 **공개된 실험만** 학생이 열 수 있습니다. 교사 화면이 번호를 넣을 때 공개 여부를 확인해 알려 줍니다
 - 7단계 페이지: `LabUI.initSteps({ onShow: step => { currentStep = step; share.stepChanged(); } })`
 - 결과 단계 등 다른 곳에 보내기 단추를 하나 더 두려면 `share.send('#상태를-보일-요소')`, `sendButtons: ['#그-단추']` 로 보내는 동안 막기
 - 자기 실험만의 조 코드 칸이 이미 있으면(진자처럼) `shareMount` 없이 `onGroup: code => 내조코드로연결(code)` 만 주면 띠만 붙습니다
@@ -87,14 +89,14 @@ const share = ClassShare.init({
 |---|---|---|---|
 | `planck` | LED 플랑크 상수 | `projects/planck-led.html` | 전용 `planck` 시트 (붙임 완료) |
 | `pendulum` | 스마트폰 진자 | `pendulum-report.html`(노트북)·`pendulum-measure.html`(폰) | 전용 `measurements` 시트 (띠 붙임 완료) |
-| `idealgas` | 이상기체 | `projects/ideal-gas.html` | 공용 `submissions` |
-| `malus` | 말루스 법칙 | `projects/malus-law.html` | 공용 |
-| `eminduction` | 전자기 유도 | `projects/em-induction.html` | 공용 |
-| `freefall` | 자유낙하 | `projects/free-fall.html` | 공용 |
+| `idealgas` | 이상기체 | `projects/ideal-gas.html` | 공용 `submissions` (붙임 완료: 실험 1·2 한 줄씩, `js/ideal-gas-share.js`) |
+| `eminduction` | 전자기 유도 | `projects/em-induction.html` | 공용 (붙임 완료: 저장한 측정 하나 = 한 줄, 요약 봉우리·∫ε dt·ΔΦ + 줄인 파형) |
+| `malus` | 말루스 법칙 | `projects/malus-law.html` | 공용 (붙임 완료, `js/malus-share.js`) |
+| `freefall` | 자유낙하 | `projects/free-fall.html` | 공용 (붙임 완료) |
 | `env` · `light` · `uv` | 환경 센서 · 조도 · 자외선 | `projects/environment-lab.html`(`?sensor=light|uv`) | 공용 |
-| `accel` | 가속도계 | `projects/accelerometer-lab.html` | 공용 |
+| `accel` | 가속도계 | `projects/accelerometer-lab.html` | 공용 (붙임 완료) |
 | `nano` | Nano 33 BLE Sense | `projects/arduino-nano-lab.html` | 공용 |
-| `phoneaccel` | 스마트폰 가속도 | `projects/phone-accelerometer.html` | 공용 |
+| `phoneaccel` | 스마트폰 가속도 | `projects/phone-accelerometer.html` | 공용 (붙임 완료) |
 | `custom:<실험 id>` | 선생님이 만든 실험 | `projects/custom-lab.html?id=…` | 공용 |
 
 새 실험 이름을 더하려면 **서버(`apps-script/Code.gs` 의 `GENERIC_EXPS`)와 `js/class-cloud.js` 의 `EXPS` 를 같이** 고칩니다(시험 `tests/class-share.test.cjs` 가 둘이 같은지 확인). 서버를 고치면 `VERSION` 을 올리고 `node tools/build-apps-script-release.cjs` → 선생님은 교사 화면의 🔄 업데이트.

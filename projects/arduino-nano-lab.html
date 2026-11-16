@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
+    <link rel="stylesheet" href="../css/class-share.css">
     <script src="../js/lab-ui.js"></script>
     <title>아두이노 Nano 33 BLE Sense 센서 실험</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
@@ -47,6 +48,14 @@
 
         .row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
         .note { line-height: 1.5; }
+        /* 회차 목록 (내 기록 + 📥 불러온 값) */
+        .runs h2 { font-size: var(--fs-base); margin: var(--sp-4) 0 var(--sp-2); }
+        #runList { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+        .run-card { border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-2) var(--sp-3); background: var(--c-card); min-width: 0; }
+        .run-card.on { border-color: var(--c-primary); box-shadow: 0 0 0 2px var(--c-primary) inset; }
+        .run-card.ext { background: var(--c-fill); }
+        .run-head { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); align-items: baseline; }
+        .run-sum { font-size: var(--fs-sm); margin: var(--sp-1) 0 var(--sp-2); overflow-wrap: anywhere; }
         code { background: var(--c-fill); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
     </style>
 </head>
@@ -54,6 +63,8 @@
     <main class="dash">
         <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
         <h1>아두이노 Nano 33 BLE Sense Rev2 센서 실험</h1>
+        <!-- 수업 참여 띠 (?c=수업코드 일 때만): js/class-share.js 가 채움 -->
+        <div id="class-bar-mount"></div>
         <p class="lead">보드 안의 <strong>가속도 센서</strong>와 <strong>환경 센서(온도·습도·기압)</strong> 값을 블루투스로 받아 그래프로 봅니다.</p>
 
         <!-- 연결·상태 띠 (위에 붙어 있음) -->
@@ -79,6 +90,15 @@
             <div id="readouts" class="dash-readouts" aria-label="지금 값"></div>
             <div id="charts" aria-label="시간 그래프"></div>
         </div>
+        <p id="viewText" class="note"></p>
+
+        <!-- 회차 목록과 조 공유 -->
+        <section class="runs" aria-label="회차 목록">
+            <h2>회차 (측정 시작 → 중지 한 번이 한 회차)</h2>
+            <div id="runList"></div>
+            <!-- 👥 조 공유: js/class-share.js 가 채움 -->
+            <div id="share-mount"></div>
+        </section>
 
         <div class="dash-more">
             <div class="row">
@@ -115,7 +135,11 @@
     <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
     <script src="../js/accelerometer-protocol.js?v=batch-200-v4"></script>
     <script src="../js/pico-ble.js?v=setup-v3"></script>
-    <script src="../js/nano-sense.js?v=nano-v1"></script>
-    <script src="../js/arduino-nano-lab.js?v=nano-dash-v1"></script>
+    <script src="../js/nano-sense.js?v=nano-share-v1"></script>
+    <script src="../js/pendulum-config.js"></script>
+    <script src="../js/pendulum-cloud.js"></script>
+    <script src="../js/class-cloud.js"></script>
+    <script src="../js/class-share.js"></script>
+    <script src="../js/arduino-nano-lab.js?v=nano-share-v1"></script>
 </body>
 </html>

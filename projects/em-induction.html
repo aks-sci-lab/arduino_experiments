@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <link rel="stylesheet" href="../css/class-share.css">
     <title>전자기 유도 측정기</title>
     <style>
         /* 단계형 실험 페이지 (보고서 순서 7단계). 색·간격은 lab-base.css 변수만 쓴다 */
@@ -57,12 +58,17 @@
         .result-grid div { background: var(--c-fill); border-radius: 6px; padding: 8px 10px; font-size: .88rem; }
         .result-grid b { display: block; font-size: 1.15em; font-variant-numeric: tabular-nums; }
         .legend { margin-top: 6px; }
+        tr.ext td { background: var(--c-primary-soft); }
+        tr.viewing td { font-weight: 700; }
+        .from { display: block; font-size: .78rem; color: var(--c-muted); font-weight: 400; }
     </style>
 </head>
 <body>
 <div class="wrap">
     <a class="back" href="../index.html">← 메인 페이지</a>
     <h1>⚡ 전자기 유도 측정기 <small>전압·전류 센서</small></h1>
+    <!-- 수업 참여 띠 (?c=수업코드 일 때만): js/class-share.js 가 채움 -->
+    <div id="class-bar-mount"></div>
 
     <nav class="steps" role="tablist" aria-label="실험 단계">
         <button role="tab" data-step="purpose"><b>1</b><span>목적</span></button>
@@ -211,6 +217,8 @@
 
     <!-- ================= 5. 데이터 ================= -->
     <section class="step-panel" data-step="data" hidden>
+        <!-- 👥 조 공유: js/class-share.js 가 채움 -->
+        <div id="share-mount"></div>
         <div class="card">
             <h2>5. 데이터 측정</h2>
             <div class="row">
@@ -280,7 +288,8 @@
     <section class="step-panel" data-step="result" hidden>
         <div class="card">
             <h2>6. 실험 결과</h2>
-            <h3>마지막 측정 그래프</h3>
+            <h3 id="viewTitle">마지막 측정 그래프</h3>
+            <p class="muted" id="viewNote" hidden></p>
             <canvas id="chartResult" width="1100" height="320" aria-label="마지막 측정의 전압·전류 그래프와 봉우리"></canvas>
             <div class="muted legend">
                 <span style="color:#d63384">━ 전압</span> &nbsp;
@@ -297,12 +306,17 @@
             <table>
                 <thead><tr>
                     <th>이름</th><th>N</th><th>최대 +ε (mV)</th><th>최대 −ε (mV)</th>
-                    <th>최대 |I| (mA)</th><th>∫ε dt (mV·s)</th><th>ΔΦ (µWb)</th><th></th>
+                    <th>최대 |I| (mA)</th><th>∫ε dt (mV·s)</th><th>ΔΦ (µWb)</th><th>그래프</th><th></th>
                 </tr></thead>
                 <tbody id="trials"></tbody>
             </table>
             </div>
             <p class="muted" id="trialsEmpty">저장한 측정이 없습니다. 자석 속도, 코일 감은 수 등을 바꿔가며 저장하고 비교해 보세요.</p>
+            <p class="muted">📈 를 누르면 그 측정의 그래프를 위에서 봅니다. 파란 줄(📥)은 같은 조 다른 노트북에서 불러온 측정입니다.</p>
+            <div class="row" style="margin-top:8px">
+                <button id="btnSend2" class="ok">📤 선생님께 보내기</button>
+                <span id="send2Status" class="muted">저장한 측정(요약·그래프)을 조 코드로 보냅니다. 조 코드는 5. 데이터 맨 위 '👥 조 공유'에서 정합니다.</span>
+            </div>
             <div class="step-next">
                 <button data-go="data">← 5. 데이터</button>
                 <button data-go="conclusion">다음: 7. 결론 →</button>
@@ -348,9 +362,16 @@
     </section>
 </div>
 
+<!-- 조 공유: 스마트폰 진자·플랑크와 같은 선생님 Apps Script (주소 js/pendulum-config.js, 링크의 ?s= 가 있으면 그것) -->
+<script src="../js/pendulum-config.js"></script>
+<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/class-cloud.js"></script>
+<script src="../js/class-share.js"></script>
+<script src="../js/em-induction-share.js"></script>
 <script>
 (() => {
     const $ = id => document.getElementById(id);
+    const esc = x => String(x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     // ---------- 상태 ----------
     // 한 샘플: { t: 초, v: mV, i: mA }
@@ -364,13 +385,25 @@
     let port = null, reader = null, demoTimer = null;
     let sampleTimes = [];
     const LIVE_WINDOW = 5;  // 초
-    const trials = loadTrials();
+    const ES = window.EmShare;
+    const trials = loadTrials();     // 이 노트북에서 저장한 측정
+    const ext = loadExt();           // 📥 불러온 측정 { 출처 키: 측정 } (같은 조 다른 노트북·CSV 파일)
+    let viewKey = null;              // 6. 결과 그래프에 보이는 측정 (null = 마지막 측정)
+    let currentStep = 'purpose';
+    let share = null;
+    if (ES.fixTrials(trials)) persistTrials();
 
     function loadTrials() {
-        try { return JSON.parse(localStorage.getItem('emTrials') || '[]'); } catch (e) { return []; }
+        try { const a = JSON.parse(localStorage.getItem('emTrials') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
     }
     function persistTrials() {
         try { localStorage.setItem('emTrials', JSON.stringify(trials)); } catch (e) { /* 무시 */ }
+    }
+    function loadExt() {
+        try { const o = JSON.parse(localStorage.getItem('emTrialsExt') || '{}'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
+    }
+    function persistExt() {
+        try { localStorage.setItem('emTrialsExt', JSON.stringify(ext)); } catch (e) { /* 무시 */ }
     }
 
     if (!('serial' in navigator)) $('serialWarn').hidden = false;
@@ -511,6 +544,7 @@
         lastResult = null;
         recStart = live.length ? live[live.length - 1].t : 0;
         recording = true;
+        showView(null);
         $('btnRec').textContent = '■ 측정 중지'; $('btnRec').className = 'rec';
         $('btnSave').disabled = true; $('btnCsv').disabled = true;
         $('results').innerHTML = '<div>측정 중…</div>';
@@ -555,15 +589,18 @@
 
     function showResults(r) {
         const cell = (k, v) => `<div>${k}<b>${v}</b></div>`;
+        // 저장·불러온 측정에는 없는 값도 있어 '—' 로 보인다
+        const f = (x, d) => (x !== null && x !== undefined && Number.isFinite(+x)) ? (+x).toFixed(d) : '—';
+        const at = t => (t !== null && t !== undefined && Number.isFinite(+t)) ? ` @ ${(+t).toFixed(2)} s` : '';
         $('results').innerHTML = [
-            cell('최대 양의 기전력', `${r.maxV.toFixed(2)} mV @ ${r.tMax.toFixed(2)} s`),
-            cell('최대 음의 기전력', `${r.minV.toFixed(2)} mV @ ${r.tMin.toFixed(2)} s`),
-            cell('봉우리 순서 (렌츠 법칙)', r.order),
-            cell('최대 전류 |I|', `${r.maxAbsI.toFixed(3)} mA`),
-            cell('전압 넓이 ∫ε dt', `${r.integral.toFixed(3)} mV·s`),
-            cell('선속 변화 ΔΦ = −∫ε dt ÷ N', `${r.dPhi.toFixed(2)} µWb`),
-            cell('실효 전압 (RMS)', `${r.rms.toFixed(2)} mV`),
-            cell('측정 시간', `${r.total.toFixed(2)} s`)
+            cell('최대 양의 기전력', `${f(r.maxV, 2)} mV${at(r.tMax)}`),
+            cell('최대 음의 기전력', `${f(r.minV, 2)} mV${at(r.tMin)}`),
+            cell('봉우리 순서 (렌츠 법칙)', esc(r.order || '—')),
+            cell('최대 전류 |I|', `${f(r.maxAbsI, 3)} mA`),
+            cell('전압 넓이 ∫ε dt', `${f(r.integral, 3)} mV·s`),
+            cell('선속 변화 ΔΦ = −∫ε dt ÷ N', `${f(r.dPhi, 2)} µWb`),
+            cell('실효 전압 (RMS)', `${f(r.rms, 2)} mV`),
+            cell('측정 시간', `${f(r.total, 2)} s`)
         ].join('');
     }
 
@@ -602,8 +639,11 @@
         const pw = W - L - R, ph = H - T - B;
 
         const showRec = !recording && rec.length > 3;
-        let pts, tLo, tHi;
-        if (mode === 'result') {
+        let pts, tLo, tHi, marks = lastResult;
+        const view = mode === 'result' ? viewedTrial() : null;
+        if (view) {
+            pts = view.pts; tLo = pts[0].t; tHi = pts[pts.length - 1].t; marks = view.trial;
+        } else if (mode === 'result') {
             if (!showRec) {
                 ctx.fillStyle = '#5f6b7a'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
                 ctx.fillText(recording ? '측정 중…' : '5. 데이터에서 측정을 마치면 그래프가 나타납니다', W / 2, H / 2);
@@ -669,7 +709,7 @@
         ctx.restore();
 
         // 결과 그래프: 최대 양·음의 기전력 위치 표시
-        if (mode === 'result' && lastResult) {
+        if (mode === 'result' && marks && Number.isFinite(marks.tMax) && Number.isFinite(marks.tMin)) {
             const mark = (t, v, label, above) => {
                 const x = X(t), y = Yv(v);
                 ctx.fillStyle = COL_V; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
@@ -677,8 +717,8 @@
                 ctx.textAlign = x > L + pw - 80 ? 'right' : (x < L + 80 ? 'left' : 'center');
                 ctx.fillText(label, x, above ? Math.max(T + 12, y - 8) : Math.min(T + ph - 4, y + 16));
             };
-            mark(lastResult.tMax, lastResult.maxV, `+${lastResult.maxV.toFixed(1)} mV`, true);
-            mark(lastResult.tMin, lastResult.minV, `${lastResult.minV.toFixed(1)} mV`, false);
+            mark(marks.tMax, marks.maxV, `+${marks.maxV.toFixed(1)} mV`, true);
+            mark(marks.tMin, marks.minV, `${marks.minV.toFixed(1)} mV`, false);
         }
     }
 
@@ -695,22 +735,73 @@
     (function loop() { charts.forEach(draw); updateReadouts(); requestAnimationFrame(loop); })();
 
     // ---------- 저장 / 비교 / CSV ----------
+    // 그래프로 볼 측정 찾기: 'm:<id>' 내 측정, 그 밖은 ext 의 키
+    function findTrial(key) {
+        if (!key) return null;
+        if (key.startsWith('m:')) return trials.find(t => t.id === key.slice(2)) || null;
+        return ext[key] || null;
+    }
+    function viewedTrial() {
+        const t = findTrial(viewKey);
+        if (!t) return null;
+        const pts = ES.wavePoints(t.wave);
+        return pts.length > 1 ? { trial: t, pts } : null;
+    }
+    function showView(key) {
+        viewKey = key;
+        const t = findTrial(key);
+        $('viewTitle').textContent = t ? `측정 그래프: ${t.from ? '📥 ' + t.from + ' · ' : ''}${t.name}` : '마지막 측정 그래프';
+        $('viewNote').hidden = !t;
+        $('viewNote').textContent = t ? '저장한 측정은 그래프를 600점 안으로 줄여 보관합니다(봉우리는 그대로). 아래 분석 결과는 그 측정의 값입니다.' : '';
+        if (t) {
+            const pts = ES.wavePoints(t.wave);
+            const total = pts.length > 1 ? pts[pts.length - 1].t - pts[0].t : null;
+            showResults(Object.assign({ rms: null, total }, t));
+        }
+        else if (lastResult) showResults(lastResult);
+        renderTrials();
+    }
+    function extList() { return Object.keys(ext).map(k => Object.assign({ key: k }, ext[k])); }
+
     function renderTrials() {
         const tb = $('trials');
         tb.innerHTML = '';
-        trials.forEach((t, idx) => {
+        const rows = trials.map((t, idx) => ({ t, key: 'm:' + t.id, idx })).concat(extList().map(t => ({ t, key: t.key, idx: -1 })));
+        rows.forEach(({ t, key, idx }) => {
             const tr = document.createElement('tr');
-            [t.name, t.N, t.maxV.toFixed(2), t.minV.toFixed(2), t.maxAbsI.toFixed(3),
-             t.integral.toFixed(3), t.dPhi.toFixed(2)].forEach(v => {
+            if (idx < 0) tr.className = 'ext';
+            if (key === viewKey) tr.classList.add('viewing');
+            const nameTd = document.createElement('td');
+            nameTd.textContent = t.name;
+            if (idx < 0) { const s = document.createElement('span'); s.className = 'from'; s.textContent = '📥 ' + (t.from || '불러온 값'); nameTd.appendChild(s); }
+            tr.appendChild(nameTd);
+            const f = (x, d) => Number.isFinite(+x) && x !== null ? (+x).toFixed(d) : '—';
+            [t.N, f(t.maxV, 2), f(t.minV, 2), f(t.maxAbsI, 3), f(t.integral, 3), f(t.dPhi, 2)].forEach(v => {
                 const td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
             });
+            const tdv = document.createElement('td');
+            if (t.wave && t.wave.t && t.wave.t.length > 1) {
+                const b = document.createElement('button'); b.textContent = '📈'; b.title = '이 측정의 그래프 보기';
+                b.setAttribute('aria-label', t.name + ' 그래프 보기');
+                b.addEventListener('click', () => { showView(viewKey === key ? null : key); $('chartResult').scrollIntoView({ block: 'center' }); });
+                tdv.appendChild(b);
+            }
+            tr.appendChild(tdv);
             const td = document.createElement('td');
-            const b = document.createElement('button'); b.textContent = '삭제'; b.className = 'rec';
-            b.addEventListener('click', () => { trials.splice(idx, 1); persistTrials(); renderTrials(); });
-            td.appendChild(b); tr.appendChild(td);
+            if (idx >= 0) {
+                const b = document.createElement('button'); b.textContent = '삭제'; b.className = 'rec';
+                b.addEventListener('click', () => {
+                    trials.splice(idx, 1); persistTrials();
+                    if (viewKey === key) showView(null); else renderTrials();
+                    if (share) share.stepChanged();
+                });
+                td.appendChild(b);
+            }
+            tr.appendChild(td);
             tb.appendChild(tr);
         });
-        $('trialsEmpty').hidden = trials.length > 0;
+        $('trialsEmpty').hidden = rows.length > 0;
+        if (share) share.render();
     }
 
     function saveTrial() {
@@ -718,10 +809,13 @@
         const name = prompt('이 측정의 이름 (예: 자석 빠르게)', `측정 ${trials.length + 1}`);
         if (name === null) return;
         const r = analyze(rec);
-        trials.push({ name: name || `측정 ${trials.length + 1}`, N: r.N, maxV: r.maxV, minV: r.minV,
-                      maxAbsI: r.maxAbsI, integral: r.integral, dPhi: r.dPhi });
+        trials.push({ id: ES.newId(), name: name || `측정 ${trials.length + 1}`, N: r.N, maxV: r.maxV, minV: r.minV,
+                      tMax: r.tMax, tMin: r.tMin, order: r.order, maxAbsI: r.maxAbsI, integral: r.integral, dPhi: r.dPhi,
+                      samples: rec.length, wave: ES.downsample(rec) });
         persistTrials(); renderTrials();
-        $('recInfo').textContent = `'${name || `측정 ${trials.length}`}' 저장함 · 6. 결과의 비교 표에 추가됨`;
+        if (share) share.stepChanged();
+        $('recInfo').textContent = `'${name || `측정 ${trials.length}`}' 저장함 · 6. 결과의 비교 표에 추가됨` +
+            (share && share.group() ? ' · 📤 선생님께 보내기를 누르면 조원과 나눕니다' : '');
     }
 
     function downloadCsv() {
@@ -744,9 +838,63 @@
     $('pga').addEventListener('change', sendPga);
     renderTrials();
 
+    // ---------- 👥 조 공유 (교사·학생 구글 로그인 없이, 선생님 구글 시트로: docs/class-share.md) ----------
+    function initShare() {
+        if (!window.ClassShare || !window.PendulumCloud || !window.ClassCloud) return null;
+        return window.ClassShare.init({
+            exp: 'eminduction',
+            barMount: '#class-bar-mount', shareMount: '#share-mount',
+            csvHint: '5. 데이터 → ⬇ CSV 저장',
+            sendButtons: ['#btnSend2'],
+            getItems: () => ES.itemsFrom(trials),
+            onIncoming: items => {
+                const changed = ES.applyIncoming(ext, items);
+                if (changed) {
+                    persistExt();
+                    if (viewKey && !findTrial(viewKey)) showView(null); else renderTrials();
+                }
+                return changed;
+            },
+            getStep: () => currentStep,
+            getPoints: () => trials.length,
+            pollWhen: () => ['data', 'result', 'conclusion'].includes(currentStep),
+            incomingCount: () => Object.keys(ext).length,
+            clearIncoming: () => {
+                Object.keys(ext).forEach(k => delete ext[k]); persistExt();
+                if (viewKey && !viewKey.startsWith('m:')) showView(null); else renderTrials();
+            },
+            csvImport: async files => {
+                const msgs = [];
+                for (const f of files) {
+                    const r = ES.parseCsv(await f.text());
+                    if (r.error) { msgs.push('⚠ ' + esc(f.name) + ': ' + esc(r.error)); continue; }
+                    const a = analyze(r.rec);
+                    const key = 'f:' + f.name;
+                    ext[key] = { name: f.name.replace(/\.csv$/i, ''), from: '파일 ' + f.name, N: a.N, maxV: a.maxV, minV: a.minV, tMax: a.tMax, tMin: a.tMin,
+                                 order: a.order, maxAbsI: a.maxAbsI, integral: a.integral, dPhi: a.dPhi, samples: r.rec.length, wave: ES.downsample(r.rec) };
+                    msgs.push('✅ ' + esc(f.name) + ': 샘플 ' + r.rec.length + '개를 6. 결과 비교 표에 넣었습니다 (지금 입력한 N = ' + a.N + ' 으로 ΔΦ 계산).');
+                }
+                persistExt(); renderTrials();
+                return { html: msgs.join('<br>'), error: msgs.some(m => m.startsWith('⚠')) };
+            }
+        });
+    }
+    share = initShare();
+    $('btnSend2').addEventListener('click', () => {
+        if (!share) { $('send2Status').textContent = '조 공유를 불러오지 못했습니다. ⬇ CSV 저장 파일로 내세요.'; return; }
+        if (!share.group()) { $('send2Status').textContent = "먼저 5. 데이터 맨 위 '👥 조 공유'에서 조 코드를 정하세요."; return; }
+        if (!trials.length) { $('send2Status').textContent = '저장한 측정이 없습니다. 5. 데이터에서 측정한 뒤 💾 이 측정 저장을 누르세요.'; return; }
+        share.send('#send2Status');
+    });
+    // 같은 브라우저의 다른 창에서 받은 값이 바뀌면 따라간다
+    window.addEventListener('storage', e => {
+        if (e.key === 'emTrialsExt') { Object.keys(ext).forEach(k => delete ext[k]); Object.assign(ext, loadExt()); renderTrials(); }
+        if (e.key === 'emTrials') { trials.splice(0, trials.length, ...loadTrials()); renderTrials(); }
+    });
+
     // ---------- 보고서 순서 7단계 ----------
     // 숨어 있던 그래프가 보이면 크기를 다시 맞춘다 (lab-ui 가 resize 도 보내지만 직접도 맞춤)
-    LabUI.initSteps({ key: 'em-induction', onShow: () => fit() });
+    LabUI.initSteps({ key: 'em-induction', onShow: step => { currentStep = step; fit(); if (share) share.stepChanged(); } });
 })();
 </script>
 </body>

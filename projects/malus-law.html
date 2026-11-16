@@ -6,12 +6,14 @@
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
     <title>말루스 법칙 실험 (스마트폰 카메라)</title>
+    <link rel="stylesheet" href="../css/class-share.css">
     <link rel="stylesheet" href="../css/malus-law.css">
 </head>
 <body>
 <div class="wrap">
     <a class="back" href="../index.html">← 메인 페이지</a>
     <h1>🔦 말루스 법칙 실험 (스마트폰 카메라)</h1>
+    <div id="class-bar-mount"></div>
     <p class="note">레이저 → 편광판(회전) → 종이/휴지 스크린 → 카메라 순으로 놓고, 편광판을 돌릴 때 스크린의 밝기가 어떻게 변하는지 탐구합니다. 카메라 접근은 <b>https</b> 주소에서만 동작합니다.</p>
 
     <nav class="steps" role="tablist" aria-label="실험 단계">
@@ -206,6 +208,7 @@
 
     <!-- ===================== 5. 데이터 ===================== -->
     <section class="step-panel" data-step="data" hidden>
+    <div id="share-mount"></div>
     <div class="card">
         <h2>1. 카메라 준비</h2>
         <details class="tip">
@@ -370,13 +373,19 @@
             <div class="row"><button id="btn-copy-report" class="secondary">📋 실험 기록 전체 복사 (예측·계획·결론)</button><span id="report-status" class="note"></span></div>
         </div>
 
-    <div class="card">
-            <h2>2. 내 구글 스프레드시트로 내보내기</h2>
+        <div class="card">
+            <h2>2. 선생님께 보내기 (조 공유)</h2>
+            <p class="note">내가 잰 회차들을 선생님 시트와 같은 조 노트북에 보냅니다. <b>구글 로그인은 필요 없습니다.</b> 조 코드는 <b>5. 데이터</b> 맨 위 '👥 조 공유'에서 정합니다. 결측 처리를 고쳤으면 다시 보내세요(같은 회차는 고쳐 씁니다).</p>
+            <div class="row"><button id="btn-send2" class="good">📤 선생님께 보내기</button><span id="send2-status" class="note"></span></div>
+        </div>
+
+        <details class="card more-export">
+            <summary>📁 다른 내보내기 (선택: 표 복사 · 내 구글 시트)</summary>
             <div class="row">
                 <button id="btn-gs-oauth" class="good" disabled>🟢 구글 로그인 후 내 드라이브에 새 시트 만들기</button>
             </div>
             <div class="row"><span id="gs-oauth-status" class="note"></span> <a id="gs-oauth-link" href="#" target="_blank" rel="noopener" hidden>📄 시트 열기</a></div>
-            <p class="note">로그인한 본인 계정의 드라이브에 새 스프레드시트가 만들어지고, 이 앱이 만든 파일에만 접근합니다. 아래는 로그인 없이 쓰는 다른 방법입니다.</p>
+            <p class="note">구글 로그인이 필요합니다. 로그인한 본인 계정의 드라이브에 새 스프레드시트가 만들어지고, 이 앱이 만든 파일에만 접근합니다. 아래는 로그인 없이 쓰는 다른 방법입니다.</p>
             <hr class="sep">
             <div class="row">
                 <button id="btn-copy" class="secondary" disabled>📋 표 복사 (시트에 붙여넣기)</button>
@@ -408,13 +417,18 @@
                 <button id="btn-copy-code" class="secondary">코드 복사</button>
                 <p class="note">브라우저 보안상 전송 성공 여부는 앱에서 확인할 수 없으니 시트에 행이 생겼는지 확인하세요. URL을 아는 사람은 누구나 시트에 쓸 수 있으므로 URL을 공유하지 마세요.</p>
             </details>
-        </div>
+        </details>
         <div class="step-next"><button class="secondary" data-go="result">← 이전: 6. 결과</button></div>
     </section>
 </div>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="../js/pendulum-config.js"></script>
+<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/class-cloud.js"></script>
+<script src="../js/class-share.js"></script>
 <script src="../js/malus-math.js"></script>
+<script src="../js/malus-share.js"></script>
 <script src="../js/malus-tutorial.js"></script>
 <script src="../js/malus-law.js"></script>
 <script src="../js/malus-sheets.js"></script>

@@ -299,10 +299,30 @@
     }
     ['inBan', 'inN', 'inSize', 'inExp', 'inCustom'].forEach(function (id) { $(id).addEventListener('input', renderPreview); });
     $('inExp').addEventListener('change', renderPreview);
+    // 선생님이 만든 실험은 '공개'여야 학생이 열 수 있다 → 번호를 넣으면 확인해 알려 줌
+    var customState = { id: '', state: '', timer: null };
+    function checkCustomNow() {
+        var o = inputs(), el = $('customCheck');
+        var id = $('inExp').value === 'custom' && /^custom:/.test(o.exp) ? o.exp.slice(7) : '';
+        el.hidden = !id;
+        if (!id || id === customState.id) return;
+        customState.id = id; customState.state = 'checking';
+        el.className = 'note'; el.textContent = '⏳ 학생에게 공개된 실험인지 확인하는 중…';
+        CC.checkCustom(id).then(function (r) {
+            if (customState.id !== id) return;
+            customState.state = r.state;
+            if (r.state === 'public') { el.className = 'note'; el.textContent = '✅ 공개된 실험이에요' + (r.title ? ': ' + r.title : '') + '. 학생이 열 수 있어요.'; }
+            else if (r.state === 'hidden') { el.className = 'note err'; el.innerHTML = '⚠️ 학생이 열 수 없는 실험이에요 (비공개이거나 번호가 틀림). <b>메인 페이지 → 🔐 사이트 관리</b>에서 로그인해 그 실험을 고치고 <b>학생에게 공개</b>를 켜야 학생이 열 수 있어요.'; }
+            else { el.className = 'note'; el.textContent = 'ℹ️ 공개 여부를 확인하지 못했어요 (' + r.error + '). 공개된 실험만 학생이 열 수 있어요.'; }
+        });
+    }
+    ['inExp', 'inCustom'].forEach(function (id) { $(id).addEventListener('input', function () { clearTimeout(customState.timer); customState.timer = setTimeout(checkCustomNow, 400); }); });
+    $('inExp').addEventListener('change', checkCustomNow);
     $('btnCreate').addEventListener('click', async function () {
         if (state.busy) return;
         var o = inputs(), msg = $('createMsg');
         if (!server.url) { msg.className = 'note err'; msg.textContent = '⚠️ 먼저 ① 시트 연결을 해 주세요.'; return; }
+        if (/^custom:/.test(o.exp) && customState.state === 'hidden' && !confirm('이 실험은 아직 학생에게 공개되지 않았어요. 공개하기 전에는 학생이 열 수 없어요.\n그래도 수업을 만들까요? (나중에 공개로 바꾸면 그때부터 열려요)')) return;
         state.busy = true; $('btnCreate').disabled = true;
         msg.className = 'note'; msg.textContent = '⏳ 수업을 만드는 중…';
         var r = await CC.createClass(server.url, o);

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <link rel="stylesheet" href="../css/class-share.css">
     <title>스마트폰 가속도 실험</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" defer></script>
     <style>
@@ -44,13 +45,21 @@
         .row .push { margin-left: auto; }
         #selection-status, #time-range { font-weight: 600; font-size: var(--fs-sm); }
         .note { margin: var(--sp-1) 0; line-height: 1.5; }
+        #in-box > summary { cursor: pointer; font-weight: 700; min-height: var(--tap); display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); }
+        .in-list { list-style: none; margin: 0; padding: 0; }
+        .in-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-1) 0; border-top: 1px solid var(--c-line); }
+        .in-list label { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); overflow-wrap: anywhere; }
+        .in-list input { width: 20px; height: 20px; }
+        .in-list .sm { color: var(--c-muted); font-size: var(--fs-sm); }
     </style>
 </head>
 <body>
     <main class="dash">
         <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
         <h1>스마트폰 가속도 센서 실험</h1>
-        <p class="lead">스마트폰 안의 가속도 센서 값을 기록해 그래프로 보고, 필요한 구간만 골라 제출합니다.</p>
+        <!-- 수업 참여 띠 (?c=수업코드 일 때만): js/class-share.js 가 채움 -->
+        <div id="class-bar-mount"></div>
+        <p class="lead">스마트폰 안의 가속도 센서 값을 기록해 그래프로 보고, 필요한 구간만 골라 같은 조·선생님과 나눕니다.</p>
 
         <!-- 상태 + 주요 단추 (위에 붙어 있음) -->
         <div class="dash-bar">
@@ -89,19 +98,21 @@
         </div>
 
         <div class="dash-more">
-            <div class="panel">
-                <h2>제출</h2>
-                <p class="note"><strong>학생:</strong> <a href="../index.html">메인 페이지</a>에서 구글 로그인 후, 이 페이지에서 실험하고 '☁️ Cloud DB에 제출'로 결과를 제출합니다.<br>
-                <strong>교사:</strong> 메인 페이지의 교사 대시보드에서 학생들이 제출한 결과를 확인합니다.</p>
-                <button id="btn-cloud-submit" class="btn-success" disabled>☁️ Cloud DB에 제출</button>
-            </div>
+            <!-- 👥 조 공유 (구글 로그인 없이 조 코드로 선생님 시트에 보내기·같은 조 기기에서 불러오기): js/class-share.js 가 채움 -->
+            <div id="share-mount"></div>
+            <details id="in-box" class="panel" hidden>
+                <summary>📥 같은 조에서 불러온 기록 <span id="in-sum" class="note"></span></summary>
+                <p class="note">같은 조의 다른 기기가 📤 보낸 기록입니다. 체크하면 그래프에 크기 |a| 를 점선으로 겹쳐 봅니다. 내 기록과는 따로 두므로 내 CSV·보내기에는 들어가지 않습니다.</p>
+                <ul id="in-list" class="in-list"></ul>
+            </details>
 
             <details>
                 <summary>알아 두기</summary>
                 <ul class="note">
                     <li>스마트폰에서 '시작'을 눌러 데이터를 기록하세요. 아이폰(iOS)에서는 처음에 동작 센서 권한을 허용해야 합니다.</li>
                     <li>반드시 https 주소로 접속해야 센서가 동작합니다.</li>
-                    <li>최근 샘플 <span id="buffer-size">100</span>개까지 기록합니다.</li>
+                    <li>최근 샘플 <span id="buffer-size">100</span>개까지 기록합니다. 마지막 기록은 이 기기에 남아 새로고침해도 다시 보입니다.</li>
+                    <li>예전에 구글 로그인으로 'Cloud DB'에 제출한 기록은 지우지 않았습니다. 선생님은 메인 페이지의 사이트 관리 쪽에서 봅니다.</li>
                 </ul>
             </details>
         </div>
@@ -109,10 +120,12 @@
 
     <script src="../js/phone-accel.js" defer></script>
 
-    <!-- Firebase SDK (같은 프로젝트 index.html에서 로그인하면 세션이 공유됩니다) -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-    <script src="../js/phone-accel-cloud.js" defer></script>
+    <!-- 조 공유: 선생님 구글 시트의 Apps Script (주소 js/pendulum-config.js, 링크의 ?s= 가 있으면 그것). 구글 로그인 없음 -->
+    <script src="../js/pendulum-config.js" defer></script>
+    <script src="../js/pendulum-cloud.js" defer></script>
+    <script src="../js/class-cloud.js" defer></script>
+    <script src="../js/class-share.js" defer></script>
+    <script src="../js/accelerometer-share.js" defer></script>
+    <script src="../js/phone-accel-share.js" defer></script>
 </body>
 </html>
