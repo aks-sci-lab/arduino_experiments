@@ -96,6 +96,24 @@
         var e = expInfo(exp);
         return (e && e.steps[step]) || (step ? step : '–');
     }
+    /* 선생님이 만든 실험이 학생에게 공개되었는지 (로그인 없이 Firestore 를 읽어 봄. 규칙: published == true 일 때만 누구나 읽기)
+       돌려주는 값: { state: 'public', title } | { state: 'hidden' }(비공개이거나 없는 번호) | { state: 'unknown', error }(인터넷 등) */
+    var FIRESTORE_DOC = 'https://firestore.googleapis.com/v1/projects/web-experiment-f9b24/databases/(default)/documents/customExperiments/';
+    var FIREBASE_KEY = 'AIzaSyCYVme6ZP-iyspRmHTtuUSsKXe7K_D0vJQ';   // 사이트 공개 웹 키 (index.html·js/phone-accel-cloud.js 와 같음)
+    function checkCustom(id, fetchImpl) {
+        var f = fetchImpl || (typeof fetch === 'function' ? fetch : null);
+        if (!/^[A-Za-z0-9_-]{1,40}$/.test(String(id || ''))) return Promise.resolve({ state: 'hidden' });
+        if (!f) return Promise.resolve({ state: 'unknown', error: '이 브라우저는 확인할 수 없어요.' });
+        return f(FIRESTORE_DOC + encodeURIComponent(id) + '?key=' + FIREBASE_KEY, { method: 'GET' }).then(function (res) {
+            if (res.status === 403 || res.status === 404) return { state: 'hidden' };
+            if (!res.ok) return { state: 'unknown', error: '확인하지 못했어요 (' + res.status + ').' };
+            return res.json().then(function (j) {
+                var fl = (j && j.fields) || {};
+                if (!(fl.published && fl.published.booleanValue === true)) return { state: 'hidden' };
+                return { state: 'public', title: fl.title && fl.title.stringValue || '' };
+            });
+        }, function (e) { return { state: 'unknown', error: '확인하지 못했어요 (' + (e && e.message || e) + ').' }; });
+    }
     // 교사 화면: 조 하나의 제출 요약 한 줄 (실험마다 단위가 달라 이름은 실험이 정한 summary 이름 그대로)
     function submissionText(exp, sub) {
         if (!sub || !sub.rows) return '아직 제출 없음';
@@ -199,7 +217,7 @@
         claimAdmin: claimAdmin, update: update, rollback: rollback, updatePlan: updatePlan,
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
-        studentState: studentState, submissionText: submissionText, agoText: agoText, stepName: stepName, summarize: summarize,
+        studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
         parseResponse: parseResponse, ping: ping, createClass: createClass, joinInfo: joinInfo, heartbeat: heartbeat, classStatus: classStatus
     };
 });

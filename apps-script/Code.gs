@@ -43,7 +43,7 @@
  * 4단계(보고서·AI)용 시트 reports·ai_logs·quiz 는 만들어 두기만 한다.
  */
 
-var VERSION = 6;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠  6: 모든 실험 공용 저장(submissions 시트)·수업에 모든 실험
+var VERSION = 7;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠  6: 모든 실험 공용 저장(submissions 시트)·수업에 모든 실험  7: 요약 이름에 °·%·한글 등 허용('|'·제어 문자만 막음)
 // 스스로 업데이트: 코드는 이 고정 주소에서만 받는다 (요청 값으로 바꿀 수 없음)
 var SITE = 'https://aks-sci-lab.web.app/apps-script/';
 var SCRIPT_API = 'https://script.googleapis.com/v1/projects/';
@@ -672,7 +672,8 @@ function cleanSummary(v) {
   if (keys.length > SUMMARY_KEYS) throw new Error('요약(summary) 항목이 너무 많습니다.');
   var out = {};
   keys.forEach(function (k) {
-    if (!/^[A-Za-z0-9_가-힣 .()-]{1,30}$/.test(k)) throw new Error('요약 이름이 올바르지 않습니다.');
+    // 이름은 30자까지 아무 글자나 (예: '온도(°C)', '습도(%)'). 시트에서 칸을 나누는 데 쓸 수 있는 '|' 와 제어 문자만 막는다
+    if (!/^[^|\u0000-\u001f]{1,30}$/.test(k) || !k.trim()) throw new Error('요약 이름이 올바르지 않습니다 (1~30자, | 는 쓸 수 없음).');
     var x = v[k];
     if (typeof x === 'number') { if (!isFinite(x)) throw new Error('요약 값이 올바르지 않습니다.'); out[k] = x; }
     else if (x == null) out[k] = null;
