@@ -265,11 +265,155 @@
         return '﻿' + lines.join('\r\n') + '\r\n';
     }
 
+    // ---------- 조 공유 (js/class-share.js, 구글 로그인 없이 선생님 시트로) ----------
+    const SHARE_SERIES = MAX_SUBMIT_SERIES;   // 보낼 때 센서 기록 점 수 한도 (넘으면 고르게 솎아 냄)
+    // 서버 요약 이름 규칙 (apps-script/Code.gs cleanSummary): 영어·숫자·한글·공백·.()- 30자
+    function summaryKey(s, fallback) {
+        const k = String(s == null ? '' : s).replace(/[^A-Za-z0-9_가-힣 .()-]/g, '').trim().slice(0, 30);
+        return k || fallback;
+    }
+    function roundSig(v) { return typeof v === 'number' && isFinite(v) ? Number(v.toPrecision(6)) : null; }
+    function nonEmptyRows(rows) {
+        return (rows || []).filter(r => (r || []).some(c => String(c == null ? '' : c).trim() !== ''));
+    }
+    /* 이 기기가 보낼 것 → ClassShare 의 getItems 모양 [{ id, title, n, summary, data }]
+       o: { def, rows, answers, series, fields, sel }. 표·센서 기록·질문 답을 따로 한 줄씩 (비어 있어도 n 0 으로 보내 '지움') */
+    function shareItems(o) {
+        const def = o.def, cols = def.columns;
+        const rows = nonEmptyRows(o.rows).map(r => cols.map((_, i) => String(r[i] == null ? '' : r[i]).slice(0, 200)));
+        const sel = o.sel || { x: def.xCol, y: def.yCol, fit: def.fit };
+        const items = [];
+        const tSum = { 행: rows.length };
+        if (cols.length >= 2 && sel.x !== sel.y) {
+            const r = fit(pointsFromRows(rows, sel.x, sel.y), sel.fit);
+            if (r) {
+                tSum['기울기'] = roundSig(r.slope);
+                if (r.kind === 'linear') tSum['절편'] = roundSig(r.intercept);
+                if (r.r2 !== null) tSum.R2 = roundSig(r.r2);
+            }
+        }
+        items.push({ id: 'table', title: '측정값 표', n: rows.length, summary: tSum, data: { cols: cols.map(c => c.name), rows } });
+        const fields = o.fields || [];
+        if (fields.length) {
+            const s = o.series || emptySeries(fields), n = s.t.length;
+            const sum = { 점: n };
+            if (n) {
+                sum['초'] = roundSig(s.t[n - 1]);
+                fields.forEach(f => {
+                    const vals = s.v[f.key].filter(v => v !== null);
+                    if (!vals.length) return;
+                    const k = summaryKey(f.name, f.key);
+                    sum[(k + ' 최소').slice(0, 30)] = roundSig(Math.min.apply(null, vals));
+                    sum[(k + ' 최대').slice(0, 30)] = roundSig(Math.max.apply(null, vals));
+                });
+            }
+            const thin = thinSeries(s, SHARE_SERIES);
+            items.push({ id: 'sensor', title: '센서 기록', n, summary: sum,
+                data: { mode: def.sensor.mode, keys: fields.map(f => f.key), series: n ? thin.series : null, total: thin.thinned ? n : undefined } });
+        }
+        if (def.questions.length) {
+            const answers = def.questions.map((_, i) => String((o.answers || [])[i] || '').slice(0, 2000));
+            const done = answers.filter(a => a.trim()).length;
+            items.push({ id: 'answers', title: '질문 답', n: done, summary: { 답: done, 질문: def.questions.length }, data: { questions: def.questions, answers } });
+        }
+        return items;
+    }
+    /* 같은 조 다른 기기가 보낸 것(ClassShare onIncoming 의 items)을 기기별 보관함에 넣는다.
+       ext: { 기기번호: { from, rows, series, answers } } (이 기기에서 잰 값과 따로). 돌려주는 값: { ext, changed }
+       표는 열 이름으로 맞춰 넣는다 (선생님이 실험을 고쳐 열 순서가 달라져도) */
+    function mergeIncoming(ext, items, def, fields) {
+        const out = {};
+        // CSV 로 불러온 것(이름이 csv 로 시작)은 서버 목록에 없으니 그대로 둔다
+        Object.keys(ext || {}).forEach(k => { if (/^csv/.test(k)) out[k] = ext[k]; });
+        (items || []).forEach(it => {
+            if (!it || !it.device || /^csv/.test(it.device) || !it.data || typeof it.data !== 'object') return;
+            const box = out[it.device] || (out[it.device] = { from: String(it.from || it.device), rows: [], series: null, answers: [] });
+            if (it.id === 'table' && Array.isArray(it.data.rows) && Array.isArray(it.data.cols)) {
+                const at = def.columns.map(c => it.data.cols.indexOf(c.name));
+                if (at.some(i => i >= 0)) {
+                    box.rows = it.data.rows.slice(0, MAX_ROWS).map(r => at.map(i => (i >= 0 && Array.isArray(r) && r[i] != null ? String(r[i]) : '')))
+                        .filter(r => r.some(c => c.trim() !== ''));
+                }
+            } else if (it.id === 'sensor' && it.data.series && it.data.mode === def.sensor.mode) {
+                const s = normalizeSeries(it.data.series, fields || []);
+                if (s.t.length) box.series = s;
+            } else if (it.id === 'answers' && Array.isArray(it.data.questions) && Array.isArray(it.data.answers)) {
+                box.answers = def.questions.map(q => {
+                    const i = it.data.questions.indexOf(q);
+                    return i >= 0 ? String(it.data.answers[i] || '') : '';
+                });
+            }
+        });
+        Object.keys(out).forEach(d => { const b = out[d]; if (/^csv/.test(d)) return; if (!b.rows.length && !b.series && !b.answers.some(a => a.trim())) delete out[d]; });
+        const changed = JSON.stringify(out) !== JSON.stringify(ext || {});
+        return { ext: changed ? out : (ext || {}), changed };
+    }
+    // 불러온 값 개수 (표의 행 + 센서 점 + 답)
+    function incomingCount(ext) {
+        return Object.keys(ext || {}).reduce((n, d) => {
+            const b = ext[d];
+            return n + (b.rows || []).length + (b.series ? b.series.t.length : 0) + (b.answers || []).filter(a => String(a).trim()).length;
+        }, 0);
+    }
+    // 저장해 둔 보관함을 읽을 때 모양을 다듬는다
+    function normalizeExt(ext, def, fields) {
+        const out = {};
+        if (!ext || typeof ext !== 'object') return out;
+        Object.keys(ext).slice(0, 30).forEach(d => {
+            const b = ext[d];
+            if (!/^[A-Za-z0-9_-]{4,20}$/.test(d) || !b || typeof b !== 'object') return;
+            out[d] = {
+                from: String(b.from || d).slice(0, 40),
+                rows: (Array.isArray(b.rows) ? b.rows : []).slice(0, MAX_ROWS).map(r => def.columns.map((_, i) => (Array.isArray(r) && r[i] != null ? String(r[i]) : ''))),
+                series: b.series ? normalizeSeries(b.series, fields || []) : null,
+                answers: def.questions.map((_, i) => (Array.isArray(b.answers) && typeof b.answers[i] === 'string' ? b.answers[i] : ''))
+            };
+            if (out[d].series && !out[d].series.t.length) out[d].series = null;
+        });
+        return out;
+    }
+
+    // CSV 한 파일 → 글자 칸 목록 (따옴표·따옴표 안 줄바꿈·BOM 처리)
+    function parseCsv(text) {
+        const s = String(text || '').replace(/^﻿/, '');
+        const out = []; let row = [], cell = '', q = false;
+        for (let i = 0; i < s.length; i++) {
+            const ch = s[i];
+            if (q) {
+                if (ch === '"') { if (s[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+                else cell += ch;
+            } else if (ch === '"') q = true;
+            else if (ch === ',') { row.push(cell); cell = ''; }
+            else if (ch === '\n' || ch === '\r') {
+                if (ch === '\r' && s[i + 1] === '\n') i++;
+                row.push(cell); out.push(row); row = []; cell = '';
+            } else cell += ch;
+        }
+        if (cell !== '' || row.length) { row.push(cell); out.push(row); }
+        return out.filter(r => r.some(c => c.trim() !== ''));
+    }
+    /* 이 페이지의 'CSV 저장' 파일을 표 행으로 (첫 줄 머리글을 열 이름·"이름 (단위)"로 맞춤)
+       돌려주는 값: { rows } 또는 { error } */
+    function rowsFromCsv(text, columns) {
+        const grid = parseCsv(text);
+        if (grid.length < 2) return { error: '값이 들어 있는 CSV 가 아닙니다.' };
+        const head = grid[0].map(h => h.trim());
+        const at = columns.map(c => {
+            let i = head.indexOf(columnLabel(c));
+            if (i < 0) i = head.indexOf(c.name);
+            return i;
+        });
+        if (!at.some(i => i >= 0)) return { error: '첫 줄의 열 이름이 이 실험의 표와 맞지 않습니다 (이 페이지에서 저장한 CSV 인지 확인하세요).' };
+        const rows = grid.slice(1, MAX_ROWS + 1).map(r => at.map(i => (i >= 0 && r[i] != null ? r[i].trim() : ''))).filter(r => r.some(c => c !== ''));
+        return { rows };
+    }
+
     return {
         MAX_COLS, MAX_ROWS, MAX_QUESTIONS, MAX_TITLE, MAX_DESC, FITS, MAX_SERIES, MAX_SUBMIT_SERIES, SENSORS,
         LAYOUTS, STEP_TEXTS, MAX_STEP_TEXT,
         normalizeSensor, sensorFields, sensorValueText, emptySeries, normalizeSeries, thinSeries, seriesToCsv, seriesSummary,
         parseNumber, parsePaste, normalizeDefinition, validateDefinition, columnLabel,
-        pointsFromRows, filledRowCount, fit, formatNumber, fitText, toCsv
+        pointsFromRows, filledRowCount, fit, formatNumber, fitText, toCsv,
+        summaryKey, shareItems, mergeIncoming, incomingCount, normalizeExt, parseCsv, rowsFromCsv
     };
 });
