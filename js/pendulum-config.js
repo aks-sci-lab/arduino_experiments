@@ -13,5 +13,5 @@ window.PENDULUM_CONFIG = {
     templateCopyUrl: '',
     // 교사 화면 '🛠 내 서버 만들기'(구글 로그인 한 번으로 시트 + Apps Script 만들고 배포)에 쓰는 구글 OAuth 클라이언트 ID
     // (…apps.googleusercontent.com). 비어 있으면 그 단추 대신 '손으로 만들기' 안내만. 등록 방법: docs/class-teacher-guide.md
-    googleClientId: ''
+    googleClientId: '718758606428-u2gap7oatoamfsk8amo4qcigjj2vjpl6.apps.googleusercontent.com'   // 2026-11-16 사이트 관리자가 등록(web-experiment-f9b24 의 웹 클라이언트, 공개 값)
 };
