@@ -18,6 +18,9 @@
     const chartsBox = $('charts');
     const modeNote = $('modeNote');
     const tabs = [$('tabImu'), $('tabEnv')];
+    const runList = $('runList');
+    const viewText = $('viewText');
+    const STORE_KEY = 'nano-lab:runs:v1';
 
     const MODE_NOTES = {
         imu: '가속도 센서(BMI270): x·y·z 세 방향과 크기 |a| 를 g 단위로 보여 줍니다 (1 g ≈ 9.8 m/s²). 범위 ±16 g, 최대 100 Hz.',
@@ -36,7 +39,12 @@
     let firstEnvTs = null;
     let fullNotified = false;
     let chartScheduled = false;
-    const samples = { imu: [], env: [] };
+    // 회차: 측정 시작 → 중지 한 번. 내 회차(myRuns)는 이 브라우저에 저장, 받은 회차(incoming)는 조 공유에서
+    let myRuns = [];
+    const incoming = new Map();
+    let current = null;                       // 지금 기록 중인 회차
+    const viewKey = { imu: null, env: null }; // 그래프에 보이는 회차 ('me:id' 또는 '노트북-id')
+    let share = null;
     const rates = { imu: N.MODES.imu.defaultRate, env: N.MODES.env.defaultRate };
     const charts = {};
 
@@ -47,6 +55,108 @@
     function setStatus(text, kind = '') {
         statusBox.textContent = text;
         statusBox.className = 'dash-status' + (kind ? ' ' + kind : '');
+    }
+
+    function runKey(run) { return run.incoming ? run.key : 'me:' + run.id; }
+    function runsOf(m) {
+        return myRuns.filter(r => r.mode === m).concat([...incoming.values()].filter(r => r.mode === m));
+    }
+    // 그래프·지금 값·CSV 에 쓰는 회차
+    function viewed() {
+        if (recording && current && current.mode === mode) return current;
+        const list = runsOf(mode);
+        return list.find(r => runKey(r) === viewKey[mode]) || myRuns.filter(r => r.mode === mode).slice(-1)[0] || null;
+    }
+    function viewedSamples() { const run = viewed(); return run ? run.samples : []; }
+
+    function saveRuns() {
+        try {
+            localStorage.setItem(STORE_KEY, JSON.stringify(myRuns.filter(r => r.samples.length).map(r => ({
+                id: r.id, mode: r.mode, no: r.no, startedAt: r.startedAt, n: r.n, summary: r.summary, data: N.packRun(r.mode, r.samples)
+            }))));
+        } catch (error) {
+            console.warn('회차 저장 실패', error);
+        }
+    }
+    function loadRuns() {
+        try {
+            const list = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+            myRuns = list.map(x => {
+                const run = N.unpackRun(x.data);
+                if (!run || !/^[A-Za-z0-9_-]{1,30}$/.test(String(x.id))) return null;
+                // 저장할 때 점을 고르게 줄였으므로 새로고침 뒤에는 줄인 값 (thinned)
+                return { id: x.id, mode: run.mode, no: x.no, startedAt: x.startedAt, samples: run.samples, n: x.n || run.n,
+                    summary: x.summary || N.runSummary(run.mode, run.samples), thinned: run.samples.length < (x.n || 0) };
+            }).filter(Boolean);
+        } catch (error) {
+            myRuns = [];
+        }
+    }
+
+    function fmt(value) { return value === null || value === undefined || value === '' ? '-' : String(value); }
+
+    // 회차 목록 (내 회차 + 📥 불러온 회차). 단추는 손가락으로 누르기 좋게 44px
+    function renderRuns() {
+        const list = runsOf(mode);
+        const shown = viewed();
+        runList.innerHTML = '';
+        if (!list.length) {
+            runList.innerHTML = '<p class="note">아직 회차가 없습니다. ▶ 측정 시작 → ■ 측정 중지 하면 한 회차가 됩니다.</p>';
+        }
+        for (const run of list) {
+            const card = document.createElement('div');
+            card.className = 'run-card' + (run === shown ? ' on' : '') + (run.incoming ? ' ext' : '');
+            const head = document.createElement('div');
+            head.className = 'run-head';
+            const title = document.createElement('strong');
+            title.textContent = (run.incoming ? '📥 ' : '') + (run.incoming ? run.title : N.runTitle(run.mode, run.no)) + (run === current && recording ? ' (기록 중)' : '');
+            const who = document.createElement('span');
+            who.className = 'note';
+            who.textContent = (run.incoming ? '불러온 값 · ' + run.from : '내 기록') + ' · ' + (run.n || run.samples.length).toLocaleString('ko-KR') + '점'
+                + (run.incoming || run.thinned ? ' (그래프는 ' + run.samples.length.toLocaleString('ko-KR') + '점으로 줄임)' : '');
+            head.append(title, who);
+            const sum = document.createElement('div');
+            sum.className = 'run-sum';
+            const summary = run.summary || N.runSummary(run.mode, run.samples);
+            sum.textContent = Object.entries(summary).map(([k, v]) => k + ' ' + fmt(v)).join(' · ');
+            const row = document.createElement('div');
+            row.className = 'row';
+            const view = document.createElement('button');
+            view.type = 'button';
+            view.textContent = run === shown ? '✔ 그래프에 보이는 중' : '그래프로 보기';
+            view.disabled = recording || run === shown;
+            view.addEventListener('click', () => { viewKey[mode] = runKey(run); refreshView(); });
+            row.appendChild(view);
+            if (!run.incoming) {
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.textContent = '이 회차 지우기';
+                del.disabled = recording;
+                del.addEventListener('click', () => deleteRun(run));
+                row.appendChild(del);
+            }
+            card.append(head, sum, row);
+            runList.appendChild(card);
+        }
+        if (viewText) {
+            viewText.textContent = shown ? '그래프: ' + (shown.incoming ? '📥 ' + shown.title + ' (' + shown.from + ')' : N.runTitle(shown.mode, shown.no)) : '';
+        }
+    }
+
+    function refreshView() {
+        buildReadouts();
+        drawCharts();
+        renderRuns();
+        updateButtons();
+    }
+
+    function deleteRun(run) {
+        if (recording) return;
+        if (!window.confirm(N.runTitle(run.mode, run.no) + ' (' + run.samples.length.toLocaleString('ko-KR') + '점) 을 지울까요? 조 공유로 이미 보냈다면 다음에 보낼 때 선생님 시트에서도 지워집니다.')) return;
+        myRuns = myRuns.filter(r => r !== run);
+        viewKey[mode] = null;
+        saveRuns();
+        refreshView();
     }
 
     function connected() {
@@ -63,10 +173,10 @@
         stopButton.disabled = !recording;
         rateSelect.disabled = recording;
         tabs.forEach(tab => { tab.disabled = recording; });
-        csvButton.disabled = recording || samples[mode].length === 0;
-        clearButton.disabled = recording || samples[mode].length === 0;
-        const count = samples[mode].length;
-        countText.textContent = count ? `기록된 측정: ${count.toLocaleString('ko-KR')}개` + (count >= N.MAX_SAMPLES ? ' (최대 개수에 도달해 기록을 멈췄습니다)' : '') : '';
+        const count = viewedSamples().length;
+        csvButton.disabled = recording || count === 0;
+        if (clearButton) clearButton.style.display = 'none';   // 지우기는 회차 목록의 '이 회차 지우기'로
+        countText.textContent = count ? `그래프의 점: ${count.toLocaleString('ko-KR')}개` + (count >= N.MAX_SAMPLES ? ' (최대 개수에 도달해 기록을 멈췄습니다)' : '') : '';
     }
 
     function buildReadouts() {
@@ -88,7 +198,8 @@
             box.append(name, value, unit);
             readouts.appendChild(box);
         }
-        const last = samples[mode][samples[mode].length - 1];
+        const list = viewedSamples();
+        const last = list[list.length - 1];
         if (last) showValues(last);
     }
 
@@ -156,7 +267,7 @@
 
     function drawCharts() {
         chartScheduled = false;
-        const points = N.thin(samples[mode]);
+        const points = N.thin(viewedSamples());
         for (const chart of Object.values(charts)) {
             for (const dataset of chart.data.datasets) {
                 dataset.data = points.map(sample => ({ x: sample.time, y: sample[dataset.fieldKey] }));
@@ -177,19 +288,18 @@
         tabs.forEach(tab => tab.setAttribute('aria-pressed', String(tab.dataset.mode === mode)));
         modeNote.textContent = MODE_NOTES[mode];
         buildRateOptions();
-        buildReadouts();
         buildCharts();
-        updateButtons();
+        refreshView();
     }
 
     function addSample(kind, sample) {
-        if (!recording || kind !== mode) return;
+        if (!recording || !current || kind !== current.mode) return;
         lastSampleAt = Date.now();
         if (staleShown) {
             staleShown = false;
             setStatus(`측정 중: ${device ? device.name : ''} — 값이 다시 들어옵니다.`);
         }
-        const list = samples[kind];
+        const list = current.samples;
         if (list.length >= N.MAX_SAMPLES) {
             if (!fullNotified) {
                 fullNotified = true;
@@ -201,6 +311,7 @@
         showValues(sample);
         scheduleCharts();
         if (list.length % 25 === 0 || kind === 'env') updateButtons();
+        if (list.length % 100 === 1 || kind === 'env') renderRuns();
     }
 
     function handlePacket(packet) {
@@ -298,6 +409,7 @@
 
     function onDisconnected() {
         const wasRecording = recording;
+        if (recording) finishRun();
         recording = false;
         lastSampleAt = null;
         if (device) device.removeEventListener('gattserverdisconnected', onDisconnected);
@@ -305,8 +417,7 @@
         device = null;
         boardInfo.textContent = '';
         setStatus((wasRecording ? '측정 중에 ' : '') + '블루투스 연결이 끊어졌습니다. 기록은 남아 있습니다. 보드 전원과 거리를 확인하고 다시 연결하세요.', 'warn');
-        drawCharts();
-        updateButtons();
+        refreshView();
     }
 
     function disconnect() {
@@ -321,59 +432,76 @@
         try {
             await sendCommand('STOP');
             await sendCommand(rateCommand);
-            samples[mode] = [];
+            current = {
+                id: 'r' + Date.now().toString(36), mode, samples: [], startedAt: new Date().toISOString(),
+                no: myRuns.filter(r => r.mode === mode).reduce((m, r) => Math.max(m, r.no || 0), 0) + 1
+            };
+            myRuns.push(current);
+            viewKey[mode] = 'me:' + current.id;
             firstEnvTs = null;
             fullNotified = false;
             accelReceiver.reset();
             recording = true;
             lastSampleAt = Date.now();
             staleShown = false;
-            buildReadouts();
-            drawCharts();
+            refreshView();
+            share?.stepChanged();
             await sendCommand(startCommand);
-            setStatus(`측정 중: ${device.name || '보드'} — ${N.MODES[mode].label}`);
+            setStatus(`측정 중: ${device.name || '보드'} — ${N.runTitle(mode, current.no)}`);
         } catch (error) {
             recording = false;
+            if (current && !current.samples.length) myRuns = myRuns.filter(r => r !== current);
+            current = null;
             setStatus('측정을 시작하지 못했습니다: ' + N.friendlyError(error), 'error');
         }
-        updateButtons();
+        refreshView();
+    }
+
+    // 기록이 끝난 회차 정리: 점이 없으면 버리고, 있으면 요약을 만들어 저장
+    function finishRun() {
+        const run = current;
+        current = null;
+        if (!run) return null;
+        if (!run.samples.length) {
+            myRuns = myRuns.filter(r => r !== run);
+            viewKey[run.mode] = null;
+            return null;
+        }
+        run.n = run.samples.length;
+        run.summary = N.runSummary(run.mode, run.samples);
+        saveRuns();
+        return run;
     }
 
     async function stopRecording(message, kind) {
         if (!recording) return;
         recording = false;
+        const run = finishRun();
         lastSampleAt = null;
-        updateButtons();
-        drawCharts();
+        refreshView();
+        share?.stepChanged();
         try {
             if (connected()) await sendCommand('STOP');
         } catch (error) {
             console.warn('STOP failed', error);
         }
-        setStatus(message || `측정을 멈췄습니다. ${samples[mode].length.toLocaleString('ko-KR')}개를 기록했습니다. CSV 저장을 누르면 파일로 받을 수 있습니다.`, kind || '');
+        setStatus(message || (run ? `${N.runTitle(run.mode, run.no)}: ${run.samples.length.toLocaleString('ko-KR')}개를 기록했습니다. CSV 저장, 또는 👥 조 공유로 선생님께 보낼 수 있습니다.` : '측정을 멈췄습니다. 받은 값이 없어 회차를 만들지 않았습니다.'), kind || '');
     }
 
     function downloadCsv() {
-        const list = samples[mode];
+        const run = viewed();
+        const list = run ? run.samples : [];
         if (!list.length) return;
         const blob = new Blob([N.toCsv(mode, list)], { type: 'text/csv;charset=utf-8' });
         const link = document.createElement('a');
         const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
         link.href = URL.createObjectURL(blob);
-        link.download = `nano-${mode === 'imu' ? '가속도' : '환경'}-${stamp}.csv`;
+        const name = run.incoming ? `${run.title}-${run.from}` : N.runTitle(run.mode, run.no);
+        link.download = `nano-${name.replace(/\s+/g, '')}-${stamp}.csv`;
         document.body.appendChild(link);
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-    }
-
-    function clearSamples() {
-        if (recording || !samples[mode].length) return;
-        if (!window.confirm(`${N.MODES[mode].label} 기록 ${samples[mode].length}개를 지울까요?`)) return;
-        samples[mode] = [];
-        buildReadouts();
-        drawCharts();
-        updateButtons();
     }
 
     // 값이 15초 동안 오지 않으면 안내
@@ -390,16 +518,37 @@
     startButton.addEventListener('click', startRecording);
     stopButton.addEventListener('click', () => stopRecording());
     csvButton.addEventListener('click', downloadCsv);
-    clearButton.addEventListener('click', clearSamples);
     rateSelect.addEventListener('change', () => { rates[mode] = Number(rateSelect.value); });
     tabs.forEach(tab => tab.addEventListener('click', () => selectMode(tab.dataset.mode)));
     window.addEventListener('beforeunload', () => { if (device && device.gatt.connected) device.gatt.disconnect(); });
 
+    // 👥 조 공유 (수업 참여 ?c= · 조 코드, 구글 로그인 없음): docs/class-share.md
+    function initShare() {
+        if (!window.ClassShare || !window.PendulumCloud) return null;
+        return window.ClassShare.init({
+            exp: 'nano',
+            barMount: '#class-bar-mount', shareMount: '#share-mount',
+            csvHint: '회차를 그래프로 보기 → CSV 저장',
+            getItems: () => N.shareItems(myRuns.filter(r => r !== current)),
+            onIncoming: items => {
+                const changed = N.mergeIncoming(incoming, items);
+                if (changed) refreshView();
+                return changed;
+            },
+            getStep: () => (recording ? 'live' : 'record'),
+            getPoints: () => myRuns.reduce((n, r) => n + (r.n || r.samples.length), 0),
+            pollWhen: () => !recording,
+            incomingCount: () => [...incoming.values()].reduce((n, r) => n + (r.n || r.samples.length), 0),
+            clearIncoming: () => { incoming.clear(); refreshView(); }
+        });
+    }
+
+    loadRuns();
     modeNote.textContent = MODE_NOTES[mode];
     buildRateOptions();
-    buildReadouts();
     buildCharts();
-    updateButtons();
+    refreshView();
+    share = initShare();
     if (!navigator.bluetooth) {
         setStatus('이 브라우저는 웹 블루투스를 지원하지 않습니다. PC·안드로이드의 크롬이나 엣지로 열어 주세요. (아이폰·아이패드·파이어폭스는 안 됩니다)', 'warn');
     }

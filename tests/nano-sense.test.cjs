@@ -133,3 +133,51 @@ test('페이지가 쓰는 파일이 모두 있고 메인 목록에 링크가 있
     const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
     assert.ok(index.includes('href="projects/arduino-nano-lab.html"'));
 });
+
+test('회차 요약: 가속도는 평균·최대 |a|, 환경은 평균 온도·습도·기압', () => {
+    const imu = [{ time: 0, x: 0, y: 0, z: 1, total: 1 }, { time: 0.5, x: 0, y: 0, z: 3, total: 3 }];
+    assert.deepEqual(N.runSummary('imu', imu), { '평균 크기(g)': 2, '최대 크기(g)': 3, '시간(s)': 0.5, '점': 2 });
+    const env = [{ time: 0, temp: 24, humidity: 40, pressure: 101 }, { time: 10, temp: 25, humidity: 42, pressure: 101.2 }];
+    assert.deepEqual(N.runSummary('env', env), { '온도(C)': 24.5, '습도(퍼센트)': 41, '기압(kPa)': 101.1, '시간(s)': 10 });
+    assert.equal(N.runTitle('imu', 3), '가속도 3회');
+    // 서버(apps-script/Code.gs cleanSummary)가 받는 이름만 쓴다
+    const gs = fs.readFileSync(path.join(root, 'apps-script', 'Code.gs'), 'utf8');
+    const rule = new RegExp(gs.match(/if \(!(\/\^\[[^\n]+?\$\/)\.test\(k\)\)/)[1].slice(1, -1));
+    for (const k of [...Object.keys(N.runSummary('imu', imu)), ...Object.keys(N.runSummary('env', env))]) assert.match(k, rule, k);
+});
+
+test('회차 보내기 자료: 1500점으로 줄이고 그대로 되돌림, 모양이 틀리면 null', () => {
+    const many = Array.from({ length: 6000 }, (_, i) => ({ time: i / 100, x: 0.1, y: -0.2, z: 1, total: Math.hypot(0.1, -0.2, 1) }));
+    const data = N.packRun('imu', many);
+    assert.equal(data.rows.length, N.SHARE_POINTS);
+    assert.equal(data.n, 6000);
+    assert.ok(JSON.stringify(data).length < 270000);
+    const back = N.unpackRun(JSON.parse(JSON.stringify(data)));
+    assert.equal(back.mode, 'imu');
+    assert.equal(back.n, 6000);
+    assert.equal(back.samples.length, N.SHARE_POINTS);
+    assert.ok(Math.abs(back.samples[5].total - many[0].total) < 1e-3);
+    assert.equal(N.unpackRun({ v: 1, mode: 'env', keys: ['x'], rows: [] }), null);
+    assert.equal(N.unpackRun({ v: 1, mode: 'imu', keys: ['x', 'y', 'z'], rows: [[0, 1, 'a', 2]] }), null);
+    assert.equal(N.unpackRun(null), null);
+});
+
+test('조 공유: 내 회차 → 보낼 것, 받은 것 합치기·고쳐 쓰기·지운 것 빼기', () => {
+    const runs = [
+        { id: 'r1', mode: 'imu', no: 1, samples: [{ time: 0, x: 0, y: 0, z: 1, total: 1 }] },
+        { id: 'r2', mode: 'env', no: 1, samples: [] }
+    ];
+    const items = N.shareItems(runs);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].title, '가속도 1회');
+    assert.equal(items[0].n, 1);
+    const store = new Map();
+    const got = [{ id: 'r1', device: 'nabc123', from: '노트북 C123', title: '가속도 1회', n: 1, summary: items[0].summary, data: items[0].data, sentAt: 't1' }];
+    assert.equal(N.mergeIncoming(store, got), true);
+    assert.equal(store.size, 1);
+    assert.equal(store.get('nabc123-r1').incoming, true);
+    assert.equal(N.mergeIncoming(store, got), false, '같은 것 다시 받으면 바뀐 것 없음');
+    assert.equal(N.mergeIncoming(store, [{ ...got[0], sentAt: 't2' }]), true, '다시 보냈으면 고쳐 씀');
+    assert.equal(N.mergeIncoming(store, [{ ...got[0], data: { v: 9 } }]), true, '못 읽는 자료는 빼고 목록에 없으니 지움');
+    assert.equal(store.size, 0);
+});

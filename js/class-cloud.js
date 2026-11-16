@@ -33,7 +33,7 @@
         light: { name: '조도 센서', icon: '🔆', page: 'projects/environment-lab.html?sensor=light', steps: DASH, ready: false },
         uv: { name: '자외선 센서', icon: '🟣', page: 'projects/environment-lab.html?sensor=uv', steps: DASH, ready: false },
         accel: { name: '가속도계 데이터 분석', icon: '📐', page: 'projects/accelerometer-lab.html', steps: DASH, ready: false },
-        nano: { name: '아두이노 Nano 33 BLE Sense', icon: '🔷', page: 'projects/arduino-nano-lab.html', steps: DASH, ready: false },
+        nano: { name: '아두이노 Nano 33 BLE Sense', icon: '🔷', page: 'projects/arduino-nano-lab.html', steps: DASH, ready: true },
         phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: false }
     };
     var CUSTOM_RE = /^custom:([A-Za-z0-9_-]{1,40})$/;
