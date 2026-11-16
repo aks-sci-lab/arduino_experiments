@@ -124,7 +124,7 @@
         };
         var st = fixState(store.load());
         if (!st.runs || typeof st.runs !== 'object') st.runs = {};   // 폰 회차 목록: { 실험 id: { sel, memo, at, sig } }
-        var PICK = !!PHONE && !opts.autoSendOnSave;                  // 폰은 기본으로 '회차를 골라 보내기'
+        var PICK = !!PHONE && !opts.autoSendOnSave && !opts.phoneAutoSend;   // phoneAutoSend: 폰만 바로 보내기                  // 폰은 기본으로 '회차를 골라 보내기'
         if (PHONE) {
             if (!isPhoneDevice(st.device)) st.device = newDeviceId(null, 'p');
             if (st.group !== PHONE.group) { st.group = PHONE.group; st.sent = []; }

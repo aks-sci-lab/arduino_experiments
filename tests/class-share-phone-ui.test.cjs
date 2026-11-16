@@ -94,6 +94,10 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   await L.waitForFunction(() => phoneNotes >= 1 && document.getElementById('got').textContent.includes('run2'), null, { timeout: 15000 });
   assert.match(await L.textContent('#cs-status'), /폰에서 새 측정 1개/);
   console.log('L status after run2:', await L.textContent('#cs-status'));
+  // 전부 다시 보내도 줄 수 그대로 (같은 id 로 고쳐 씀)
+  await P.click('#cs-rall'); await P.click('#cs-rsend');
+  await P.waitForFunction(() => /측정 3개/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 15000 });
+  assert.equal(app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' }).items.length, 3);
   // 보낸 회차 지우기 → 시트에서도 빠짐
   P.once('dialog', d => d.accept());
   await P.click('[data-del=run1]');
