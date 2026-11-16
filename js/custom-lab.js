@@ -1,8 +1,9 @@
 // 선생님이 만든 실험 페이지 (projects/custom-lab.html)
-//   ?id=문서id      학생 화면: 안내 읽기 → 측정값 넣기 → 그래프 → 제출
-//   ?edit=new|문서id 선생님 화면: 실험 만들기·고치기
-//   ?record=문서id  제출 내용 보기 (본인 또는 선생님)
-// 실험 설정은 Firestore `customExperiments` 에, 학생 제출은 기존 `experiments` 에 저장한다.
+//   ?id=문서id      학생 화면: 안내 읽기 → 측정값 넣기 → 그래프 → 선생님께 보내기 (구글 로그인 없음)
+//                   ?c=수업코드&s=스크립트ID 가 붙으면 수업 참여 띠(조·번호) → 조 공유 (js/class-share.js, exp 'custom:<문서id>')
+//   ?edit=new|문서id 선생님 화면: 실험 만들기·고치기 (선생님 구글 로그인)
+//   ?record=문서id  예전 제출 내용 보기 (2026-11-16 전 구글 로그인 제출, 본인 또는 선생님)
+// 실험 설정은 Firestore `customExperiments` 에(공개한 실험은 로그인 없이 읽힘), 학생 값은 조 공유로 선생님 구글 시트(공용 submissions)에.
 // 실험 설정에서 센서 기능을 고르면 Pico 환경 센서 보드를 연결해 시간 그래프를 그린다 (custom-lab-sensor.js).
 (function () {
     'use strict';
@@ -28,6 +29,9 @@
     let auth = null, db = null, user = null, isTeacher = false;
     let loaded = false;      // 화면에 실험을 띄웠는지
     let loading = false;
+    let viewNeedsLogin = false;   // 학생 화면에서 공개 전 실험이라 선생님 로그인이 있어야 열릴 때만 로그인 단추를 보인다
+    let share = null;             // 조 공유 (ClassShare.init 결과)
+    let curStep = 'live';         // 교사 진행 보기에 보낼 '지금 단계' (한 화면은 live)
 
     // ---------- 공통 ----------
     function showMessage(text, kind) {
@@ -71,8 +75,10 @@
         } catch (e) { return false; }
     }
     function updateUserBar() {
-        $('userInfo').textContent = user ? '👤 ' + (user.displayName || user.email) + (isTeacher ? ' (선생님)' : '') : (auth ? '로그인하지 않음' : '');
-        $('btnSignIn').hidden = !auth || !!user;
+        // 학생 화면은 로그인 없이 쓴다: 로그인 단추는 선생님 화면(만들기·예전 기록)과 공개 전 실험일 때만
+        const studentView = mode === 'view' && !viewNeedsLogin;
+        $('userInfo').textContent = user ? '👤 ' + (user.displayName || user.email) + (isTeacher ? ' (선생님)' : '') : (auth && !studentView ? '로그인하지 않음' : '');
+        $('btnSignIn').hidden = !auth || !!user || studentView;
         if (mode === 'view' && loaded) {
             $('teacherLinks').hidden = !isTeacher;
         }
@@ -95,7 +101,7 @@
         }
         if (!auth) {
             updateUserBar();
-            if (mode === 'view') loadViewOffline('인터넷에 연결할 수 없어 이 기기에 저장된 실험 설정으로 엽니다. 제출은 연결 후에 할 수 있습니다.');
+            if (mode === 'view') loadViewOffline('실험 설정을 새로 받지 못해 이 기기에 저장된 설정으로 엽니다. (인터넷 연결을 확인하세요)');
             else showMessage('인터넷에 연결할 수 없어 화면을 불러오지 못했습니다. 연결을 확인하고 새로고침하세요.', 'error');
             return;
         }
@@ -120,7 +126,8 @@
     // =====================================================================
     const view = {
         def: null, rows: [], answers: [], student: { id: '', name: '' },
-        sel: { x: 0, y: 1, fit: 'none' }, submitted: '', readOnly: false, chart: null
+        sel: { x: 0, y: 1, fit: 'none' }, submitted: '', readOnly: false, chart: null,
+        ext: {}   // 같은 조 다른 기기·CSV 에서 불러온 값 { 기기번호: { from, rows, series, answers } } (내 값과 따로)
     };
     // 센서: fields 고른 측정값, series 기록한 값, live 기록하지 않을 때 보여 주는 최근 값
     const sensor = {
@@ -152,6 +159,7 @@
         } catch (e) {
             const code = e && e.code ? String(e.code) : '';
             if (code.includes('permission-denied')) {
+                viewNeedsLogin = !user;
                 showMessage(user
                     ? '이 실험은 아직 공개되지 않았거나 없는 실험입니다.'
                     : '이 실험은 아직 공개되지 않았거나 없는 실험입니다. 선생님이라면 위의 "구글 로그인"을 누르세요.');
@@ -165,7 +173,7 @@
     function restoreData() {
         const d = view.def;
         view.sel = { x: d.xCol, y: d.yCol, fit: d.fit };
-        view.rows = []; view.answers = d.questions.map(() => ''); view.student = { id: '', name: '' }; view.submitted = '';
+        view.rows = []; view.answers = d.questions.map(() => ''); view.student = { id: '', name: '' }; view.submitted = ''; view.ext = {};
         sensor.series = M.emptySeries(sensor.fields);
         try {
             const raw = localStorage.getItem(dataKey());
@@ -183,6 +191,7 @@
                     if (M.FITS.includes(s.sel.fit)) view.sel.fit = s.sel.fit;
                 }
                 if (typeof s.submitted === 'string') view.submitted = s.submitted;
+                view.ext = M.normalizeExt(s.ext, d, sensor.fields);
                 if (sensor.fields.length) {
                     sensor.series = M.normalizeSeries(s.series, sensor.fields);
                     if (typeof s.rate === 'string' && M.SENSORS[d.sensor.mode].rates.some(r => r[0] === s.rate)) sensor.rate = s.rate;
@@ -202,7 +211,8 @@
         try {
             localStorage.setItem(dataKey(), JSON.stringify({
                 v: 1, rows: view.rows, answers: view.answers, student: view.student, sel: view.sel, submitted: view.submitted,
-                series: sensor.fields.length ? sensor.series : undefined, rate: sensor.rate || undefined
+                series: sensor.fields.length ? sensor.series : undefined, rate: sensor.rate || undefined,
+                ext: Object.keys(view.ext).length ? view.ext : undefined
             }));
             $('saveStatus').textContent = '';
         } catch (e) {
@@ -236,18 +246,105 @@
         renderSelectors();
         renderQuestions();
         $('graphCard').hidden = def.columns.length < 2;
-        if (view.submitted && !view.readOnly) $('submitStatus').textContent = '마지막 제출: ' + view.submitted;
+        if (view.submitted && !view.readOnly) $('submitStatus').textContent = '마지막으로 보낸 때: ' + view.submitted;
         if (view.readOnly) {
             ['stId', 'stName'].forEach(id => { $(id).readOnly = true; });
             $('tableHelp').hidden = true;
             $('btnAddRow').hidden = true; $('btnClear').hidden = true;
             $('submitCard').hidden = true;
+            $('shareCard').hidden = true;
         }
         $('viewSection').hidden = false;
         loaded = true;
         refreshGraph();
         setupSensor();
+        renderIncoming();
+        if (!view.readOnly) share = initShare();
         if (useSteps) arrangeSteps();
+    }
+
+    // ---------- 조 공유 (구글 로그인 없이: 같은 조 다른 기기와 선생님 구글 시트로) ----------
+    function myPoints() { return M.filledRowCount(view.rows) + sensor.series.t.length; }
+    function initShare() {
+        if (!window.ClassShare || !window.PendulumCloud || !window.ClassCloud) {
+            $('shareCard').hidden = true;
+            $('submitStatus').textContent = '⚠ 조 공유 기능을 불러오지 못했습니다. CSV 저장·인쇄로 내세요.';
+            $('btnSubmit').disabled = true;
+            return null;
+        }
+        try {
+            return window.ClassShare.init({
+                exp: 'custom:' + expId,
+                barMount: '#class-bar-mount', shareMount: '#share-mount',
+                csvHint: '측정값 → ⬇ CSV 저장',
+                sendButtons: ['#btnSubmit'],
+                getItems: () => M.shareItems({ def: view.def, rows: view.rows, answers: view.answers, series: sensor.series, fields: sensor.fields, sel: view.sel }),
+                onIncoming: items => {
+                    const r = M.mergeIncoming(view.ext, items, view.def, sensor.fields);
+                    if (r.changed) { view.ext = r.ext; saveNow(); renderIncoming(); refreshGraph(); }
+                    return r.changed;
+                },
+                getStep: () => curStep,
+                getPoints: myPoints,
+                pollWhen: () => view.def.layout !== 'steps' || ['data', 'result', 'conclusion'].includes(curStep),
+                incomingCount: () => M.incomingCount(view.ext),
+                clearIncoming: () => { view.ext = {}; saveNow(); renderIncoming(); refreshGraph(); },
+                csvImport: async files => {
+                    const msgs = [];
+                    for (const f of files) {
+                        const r = M.rowsFromCsv(await f.text(), view.def.columns);
+                        if (r.error) { msgs.push('⚠ ' + escHtml(f.name) + ': ' + escHtml(r.error)); continue; }
+                        let h = 0;
+                        for (const ch of f.name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+                        view.ext['csv' + h.toString(36)] = { from: ('파일 ' + f.name).slice(0, 40), rows: r.rows, series: null, answers: view.def.questions.map(() => '') };
+                        msgs.push('✅ ' + escHtml(f.name) + ': ' + r.rows.length + '행을 불러왔습니다.');
+                    }
+                    saveNow(); renderIncoming(); refreshGraph();
+                    return { html: msgs.join('<br>'), error: msgs.some(m => m.startsWith('⚠')) };
+                }
+            });
+        } catch (e) {
+            $('shareCard').hidden = true;
+            return null;
+        }
+    }
+    function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function extRows() {
+        const out = [];
+        Object.keys(view.ext).forEach(d => (view.ext[d].rows || []).forEach(r => out.push(r)));
+        return out;
+    }
+    // 불러온 값: 기기(또는 CSV 파일)마다 읽기 전용 표 · 센서 기록 요약 · 질문 답
+    function renderIncoming() {
+        const box = $('incomingList');
+        box.textContent = '';
+        const keys = Object.keys(view.ext);
+        $('incomingCard').hidden = view.readOnly || !keys.length;
+        const cols = view.def.columns;
+        keys.forEach(d => {
+            const b = view.ext[d];
+            const part = el('div', { className: 'inc-box' }, [el('h3', { textContent: '📥 ' + b.from })]);
+            if (b.rows.length) {
+                const table = el('table', { className: 'data inc' });
+                const head = el('tr', {}, [el('th', { textContent: '#' })]);
+                cols.forEach(c => head.appendChild(el('th', { textContent: M.columnLabel(c) })));
+                table.appendChild(el('thead', {}, [head]));
+                const body = el('tbody');
+                b.rows.forEach((r, i) => {
+                    const tr = el('tr', {}, [el('td', { className: 'num', textContent: String(i + 1) })]);
+                    r.forEach(v => tr.appendChild(el('td', { textContent: v })));
+                    body.appendChild(tr);
+                });
+                table.appendChild(body);
+                part.appendChild(el('div', { className: 'table-wrap' }, [table]));
+            }
+            if (b.series && b.series.t.length) part.appendChild(el('p', { className: 'muted', textContent: '🔌 ' + M.seriesSummary(b.series, sensor.fields) }));
+            view.def.questions.forEach((q, i) => {
+                const a = (b.answers || [])[i];
+                if (a && a.trim()) part.appendChild(el('p', { className: 'inc-ans', textContent: (i + 1) + '. ' + q + '\n→ ' + a }));
+            });
+            box.appendChild(part);
+        });
     }
 
     // ---------- 7단계 화면: 카드를 보고서 순서의 단계로 나눠 담는다 (카드·id 는 그대로) ----------
@@ -256,7 +353,7 @@
         theory: ['theoryCard'],
         materials: ['materialsCard'],
         procedure: ['procedureCard'],
-        data: ['sensorCard', 'tableCard'],
+        data: ['shareCard', 'sensorCard', 'tableCard', 'incomingCard'],
         result: ['graphCard'],
         conclusion: ['questionCard', 'submitCard']
     };
@@ -285,7 +382,7 @@
             panel.appendChild(nav);
         });
         $('stepNav').hidden = false;
-        LabUI.initSteps({ key: 'custom-lab:' + expId, onShow: step => { if (step === 'result') refreshGraph(); } });
+        LabUI.initSteps({ key: 'custom-lab:' + expId, onShow: step => { curStep = step; if (share) share.stepChanged(); if (step === 'result') refreshGraph(); } });
     }
 
     // ---------- 센서 (실험 설정에서 센서 기능을 고른 경우) ----------
@@ -513,9 +610,11 @@
         });
     }
 
+    // 맞춤은 내 값 + 불러온 값 모두로 (조가 함께 잰 값을 한 그래프에)
     function currentFit() {
         const pts = M.pointsFromRows(view.rows, view.sel.x, view.sel.y);
-        return { pts, result: M.fit(pts, view.sel.fit) };
+        const ext = view.readOnly ? [] : M.pointsFromRows(extRows(), view.sel.x, view.sel.y);
+        return { pts, ext, result: M.fit(pts.concat(ext), view.sel.fit) };
     }
     function refreshGraph() {
         if (!view.def || view.def.columns.length < 2) return;
@@ -527,14 +626,15 @@
             const used = c === view.sel.x || c === view.sel.y;
             inp.classList.toggle('bad', used && inp.value.trim() !== '' && M.parseNumber(inp.value) === null);
         });
-        const { pts, result } = currentFit();
+        const { pts, ext, result } = currentFit();
+        const all = pts.concat(ext);
         let msg = '';
         if (view.sel.x === view.sel.y) msg = '가로축과 세로축에 서로 다른 열을 고르세요.';
-        else if (!pts.length) msg = '가로축·세로축 열에 숫자를 넣으면 그래프가 그려집니다.';
+        else if (!all.length) msg = '가로축·세로축 열에 숫자를 넣으면 그래프가 그려집니다.';
         const fitEl = $('fitResult');
         if (view.sel.fit === 'none') fitEl.textContent = '';
-        else if (result) fitEl.textContent = '맞춤 결과: ' + M.fitText(result, xc.name, yc.name);
-        else fitEl.textContent = pts.length < 2 ? '맞춤을 하려면 점이 2개 이상 필요합니다.' : '가로축 값이 모두 같아 맞춤을 할 수 없습니다.';
+        else if (result) fitEl.textContent = '맞춤 결과' + (ext.length ? ' (내 값 + 불러온 값)' : '') + ': ' + M.fitText(result, xc.name, yc.name);
+        else fitEl.textContent = all.length < 2 ? '맞춤을 하려면 점이 2개 이상 필요합니다.' : '가로축 값이 모두 같아 맞춤을 할 수 없습니다.';
 
         if (typeof Chart === 'undefined') {
             $('chartBox').hidden = true;
@@ -546,8 +646,9 @@
             label: '측정값', data: view.sel.x === view.sel.y ? [] : pts,
             backgroundColor: '#007BFF', pointRadius: 5, showLine: false
         }];
+        if (ext.length && view.sel.x !== view.sel.y) datasets.push({ label: '📥 불러온 값', data: ext, backgroundColor: '#F59F00', pointStyle: 'triangle', pointRadius: 6, showLine: false });
         if (result && view.sel.x !== view.sel.y) {
-            let x0 = Math.min.apply(null, pts.map(p => p.x)), x1 = Math.max.apply(null, pts.map(p => p.x));
+            let x0 = Math.min.apply(null, all.map(p => p.x)), x1 = Math.max.apply(null, all.map(p => p.x));
             if (result.kind === 'proportional') { x0 = Math.min(0, x0); x1 = Math.max(0, x1); }
             datasets.push({
                 label: '맞춤 직선',
@@ -580,16 +681,6 @@
         view.rows.forEach(r => { if (r.some(c => String(c).trim() !== '')) lines.push(r.join('\t')); });
         return lines.join('\n');
     }
-    function summaryText() {
-        const n = M.filledRowCount(view.rows);
-        const { result } = currentFit();
-        const cols = view.def.columns;
-        let s = '측정 ' + n + '행';
-        if (result) s += ' · ' + M.fitText(result, cols[view.sel.x].name, cols[view.sel.y].name);
-        if (sensor.series.t.length) s += ' · ' + M.seriesSummary(sensor.series, sensor.fields);
-        return s;
-    }
-
     function bindView() {
         const table = $('dataTable');
         table.addEventListener('input', e => {
@@ -671,59 +762,26 @@
         window.addEventListener('beforeunload', () => { if (loaded && mode === 'view') { clearTimeout(saveTimer); saveNow(); } });
     }
 
+    // 선생님께 보내기: 조 공유와 같은 길 (구글 로그인 없이 선생님 구글 시트로)
     async function submit() {
         const status = $('submitStatus');
-        if (!auth) { alert('제출 기능을 불러오지 못했습니다. 인터넷 연결을 확인하거나 CSV 저장·인쇄를 이용하세요.'); return; }
-        if (!user) { alert('먼저 구글 로그인을 하세요.'); signIn(); return; }
-        if (!view.student.id.trim() || !view.student.name.trim()) {
-            alert('학번과 이름을 넣으세요.');
-            $(view.student.id.trim() ? 'stName' : 'stId').focus();
-            return;
-        }
+        status.className = '';
+        if (!share) { alert('조 공유 기능을 불러오지 못했습니다. CSV 저장·인쇄로 내세요.'); return; }
         if (sensor.recording) { alert('센서 기록을 먼저 멈추세요.'); return; }
-        if (!M.filledRowCount(view.rows) && !sensor.series.t.length) {
-            alert(sensor.fields.length ? '표에 측정값을 넣거나 센서 값을 기록한 뒤 제출하세요.' : '측정값을 한 행 이상 넣으세요.');
+        if (!M.filledRowCount(view.rows) && !sensor.series.t.length && !view.answers.some(a => (a || '').trim())) {
+            alert(sensor.fields.length ? '표에 측정값을 넣거나 센서 값을 기록한 뒤 보내세요.' : '측정값을 한 행 이상 넣으세요.');
             return;
         }
         const emptyAnswers = view.def.questions.filter((_, i) => !(view.answers[i] || '').trim()).length;
-        if (emptyAnswers && !confirm('답을 쓰지 않은 질문이 ' + emptyAnswers + '개 있습니다. 그래도 제출할까요?')) return;
-        const btn = $('btnSubmit');
-        try {
-            btn.disabled = true; btn.textContent = '제출 중...';
-            const d = view.def;
-            // 센서 기록이 길면 제출용으로 고르게 솎아 낸다 (이 기기의 기록과 CSV 는 그대로)
-            const thin = M.thinSeries(sensor.series, M.MAX_SUBMIT_SERIES);
-            await db.collection('experiments').add({
-                userId: user.uid,
-                userEmail: user.email,
-                userName: user.displayName || '',
-                experimentName: d.title,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                tab: 'custom-lab',
-                customId: expId,
-                dataSummary: view.student.id.trim() + ' ' + view.student.name.trim() + ' · ' + summaryText(),
-                // 제출 시점의 실험 설정과 값을 그대로 담아, 나중에 실험을 고치거나 지워도 제출 내용을 볼 수 있게 한다
-                customJson: JSON.stringify({
-                    v: 1,
-                    def: { title: d.title, description: d.description, columns: d.columns, questions: d.questions, xCol: d.xCol, yCol: d.yCol, fit: d.fit, sensor: d.sensor, layout: d.layout, stepTexts: d.stepTexts },
-                    series: sensor.series.t.length ? thin.series : undefined,
-                    seriesThinned: thin.thinned ? sensor.series.t.length : undefined,
-                    rows: view.rows.filter(r => r.some(c => String(c).trim() !== '')),
-                    answers: view.answers, student: view.student, sel: view.sel
-                }),
-                // 현재 firestore.rules 가 요구하는 칸 (이 실험에서는 쓰지 않음)
-                weatherSample: {},
-                stargazingSample: []
-            });
+        if (emptyAnswers && !confirm('답을 쓰지 않은 질문이 ' + emptyAnswers + '개 있습니다. 그래도 보낼까요? (나중에 다시 보내면 고쳐 씁니다)')) return;
+        if (!share.group()) {
+            const card = document.getElementById('cs-share');
+            if (card) card.open = true;
+        }
+        const r = await share.send('#submitStatus');
+        if (r && r.ok) {
             view.submitted = new Date().toLocaleString('ko-KR');
             saveNow();
-            status.className = 'ok';
-            status.textContent = '✅ 제출했습니다 (' + view.submitted + '). 메인 페이지의 기록 목록에서 확인할 수 있습니다.';
-        } catch (e) {
-            status.className = 'error';
-            status.textContent = '❌ 제출 실패: ' + errorText(e);
-        } finally {
-            btn.disabled = false; btn.textContent = '📤 선생님께 제출';
         }
     }
 

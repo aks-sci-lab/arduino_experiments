@@ -37,11 +37,13 @@
         phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: false }
     };
     var CUSTOM_RE = /^custom:([A-Za-z0-9_-]{1,40})$/;
+    var CUSTOM_STEPS = Object.assign({ live: '한 화면' }, STEPS7);
     // 실험 정보 (선생님이 만든 실험 'custom:<id>' 도)
     function expInfo(exp) {
         if (EXPS[exp]) return EXPS[exp];
         var m = CUSTOM_RE.exec(String(exp || ''));
-        if (m) return { name: '선생님이 만든 실험 (' + m[1] + ')', icon: '👩‍🏫', page: 'projects/custom-lab.html?id=' + m[1], steps: STEPS7, ready: false, custom: true };
+        // 한 화면 방식이면 단계 'live', 7단계 방식이면 STEPS7 (js/custom-lab.js)
+        if (m) return { name: '선생님이 만든 실험 (' + m[1] + ')', icon: '👩‍🏫', page: 'projects/custom-lab.html?id=' + m[1], steps: CUSTOM_STEPS, ready: true, custom: true };
         return null;
     }
     function isExp(exp) { return !!expInfo(exp); }
