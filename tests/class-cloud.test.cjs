@@ -161,3 +161,24 @@ test('요청 도우미: 주소 없음·로그인 화면·열쇠는 POST 본문�
     const boom = async () => { throw new Error('Failed to fetch'); };
     assert.equal((await CC.heartbeat('https://s/exec', { classCode: '2-4821', jo: 1, num: 1 }, boom)).network, true);
 });
+
+test('서버 판 비교: 손으로(5판 전) · 단추로 업데이트 · 최신(되돌리기만)', () => {
+    assert.deepEqual(CC.updatePlan({ version: 4 }, { version: 5 }), { show: true, kind: 'manual', from: 4, to: 5, canRollback: false });
+    assert.deepEqual(CC.updatePlan({ version: 5, canRollback: false }, { version: 6 }), { show: true, kind: 'update', from: 5, to: 6, canRollback: false });
+    assert.deepEqual(CC.updatePlan({ version: 6, canRollback: true }, { version: 6 }), { show: true, kind: 'latest', from: 6, to: 6, canRollback: true });
+    assert.equal(CC.updatePlan({ version: 6 }, { version: 6 }).show, false);
+    assert.equal(CC.updatePlan({ version: 6 }, null).show, false);
+    assert.equal(CC.updatePlan({ version: 7 }, { version: 6 }).show, false, '시트가 사이트보다 새로우면 띄우지 않음');
+});
+
+test('요청 도우미: 업데이트·되돌리기도 관리 열쇠를 POST 본문으로', async () => {
+    let seen = null;
+    const fake = async (url, init) => { seen = { url, init }; return { text: async () => '{"ok":true,"to":6}' }; };
+    assert.equal((await CC.update('https://s/exec', 'k123', fake)).to, 6);
+    assert.deepEqual(JSON.parse(seen.init.body), { action: 'update', key: 'k123' });
+    assert.ok(!seen.url.includes('k123'));
+    await CC.rollback('https://s/exec', 'k123', fake);
+    assert.deepEqual(JSON.parse(seen.init.body), { action: 'rollback', key: 'k123' });
+    await CC.claimAdmin('https://s/exec', fake);
+    assert.deepEqual(JSON.parse(seen.init.body), { action: 'claimAdmin' });
+});

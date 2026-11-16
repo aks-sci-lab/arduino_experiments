@@ -13,6 +13,7 @@
 
     var CLASS_RE = /^\d{1,2}-\d{4}$/;
     var MIN_VERSION = 4;           // 수업 연결을 쓰려면 Apps Script 가 4판 이상
+    var UPDATE_VERSION = 5;        // 이 판부터 교사 화면의 단추로 서버가 스스로 업데이트
     var IDLE_MS = 5 * 60 * 1000;   // 이만큼 신호가 없으면 '쉬는 중'
 
     // 실험별 페이지와 단계 이름
@@ -141,9 +142,22 @@
         }, fetchImpl, 15000);
     }
     function classStatus(url, classCode, key, fetchImpl) { return post(url, { action: 'classStatus', 'class': classCode, key: key }, fetchImpl, 20000); }
+    // 스스로 업데이트 (5판): 관리 열쇠도 POST 본문으로만
+    function claimAdmin(url, fetchImpl) { return post(url, { action: 'claimAdmin' }, fetchImpl); }
+    function update(url, key, fetchImpl) { return post(url, { action: 'update', key: key }, fetchImpl, 120000); }
+    function rollback(url, key, fetchImpl) { return post(url, { action: 'rollback', key: key }, fetchImpl, 60000); }
+    /* 서버 판(ping) 과 사이트 공식 판(release.json) 비교 → 교사 화면에 보일 것
+       돌려주는 값: { show, kind: 'manual'|'update'|'latest', from, to, canRollback } */
+    function updatePlan(ping, release) {
+        var from = Number(ping && ping.version) || 0, to = Number(release && release.version) || 0;
+        var canRollback = !!(ping && ping.canRollback) && from >= UPDATE_VERSION;
+        if (!from || !to || to <= from) return { show: canRollback, kind: 'latest', from: from, to: to, canRollback: canRollback };
+        return { show: true, kind: from >= UPDATE_VERSION ? 'update' : 'manual', from: from, to: to, canRollback: canRollback };
+    }
 
     return {
-        CLASS_RE: CLASS_RE, MIN_VERSION: MIN_VERSION, IDLE_MS: IDLE_MS, EXPS: EXPS,
+        CLASS_RE: CLASS_RE, MIN_VERSION: MIN_VERSION, UPDATE_VERSION: UPDATE_VERSION, IDLE_MS: IDLE_MS, EXPS: EXPS,
+        claimAdmin: claimAdmin, update: update, rollback: rollback, updatePlan: updatePlan,
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
         studentState: studentState, agoText: agoText, stepName: stepName, summarize: summarize,

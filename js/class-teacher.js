@@ -40,7 +40,8 @@
         var v = Number(r.version) || 0;
         if (v < CC.MIN_VERSION) {
             msg.className = 'note err';
-            msg.innerHTML = '⚠️ 연결은 되지만 이 시트의 코드가 <b>' + v + '판</b>이에요. 수업 연결은 ' + CC.MIN_VERSION + '판이 필요해요: <a href="pendulum-setup.html">설정 화면</a>에서 새 코드를 복사해 붙여 넣고, 배포 관리 → 연필 → 버전 <b>새 버전</b> → 배포 하세요.';
+            msg.innerHTML = '⚠️ 연결은 되지만 이 시트의 코드가 <b>' + v + '판</b>이에요. 수업 연결은 ' + CC.MIN_VERSION + '판이 필요해요: 위 <b>손으로 업데이트하는 법</b>대로 새 코드를 붙여 넣고 새 버전으로 배포하세요.';
+            checkVersion(r);
             return false;
         }
         if (remember && id) {
@@ -49,6 +50,7 @@
         }
         msg.className = 'note'; msg.textContent = '✅ 연결됨 (' + v + '판)' + (remember ? ' · 이 브라우저가 기억해요. 진자·플랑크 노트북 화면도 이 시트를 써요.' : '');
         renderSheet();
+        checkVersion(r);
         return true;
     }
     $('btnConnect').addEventListener('click', function () {
@@ -57,6 +59,107 @@
         testSheet(PC.urlFromScriptId(id), id, true);
     });
     $('btnTestNow').addEventListener('click', function () { testSheet(server.url, server.id, false); });
+
+    // ---------- 서버 판 확인 · 스스로 업데이트 (5판부터) ----------
+    // 사이트의 apps-script/release.json(공식 판) 과 시트의 판(ping)을 비교한다. 관리 열쇠는 이 브라우저에 시트마다 저장
+    var ADMIN_KEY = 'class-teacher:admin:v1';
+    function adminMap() { try { var o = JSON.parse((STORE && STORE.getItem(ADMIN_KEY)) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+    function adminKeyOf(url) { return adminMap()[url] || ''; }
+    function setAdminKey(url, key) { var m = adminMap(); m[url] = key; try { STORE.setItem(ADMIN_KEY, JSON.stringify(m)); } catch (e) { /* 저장 불가 */ } }
+    var siteRelease = null;
+    async function loadRelease() {
+        if (siteRelease) return siteRelease;
+        try { var res = await fetch('../apps-script/release.json?_=' + Date.now(), { cache: 'no-store' }); if (res.ok) siteRelease = await res.json(); } catch (e) { siteRelease = null; }
+        return siteRelease;
+    }
+    function renderAdmin() {
+        var k = server.url && adminKeyOf(server.url);
+        $('adminBox').hidden = !k; $('adminKey').textContent = k || '';
+    }
+    async function checkVersion(ping) {
+        var url = server.url;
+        if (!url) return;
+        // 5판인데 관리 열쇠가 아직 없으면 지금 만든다 (처음 연결한 선생님 화면이 갖는다)
+        if (Number(ping.version) >= CC.UPDATE_VERSION && !ping.admin && !adminKeyOf(url)) {
+            var c = await CC.claimAdmin(url);
+            if (c.ok) { setAdminKey(url, c.key); ping.admin = true; }
+        }
+        renderAdmin();
+        var rel = await loadRelease();
+        var plan = CC.updatePlan(ping, rel), box = $('updBox');
+        box.hidden = !plan.show;
+        if (!plan.show) return;
+        box.classList.toggle('warn', plan.kind === 'manual');
+        $('updMsg').textContent = '';
+        var needKey = plan.kind === 'update' || plan.canRollback;
+        $('updKeyRow').hidden = !needKey || !!adminKeyOf(url);
+        $('btnUpdate').hidden = plan.kind !== 'update';
+        $('btnRollback').hidden = !plan.canRollback;
+        if (ping.prevServer) $('btnRollback').textContent = '↩ ' + ping.prevServer + '판으로 되돌리기';
+        $('updManual').open = plan.kind === 'manual';
+        if (plan.kind === 'update') {
+            $('updTitle').textContent = '🆕 새 서버 버전이 있어요 (' + plan.from + '판 → ' + plan.to + '판)';
+            $('updText').textContent = '단추를 누르면 선생님 시트의 스크립트가 사이트의 공식 코드를 받아 스스로 바뀌어요. 웹 앱 주소·학생 링크·시트의 기록은 그대로예요. (30초쯤 걸려요)';
+        } else if (plan.kind === 'manual') {
+            $('updTitle').textContent = '🛠 서버를 ' + plan.to + '판으로 바꿔 주세요 (지금 ' + plan.from + '판)';
+            $('updText').textContent = CC.UPDATE_VERSION + '판부터는 단추 하나로 스스로 업데이트돼요. 그 전에 한 번만 아래 순서대로 손으로 바꿔 주세요.';
+        } else {
+            $('updTitle').textContent = '✅ 서버가 최신이에요 (' + plan.from + '판)';
+            $('updText').textContent = '업데이트 뒤 문제가 있으면 이전 판으로 되돌릴 수 있어요.';
+        }
+    }
+    function currentAdminKey() {
+        var k = adminKeyOf(server.url) || $('updKey').value.trim();
+        if (k && !adminKeyOf(server.url)) setAdminKey(server.url, k);
+        return k;
+    }
+    async function afterChange(expect) {
+        // 배포가 바뀐 뒤 몇 번 다시 확인 (구글 쪽 반영에 몇 초 걸릴 수 있음)
+        for (var i = 0; i < 4; i++) {
+            await new Promise(function (r) { setTimeout(r, i ? 3000 : 1500); });
+            var p = await CC.ping(server.url);
+            if (p.ok && (expect == null || Number(p.version) === expect)) return p;
+        }
+        return CC.ping(server.url);
+    }
+    async function runServerChange(kind) {
+        var key = currentAdminKey(), msg = $('updMsg');
+        if (!key) { msg.className = 'note err'; msg.textContent = '관리 열쇠를 넣어 주세요 (처음 시트를 연결한 컴퓨터의 ① 시트 연결 → 🔑 관리 열쇠).'; $('updKeyRow').hidden = false; return; }
+        if (kind === 'rollback' && !confirm('서버를 이전 판으로 되돌릴까요? 시트의 기록은 그대로예요.')) return;
+        $('btnUpdate').disabled = $('btnRollback').disabled = true;
+        msg.className = 'note'; msg.textContent = kind === 'update' ? '⏳ 업데이트 중… 새 코드 받기 → 확인 → 바꾸기 → 새 버전으로 배포 (창을 닫지 마세요)' : '⏳ 되돌리는 중…';
+        var r = kind === 'update' ? await CC.update(server.url, key) : await CC.rollback(server.url, key);
+        if (!r.ok) {
+            $('btnUpdate').disabled = $('btnRollback').disabled = false;
+            msg.className = 'note err';
+            msg.textContent = '⚠️ ' + r.error + (/관리 열쇠가 맞지/.test(r.error) ? '' : ' — 안 되면 아래 "손으로 업데이트하는 법"을 따라 하세요.');
+            if (/관리 열쇠가 맞지/.test(r.error)) { var m = adminMap(); delete m[server.url]; try { STORE.setItem(ADMIN_KEY, JSON.stringify(m)); } catch (e) { /* 무시 */ } $('updKeyRow').hidden = false; renderAdmin(); }
+            return;
+        }
+        msg.textContent = '⏳ 바뀐 판을 확인하는 중…';
+        var p = await afterChange(kind === 'update' ? r.to : null);
+        $('btnUpdate').disabled = $('btnRollback').disabled = false;
+        if (p.ok) {
+            await checkVersion(p);
+            $('updBox').hidden = false;
+            msg.className = 'note';
+            msg.textContent = '✅ ' + (kind === 'update' ? r.to + '판으로 바뀌었어요.' : '이전 판(' + p.version + '판)으로 되돌렸어요.') + ' 학생 화면은 새로고침하면 바뀐 판을 써요.';
+        } else { msg.className = 'note err'; msg.textContent = '⚠️ 바꾼 뒤 연결 확인이 안 돼요: ' + p.error; }
+    }
+    $('btnUpdate').addEventListener('click', function () { runServerChange('update'); });
+    $('btnRollback').addEventListener('click', function () { runServerChange('rollback'); });
+    function copyFile(btn, path, label) {
+        btn.addEventListener('click', async function () {
+            try {
+                var res = await fetch(path + '?_=' + Date.now(), { cache: 'no-store' });
+                if (!res.ok) throw new Error(res.status);
+                await navigator.clipboard.writeText(await res.text());
+                $('copyCodeMsg').textContent = '✅ ' + label + ' 을 복사했어요. Apps Script 편집기에 붙여 넣으세요.';
+            } catch (e) { $('copyCodeMsg').innerHTML = '복사하지 못했어요. <a href="' + path + '" target="_blank" rel="noopener">' + label + ' 열기</a>에서 모두 선택(Ctrl+A)해 복사하세요.'; }
+        });
+    }
+    copyFile($('btnCopyCode'), '../apps-script/Code.gs', 'Code.gs');
+    copyFile($('btnCopyManifest'), '../apps-script/appsscript.json', 'appsscript.json');
 
     // ---------- ② 수업 만들기 ----------
     function inputs() { return { ban: Number($('inBan').value), nStudents: Number($('inN').value), groupSize: Number($('inSize').value), exp: $('inExp').value }; }
@@ -229,6 +332,8 @@
     $('btnCloseDetail').addEventListener('click', function () { state.detail = null; $('detail').hidden = true; });
     document.addEventListener('visibilitychange', function () { if (!document.hidden && tabs.current() === 'watch') refresh(); });
 
-    renderSheet(); renderPreview(); renderList(); renderWatchSel();
+    renderSheet(); renderPreview(); renderList(); renderWatchSel(); renderAdmin();
+    // 열 때 한 번: 시트의 판을 조용히 확인해 업데이트가 있으면 띠를 보여 준다
+    if (server.url) CC.ping(server.url).then(function (p) { if (p.ok) checkVersion(p); });
     if (state.classes[0]) showClass(state.classes[0]);
 })();

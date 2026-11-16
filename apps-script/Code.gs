@@ -2,9 +2,11 @@
  * 스마트폰 진자 실험 — 선생님 구글 시트에 붙이는 Apps Script (센서 기반 실험실)
  *
  * 설치(1번만): 구글 시트 → 확장 프로그램 → Apps Script → 이 내용을 통째로 붙여 넣고 저장
- *   → 배포 → 새 배포 → 유형 '웹 앱' → 실행: 나 / 액세스: 모든 사용자 → 배포 → 웹 앱 주소 복사
- *   → 사이트의 js/pendulum-config.js 에 그 주소를 넣는다.
+ *   → (5판부터) ⚙ 프로젝트 설정 → "appsscript.json 매니페스트 파일을 편집기에 표시" 켜기 → appsscript.json 에 사이트의 같은 파일 붙여 넣기
+ *   → https://script.google.com/home/usersettings 에서 'Google Apps Script API' 켜기 (스스로 업데이트에 필요)
+ *   → 배포 → 새 배포 → 유형 '웹 앱' → 실행: 나 / 액세스: 모든 사용자 → 배포 → 권한 허용 → 웹 앱 주소 복사
  *   자세한 안내: https://aks-sci-lab.web.app/projects/pendulum-setup.html
+ *   5판부터는 교사 화면(projects/class-teacher.html)의 '🔄 업데이트' 단추로 이 코드가 사이트의 공식 새 코드로 스스로 바뀐다.
  *
  * 하는 일
  *   POST (본문은 JSON 글자, Content-Type: text/plain → 브라우저가 미리보기 요청을 보내지 않음)
@@ -24,11 +26,24 @@
  *   POST { action: 'classStatus', class, key }                    → 모든 학생 진행 + 조별 제출 요약 (열쇠가 맞을 때만)
  *   교사 열쇠는 시트에 SHA-256 해시만 저장한다. 열쇠는 주소(쿼리)에 넣지 않고 POST 본문으로만 받는다.
  *
+ *   스스로 업데이트(5판부터): 관리 열쇠(시트 하나에 하나, 해시만 스크립트 속성에)가 있어야 한다
+ *   GET  ?action=ping                         → { version, admin: 관리 열쇠가 있는지, canRollback }
+ *   POST { action: 'claimAdmin' }             → 관리 열쇠가 아직 없을 때만 새로 만들어 한 번 보여 줌
+ *   POST { action: 'update', key }            → 고정된 사이트 주소(SITE)의 release.json·Code.gs·appsscript.json 을 받아
+ *                                               해시·판 번호·크기를 확인 → Apps Script API 로 이 프로젝트 내용 바꾸기 → 새 버전 → 같은 배포를 새 버전으로
+ *   POST { action: 'rollback', key }          → 업데이트 전 배포 버전으로 되돌리기
+ *   데이터 시트는 건드리지 않는다. 받을 주소는 요청 값으로 바꿀 수 없다.
+ *
  * 개인정보: 학생 이름·학번·이메일은 받지도 저장하지도 않는다. 조 코드로만 구분한다.
  * 4단계(보고서·AI)용 시트 reports·ai_logs·quiz 는 만들어 두기만 한다.
  */
 
-var VERSION = 4;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)
+var VERSION = 5;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠
+// 스스로 업데이트: 코드는 이 고정 주소에서만 받는다 (요청 값으로 바꿀 수 없음)
+var SITE = 'https://aks-sci-lab.web.app/apps-script/';
+var SCRIPT_API = 'https://script.googleapis.com/v1/projects/';
+var UPDATE_MAX_CODE = 400000, UPDATE_MAX_MANIFEST = 20000;
+var PROP_ADMIN = 'ADMIN_KEY_HASH', PROP_PREV = 'PREV_DEPLOY_VERSION', PROP_PREV_SERVER = 'PREV_SERVER_VERSION';
 var GROUP_RE = /^\d{1,2}-\d{1,2}-\d{4}$/;      // 반-조-4자리 숫자 (예: 2-3-4821)
 var ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
 var MAX_BODY = 400000;                            // 보내는 글자 수 한도
@@ -60,7 +75,7 @@ var PLANCK_POINTS = 500;                          // LED 하나·기준 하나�
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping') return json({ ok: true, version: VERSION });
+    if (p.action === 'ping') return json(pingInfo());
     if (p.action === 'joinInfo') return json(joinInfo(p['class']));
     var group = cleanGroup(p.group);
     if (p.exp === 'planck') {
@@ -85,6 +100,9 @@ function doPost(e) {
     if (bodyText.length > MAX_BODY) throw new Error('보낸 내용이 너무 큽니다.');
     var body = JSON.parse(bodyText);
     if (body.action === 'save' && body.exp === 'planck') return json(savePlanck(body));
+    if (body.action === 'claimAdmin') return json(claimAdmin());
+    if (body.action === 'update') return json(selfUpdate(body));
+    if (body.action === 'rollback') return json(rollback(body));
     if (body.action === 'createClass') return json(createClass(body));
     if (body.action === 'heartbeat') return json(heartbeat(body));
     if (body.action === 'classStatus') return json(classStatus(body));
@@ -467,4 +485,138 @@ function classStatus(b) {
   out.students = students;
   out.submissions = cls.groups.map(function (g) { return subs[g.code]; });
   return out;
+}
+
+// ---------- 스스로 업데이트 (5판) ----------
+// 관리 열쇠: 시트(스크립트) 하나에 하나. 처음 연결한 교사 화면이 만들고, 해시만 스크립트 속성에 둔다.
+// 열쇠를 잃어버리면: Apps Script 편집기 ⚙ 프로젝트 설정 → 스크립트 속성에서 ADMIN_KEY_HASH 를 지우고 교사 화면에서 다시 연결
+function props() { return PropertiesService.getScriptProperties(); }
+function pingInfo() {
+  var p = props();
+  return { ok: true, version: VERSION, admin: !!p.getProperty(PROP_ADMIN), canRollback: !!p.getProperty(PROP_PREV),
+    prevServer: p.getProperty(PROP_PREV_SERVER) ? Number(p.getProperty(PROP_PREV_SERVER)) : null };
+}
+function claimAdmin() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    if (props().getProperty(PROP_ADMIN)) throw new Error('이 시트에는 이미 관리 열쇠가 있습니다. 처음 연결한 컴퓨터의 교사 화면에서 열쇠를 확인하세요.');
+    var key = Utilities.getUuid().replace(/-/g, '').slice(0, 16);
+    props().setProperty(PROP_ADMIN, hashKey(key));
+    return { ok: true, key: key };
+  } finally {
+    lock.releaseLock();
+  }
+}
+function requireAdmin(b) {
+  var h = props().getProperty(PROP_ADMIN);
+  if (!h) throw new Error('관리 열쇠가 아직 없습니다. 교사 화면에서 시트를 다시 연결하세요.');
+  if (!b || !b.key || hashKey(String(b.key)) !== h) throw new Error('관리 열쇠가 맞지 않습니다.');
+}
+function hexOf(bytes) { return bytes.map(function (b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join(''); }
+// 고정된 사이트 주소에서 파일 받기 (이름은 정해 둔 것만)
+function siteFile(name, max) {
+  if (['release.json', 'Code.gs', 'appsscript.json'].indexOf(name) < 0) throw new Error('받을 수 없는 파일입니다.');
+  var res = UrlFetchApp.fetch(SITE + name + '?_=' + Date.now(), { muteHttpExceptions: true, followRedirects: true });
+  if (res.getResponseCode() !== 200) throw new Error('사이트에서 ' + name + ' 을 받지 못했습니다 (' + res.getResponseCode() + ').');
+  var bytes = res.getContent();
+  if (bytes.length > max) throw new Error(name + ' 이 너무 큽니다.');
+  return { bytes: bytes, text: res.getContentText('UTF-8'), sha256: hexOf(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes)) };
+}
+// Apps Script API 부르기 (선생님 권한의 토큰). 자주 나는 오류는 쉬운 말로
+function scriptApi(method, path, payload) {
+  var opt = { method: method, muteHttpExceptions: true, contentType: 'application/json', headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() } };
+  if (payload) opt.payload = JSON.stringify(payload);
+  var res = UrlFetchApp.fetch(SCRIPT_API + ScriptApp.getScriptId() + path, opt);
+  var code = res.getResponseCode(), body = {};
+  try { body = JSON.parse(res.getContentText() || '{}'); } catch (err) { body = {}; }
+  if (code >= 200 && code < 300) return body;
+  var msg = String((body.error && body.error.message) || '');
+  if (code === 403 && /Apps Script API|has not been used|is disabled|SERVICE_DISABLED|User has not enabled/i.test(msg))
+    throw new Error('Apps Script API 가 꺼져 있습니다. https://script.google.com/home/usersettings 에서 "Google Apps Script API" 를 켠 뒤 다시 누르세요.');
+  if (code === 401 || code === 403)
+    throw new Error('업데이트 권한이 없습니다. 5판 코드와 appsscript.json 을 손으로 한 번 붙여 넣고 배포할 때 권한을 허용했는지 확인하세요. 학교(Workspace) 계정에서 막혀 있으면 손으로 붙여 넣는 방법을 쓰세요. (' + code + ')');
+  throw new Error('Apps Script API 오류 ' + code + (msg ? ': ' + msg : ''));
+}
+// 이 웹 앱의 배포 번호: 웹 앱 주소 …/macros/s/<배포 ID>/exec
+function deploymentId() {
+  var url = String(ScriptApp.getService().getUrl() || '');
+  var m = /\/s\/([A-Za-z0-9_-]+)\/(?:exec|dev)/.exec(url);
+  if (m && !/\/dev/.test(url)) return m[1];
+  var list = scriptApi('get', '/deployments').deployments || [];
+  var web = list.filter(function (d) { return (d.entryPoints || []).some(function (e) { return e.entryPointType === 'WEB_APP'; }) && d.deploymentConfig && d.deploymentConfig.versionNumber; });
+  if (web.length === 1) return web[0].deploymentId;
+  throw new Error('웹 앱 배포를 찾지 못했습니다. 손으로 업데이트하세요.');
+}
+function scopesOf(manifestText) {
+  try { var m = JSON.parse(manifestText); return Array.isArray(m.oauthScopes) ? m.oauthScopes : null; } catch (err) { return null; }
+}
+function selfUpdate(b) {
+  requireAdmin(b);
+  var rel;
+  try { rel = JSON.parse(siteFile('release.json', 5000).text); } catch (err) { throw new Error(String(err.message || err).indexOf('받지 못했') >= 0 ? err.message : '사이트의 release.json 을 읽지 못했습니다.'); }
+  var to = Number(rel.version);
+  if (!(to % 1 === 0 && to > VERSION)) throw new Error('이미 최신입니다 (지금 ' + VERSION + '판, 사이트 ' + rel.version + '판).');
+  var code = siteFile('Code.gs', UPDATE_MAX_CODE), man = siteFile('appsscript.json', UPDATE_MAX_MANIFEST);
+  if (!rel.files || !rel.files.Code || !rel.files.appsscript || code.sha256 !== rel.files.Code.sha256 || man.sha256 !== rel.files.appsscript.sha256)
+    throw new Error('받은 코드의 확인 값(SHA-256)이 맞지 않습니다. 사이트가 배포 중일 수 있으니 잠시 뒤 다시 누르세요.');
+  if (!new RegExp('\\bvar VERSION = ' + to + ';').test(code.text)) throw new Error('받은 코드의 판 번호가 release.json 과 다릅니다.');
+  var newScopes = scopesOf(man.text);
+  if (!newScopes) throw new Error('받은 appsscript.json 형식이 올바르지 않습니다.');
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var content = scriptApi('get', '/content');
+    var files = content.files || [];
+    var oldMan = files.filter(function (f) { return f.name === 'appsscript' && f.type === 'JSON'; })[0];
+    var oldScopes = oldMan ? scopesOf(oldMan.source) : null;
+    // 새 권한(scope)이 늘면 자동으로 바꾸지 않는다: 배포는 선생님이 허용한 권한으로만 돌아가므로
+    if (!oldScopes) throw new Error('지금 프로젝트에 appsscript.json(권한 목록)이 없습니다. 5판을 손으로 붙여 넣을 때 매니페스트도 붙여 넣으세요.');
+    var added = newScopes.filter(function (s) { return oldScopes.indexOf(s) < 0; });
+    if (added.length) throw new Error('새 판은 새 권한이 필요해 자동으로 바꿀 수 없습니다. 이번 한 번은 손으로 붙여 넣고 배포해 권한을 허용하세요. (' + added.join(', ') + ')');
+    // 서버 코드 파일: 'function doGet' 과 'var VERSION' 이 든 SERVER_JS (선생님이 이름을 바꿨어도 그 파일을 바꾼다)
+    var server = files.filter(function (f) { return f.type === 'SERVER_JS' && /function doGet/.test(f.source) && /var VERSION = /.test(f.source); });
+    if (server.length !== 1) throw new Error('바꿀 서버 코드 파일을 하나로 찾지 못했습니다. 손으로 업데이트하세요.');
+    var next = files.map(function (f) {
+      if (f === server[0]) return { name: f.name, type: 'SERVER_JS', source: code.text };
+      if (f === oldMan) return { name: 'appsscript', type: 'JSON', source: man.text };
+      return { name: f.name, type: f.type, source: f.source };
+    });
+    var dep = deploymentId();
+    var cur = scriptApi('get', '/deployments/' + dep);
+    var prevNo = cur.deploymentConfig && cur.deploymentConfig.versionNumber;
+    scriptApi('put', '/content', { scriptId: ScriptApp.getScriptId(), files: next });
+    var ver = scriptApi('post', '/versions', { description: '센서 기반 실험실 서버 ' + to + '판 (자동 업데이트, ' + VERSION + '판에서)' });
+    scriptApi('put', '/deployments/' + dep, { deploymentConfig: {
+      scriptId: ScriptApp.getScriptId(), versionNumber: ver.versionNumber, manifestFileName: 'appsscript',
+      description: '센서 기반 실험실 서버 ' + to + '판'
+    } });
+    if (prevNo) { props().setProperty(PROP_PREV, String(prevNo)); props().setProperty(PROP_PREV_SERVER, String(VERSION)); }
+    return { ok: true, from: VERSION, to: to, versionNumber: ver.versionNumber, previousVersionNumber: prevNo || null };
+  } finally {
+    lock.releaseLock();
+  }
+}
+function rollback(b) {
+  requireAdmin(b);
+  var prev = Number(props().getProperty(PROP_PREV));
+  if (!(prev > 0)) throw new Error('되돌릴 이전 버전이 없습니다.');
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var dep = deploymentId();
+    var cur = scriptApi('get', '/deployments/' + dep);
+    var curNo = cur.deploymentConfig && cur.deploymentConfig.versionNumber;
+    scriptApi('put', '/deployments/' + dep, { deploymentConfig: {
+      scriptId: ScriptApp.getScriptId(), versionNumber: prev, manifestFileName: 'appsscript',
+      description: '센서 기반 실험실 서버 ' + (props().getProperty(PROP_PREV_SERVER) || '') + '판으로 되돌림'
+    } });
+    // 한 번 더 누르면 다시 앞으로 (되돌리기를 되돌리기)
+    if (curNo) props().setProperty(PROP_PREV, String(curNo));
+    props().setProperty(PROP_PREV_SERVER, String(VERSION));
+    return { ok: true, versionNumber: prev };
+  } finally {
+    lock.releaseLock();
+  }
 }
