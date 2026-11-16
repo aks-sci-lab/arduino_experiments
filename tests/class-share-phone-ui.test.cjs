@@ -20,13 +20,14 @@ const HARNESS = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><met
 <button id="save" class="cs-btn good">💾 측정 저장</button><p id="role"></p><pre id="got"></pre>
 <script src="../js/pendulum-config.js"></script><script src="../js/pendulum-cloud.js"></script><script src="../js/class-cloud.js"></script><script src="../js/class-share.js"></script>
 <script>
-window.mine = []; window.got = {}; window.phoneNotes = 0;
-window.share = ClassShare.init({ exp: 'phoneaccel', barMount: '#bar', shareMount: '#sh', phone: true,
+window.mine = JSON.parse(localStorage.getItem('mine' + location.search.includes('role=phone')) || '[]'); window.got = {}; window.phoneNotes = 0;
+window.share = ClassShare.init({ exp: 'phoneaccel', barMount: '#bar', shareMount: '#sh', phone: true, autoSendOnSave: /auto=1/.test(location.search),
+  deleteItem: id => { mine = mine.filter(x => x.id !== id); },
   getItems: () => mine, getStep: () => 'live', getPoints: () => mine.length,
   onRole: r => { document.getElementById('role').textContent = 'role=' + r; },
   onPhoneData: n => { phoneNotes += n; },
   onIncoming: items => { const b = JSON.stringify(got); items.forEach(it => { got[it.from + '/' + it.id] = it.data; }); document.getElementById('got').textContent = JSON.stringify(got); return JSON.stringify(got) !== b; } });
-document.getElementById('save').onclick = () => { mine.push({ id: 'run' + (mine.length + 1), title: (mine.length + 1) + '회', n: 50, summary: { '최대 a (m/s²)': 12.3 }, data: { t: [0, 1], a: [9.8, 12.3] } }); share.saved(); };
+document.getElementById('save').onclick = () => { const k = mine.reduce((m, x) => Math.max(m, +x.id.slice(3)), 0) + 1; mine.push({ id: 'run' + k, title: k + '회', n: 50, summary: { '최대 a (m/s²)': 12.3 }, data: { t: [0, 1], a: [9.8, 12.3] } }); localStorage.setItem('mine' + location.search.includes('role=phone'), JSON.stringify(mine)); share.saved(); };
 </script></body></html>`;
 const stat = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
@@ -63,22 +64,60 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   assert.equal(await P.textContent('#role'), 'role=phone'); assert.equal(await L.textContent('#role'), 'role=laptop');
   assert.equal(await P.evaluate(() => document.getElementById('cs-share').open), false);
   console.log('P role:', await P.textContent('#role'), '| strip:', (await P.textContent('.cs-phone')).replace(/\s+/g, ' '), '| share open:', await P.evaluate(() => document.getElementById('cs-share').open));
-  await P.click('#save');
+  // 3회 측정 → 목록에 쌓임 (바로 보내지 않음) → 2회 빼고 1·3회만 보내기
+  for (let i = 0; i < 3; i++) await P.click('#save');
+  assert.equal(await P.locator('.cs-run').count(), 3);
+  assert.match(await P.textContent('#cs-rsend'), /3개/);
+  await P.reload();   // 새로고침해도 남음
+  assert.equal(await P.locator('.cs-run').count(), 3);
+  await P.locator('.cs-run input[type=checkbox][data-id=run2]').uncheck();
+  await P.locator('.cs-memo[data-id=run3]').fill('손에 들고'); await P.locator('.cs-memo[data-id=run3]').press('Enter');
+  await P.locator('.cs-memo[data-id=run3]').blur();
+  assert.match(await P.textContent('#cs-rsend'), /2개/);
+  await check(P, 'P(Pixel7) 회차 3개');
+  await P.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + '/phone-runs.png' : '/dev/null' }).catch(() => {});
+  await P.click('#cs-rsend');
   await P.waitForFunction(() => /보냈|못했/.test(document.getElementById('cs-pmsg').textContent));
-  console.log('P sent:', await P.textContent('#cs-pmsg'));
-  await check(P, 'P(Pixel7)');
-  await L.waitForFunction(() => document.getElementById('got').textContent.includes('📱 폰'), null, { timeout: 15000 });
+  console.log('P sent:', await P.textContent('#cs-pmsg'), '| states:', await P.locator('.cs-rst').allTextContents());
+  assert.deepEqual(await P.locator('.cs-rst').allTextContents(), ['✅ 보냄', '보내기 전', '✅ 보냄']);
+  await L.waitForFunction(() => document.getElementById('got').textContent.includes('run3'), null, { timeout: 15000 });
   await L.waitForTimeout(300);
-  assert.match(await L.textContent('#got'), /📱 폰 .+\/run1/);
-  console.log('L got:', await L.textContent('#got'), '| dialog note:', await L.textContent('.cs-dlg .cs-note'));
-  await P.click('#save');
+  const g1 = JSON.parse(await L.textContent('#got'));
+  assert.deepEqual(Object.keys(g1).map(k => k.split('/')[1]).sort(), ['run1', 'run3']);
+  assert.ok(Object.keys(g1).every(k => /^📱 폰 /.test(k)));
+  const rows = app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' }).items;
+  assert.equal(rows.length, 2); assert.ok(rows.some(r => /3회 · 손에 들고/.test(r.title)));
+  console.log('L got 2 rows:', Object.keys(g1), '| titles', rows.map(r => r.title), '| dialog note:', await L.textContent('.cs-dlg .cs-note'));
+  // 2회를 마저 보내면 '새 측정 1개' (이미 보낸 것은 세지 않음)
+  await P.locator('.cs-run input[type=checkbox][data-id=run2]').check();
+  await P.click('#cs-rsend');
   await L.waitForFunction(() => phoneNotes >= 1 && document.getElementById('got').textContent.includes('run2'), null, { timeout: 15000 });
   assert.match(await L.textContent('#cs-status'), /폰에서 새 측정 1개/);
-  console.log('L status after 2nd:', await L.textContent('#cs-status'), '| phoneNotes', await L.evaluate(() => phoneNotes));
+  console.log('L status after run2:', await L.textContent('#cs-status'));
+  // 보낸 회차 지우기 → 시트에서도 빠짐
+  P.once('dialog', d => d.accept());
+  await P.click('[data-del=run1]');
+  await P.waitForFunction(() => document.querySelectorAll('.cs-run').length === 2);
+  await new Promise(r => setTimeout(r, 1500));
+  const after = app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' }).items.filter(r => Number(r.n) > 0);
+  assert.deepEqual(after.map(r => r.id.split('-').pop()).sort(), ['run2', 'run3']);
+  console.log('after delete run1, sheet rows with data:', after.map(r => r.id));
+  // 못 보낸 회차는 체크가 남아 그대로 다시 보내면 됨
+  await P.route('**/exec**', r => r.abort());
+  await P.click('#save');
+  await P.click('#cs-rsend');
+  await P.waitForFunction(() => /못했/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 40000 });
+  assert.equal(await P.locator('.cs-run input[type=checkbox][data-id=run4]').isChecked(), true);
+  assert.match(await P.textContent('#cs-rsend'), /1개/);
+  await P.unroute('**/exec**');
+  await P.click('#cs-rsend');
+  await P.waitForFunction(() => /보냈어요/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 20000 });
+  assert.equal(await P.locator('.cs-run input[type=checkbox][data-id=run4]').isChecked(), false);
+  console.log('P retry ok:', await P.locator('.cs-rst').allTextContents());
   // ---- 2) 수업 있음 ----
   const c = app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'phoneaccel' });
   const L2 = await ctx({ viewport: { width: 1280, height: 800 } }, 'L2');
-  await L2.goto(ROOT + 'projects/_phone.html?c=' + c.classCode);
+  await L2.goto(ROOT + 'projects/_phone.html?auto=1&c=' + c.classCode);   // 이 실험은 '한 번에 하나' (autoSendOnSave)
   await L2.waitForFunction(() => !document.getElementById('cs-cpick').hidden);
   await L2.selectOption('#cs-cjo', '2'); await L2.selectOption('#cs-cnum', '3'); await L2.click('#cs-cjoin');
   await L2.waitForFunction(() => !document.getElementById('cs-cjoined').hidden);
@@ -90,8 +129,9 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   const P2 = await ctx(devices['Pixel 7'], 'P2');
   await P2.goto(link2);
   await P2.waitForFunction(() => !document.getElementById('cs-cjoined').hidden, null, { timeout: 10000 });
-  assert.match(link2, /role=phone&group=2-2-\d{4}&c=2-\d{4}&jo=2&num=3/);
+  assert.match(link2, /auto=1/); assert.match(link2, /role=phone&group=2-2-\d{4}&c=2-\d{4}&jo=2&num=3/);
   assert.equal(await P2.isHidden('#cs-cpick'), true);
+  assert.equal(await P2.locator('#cs-rsend').count(), 0);   // 바로 보내기 방식이면 회차 고르기 없음
   console.log('P2 me:', (await P2.textContent('#cs-cme')).replace(/\s+/g, ' '), '| pick hidden', await P2.isHidden('#cs-cpick'), '| change hidden', await P2.isHidden('#cs-cchange'));
   await P2.click('#save');
   await P2.waitForFunction(() => /보냈|못했/.test(document.getElementById('cs-pmsg').textContent));
