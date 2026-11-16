@@ -41,8 +41,19 @@ firebase init hosting:github
 
 ## Firestore 보안 규칙
 
-`firestore.rules` 는 자동 배포하지 않습니다. PC 없이 하려면 Firebase 콘솔(console.firebase.google.com) → 프로젝트 `web-experiment-f9b24` → Firestore Database → **규칙** 탭에 `firestore.rules` 내용을 통째로 붙여 넣고 **게시**를 눌러도 됩니다. 규칙을 바꾼 PR(커밋 메시지에 "배포 필요")이 머지되면 PC에서 한 번 실행하세요.
+**2026-11-14 부터 자동입니다.** `firestore.rules` 가 바뀐 PR 이 `main` 에 머지되면 GitHub Actions 의
+"Deploy Firestore rules"(`.github/workflows/deploy-firestore-rules.yml`)가 사이트 배포와 같은 키(`FIREBASE_SERVICE_ACCOUNT`)로 규칙을 게시합니다.
+- 진행 상황: 저장소 **Actions** 탭 → "Deploy Firestore rules". 손으로 다시 게시하려면 같은 화면의 **Run workflow**.
+- 게시 결과는 Firebase 콘솔 → Firestore Database → **규칙** 탭 왼쪽 기록에도 시각과 함께 남습니다.
 
-```bash
-firebase deploy --only firestore:rules --project web-experiment-f9b24
-```
+### 처음 한 번: 권한 오류가 나면 (약 2분)
+
+키(서비스 계정)에 규칙을 바꿀 권한이 없으면 Actions 에 `403`·`PERMISSION_DENIED`·`firebaserules` 오류가 납니다.
+1. https://console.cloud.google.com/iam-admin/iam?project=web-experiment-f9b24 를 엽니다.
+2. 사이트 배포에 쓰는 서비스 계정 줄(이름에 `github-action` 또는 `firebase-adminsdk` 가 들어 있음)의 ✏️ 를 누릅니다.
+3. **다른 역할 추가** → `Firebase Rules 관리자`(Firebase Rules Admin) → 저장.
+4. Actions 탭 → "Deploy Firestore rules" → **Run workflow** 로 다시 실행합니다.
+
+### 자동 게시가 안 될 때 (예비 방법)
+
+Firebase 콘솔 → 프로젝트 `web-experiment-f9b24` → Firestore Database → **규칙** 탭에 `firestore.rules` 내용을 통째로 붙여 넣고 **게시**를 누릅니다.

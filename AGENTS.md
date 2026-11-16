@@ -100,7 +100,7 @@
 
 1. `main` 에 직접 커밋하지 않고 브랜치에서 작업한 뒤 PR 을 만든다. 머지는 위 역할 분담에 따라 사용자 승인 후에만 한다.
 2. PR 이 `main` 에 머지되면 `.github/workflows/deploy-hosting.yml` 이 aks-sci-lab.web.app 에 자동 배포한다.
-3. `firestore.rules` 를 바꾸면 PR 설명과 커밋 메시지에 "(규칙 배포 필요)"를 적는다. 규칙은 자동 배포되지 않는다.
+3. `firestore.rules` 를 바꾼 PR 이 머지되면 `.github/workflows/deploy-firestore-rules.yml` 이 규칙을 자동으로 게시한다(2026-11-14 부터, 사용자 요청). PR 설명에는 "(규칙 바뀜)"을 적고, 머지 뒤 Actions 의 "Deploy Firestore rules" 가 성공했는지 확인한다. 실패하면 `docs/DEPLOY.md` 의 권한 안내.
 
 자세한 배포 설정: `docs/DEPLOY.md`
 
@@ -216,3 +216,5 @@
   - 확인 필요: **선생님이 Apps Script 에 새 Code.gs 를 붙여 넣고 새 버전으로 다시 배포해야 동작**, 실제 Apps Script·학교 망(시험은 가짜 시트), 여러 조가 동시에 5초마다 불러올 때 Apps Script 한도
 - 2026-11-16: 수업 연결 1단계(선생님 결정 "교사·학생 모두 구글 로그인 없이", 통합 관리 세션 전달) — 메인 화면 맨 위 '교사로 시작 / 학생으로 시작'(고르기 카드, 학생은 수업 코드 → 실험 페이지), 구글 로그인은 '🔐 사이트 관리 (선생님)' 접기로 옮김. 교사 화면 `projects/class-teacher.html`(시트 연결·수업 만들기·진행 보기). 플랑크 페이지 `?c=` 면 '🏫 수업 참여' 띠: 조·번호 고르기(이름 없음, 이 브라우저 기억) → 조 공유 조 코드 자동·자동 불러오기, 단계 바꿀 때·보낼 때·1분마다 신호. `apps-script/Code.gs` 4판(진자·플랑크 동작 그대로), `tests/fake-apps-script.cjs` 에 `Utilities`(해시·UUID)와 두 부분 날짜(`2-4821`) 변환 추가. 2단계(AI 보고서 도움)·3단계(초안)는 만들지 않음 — Claude Code
   - 확인 필요: **선생님이 Apps Script 에 새 Code.gs(4판)를 붙여 넣고 새 버전으로 다시 배포해야 동작**, 실제 Apps Script 의 `Utilities.computeDigest`·`getUuid`(시험은 가짜), 한 반 30명이 1분마다 신호 + 교사 10초마다 볼 때 Apps Script 동시 실행·하루 한도, 학교 망, 실제 QR 찍기
+- 2026-11-14: Firestore 규칙 자동 게시(사용자 요청 "클로드 코드에서 파이어베이스까지 관리") — `firestore.rules` 가 바뀐 채 `main` 에 머지되면 GitHub Actions 가 사이트 배포 키로 `firebase deploy --only firestore:rules`. 손 실행(Run workflow)도 됨. 로그인 설정(OAuth 클라이언트 보안 비밀번호)처럼 콘솔에서만 되는 일은 여전히 사용자가 함 — Claude Code
+  - 확인 필요: 배포 키(서비스 계정)에 규칙 권한이 있는지(없으면 `Firebase Rules 관리자` 역할 추가, `docs/DEPLOY.md`), 첫 실행 결과
