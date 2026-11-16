@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const rate = element('samplingRateSelect');
     const downloadButton = element('downloadButton');
     const saveButton = element('saveTrialButton');
-    const cloudButton = element('saveCloudButton');
     const tbody = element('historyTbody');
     const trialsList = element('trialList');
     const storageKey = `${mode}_sensor_trials`;
@@ -23,7 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let device = null, tx = null, cmd = null;
     let recording = false, samples = [], firstTimestamp = null, lastSampleAt = null;
     let trials = [];
-    let auth = null, db = null, currentUser = null;
+    let share = null;                        // 조 공유 (조도·자외선만, js/environment-share.js)
+    const hiddenIncoming = new Set();        // 그래프에서 끈 📥 불러온 회차
+    const INCOMING_COLORS = ['#e8590c', '#2f9e44', '#9c36b5', '#c2255c', '#0c8599', '#5c940d'];
     let connecting = false;
     let receivedSample = false;
     let pageLeaving = false;
@@ -87,34 +88,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     return Number.isFinite(point.time) && point.time >= 0;
                 })
             )) throw new Error('저장된 회차 형식이 올바르지 않습니다.');
+            // 조 공유에서 회차를 구분하려고 번호를 붙인다 (예전 회차는 없음)
+            let fixed = false;
+            parsed.forEach((trial, i) => { if (!/^[A-Za-z0-9_-]{1,30}$/.test(trial.id || '')) { trial.id = `t${Date.now().toString(36)}${i}`; fixed = true; } });
             trials = parsed;
+            if (fixed) localStorage.setItem(storageKey, JSON.stringify(trials));
         }
     } catch (error) {
         console.error('Load sensor trials failed:', error);
         alert('로컬 회차 불러오기 실패: ' + error.message);
     }
     renderTrials();
-    try {
-        firebase.initializeApp({
-            projectId: 'web-experiment-f9b24',
-            appId: '1:718758606428:web:e11ed8d0b64a471ee65899',
-            storageBucket: 'web-experiment-f9b24.firebasestorage.app',
-            apiKey: 'AIzaSyCYVme6ZP-iyspRmHTtuUSsKXe7K_D0vJQ',
-            authDomain: 'web-experiment-f9b24.firebaseapp.com',
-            messagingSenderId: '718758606428'
-        });
-        auth = firebase.auth();
-        db = firebase.firestore();
-        auth.onAuthStateChanged(user => {
-            currentUser = user;
-            element('authNotice').textContent = user ? `로그인: ${user.email}` : 'Cloud 제출은 메인 페이지에서 Google 로그인 후 가능합니다.';
-        });
-    } catch (error) {
-        console.error('Firebase initialization failed:', error);
-        element('authNotice').textContent = 'Firebase 초기화 실패: ' + error.message;
-        cloudButton.disabled = true;
-    }
-
     function updateButtons() {
         downloadButton.disabled = recording || samples.length === 0;
         saveButton.disabled = recording || samples.length === 0;
@@ -123,9 +107,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function endRecording() {
+        const was = recording;
         recording = false;
         updateButtons();
+        if (was) shareStep();
     }
+    function shareStep() { if (share) share.stepChanged(); }
 
     function cleanConnection() {
         const previous = device;
@@ -144,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function disconnected() {
         cleanConnection();
         status.textContent = '연결 해제됨 — 측정 데이터는 보존됩니다.';
+        shareStep();
     }
 
     function fail(error) {
@@ -227,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!receivedSample) status.textContent = `${selected.name} 연결됨 — 센서 데이터 대기`;
             connectButton.style.display = 'none';
             disconnectButton.style.display = '';
+            shareStep();
         } catch (error) {
             fail(setupFailure || new Error(`${connectionStage}: ${error.message}`));
         } finally {
@@ -258,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chart.update('none');
             status.textContent = '측정 중';
             updateButtons();
+            shareStep();
         }
     });
 
@@ -310,6 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem(storageKey, JSON.stringify(next));
             trials = next;
             renderTrials();
+            shareStep();
         } catch (error) {
             console.error('Save sensor trials failed:', error);
             alert('로컬 회차 저장 실패: ' + error.message);
@@ -318,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     saveButton.addEventListener('click', () => {
         const name = prompt('회차 이름', `${config.title} ${new Date().toLocaleString()}`);
-        if (name) persist([...trials, { name, data: JSON.parse(JSON.stringify(samples)) }]);
+        if (name) persist([...trials, { id: `t${Date.now().toString(36)}`, name, data: JSON.parse(JSON.stringify(samples)) }]);
     });
     element('clearTrialsButton').addEventListener('click', () => {
         if (confirm('저장된 회차를 모두 삭제할까요?')) persist([]);
@@ -351,6 +342,33 @@ document.addEventListener('DOMContentLoaded', () => {
             li.append(label, view, remove);
             trialsList.appendChild(li);
         });
+        // 📥 같은 조 다른 노트북에서 불러온 회차: 그래프에 겹쳐 그림 (지우기는 조 공유 칸의 '불러온 값 지우기')
+        if (share) share.list().forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'incoming';
+            const label = document.createElement('label');
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = !hiddenIncoming.has(item.key);
+            cb.addEventListener('change', () => {
+                if (cb.checked) hiddenIncoming.delete(item.key); else hiddenIncoming.add(item.key);
+                drawIncoming();
+            });
+            label.append(cb, ` ${item.name} (${item.n}개)`);
+            li.append(label);
+            trialsList.appendChild(li);
+        });
+    }
+    // 그래프: 0번은 내 측정, 그 뒤는 보이게 고른 📥 불러온 회차
+    function drawIncoming() {
+        const mine = chart.data.datasets[0];
+        const extra = share ? share.list().filter(item => !hiddenIncoming.has(item.key)).map((item, i) => ({
+            label: item.name, showLine: true, borderColor: INCOMING_COLORS[i % INCOMING_COLORS.length], pointRadius: 1,
+            data: item.points.map(point => ({ x: point.time, y: point.data[config.key] ?? null }))
+        })) : [];
+        chart.data.datasets = [mine, ...extra];
+        chart.options.plugins = { ...(chart.options.plugins || {}), legend: { display: extra.length > 0 } };
+        chart.update('none');
     }
     downloadButton.addEventListener('click', () => {
         const columns = ['Time (s)', ...config.fields.map(([, label, unit]) => `${label} (${unit})`), 'Pico timestamp (ms)'];
@@ -366,27 +384,28 @@ document.addEventListener('DOMContentLoaded', () => {
         link.click();
         URL.revokeObjectURL(url);
     });
-    cloudButton.addEventListener('click', async () => {
-        if (!auth || !currentUser) return alert('메인 페이지에서 Google 로그인 후 제출하세요.');
-        if (samples.length === 0 && trials.length === 0) return alert('제출할 데이터가 없습니다.');
-        cloudButton.disabled = true;
-        try {
-            await db.collection('experiments').add({
-                userId: currentUser.uid, userEmail: currentUser.email,
-                experimentName: config.title, tab: `${mode}-lab`,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                trialsCount: trials.length,
-                dataSummary: `회차 ${trials.length}개 / 현재 샘플 ${samples.length}개 (${config.unit})`,
-                weatherSample: {}, stargazingSample: []
-            });
-            alert('Cloud에 요약을 제출했습니다. 원시 값은 CSV로 보관하세요.');
-        } catch (error) {
-            console.error('Cloud submission failed:', error);
-            alert('제출 실패: ' + error.message);
-        } finally {
-            cloudButton.disabled = false;
-        }
-    });
+    // 조 공유 (조도·자외선): 저장한 회차 + 지금 측정을 보내고, 같은 조 다른 노트북 회차를 📥 로 받아 그래프에 겹쳐 그린다
+    if ((mode === 'light' || mode === 'uv') && typeof EnvironmentShare !== 'undefined') {
+        const keys = config.fields.map(([key]) => key);
+        const csvHeaders = { 'Time (s)': 'time' };
+        config.fields.forEach(([key, label, unit]) => { csvHeaders[`${label} (${unit})`] = key; });
+        const digits = { time: 3 };
+        digits[config.key] = config.digits;
+        share = EnvironmentShare.attach({
+            exp: mode,
+            csvHint: '맨 위 CSV 저장',
+            cols: ['time', ...keys], digits,
+            get: (point, col) => col === 'time' ? point.time : point.data[col],
+            summary: points => EnvironmentShare.summarySingle(points.map(point => ({ time: point.time, [config.key]: point.data[config.key] })), config.key, config.unit, config.digits),
+            toPoint: o => { const data = {}; keys.forEach(key => { data[key] = o[key]; }); return { time: o.time, data }; },
+            mine: () => [...trials.map(trial => ({ id: trial.id, title: trial.name, points: trial.data })), { id: 'current', title: '현재 측정', points: samples }],
+            csvHeaders,
+            onChange: () => { renderTrials(); drawIncoming(); },
+            getStep: () => (recording || device?.gatt.connected) ? 'live' : (samples.length || trials.length ? 'record' : 'more'),
+            getPoints: () => samples.length + trials.reduce((n, trial) => n + trial.data.length, 0)
+        });
+        if (share) { renderTrials(); drawIncoming(); }
+    }
     if (!receiverSupported) {
         connectButton.disabled = true;
         status.textContent = '이전 BLE 수신 코드가 로드되었습니다. Ctrl+Shift+R로 새로고침하거나 최신 페이지 링크로 접속하세요.';

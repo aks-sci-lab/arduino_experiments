@@ -68,10 +68,8 @@
         <h2>회차 저장</h2>
         <div class="lab-controls"><button id="saveTrialButton" disabled>현재 회차 저장</button><button id="clearTrialsButton">모든 회차 삭제</button></div>
         <ul id="trialList"></ul>
-        <p id="authNotice">메인 페이지에서 Google 로그인 후 Cloud 제출이 가능합니다.</p>
         <p>화면에는 VOC Index만 표시합니다. CSV·로컬 회차에는 Index와 원시 신호·보정 온습도·알고리즘 버전도 보관합니다.
-            준비 구간의 Index는 빈칸입니다. Cloud에는 회차 수·샘플 수 요약만 제출합니다.</p>
-        <button id="saveCloudButton">Cloud에 요약 제출</button>
+            준비 구간의 Index는 빈칸입니다. (예전 회차 보관용 페이지라 조 공유는 없습니다. 새 측정은 <a href="environment-lab.html">환경 센서 페이지</a>에서 하세요.)</p>
         </section>
         <section aria-label="측정 그래프">
             <h2>실시간 변화 그래프</h2>
@@ -79,13 +77,10 @@
         </section>
         </div>
     </main>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
     <script src="../js/pico-ble.js?v=setup-v3"></script>
     <script src="../js/sensor-definitions.js?v=voc-index-v3"></script>
     <script src="../js/voc-index.js?v=official-v1"></script>
-    <script src="../js/sensor-lab.js?v=voc-index-v6"></script>
+    <script src="../js/sensor-lab.js?v=share-v1"></script>
 </body>
 </html>

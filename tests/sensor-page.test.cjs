@@ -148,7 +148,7 @@ const data = {
 const sample = (mode, ts, seq) => ({ type: mode, ts, seq, data: data[mode] });
 
 for (const mode of Object.keys(data)) {
-    test(`${mode} independent page: connect/display/record/CSV/trials/cloud`, async () => {
+    test(`${mode} independent page: connect/display/record/CSV/trials (no cloud)`, async () => {
         const app = page(mode);
         assert.equal(app.element('readouts').children.length, 1);
         assert.equal(app.element('tableHead').children.length, 1);
@@ -178,9 +178,10 @@ for (const mode of Object.keys(data)) {
         assert.equal(trial.data[1].time, 5);
         assert.deepEqual(trial.data[0].data, mode === 'voc' ? { ...data[mode], vocIndex: null } : data[mode]);
         assert.equal(app.element('trialList').children[0].children[0].textContent, '<trial> (2개) ');
-        await app.click('saveCloudButton');
-        assert.equal(app.documents[0].tab, `${mode}-lab`);
-        assert.equal(app.documents[0].trialsCount, 1);
+        // 구글 로그인 'Cloud 제출'은 없앴다 (조 공유로 바꿈, 2026-11-16)
+        assert.equal(app.element('saveCloudButton').listeners.click, undefined);
+        assert.equal(app.documents.length, 0);
+        assert.match(trial.id, /^[A-Za-z0-9_-]{1,30}$/);
         app.click('recordButton');
         app.click('recordButton');
         app.element('trialList').children[0].children[1].click();
@@ -390,6 +391,11 @@ test('all three HTML pages wire shared scripts and firmware downloads', () => {
             assert.ok(view.indexOf('id="connectButton"') < view.indexOf('id="readouts"'));
             assert.ok(view.indexOf('id="readouts"') < view.indexOf('id="chart"'));
             assert.ok(view.indexOf('id="chart"') < view.indexOf('id="historyTbody"'));
+            // 조 공유(구글 로그인 없이): 수업 띠 자리, 조 공유 칸, 공통 부품 순서, Firebase 없음
+            assert.ok(view.includes('id="share-mount"') && html.includes('id="class-bar-mount"'));
+            const order = ['pendulum-config.js', 'pendulum-cloud.js', 'class-cloud.js', 'class-share.js', 'environment-share.js', 'sensor-lab.js'].map(f => html.indexOf(f));
+            assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), order.join(','));
+            assert.ok(!html.includes('firebase') && !html.includes('saveCloudButton'));
         } else {
             assert.ok(html.includes('class="sensor-lab-layout"'));
             assert.ok(html.indexOf('id="historyTbody"') < html.indexOf('id="chart"'));
@@ -403,7 +409,7 @@ test('all three HTML pages wire shared scripts and firmware downloads', () => {
         }
         for (const filename of ['main.py', 'bme280.py', 'imu.py', 'extra_sensors.py']) assert.ok(html.includes(filename));
         for (const id of ['connectButton', 'disconnectButton', 'recordButton', 'historyTbody', 'readouts',
-            'chart', 'saveTrialButton', 'clearTrialsButton', 'trialList', 'saveCloudButton']) {
+            'chart', 'saveTrialButton', 'clearTrialsButton', 'trialList']) {
             assert.ok(html.includes(`id="${id}"`));
         }
     }
