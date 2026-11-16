@@ -88,7 +88,7 @@ const share = ClassShare.init({
 | `planck` | LED 플랑크 상수 | `projects/planck-led.html` | 전용 `planck` 시트 (붙임 완료) |
 | `pendulum` | 스마트폰 진자 | `pendulum-report.html`(노트북)·`pendulum-measure.html`(폰) | 전용 `measurements` 시트 (띠 붙임 완료) |
 | `idealgas` | 이상기체 | `projects/ideal-gas.html` | 공용 `submissions` |
-| `malus` | 말루스 법칙 | `projects/malus-law.html` | 공용 |
+| `malus` | 말루스 법칙 | `projects/malus-law.html` | 공용 (붙임 완료, `js/malus-share.js`) |
 | `eminduction` | 전자기 유도 | `projects/em-induction.html` | 공용 |
 | `freefall` | 자유낙하 | `projects/free-fall.html` | 공용 |
 | `env` · `light` · `uv` | 환경 센서 · 조도 · 자외선 | `projects/environment-lab.html`(`?sensor=light|uv`) | 공용 |

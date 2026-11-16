@@ -109,3 +109,7 @@ details.tip summary { font-size: .92em; }
 .setting input[type=number] { width: 70px; }
 th { white-space: nowrap; font-size: .85em; }
 [data-step=result] td { font-size: .92em; }
+/* 7. 결론의 '다른 내보내기' 접기, 6. 결과 표의 📥 불러온 값 줄 */
+details.more-export summary { min-height: var(--tap); display: flex; align-items: center; }
+details.more-export[open] summary { margin-bottom: 8px; }
+tr.ext td { background: var(--c-primary-soft); }
