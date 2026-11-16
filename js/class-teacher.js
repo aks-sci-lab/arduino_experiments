@@ -161,17 +161,144 @@
     copyFile($('btnCopyCode'), '../apps-script/Code.gs', 'Code.gs');
     copyFile($('btnCopyManifest'), '../apps-script/appsscript.json', 'appsscript.json');
 
+    // ---------- 🛠 내 서버 만들기 (구글 로그인 한 번 → 시트 + Apps Script 만들고 배포, js/server-maker.js) ----------
+    // 토큰 방식(accounts.google.com/gsi/client)이라 사이트 비밀번호가 필요 없다. 클라이언트 ID 는 js/pendulum-config.js 의 googleClientId
+    var SM = window.ServerMaker, CLIENT_ID = String(CONFIG.googleClientId || '');
+    var MAKER_KEY = 'class-teacher:maker:v1';
+    var maker = { resume: null, busy: false, poll: null };
+    try { maker.resume = JSON.parse((STORE && STORE.getItem(MAKER_KEY)) || 'null'); } catch (e) { maker.resume = null; }
+    function saveMaker() { try { if (maker.resume) STORE.setItem(MAKER_KEY, JSON.stringify(maker.resume)); else STORE.removeItem(MAKER_KEY); } catch (e) { /* 저장 불가 */ } }
+    function mkStep(key, st, text) {
+        var li = document.querySelector('#mkSteps li[data-k="' + key + '"]');
+        if (!li) return;
+        li.className = st;
+        li.querySelector('small').textContent = text ? ' — ' + text : '';
+    }
+    function mkMsg(html, err) { $('mkMsg').className = 'note' + (err ? ' err' : ''); $('mkMsg').innerHTML = html; }
+    function renderMaker() {
+        if (!SM) return;
+        $('mkSteps').innerHTML = SM.STEPS.map(function (s) { return '<li data-k="' + s[0] + '">' + esc(s[1]) + '<small></small></li>'; }).join('');
+        $('mkNoClient').hidden = !!CLIENT_ID;
+        $('btnMake').disabled = !CLIENT_ID;
+        var r = maker.resume;
+        $('btnMakeReset').hidden = !r;
+        if (r && r.connected) {
+            $('btnMake').textContent = '🛠 서버 하나 더 만들기';
+            mkMsg('✅ 이 브라우저에서 만든 서버가 연결되어 있어요' + (r.sheetUrl ? ' · <a href="' + esc(r.sheetUrl) + '" target="_blank" rel="noopener">시트 열기</a>' : '') + '.');
+        } else if (r) {
+            $('btnMake').textContent = '🛠 이어서 만들기';
+            $('mkSteps').hidden = false;
+            ['sheet', 'project', 'code', 'version', 'deploy'].forEach(function (k) {
+                var done = { sheet: r.spreadsheetId, project: r.scriptId, code: r.codeVersion, version: r.versionNumber, deploy: r.url }[k];
+                if (done) mkStep(k, 'done');
+            });
+            if (r.url) { $('mkAllowRow').hidden = false; mkStep('allow', 'run'); mkMsg('배포까지 끝났어요. <b>🔓 권한 허용 창 열기</b>를 눌러 허용하면 자동으로 연결돼요.'); waitAllow(); }
+            else mkMsg('지난번에 중간에서 멈췄어요. 단추를 누르면 이미 만든 것을 다시 써서 이어서 해요.');
+        }
+    }
+    // 배포 뒤: 선생님이 새 탭에서 권한을 허용할 때까지 몇 초마다 연결 시험
+    function waitAllow() {
+        clearTimeout(maker.poll);
+        var url = maker.resume && maker.resume.url, started = Date.now();
+        if (!url) return;
+        (async function tick() {
+            var p = await CC.ping(url);
+            if (p.ok && Number(p.version) > 0) { finishMaker(url, p); return; }
+            if (Date.now() - started > 15 * 60 * 1000) { mkMsg('⚠️ 아직 권한 허용이 확인되지 않아요. <b>🔓 권한 허용 창 열기</b>를 다시 눌러 주세요.', true); return; }
+            maker.poll = setTimeout(tick, 3000);
+        })();
+    }
+    async function finishMaker(url, ping) {
+        mkStep('allow', 'done'); mkStep('connect', 'run');
+        $('mkAllowRow').hidden = true;
+        var id = PC.scriptIdFromUrl(url);
+        try { STORE.setItem(PC.SERVER_KEY, id); } catch (e) { /* 저장 불가 */ }
+        server = { url: url, id: id, from: 'saved' };
+        if (!ping.admin && !adminKeyOf(url)) {
+            var c = await CC.claimAdmin(url);
+            if (c.ok) { setAdminKey(url, c.key); ping.admin = true; }
+        }
+        mkStep('connect', 'done', ping.version + '판');
+        maker.resume.connected = true; saveMaker();
+        renderSheet(); renderAdmin(); checkVersion(ping);
+        mkMsg('✅ 내 서버가 준비됐어요 (' + ping.version + '판). 이 브라우저가 기억해요.' + (maker.resume.sheetUrl ? ' <a href="' + esc(maker.resume.sheetUrl) + '" target="_blank" rel="noopener">시트 열기</a>' : '') + ' 이제 ② 수업 만들기로 가세요.');
+        $('btnMake').textContent = '🛠 서버 하나 더 만들기';
+    }
+    function loadGis() {
+        if (!CLIENT_ID || (window.google && google.accounts && google.accounts.oauth2) || document.getElementById('gisScript')) return;
+        var sc = document.createElement('script');
+        sc.id = 'gisScript'; sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.defer = true;
+        sc.onerror = function () { mkMsg('⚠️ 구글 로그인 도구를 불러오지 못했어요(인터넷·학교 망 확인). 아래 손으로 만들기를 쓰세요.', true); };
+        document.head.appendChild(sc);
+    }
+    if (SM) {
+        loadGis();
+        renderMaker();
+        $('btnMake').addEventListener('click', async function () {
+            if (maker.busy || !CLIENT_ID) return;
+            if (maker.resume && maker.resume.connected) maker.resume = null;   // 하나 더 만들기
+            maker.busy = true; $('btnMake').disabled = true;
+            $('mkSteps').hidden = false;
+            mkMsg('🔐 구글 로그인 창에서 선생님 계정을 고르고 권한 3가지를 허용해 주세요.');
+            var t = await SM.requestToken(CLIENT_ID);   // 팝업은 단추를 누른 바로 그때 열린다
+            if (!t.ok) { maker.busy = false; $('btnMake').disabled = false; mkMsg('⚠️ ' + esc(t.error), true); return; }
+            mkMsg('⏳ 만드는 중… (창을 닫지 마세요)');
+            var r = await SM.run({ token: t.token, siteBase: '../apps-script/', resume: maker.resume || {}, onStep: mkStep });
+            maker.resume = r.resume; saveMaker();
+            maker.busy = false; $('btnMake').disabled = false; $('btnMakeReset').hidden = false;
+            if (!r.ok) {
+                $('btnMake').textContent = '🛠 이어서 만들기';
+                mkMsg('⚠️ ' + esc(r.error) + (r.resume.spreadsheetId ? '<br>지금까지 만든 것은 남아 있어요. 고친 뒤 <b>🛠 이어서 만들기</b>를 누르면 그다음부터 해요.' : ''), true);
+                return;
+            }
+            mkStep('allow', 'run');
+            $('mkAllowRow').hidden = false;
+            mkMsg('거의 다 됐어요! <b>🔓 권한 허용 창 열기</b>를 눌러 새 탭에서 선생님 계정으로 <b>허용</b>해 주세요. 허용하면 이 화면이 저절로 연결돼요.');
+            waitAllow();
+        });
+        $('btnAllow').addEventListener('click', function () {
+            var url = maker.resume && maker.resume.url;
+            if (!url) return;
+            var w = window.open(url + '?action=ping', '_blank');
+            if (!w) mkMsg('⚠️ 새 탭이 막혔어요. 이 주소를 새 탭에 붙여 넣어 여세요: <code>' + esc(url) + '?action=ping</code>', true);
+            else mkMsg('새 탭에서 <b>권한 검토 → 계정 고르기 → (경고가 나오면) 고급 → 이동 → 허용</b>을 마치면 이 화면이 저절로 연결돼요. 새 탭에 <code>{"ok":true…}</code> 가 보이면 끝이에요.');
+            waitAllow();
+        });
+        $('btnMakeReset').addEventListener('click', function () {
+            if (!confirm('만들던 기록을 지우고 처음부터 다시 할까요? (구글 드라이브에 이미 만든 시트는 지워지지 않아요. 필요 없으면 드라이브에서 지우세요)')) return;
+            clearTimeout(maker.poll); maker.resume = null; saveMaker();
+            $('mkAllowRow').hidden = true; $('mkSteps').hidden = true; $('btnMake').textContent = '🛠 구글 계정으로 내 서버 만들기';
+            renderMaker(); mkMsg('');
+        });
+    }
+
     // ---------- ② 수업 만들기 ----------
-    function inputs() { return { ban: Number($('inBan').value), nStudents: Number($('inN').value), groupSize: Number($('inSize').value), exp: $('inExp').value }; }
+    // 실험 고르기: js/class-cloud.js 의 EXPS 전체 + 선생님이 만든 실험(번호 넣기)
+    $('inExp').innerHTML = Object.keys(CC.EXPS).map(function (k) {
+        var e = CC.EXPS[k];
+        return '<option value="' + k + '">' + e.icon + ' ' + esc(e.name) + (e.ready ? '' : ' (페이지 연결 준비 중)') + '</option>';
+    }).join('') + '<option value="custom">👩‍🏫 선생님이 만든 실험…</option>';
+    function chosenExp() {
+        var v = $('inExp').value;
+        if (v !== 'custom') return v;
+        var id = $('inCustom').value.trim().replace(/^.*[?&]id=/, '').replace(/[&#].*$/, '');
+        return /^[A-Za-z0-9_-]{1,40}$/.test(id) ? 'custom:' + id : '';
+    }
+    function inputs() { return { ban: Number($('inBan').value), nStudents: Number($('inN').value), groupSize: Number($('inSize').value), exp: chosenExp() }; }
     function renderPreview() {
         var o = inputs(), g = CC.splitGroups(o.nStudents, o.groupSize);
-        var ok = g.length && o.ban >= 1 && o.ban <= 99 && o.ban % 1 === 0;
+        var ok = g.length && o.ban >= 1 && o.ban <= 99 && o.ban % 1 === 0 && !!o.exp;
         $('btnCreate').disabled = !ok;
+        $('customRow').hidden = $('inExp').value !== 'custom';
+        var e = o.exp && CC.expInfo(o.exp);
+        $('expNote').innerHTML = $('inExp').value === 'custom' && !o.exp ? '선생님이 만든 실험의 번호(또는 학생 화면 주소)를 넣어 주세요.'
+            : e && !e.ready ? '⚠️ 이 실험 페이지는 아직 수업 참여 띠를 붙이는 중이에요. 수업은 만들 수 있지만, 학생 화면에 조·번호 고르기가 아직 안 나올 수 있어요.' : '';
         $('preview').innerHTML = ok
             ? '👥 ' + o.nStudents + '명 → <b>' + g.length + '개 조</b>: ' + g.map(function (k, i) { return (i + 1) + '조 ' + k + '명'; }).join(', ')
             : '반(1~99), 학생 수(1~60), 조별 인원(1~10)을 정수로 넣어 주세요.';
     }
-    ['inBan', 'inN', 'inSize', 'inExp'].forEach(function (id) { $(id).addEventListener('input', renderPreview); });
+    ['inBan', 'inN', 'inSize', 'inExp', 'inCustom'].forEach(function (id) { $(id).addEventListener('input', renderPreview); });
+    $('inExp').addEventListener('change', renderPreview);
     $('btnCreate').addEventListener('click', async function () {
         if (state.busy) return;
         var o = inputs(), msg = $('createMsg');
@@ -199,7 +326,7 @@
         return qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true });
     }
     function showClass(c) {
-        var link = studentLink(c), e = CC.EXPS[c.exp];
+        var link = studentLink(c), e = CC.expInfo(c.exp);
         $('classOut').hidden = false;
         $('outTitle').textContent = '— ' + c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + c.nStudents + '명, ' + c.groups.length + '개 조';
         $('outCode').textContent = c.classCode;
@@ -225,7 +352,7 @@
         var el = $('classList');
         if (!state.classes.length) { el.innerHTML = '<p class="note">아직 만든 수업이 없어요.</p>'; return; }
         el.innerHTML = state.classes.map(function (c, i) {
-            var e = CC.EXPS[c.exp];
+            var e = CC.expInfo(c.exp);
             return '<div class="ct-item"><span><b>' + esc(c.classCode) + '</b> ' + esc(c.ban) + '반 · ' + esc(e ? e.name : c.exp) + ' · ' + esc(c.nStudents) + '명/' + esc(c.groups.length) + '조' +
                 '<br><span class="note">' + esc(new Date(c.created).toLocaleString('ko-KR')) + '</span></span>' +
                 '<span class="ct-row" style="margin:0"><button class="secondary" data-show="' + i + '">QR 보기</button><button data-watch="' + i + '">진행 보기</button>' +
@@ -292,9 +419,7 @@
             '<div>쉬는 중 (5분+)<b>' + s.idle + '</b></div>' +
             '<div>제출한 조<b>' + s.submittedGroups + ' / ' + s.groups.length + '</b></div>';
         $('groups').innerHTML = s.groups.map(function (g) {
-            var sub = g.sub, subTxt = sub && sub.rows
-                ? '📤 제출: LED ' + sub.rows + '개 (' + esc(sub.leds.join(', ')) + ')' + (sub.hCurrent !== '' && sub.hCurrent != null ? ' · h = ' + Number(sub.hCurrent).toFixed(2) + ' ×10⁻³⁴' + (sub.errorPct !== '' && sub.errorPct != null ? ' (' + (sub.errorPct >= 0 ? '+' : '') + Number(sub.errorPct).toFixed(1) + ' %)' : '') : '')
-                : '아직 제출 없음';
+            var sub = g.sub, subTxt = sub && sub.rows ? '📤 ' + esc(CC.submissionText(st.exp, sub)) : '아직 제출 없음';
             return '<section class="ct-group"><h3><span>' + esc(g.jo) + '조</span><span class="note">' + esc(g.code) + '</span></h3>' +
                 '<p class="ct-sub' + (sub && sub.rows ? ' done' : '') + '">' + subTxt + '</p>' +
                 g.members.map(function (m) {
@@ -321,7 +446,7 @@
             '<tr><th>마지막 활동</th><td>' + esc(new Date(x.lastSeen).toLocaleTimeString('ko-KR')) + ' (' + esc(CC.agoText(m.state.ago)) + ')</td></tr>' +
             '<tr><th>이 학생이 잰 점</th><td>' + (x.points == null ? '–' : esc(x.points) + '개') + '</td></tr>' +
             '<tr><th>선생님께 보냄</th><td>' + (x.submitted ? '✅ 보냄' : '아직') + '</td></tr>' +
-            '<tr><th>조 전체 제출</th><td>' + (g.sub && g.sub.rows ? 'LED ' + g.sub.rows + '개, 노트북 ' + g.sub.devices + '대' + (g.sub.lastSent ? ', 마지막 ' + esc(new Date(g.sub.lastSent).toLocaleTimeString('ko-KR')) : '') : '아직') + '</td></tr>' +
+            '<tr><th>조 전체 제출</th><td>' + (g.sub && g.sub.rows ? esc(CC.submissionText(st.exp, g.sub)) + ', 기기 ' + g.sub.devices + '대' + (g.sub.lastSent ? ', 마지막 ' + esc(new Date(g.sub.lastSent).toLocaleTimeString('ko-KR')) : '') : '아직') + '</td></tr>' +
             '</tbody></table>';
     }
     $('groups').addEventListener('click', function (e) {

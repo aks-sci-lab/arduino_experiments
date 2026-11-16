@@ -768,247 +768,80 @@
         $('concl-sum').innerHTML = html;
     }
 
-    // ---------- 조 공유: 선생님 시트로 보내기 · 같은 조 다른 노트북에서 불러오기 ----------
-    // 서버는 스마트폰 진자와 같은 Apps Script. 어느 시트인지: 링크의 ?s=스크립트ID > 이 브라우저 기억 > js/pendulum-config.js 기본
+    // ---------- 조 공유 · 수업 참여: 공통 부품 js/class-share.js (docs/class-share.md) ----------
+    // 플랑크는 전용 시트(planck 탭, LED 하나 = 한 줄)를 쓰므로 보내기·불러오기만 이 실험 방식으로 바꿔 끼운다.
+    // 다른 노트북·CSV 에서 불러온 값은 LED 의 ext[출처] 에 따로 둔다 (js/planck-cloud.js)
     const PCF = window.PendulumCloud;
-    const CFG = window.PENDULUM_CONFIG || {};
-    let STORE = null; try { STORE = window.localStorage; } catch (e) { STORE = null; }
-    const SERVER = PCF ? PCF.resolveServer(location.search, CFG.appsScriptUrl || '', STORE, true) : { url: '', from: 'none' };
-    const LIST_URL = SERVER.url ? SERVER.url + (SERVER.url.indexOf('?') >= 0 ? '&' : '?') + 'exp=' + PCL.EXP : '';
-    const share = { busy: false, lastOk: null, fails: 0, timer: null };
-    const timeText = d => d ? d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
-    function setShareStatus(html, err) {
-        $('sh-status').innerHTML = html; $('sh-status').classList.toggle('err', !!err);
-    }
-    function groupOk() { return !!PCF && PCF.isGroupCode(state.share.group); }
-    function renderShare() {
-        const sh = state.share;
-        if (document.activeElement !== $('sh-group')) $('sh-group').value = sh.group;
-        if (document.activeElement !== $('sh-ban')) $('sh-ban').value = sh.ban;
-        if (document.activeElement !== $('sh-jo')) $('sh-jo').value = sh.jo;
-        $('sh-auto').checked = sh.auto;
-        const ok = groupOk();
-        ['sh-send', 'sh-pull', 'btn-send2'].forEach(id => { $(id).disabled = !ok || share.busy; });
-        const ext = state.leds.reduce((n, l) => n + PCL.extCount(l), 0);
-        $('sh-clear').disabled = !ext;
-        $('share-sum').textContent = ok ? '— 조 ' + sh.group + (ext ? ' · 불러온 값 ' + ext + '개' : '') : '— 조 코드 없음';
-        $('sh-server').textContent = !SERVER.url ? '⚠ 선생님 설정이 아직 안 되어 보내기·불러오기를 쓸 수 없습니다. CSV 로 주고받으세요.'
-            : '보낼 곳: ' + (SERVER.from === 'link' ? '링크로 받은 선생님 시트' : SERVER.from === 'saved' ? '이 브라우저가 기억한 선생님 시트' : '사이트 기본 선생님 시트') +
-              ' (스마트폰 진자와 같은 시트의 planck 탭) · 이 노트북: ' + PCL.deviceLabel(sh.device);
-        if (!ok && !$('sh-status').textContent) setShareStatus('반·조를 넣고 <b>🎲 새 조 코드 만들기</b>를 누르거나, 같은 조 노트북의 조 코드를 넣으세요.');
-        scheduleShare();
-    }
-    function setGroup(code) {
-        const g = PCF.normalizeGroup(code);
-        if (g !== state.share.group) { state.share.group = g; state.share.sent = []; }
-        if (PCF.isGroupCode(g)) { const p = PCF.groupParts(g); state.share.ban = String(p.ban); state.share.jo = String(p.jo); }
-        save();
-        setShareStatus('');
-        renderShare();
-        if (groupOk() && state.share.auto) pull(true);
-    }
-    $('sh-group').addEventListener('change', e => setGroup(e.target.value));
-    // 다 치면(형식이 맞으면) 바로 연결
-    $('sh-group').addEventListener('input', e => { const g = PCF && PCF.normalizeGroup(e.target.value); if (g && PCF.isGroupCode(g) && g !== state.share.group) setGroup(g); });
-    $('sh-ban').addEventListener('input', e => { state.share.ban = e.target.value; save(); });
-    $('sh-jo').addEventListener('input', e => { state.share.jo = e.target.value; save(); });
-    $('sh-make').addEventListener('click', () => {
-        if (!PCF) return;
-        const code = PCF.makeGroupCode(state.share.ban, state.share.jo);
-        if (!code) { setShareStatus('반과 조를 1~99 사이 숫자로 넣으세요.', true); return; }
-        if (groupOk() && state.share.group !== code && !confirm('지금 조 코드(' + state.share.group + ')를 새 코드로 바꿀까요? 같은 조의 다른 노트북에도 새 코드를 넣어야 합니다.')) return;
-        setGroup(code);
-        setShareStatus('조 코드 <b>' + esc(code) + '</b> 를 만들었습니다. 같은 조의 다른 노트북에 이 코드를 넣으세요.');
-    });
-    $('sh-auto').addEventListener('change', e => { state.share.auto = e.target.checked; save(); renderShare(); if (state.share.auto) pull(true); });
-
-    async function send(statusEl) {
-        if (!groupOk() || share.busy) return;
-        const cur = fitFor('current', false).res, gl = fitFor('glow', false).res;
-        const b = PCL.buildPayloads({
-            group: state.share.group, device: state.share.device, leds: state.leds, sent: state.share.sent,
-            v0: (led, m) => { const t = thr(led, m); return t.error ? null : t.v0; },
-            summary: {
-                hCurrent: cur ? cur.h / 1e-34 : null, errorPct: cur ? cur.errorPct : null, r2: cur ? cur.fit.r2 : null,
-                hGlow: gl ? gl.h / 1e-34 : null
-            },
-            curMode: state.curMode, iMin: state.iMin
-        }, PCF.isGroupCode);
-        const show = (html, err) => { setShareStatus(html, err); if (statusEl) { statusEl.innerHTML = html; } };
-        if (b.error) { show('⚠ ' + esc(b.error), true); return; }
-        share.busy = true; renderShare();
-        let done = 0, fail = null;
-        for (const pl of b.payloads) {
-            show('📤 보내는 중… (' + (done + 1) + '/' + b.payloads.length + ')');
-            const r = await PCF.save(SERVER.url, pl);
-            if (!r.ok) { fail = r; break; }
-            done++;
-            if (!state.share.sent.includes(pl.id)) state.share.sent.push(pl.id);
-        }
-        share.busy = false;
-        save();
-        if (fail) show('⚠ 보내지 못했습니다: ' + esc(fail.error) + (done ? ' (' + done + '개는 보냄)' : '') + '<br>다시 눌러 보고, 계속 안 되면 6. 실험 결과의 <b>CSV 다운로드</b> 파일을 선생님께 내세요.', true);
-        else { show('✅ LED ' + done + '개의 측정값을 선생님 시트로 보냈습니다 (' + timeText(new Date()) + '). 같은 조의 다른 노트북에서 📥 불러오기를 누르면 합쳐집니다.'); classBeat(true); }
-        renderShare();
-    }
-    $('sh-send').addEventListener('click', () => send());
-    $('btn-send2').addEventListener('click', () => {
-        if (!groupOk()) { $('send2-status').textContent = '먼저 5. 데이터 수집 맨 위 \'👥 조 공유\'에서 조 코드를 정하세요.'; return; }
-        send($('send2-status'));
-    });
-
-    let pulling = false;
-    async function pull(quiet) {
-        if (!groupOk() || pulling || !SERVER.url) { if (!SERVER.url && !quiet) setShareStatus('⚠ 선생님 설정이 아직 안 되었습니다. CSV 로 주고받으세요.', true); return; }
-        pulling = true;
-        if (!quiet) setShareStatus('📥 불러오는 중…');
-        const group = state.share.group;
-        const r = await PCF.list(LIST_URL, group);
-        pulling = false;
-        if (group !== state.share.group) return;    // 그 사이 조 코드를 바꿈
-        if (!r.ok) {
-            share.fails++;
-            setShareStatus('⚠ 불러오지 못했습니다: ' + esc(r.error) + (share.lastOk ? ' (마지막 성공 ' + timeText(share.lastOk) + ')' : '') + '<br>계속 안 되면 CSV 파일로 주고받으세요.', true);
-            scheduleShare();
-            return;
-        }
-        share.fails = 0; share.lastOk = new Date();
-        const entries = PCL.entriesFromServer(r.items, state.share.device);
-        const res = PCL.applyEntries(state.leds, entries, () => 'x' + Date.now().toString(36) + Math.floor(Math.random() * 1000));
-        const others = new Set((r.items || []).map(x => String(x.device)).filter(d => d !== state.share.device)).size;
-        if (res.changed) { save(); renderAll(); }
-        setShareStatus((res.changed ? '🆕 다른 노트북의 값을 표에 합쳤습니다' : '🟢 연결됨') +
-            ' · 같은 조의 다른 노트북 ' + others + '대, 불러온 값 ' + res.points + '개' + (res.newLeds ? ', 새 LED ' + res.newLeds + '개' : '') +
-            ' <span class="note">(마지막 확인 ' + timeText(share.lastOk) + (state.share.auto ? ', ' + pollSec() + '초마다 확인' : '') + ')</span>');
-        renderShare();
-    }
-    $('sh-pull').addEventListener('click', () => pull(false));
-    const pollSec = () => Math.max(3, Number(CFG.pollSeconds) || 5) * (share.fails >= 3 ? 3 : 1);
-    // 자동 불러오기: 데이터·결과·결론 탭을 보고 있고 창이 보일 때만
-    function scheduleShare() {
-        clearTimeout(share.timer); share.timer = null;
-        if (!state.share.auto || !groupOk() || !SERVER.url) return;
-        share.timer = setTimeout(() => {
-            if (!document.hidden && ['data', 'result', 'conclusion'].includes(state.tab)) pull(true); else scheduleShare();
-        }, pollSec() * 1000);
-    }
-
-    $('sh-csv').addEventListener('change', async e => {
-        const files = Array.from(e.target.files || []);
-        e.target.value = '';
-        const msgs = [];
-        let changed = false;
-        for (const f of files) {
-            const r = PCL.parseCsv(await f.text());
-            if (r.error) { msgs.push('⚠ ' + esc(f.name) + ': ' + esc(r.error)); continue; }
-            // 이 노트북에서 잰 값과 똑같은 점은 빼고 (내가 받은 CSV 를 다시 불러온 경우)
-            r.entries.forEach(en => {
-                const led = PCL.findLed(state.leds, null, en.name, en.lambda);
-                if (!led) return;
-                en.iv = en.iv.filter(p => !led.iv.some(q => q.v === p.v && Math.abs(q.i - p.i) < 1e-9));
-                en.glow = en.glow.filter(v => !led.glow.includes(v));
-            });
-            const res = PCL.applyEntries(state.leds, r.entries.map(en => Object.assign(en, { src: 'f:' + f.name, label: '파일 ' + f.name })),
-                () => 'x' + Date.now().toString(36) + Math.floor(Math.random() * 1000));
-            changed = changed || res.changed;
-            msgs.push('✅ ' + esc(f.name) + ': 측정값 ' + res.points + '개를 합쳤습니다' + (res.newLeds ? ' (새 LED ' + res.newLeds + '개)' : '') + '.');
-        }
-        if (changed) { save(); renderAll(); }
-        setShareStatus(msgs.join('<br>'), msgs.some(m => m.startsWith('⚠')));
-    });
-    $('sh-clear').addEventListener('click', () => {
-        const n = state.leds.reduce((k, l) => k + PCL.extCount(l), 0);
-        if (!n || !confirm('다른 노트북·CSV 에서 불러온 값 ' + n + '개를 이 노트북에서 지울까요? (이 노트북에서 잰 값과 선생님 시트는 그대로입니다)' +
-            (state.share.auto ? '\n자동 불러오기는 끕니다.' : ''))) return;
-        state.leds.forEach(l => { l.ext = {}; });
-        state.share.auto = false;
-        save(); renderAll();
-        setShareStatus('불러온 값을 지웠습니다. 다시 합치려면 📥 불러오기를 누르세요.');
-    });
-
-    // ---------- 수업 참여 (?c=수업코드, 선생님 '수업 연결' 화면의 QR) ----------
-    // 조·번호(이름 없음)를 고르면 그 조의 조 코드가 조 공유에 들어가고 자동 불러오기가 켜진다.
-    // 단계를 바꿀 때·보낼 때·1분마다 선생님 시트에 '신호'(보고 있는 단계·잰 점 수·보냄 여부)를 보낸다.
-    const CC = window.ClassCloud;
-    const CLASS_CODE = CC ? CC.readClassParam(location.search) : '';
-    const CLASS_KEY = 'planck-class:v1';
-    const cls = { info: null, me: null, lastBeat: 0, timer: null, pending: null };
-    function loadMe() {
-        let d = null;
-        try { d = JSON.parse(localStorage.getItem(CLASS_KEY) || 'null'); } catch (e) { d = null; }
-        return d && d.c === CLASS_CODE && d.jo && d.num ? d : null;
-    }
-    function saveMe() { try { localStorage.setItem(CLASS_KEY, JSON.stringify(cls.me)); } catch (e) { /* 저장 불가 */ } }
+    const newLedId = () => 'x' + Date.now().toString(36) + Math.floor(Math.random() * 1000);
+    let share = null;
     function myPoints() { return state.leds.reduce((n, l) => n + l.iv.length + l.glow.length, 0); }
-    function classBeat(force) {
-        if (!CLASS_CODE || !cls.me || !cls.info || !SERVER.url) return;
-        const now = Date.now(), wait = 5000 - (now - cls.lastBeat);
-        // 탭을 빨리 넘길 때 너무 자주 보내지 않게: 5초 안이면 조금 뒤에 마지막 단계로 한 번만 보낸다
-        if (!force && wait > 0) { if (!cls.pending) cls.pending = setTimeout(() => { cls.pending = null; classBeat(true); }, wait); return; }
-        clearTimeout(cls.pending); cls.pending = null;
-        cls.lastBeat = now;
-        CC.heartbeat(SERVER.url, { classCode: CLASS_CODE, jo: cls.me.jo, num: cls.me.num, step: state.tab, points: myPoints(), submitted: state.share.sent.length > 0, device: state.share.device })
-            .then(r => { $('class-msg').innerHTML = r.ok ? '' : '⚠ 선생님께 진행 상황을 보내지 못했습니다: ' + esc(r.error); });
+    function initShare() {
+        if (!window.ClassShare || !PCF) return null;
+        return window.ClassShare.init({
+            exp: 'planck',
+            barMount: '#class-bar-mount', shareMount: '#share-mount',
+            csvHint: '6. 실험 결과 → CSV 다운로드',
+            legacyMeKey: 'planck-class:v1',
+            sendButtons: ['#btn-send2'],
+            store: { load: () => state.share, save: o => { state.share = o; save(); } },
+            getStep: () => state.tab,
+            getPoints: myPoints,
+            pollWhen: () => ['data', 'result', 'conclusion'].includes(state.tab),
+            async send(ctx) {
+                const cur = fitFor('current', false).res, gl = fitFor('glow', false).res;
+                const b = PCL.buildPayloads({
+                    group: ctx.group, device: ctx.device, leds: state.leds, sent: ctx.sent,
+                    v0: (led, m) => { const t = thr(led, m); return t.error ? null : t.v0; },
+                    summary: { hCurrent: cur ? cur.h / 1e-34 : null, errorPct: cur ? cur.errorPct : null, r2: cur ? cur.fit.r2 : null, hGlow: gl ? gl.h / 1e-34 : null },
+                    curMode: state.curMode, iMin: state.iMin
+                }, PCF.isGroupCode);
+                if (b.error) return { ok: false, error: b.error };
+                let done = 0;
+                const ids = [];
+                for (const pl of b.payloads) {
+                    ctx.progress(done + 1, b.payloads.length);
+                    const r = await PCF.save(ctx.url, pl);
+                    if (!r.ok) return { ok: false, error: r.error, done, ids };
+                    done++; ids.push(pl.id);
+                }
+                return { ok: true, done, ids, label: 'LED ' + done + '개의 측정값' };
+            },
+            async pull(ctx) {
+                const r = await PCF.list(ctx.url + (ctx.url.indexOf('?') >= 0 ? '&' : '?') + 'exp=' + PCL.EXP, ctx.group);
+                if (!r.ok) return r;
+                const res = PCL.applyEntries(state.leds, PCL.entriesFromServer(r.items, ctx.device), newLedId);
+                if (res.changed) { save(); renderAll(); }
+                const others = new Set((r.items || []).map(x => String(x.device)).filter(d => d !== ctx.device)).size;
+                return { ok: true, changed: res.changed, others, points: res.points, newItems: res.newLeds };
+            },
+            async csvImport(files) {
+                const msgs = [];
+                let changed = false;
+                for (const f of files) {
+                    const r = PCL.parseCsv(await f.text());
+                    if (r.error) { msgs.push('⚠ ' + esc(f.name) + ': ' + esc(r.error)); continue; }
+                    // 이 노트북에서 잰 값과 똑같은 점은 빼고 (내가 받은 CSV 를 다시 불러온 경우)
+                    r.entries.forEach(en => {
+                        const led = PCL.findLed(state.leds, null, en.name, en.lambda);
+                        if (!led) return;
+                        en.iv = en.iv.filter(p => !led.iv.some(q => q.v === p.v && Math.abs(q.i - p.i) < 1e-9));
+                        en.glow = en.glow.filter(v => !led.glow.includes(v));
+                    });
+                    const res = PCL.applyEntries(state.leds, r.entries.map(en => Object.assign(en, { src: 'f:' + f.name, label: '파일 ' + f.name })), newLedId);
+                    changed = changed || res.changed;
+                    msgs.push('✅ ' + esc(f.name) + ': 측정값 ' + res.points + '개를 합쳤습니다' + (res.newLeds ? ' (새 LED ' + res.newLeds + '개)' : '') + '.');
+                }
+                if (changed) { save(); renderAll(); }
+                return { html: msgs.join('<br>'), error: msgs.some(m => m.startsWith('⚠')) };
+            },
+            incomingCount: () => state.leds.reduce((n, l) => n + PCL.extCount(l), 0),
+            clearIncoming() { state.leds.forEach(l => { l.ext = {}; }); save(); renderAll(); }
+        });
     }
-    function renderClass() {
-        if (!CLASS_CODE) return;
-        const info = cls.info, me = cls.me;
-        $('class-bar').hidden = false;
-        if (!info) return;
-        const exp = CC.EXPS[info.exp];
-        $('class-info').innerHTML = '<b>🏫 ' + esc(info.ban) + '반 수업</b> <span class="note">수업 코드 ' + esc(info.classCode) + (exp && info.exp !== 'planck' ? ' · ⚠ 이 수업은 ' + esc(exp.name) + ' 수업입니다' : '') + '</span>';
-        $('class-pick').hidden = !!me; $('class-joined').hidden = !me;
-        if (me) {
-            const g = CC.groupFor(info, me.jo);
-            $('cl-me').innerHTML = '나: <b>' + esc(me.jo) + '조 ' + esc(me.num) + '번</b> <span class="note">· 조 코드 ' + esc(g ? g.code : '') + ' · 측정값은 조원·선생님과 자동으로 나눠요</span>';
-            return;
-        }
-        $('cl-jo').innerHTML = '<option value="">조 고르기</option>' + info.groups.map(g => '<option value="' + g.jo + '">' + g.jo + '조 (' + g.size + '명)</option>').join('');
-        fillNums();
-    }
-    function fillNums() {
-        const g = cls.info && CC.groupFor(cls.info, $('cl-jo').value);
-        $('cl-num').innerHTML = g ? Array.from({ length: g.size }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '번</option>').join('') : '<option value="">–</option>';
-        $('cl-join').disabled = !g;
-    }
-    function applyMe() {
-        const g = CC.groupFor(cls.info, cls.me.jo);
-        if (!g) return;
-        state.share.auto = true;
-        if (state.share.group !== g.code) setGroup(g.code); else { save(); renderShare(); pull(true); }
-        classBeat(true);
-        clearInterval(cls.timer);
-        cls.timer = setInterval(() => { if (!document.hidden) classBeat(true); }, 60000);
-    }
-    async function startClass() {
-        if (!CLASS_CODE) return;
-        $('class-bar').hidden = false;
-        if (!SERVER.url) { $('class-msg').textContent = '⚠ 선생님 시트 주소가 없습니다. 선생님이 보여 준 QR 로 다시 들어오세요.'; return; }
-        const r = await CC.joinInfo(SERVER.url, CLASS_CODE);
-        if (!r.ok) {
-            $('class-info').innerHTML = '<b>🏫 수업 참여</b>';
-            $('class-msg').innerHTML = '⚠ ' + esc(r.error) + '<br>수업 없이 측정은 그대로 할 수 있고, 조 공유에 조 코드를 직접 넣어도 됩니다.';
-            return;
-        }
-        cls.info = r;
-        cls.me = loadMe();
-        if (cls.me && !CC.groupFor(r, cls.me.jo)) cls.me = null;
-        renderClass();
-        if (cls.me) applyMe();
-    }
-    $('cl-jo').addEventListener('change', fillNums);
-    $('cl-join').addEventListener('click', () => {
-        const jo = Number($('cl-jo').value), num = Number($('cl-num').value);
-        if (!jo || !num) return;
-        cls.me = { c: CLASS_CODE, jo, num };
-        saveMe(); renderClass(); applyMe();
-        $('class-msg').textContent = '✅ ' + jo + '조 ' + num + '번으로 참여했습니다.';
-    });
-    $('cl-change').addEventListener('click', () => {
-        if (!confirm('조·번호를 다시 고를까요? (이 노트북에서 잰 값은 그대로 남습니다)')) return;
-        cls.me = null; clearInterval(cls.timer);
-        try { localStorage.removeItem(CLASS_KEY); } catch (e) { /* 저장 불가 */ }
-        renderClass();
+    $('btn-send2').addEventListener('click', () => {
+        if (!share) return;
+        if (!PCF.isGroupCode(share.group())) { $('send2-status').textContent = '먼저 5. 데이터 수집 맨 위 \'👥 조 공유\'에서 조 코드를 정하세요.'; return; }
+        share.send('#send2-status');
     });
 
     function renderAll() {
@@ -1017,7 +850,7 @@
         renderMeasure();
         renderResults();
         renderConclusion();
-        renderShare();
+        if (share) share.render();
     }
 
     // ---------- 입력 중인 값 ----------
@@ -1037,7 +870,7 @@
         save();
         renderAll();   // 숨겨져 있던 그래프는 보일 때 크기에 맞춰 다시 그린다
         if (scroll) window.scrollTo(0, 0);
-        classBeat();   // 수업 참여 중이면 선생님께 지금 단계를 알림
+        if (share) share.stepChanged();   // 수업 참여 중이면 선생님께 지금 단계를 알림
     }
     document.querySelectorAll('.tabs button, [data-go]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab || b.dataset.go, true)));
 
@@ -1059,10 +892,8 @@
 
     load();
     applyControls();
-    if (!groupOk()) $('share-box').open = true;
+    share = initShare();
     showTab(state.tab);
-    if (groupOk() && state.share.auto && !CLASS_CODE) pull(true);
-    startClass();
     // 같은 브라우저의 다른 창(탭)에서 바꾼 내용을 따라간다. 그렇지 않으면 이 창이 저장할 때 다른 창의 기록을 덮어쓴다.
     window.addEventListener('storage', e => {
         if (e.key !== STORE_KEY) return;

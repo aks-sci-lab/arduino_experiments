@@ -51,6 +51,29 @@
 
     <!-- ① 시트 연결 -->
     <div class="tab-panel" data-tab="sheet">
+        <!-- 🛠 내 서버 만들기: 구글 로그인(토큰 방식) 한 번으로 시트 + Apps Script 만들고 배포 (js/server-maker.js) -->
+        <section class="ct-card ct-maker" id="makerCard">
+            <h2>🛠 내 서버 만들기 <span class="note">(처음 한 번, 1~2분)</span></h2>
+            <p class="note">선생님 구글 계정으로 로그인하면 내 구글 드라이브에 <b>'센서 실험실 서버'</b> 시트와 Apps Script 가 만들어지고 웹 앱으로 배포돼요. 수업 중에는 지금처럼 로그인 없이 써요. 학생은 구글 계정이 필요 없어요.</p>
+            <p class="note">미리 한 번: <a href="https://script.google.com/home/usersettings" target="_blank" rel="noopener">Apps Script 설정</a>에서 <b>Google Apps Script API</b> 를 <b>사용</b>으로 켜 주세요.</p>
+            <p id="mkNoClient" class="ct-status warn" hidden>사이트 관리자가 구글 클라우드 등록(클라이언트 ID)을 마치면 이 단추가 생겨요. 지금은 아래 <b>손으로 만들기</b>를 쓰세요.</p>
+            <div class="ct-row">
+                <button id="btnMake" class="good">🛠 구글 계정으로 내 서버 만들기</button>
+                <button id="btnMakeReset" class="secondary" hidden>처음부터 다시</button>
+            </div>
+            <ol id="mkSteps" class="ct-mk-steps" hidden></ol>
+            <div class="ct-row" id="mkAllowRow" hidden><button id="btnAllow">🔓 권한 허용 창 열기</button></div>
+            <p id="mkMsg" class="note" role="status" aria-live="polite"></p>
+            <details class="ct-key">
+                <summary>'확인되지 않은 앱' 경고가 나오면</summary>
+                <p class="note">선생님 계정으로 선생님이 만든 스크립트라서 나오는 구글의 안내예요. <b>고급</b> → <b>센서 실험실 서버(으)로 이동(안전하지 않음)</b> → 권한 확인 → <b>허용</b>. 이 스크립트는 붙어 있는 시트 하나와 그 자신의 코드(스스로 업데이트)만 다뤄요.</p>
+            </details>
+            <details class="ct-key">
+                <summary>손으로 만들기 (코드 복사·붙여 넣기)</summary>
+                <p class="note"><a href="pendulum-setup.html">시트 만들기 자세한 안내</a>대로 시트를 만들고, 위 띠의 <b>📋 Code.gs 복사</b>·<b>📋 appsscript.json 복사</b>로 붙여 넣은 뒤 배포하세요. 나온 웹 앱 주소를 아래에 넣고 연결 시험을 누르면 돼요.</p>
+            </details>
+        </section>
+
         <section class="ct-card">
             <h2>① 선생님 시트 연결</h2>
             <p id="sheetNow" class="ct-status"></p>
@@ -85,8 +108,12 @@
                 <label class="ct-field">조별 인원 <input type="number" id="inSize" min="1" max="10" inputmode="numeric" value="4"></label>
             </div>
             <label class="ct-field">실험
-                <select id="inExp"><option value="planck">💡 LED 로 플랑크 상수 측정</option></select>
+                <select id="inExp"></select>
             </label>
+            <label class="ct-field" id="customRow" hidden>선생님이 만든 실험의 번호 (주소 <code>custom-lab.html?id=</code> 뒤의 글자)
+                <input type="text" id="inCustom" autocomplete="off" spellcheck="false" placeholder="예: aB3xY9…">
+            </label>
+            <p id="expNote" class="note"></p>
             <p id="preview" class="ct-preview"></p>
             <div class="ct-row"><button id="btnCreate" class="good">✨ 수업 만들기</button></div>
             <p id="createMsg" class="note" role="status" aria-live="polite"></p>
@@ -158,6 +185,7 @@
 <script src="../js/pendulum-config.js"></script>
 <script src="../js/pendulum-cloud.js"></script>
 <script src="../js/class-cloud.js"></script>
+<script src="../js/server-maker.js"></script>
 <script src="../js/class-teacher.js"></script>
 </body>
 </html>

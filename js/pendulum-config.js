@@ -10,5 +10,8 @@ window.PENDULUM_CONFIG = {
     pollSeconds: 5,         // 노트북 분석 화면이 새 측정을 확인하는 간격(초)
     // 코드가 든 템플릿 시트의 '사본 만들기' 주소 (https://docs.google.com/spreadsheets/d/…/copy).
     // 넣으면 선생님 설정 화면에 "템플릿 시트 사본 만들기" 단추가 나와 코드 붙여 넣기를 건너뛴다. 만드는 법: 설정 화면 맨 아래
-    templateCopyUrl: ''
+    templateCopyUrl: '',
+    // 교사 화면 '🛠 내 서버 만들기'(구글 로그인 한 번으로 시트 + Apps Script 만들고 배포)에 쓰는 구글 OAuth 클라이언트 ID
+    // (…apps.googleusercontent.com). 비어 있으면 그 단추 대신 '손으로 만들기' 안내만. 등록 방법: docs/class-teacher-guide.md
+    googleClientId: '718758606428-u2gap7oatoamfsk8amo4qcigjj2vjpl6.apps.googleusercontent.com'   // 2026-11-16 사이트 관리자가 등록(web-experiment-f9b24 의 웹 클라이언트, 공개 값)
 };
