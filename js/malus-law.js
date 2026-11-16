@@ -7,7 +7,9 @@
     const MS = window.MalusShare;
     let share = null;    // 조 공유 (아래 '조 공유'에서 ClassShare.init)
     const $ = id => document.getElementById(id);
-    const STORE_KEY = 'malus-law-v1';
+    // 📱 노트북 QR 로 연 폰 화면(?role=phone&group=…)이면 카메라·측정만 보이고, 기록은 노트북 화면과 따로 저장한다
+    const PHONE = !!(window.ClassShare && ClassShare.readPhoneParams && ClassShare.readPhoneParams(location.search));
+    const STORE_KEY = PHONE ? 'malus-law-v1:phone' : 'malus-law-v1';
     const SETTINGS_KEY = 'malus-law-settings-v1';
     const NOTES_KEY = 'malus-law-notes-v1';
 
@@ -459,7 +461,7 @@
         const drift = Math.hypot((state.cx - state.refPos.cx) * d.w, (state.cy - state.refPos.cy) * d.h);
         const moved = drift > roiRect().s * 0.3;
         const pt = { run: state.run, theta, raw: r.mean, sd: r.sd, sat: r.sat, ch: $('sel-channel').value, gamma: $('sel-gamma').value,
-            edge: m0 ? m0.edge : 0, drift: Math.round(drift), moved, excluded: false, reason: '' };
+            edge: m0 ? m0.edge : 0, drift: Math.round(drift), moved, excluded: false, reason: '', t: Date.now() };
         state.points.push(pt);
         // 학생이 정한 기준에 걸리는지 확인 (자동 결측이 켜져 있으면 바로 결측 처리)
         const why = flags()[state.points.length - 1];
@@ -476,14 +478,18 @@
         else if (next !== theta) note += ' · 다음 계획 각도: ' + next + '°';
         $('rec-status').textContent = theta + '° 기록 완료' + (r.sat > 0.01 ? ' (⚠ 포화)' : '') + note;
         state.busy = false;
-        save(); render();
+        save(); render(); savedRun();
     }
 
     // ---------- 데이터 ----------
     function intensity(p) { return p.ext ? p.y : p.raw - darkFor(p.ch, p.gamma); }
     // 분석·표·내보내기에 쓰는 모든 점: 내가 잰 점(먼저, 순서 그대로) + 📥 불러온 점(회차 101, 102 …)
     function allPoints() { return MS ? state.points.concat(MS.extPoints(state.ext)) : state.points; }
-    const runName = p => p.ext ? '📥 ' + p.label : p.run + '회차';
+    // 불러온 회차 이름: 폰에서 온 것은 '📱 폰 AB12 · 1회차', 다른 노트북은 '📥 노트북 AB12 · 1회차'
+    const extName = p => (/^📱/.test(p.from || '') ? '' : '📥 ') + p.label;
+    const runName = p => p.ext ? extName(p) : p.run + '회차';
+    // 회차 내용이 바뀌었을 때 (폰: 보낼 회차 목록을 새로 그림, 노트북: 아무 일 없음)
+    function savedRun() { if (share) share.saved(); }
 
     const RUN_COLORS = ['#1c64f2', '#e8590c', '#2f9e44', '#ae3ec9', '#f08c00', '#0c8599', '#c92a2a', '#5c940d'];
     const runColor = run => RUN_COLORS[(run - 1) % RUN_COLORS.length];
@@ -508,7 +514,7 @@
         const pl = plan();
         $('angle').value = pl.angles.length ? pl.angles[0] : 0;
         $('rec-status').textContent = state.run + '회차를 시작합니다. 카메라·스크린 정렬을 다시 확인하세요.';
-        save(); render();
+        save(); render(); savedRun();
     }
 
     // 삭제는 결측 처리와 달리 기록에 남지 않으므로 어느 화면에서든 확인을 받는다
@@ -517,11 +523,11 @@
         if (i < 0) return;
         if (!confirm(p.run + '회차 ' + p.theta + '° 측정값을 삭제할까요?\n(결측 처리와 달리 기록에 남지 않습니다. 잘못 누른 기록만 삭제하세요)')) return;
         state.points.splice(i, 1);
-        save(); render();
+        save(); render(); savedRun();
     }
 
     function setExcluded(p, on) {
-        if (!on) { p.excluded = false; p.reason = ''; save(); render(); return; }
+        if (!on) { p.excluded = false; p.reason = ''; save(); render(); savedRun(); return; }
         const msg = settings.requireReason
             ? '이 값을 결측 처리하는 이유를 적어 주세요. (필수)\n예: 측정 중 폰이 밀림, 판단 기준의 "반복 차이"에 걸림'
             : '결측 처리하는 이유 (선택)';
@@ -530,7 +536,7 @@
         if (settings.requireReason && !reason.trim()) { alert('이유를 적어야 결측 처리할 수 있습니다.'); return; }
         p.excluded = true;
         p.reason = reason.trim();
-        save(); render();
+        save(); render(); savedRun();
     }
 
     // ---------- 화면 갱신 ----------
@@ -608,7 +614,7 @@
             const tr = document.createElement('tr');
             tr.className = (p.excluded ? 'excluded' : '') + (p.ext ? ' ext' : '');
             // 불러온 값은 보낸 노트북에서 고친다 (여기서는 결측·삭제 단추 없음)
-            tr.innerHTML = '<td><span class="run-dot" style="background:' + runColor(p.run) + '"></span>' + (p.ext ? '📥 ' + escapeHtml(p.label) : p.run) + '</td><td>' + p.theta + '°</td><td>' +
+            tr.innerHTML = '<td><span class="run-dot" style="background:' + runColor(p.run) + '"></span>' + (p.ext ? escapeHtml(extName(p)) : p.run) + '</td><td>' + p.theta + '°</td><td>' +
                 pts[i].y.toFixed(4) + '</td><td>' + (fl[i].length ? '<span class="flag">⚠ ' + fl[i].join(', ') + '</span>' : '') + '</td><td class="reason">' +
                 escapeHtml(p.reason || '') + '</td><td class="acts">' + (p.ext ? '<span class="note">불러온 값</span>' : '<button class="secondary">' + (p.excluded ? '복원' : '결측') + '</button> <button class="danger">삭제</button>') + '</td>';
             if (!p.ext) {
@@ -619,7 +625,7 @@
             $('tbody').appendChild(tr);
         });
         const nEx = all.filter(p => p.excluded).length, nExt = all.length - state.points.length;
-        $('cnt').textContent = '(' + all.length + '개' + (nExt ? ', 📥 불러온 값 ' + nExt + '개' : '') + (nEx ? ', 결측 ' + nEx + '개' : '') + ')';
+        $('cnt').textContent = '(' + all.length + '개' + (nExt ? ', 불러온 값 ' + nExt + '개' : '') + (nEx ? ', 결측 ' + nEx + '개' : '') + ')';
 
         // 2. 모델 비교
         $('model-list').innerHTML = '';
@@ -970,7 +976,7 @@
     $('angle').onchange = () => { save(); renderMeasure(); };
     $('frames').onchange = save;
     $('btn-csv').onclick = downloadCsv;
-    $('btn-clear').onclick = () => { if (confirm('측정 데이터를 모두 지울까요?')) { state.points = []; state.refPos = null; state.run = 1; $('move-warn').hidden = true; save(); render(); } };
+    $('btn-clear').onclick = () => { if (confirm('측정 데이터를 모두 지울까요?')) { state.points = []; state.refPos = null; state.run = 1; $('move-warn').hidden = true; save(); render(); savedRun(); } };
     $('btn-zoom').onclick = () => setZoom(!state.zoom);
     $('btn-new-run').onclick = newRun;
     $('resid-model').onchange = e => { state.residModel = e.target.value; save(); renderAnalysis(); };
@@ -1033,7 +1039,22 @@
             getPoints: () => state.points.length,
             pollWhen: () => ['data', 'result', 'conclusion'].includes(state.tab),
             incomingCount: () => MS.extCount(state.ext),
-            clearIncoming: () => { state.ext = {}; save(); render(); }
+            clearIncoming: () => { state.ext = {}; save(); render(); },
+            // 📱 폰 연결: 노트북 조 공유 칸의 '📱 폰으로 측정하기' QR → 폰(같은 페이지 ?role=phone)에서 회차 여러 번 → 골라 보내기
+            phone: true,
+            onRole: role => { document.body.classList.toggle('malus-phone', role === 'phone'); },
+            onPhoneData: n => {
+                const el = $('phone-note');
+                el.hidden = false;
+                el.innerHTML = '🆕 <b>폰에서 새 회차 ' + n + '개</b>가 들어왔어요. <button type="button" class="secondary" data-go="result">6. 결과에서 보기 →</button>';
+            },
+            // 폰 회차 목록의 🗑: 그 회차의 측정점을 지움 (id 'run3' → 3회차)
+            deleteItem: id => {
+                const run = Number(String(id).replace(/^run/, ''));
+                state.points = state.points.filter(p => p.run !== run);
+                if (!state.points.some(p => p.run === state.run)) state.refPos = null;
+                save(); render();
+            }
         });
     }
     $('btn-send2').onclick = () => {
@@ -1046,9 +1067,11 @@
     let hasStepRecord = false;
     try { hasStepRecord = localStorage.getItem('lab-steps:malus-law') != null; } catch (e) { /* 무시 */ }
     steps = window.LabUI && LabUI.initSteps({
-        key: 'malus-law',
-        start: !hasStepRecord && OLD_TAB[state.oldTab] && !location.hash ? OLD_TAB[state.oldTab] : undefined,
+        key: PHONE ? 'malus-law-phone' : 'malus-law',
+        start: PHONE ? 'data' : !hasStepRecord && OLD_TAB[state.oldTab] && !location.hash ? OLD_TAB[state.oldTab] : undefined,
         onShow: onStep
     });
+    // 폰은 5. 데이터(카메라·측정)만 쓴다
+    if (PHONE && state.tab !== 'data') showStep('data');
     requestAnimationFrame(frame);
 })();

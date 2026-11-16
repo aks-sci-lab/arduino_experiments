@@ -113,3 +113,11 @@ th { white-space: nowrap; font-size: .85em; }
 details.more-export summary { min-height: var(--tap); display: flex; align-items: center; }
 details.more-export[open] summary { margin-bottom: 8px; }
 tr.ext td { background: var(--c-primary-soft); }
+/* 📱 노트북 QR 로 연 폰 화면: 카메라·측정(5. 데이터)만 */
+body.malus-phone nav.steps,
+body.malus-phone .step-panel:not([data-step="data"]),
+body.malus-phone #share-mount,
+body.malus-phone #phone-note,
+body.malus-phone .step-next,
+body.malus-phone .plan-banner [data-go] { display: none !important; }
+#phone-note { margin: 0 0 12px; }
