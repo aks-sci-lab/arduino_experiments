@@ -130,7 +130,7 @@
             seenRaw[sig] = true;
             const u = R.rawUnpack(it.raw);
             if (!u || !u.frames.length) return;
-            const who = (/^p/.test(it.device) ? '📱 폰 ' : '💻 ') + it.device.replace(/^p/, '').slice(0, 4).toUpperCase();
+            const who = it.from || ((/^p/.test(it.device) ? '📱 폰 ' : '💻 ') + it.device.replace(/^p/, '').slice(-4).toUpperCase());
             const old = custom.findIndex(c => c.srcKey === it.key);
             const n = old >= 0 ? custom[old].no : custom.filter(c => c.srcKey).length + 1;
             const kind = u.mode === 'breath' ? '🫁 숨 참기' : '❤️ 한 번 재기';
@@ -161,6 +161,10 @@
             getStep: () => 'datalab',
             phone: { page: 'projects/heart-rate.html' }
         });
+        // 폰이 아니면(노트북·태블릿) QR 카드를 바로 보임 — 조 코드가 없으면 저절로 만듦
+        const card = () => { if (share.phoneCard && !card.done && !(window.LabUI && LabUI.device && LabUI.device().kind === 'phone')) { card.done = true; share.phoneCard('#phone-card'); } };
+        window.addEventListener('lab-device', card);
+        card();
     }
 
     function showMsg(t) { $('msg').hidden = !t; $('msg').textContent = t; }

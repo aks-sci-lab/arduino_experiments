@@ -20,9 +20,16 @@
         <button type="button" id="mode-breath" aria-pressed="false"><span class="ic" aria-hidden="true">🫁</span>숨 참기 탐구<small>안정 → 숨 참기 → 회복</small></button>
     </div>
     <p class="lead">뒤 카메라를 검지로 덮으면 심장이 뛸 때마다 밝기가 아주 조금 오르내립니다. 그 맥파로 심박수를 구해요. <b>수업용 — 의료 진단에 쓰지 마세요.</b> 영상은 저장·전송하지 않습니다.</p>
+    <div class="hr-devline"><span id="dev-switch"></span></div>
+    <!-- 💻 노트북·PC: 측정 기능 없이 분석만 (폰 측정 · 노트북 분석 이원화). 태블릿·폰은 그대로 측정 -->
+    <section class="br-card hr-laptop-only" id="phone-card-box">
+        <h2>📱 폰으로 측정해 보내기</h2>
+        <p class="note">노트북에서는 재지 않고 <b>분석만</b> 해요. 폰으로 QR 을 찍어 폰에서 재고(한 번 재기·숨 참기), 보낼 회차를 골라 📤 보내면 여기 회차 목록에 들어와 이 노트북이 계산해요. 폰이 보낸 원본(밝기 숫자, 영상 아님)은 선생님 구글 시트를 거쳐 같은 조 기기만 불러와요.</p>
+        <div id="phone-card"></div>
+    </section>
 
     <!-- 연결·상태 띠 -->
-    <div class="dash-bar">
+    <div class="dash-bar hr-measure">
         <span id="status" class="dash-status" role="status" aria-live="polite">📷 카메라를 켜세요</span>
         <button id="cam" class="primary">📷 카메라 켜기</button>
         <button id="start" class="good" disabled>▶ 측정 시작</button>
@@ -34,7 +41,7 @@
     <div id="torch-warn" class="warn" hidden>⚠️ 플래시를 켜면 폰과 손가락이 뜨거워질 수 있어요. 한 번에 60초까지만, 뜨거우면 바로 멈추세요.</div>
     <p id="msg" class="note" role="status" aria-live="polite"></p>
 
-    <div class="dash-grid">
+    <div class="dash-grid hr-measure">
         <div class="dash-readouts" aria-label="지금 값">
             <div class="dash-card heart"><span class="label">심박수</span><span id="v-bpm" class="value num">--</span><span class="unit">회/분</span></div>
             <div class="dash-card"><span class="label">박동 간격</span><span id="v-ibi" class="value num">--</span><span class="unit">ms</span></div>
@@ -48,13 +55,13 @@
         </div>
     </div>
 
-    <p id="wave-label" class="note">그래프: 빨강(R) 밝기 · 노출 보정 전 · 1초 평균을 빼고 뒤집음(위 = 피가 많아 어두워진 때) · 파란 점 = 계산이 찾은 봉우리</p>
-    <p id="live-est" class="note live-est" aria-live="polite"></p>
+    <p id="wave-label" class="note hr-measure">그래프: 빨강(R) 밝기 · 노출 보정 전 · 1초 평균을 빼고 뒤집음(위 = 피가 많아 어두워진 때) · 파란 점 = 계산이 찾은 봉우리</p>
+    <p id="live-est" class="note live-est hr-measure" aria-live="polite"></p>
 
     <!-- ===== 숨 참기 탐구 (설계: docs/data-processing-class-design.md 2부) ===== -->
     <section id="breath" class="breath" hidden>
         <div id="br-phone-note" class="ok" hidden></div>
-        <div class="br-card" id="br-setup">
+        <div class="br-card hr-measure" id="br-setup">
             <h2>🫁 숨 참기와 심박수</h2>
             <p class="note">안정 <b>60초</b> → 숨 참기 <b>30초 또는 60초</b> → 회복 <b>60초</b> 를 끊지 않고 이어서 잽니다. 힘들면 언제든 <b>■ 숨 참기 멈춤</b> — 멈춘 것도 정상 자료예요(실패가 아님).</p>
             <div class="warn">⚠️ <b>천식·심장 질환·어지럼증이 있거나 최근 아팠던 학생은 숨을 참지 않고</b> 관찰·기록 역할을 맡아요. 60초는 선택이고 30초만 해도 돼요.</div>
@@ -74,7 +81,7 @@
             <div class="row"><button id="br-start" class="good" disabled>▶ 숨 참기 측정 시작</button><span id="br-why" class="note"></span></div>
         </div>
 
-        <div class="br-card br-run" id="br-run" hidden>
+        <div class="br-card br-run hr-measure" id="br-run" hidden>
             <div class="br-phase"><span id="br-phase">안정</span> <b id="br-count">60</b><small>초</small></div>
             <p id="br-guide" class="br-guide">편하게 앉아 숨 쉬세요</p>
             <div class="br-steps" aria-hidden="true"><span data-p="rest">안정</span><span data-p="hold">숨 참기</span><span data-p="rec">회복</span></div>
@@ -109,7 +116,7 @@
             <p id="br-send-st" class="note" role="status"></p>
             <div id="br-share-mount"></div>
             <p class="note">📤 보내기는 '수업 분석 동의'를 체크한 회차만 보내요. 이름·학번·성별은 보내지 않아요.</p>
-            <p class="note">📱 <b>폰으로 재고 노트북에서 분석</b>: 아래 '👥 조 공유'의 '📱 폰으로 측정하기' QR 을 폰으로 찍으세요. 폰이 보낸 원본(밝기 숫자, 영상 아님)은 선생님 시트를 거쳐 같은 조 기기만 불러와요. 동의하지 않은 회차의 결과는 이 노트북에만 남아요.</p>
+            <p class="note">📱 <b>폰으로 재고 노트북에서 분석</b>: 폰이 보낸 원본(밝기 숫자, 영상 아님)은 선생님 시트를 거쳐 같은 조 기기만 불러와요. 결과(곡선·지표)는 이 노트북이 계산하고, 동의하지 않은 회차의 결과는 이 노트북에만 남아요.</p>
         </details>
     </section>
 

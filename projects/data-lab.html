@@ -24,11 +24,12 @@
     </div>
     <p id="src-note" class="note"></p>
     <p id="phone-new" class="ok" role="status" aria-live="polite" hidden></p>
-    <details class="dl-more dl-phone" id="phone-box">
-        <summary>📱 폰으로 재고 여기서 분석하기 (👥 조 공유)</summary>
-        <p class="note">측정은 스마트폰, 분석은 이 노트북에서 해요. 조 코드를 정하고 <b>📱 폰으로 측정하기</b> QR 을 폰으로 찍으세요. 폰에서 잰 회차를 골라 보내면 위 '자료' 목록에 <b>📱 폰 …</b> 으로 들어와요. 폰이 보낸 원본(밝기 숫자, 영상 아님)은 <b>선생님 구글 시트를 거쳐</b> 같은 조 기기만 불러와요.</p>
-        <div id="share-mount"></div>
-    </details>
+    <section class="dl-phone hide-on-phone" id="phone-box">
+        <h2>📱 폰으로 측정해 보내기</h2>
+        <p class="note">측정은 스마트폰, 분석은 여기서 해요. 폰으로 QR 을 찍어 재고 보낼 회차를 골라 📤 보내면 위 '자료' 목록의 <b>📱 폰에서 받은 측정</b>에 들어와요. 폰이 보낸 원본(밝기 숫자, 영상 아님)은 <b>선생님 구글 시트를 거쳐</b> 같은 조 기기만 불러와요.</p>
+        <div id="phone-card"></div>
+        <details class="dl-more"><summary>👥 조 코드 바꾸기 · CSV 로 받기</summary><div id="share-mount"></div></details>
+    </section>
 
     <!-- 늘 보이는 최종 결과 + 단계 탭 -->
     <div class="dl-top">

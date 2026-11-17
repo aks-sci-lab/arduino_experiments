@@ -336,6 +336,18 @@
         share.send('#br-send-st');
     });
 
+    // ---------- 기기 종류: 💻 노트북·PC 는 분석만, 📱 폰·태블릿은 측정 (폰 측정 · 노트북 분석 이원화, AGENTS.md UI 규칙) ----------
+    //  폰 역할(?role=phone)이면 기기 추측과 상관없이 측정 화면. 노트북이면 측정 부분(.hr-measure)을 숨기고 '📱 폰으로 측정해 보내기' 카드
+    function applyDevice() {
+        const kind = window.LabUI && LabUI.device ? LabUI.device().kind : 'phone';
+        const laptop = !PHONE && kind === 'laptop';
+        document.body.classList.toggle('hr-laptop', laptop);
+        if (laptop && share && share.phoneCard && !applyDevice.card) { applyDevice.card = true; share.phoneCard('#phone-card'); }
+    }
+    if (!PHONE && window.LabUI && LabUI.deviceSwitch) LabUI.deviceSwitch('#dev-switch');
+    window.addEventListener('lab-device', applyDevice);
+    applyDevice();
+
     setMode(state.mode);
     // 시험용
     window.__breath = { state: () => state, scale: SCALE };

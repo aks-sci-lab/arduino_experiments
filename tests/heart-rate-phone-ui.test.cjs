@@ -75,19 +75,27 @@ test('📱 폰 측정 → 노트북 분석: 데이터 가공 실험실 · 숨 �
         const L = await ctx({ viewport: { width: 1280, height: 800 } }, 'L');
         await L.goto(ROOT + 'projects/data-lab.html');
         await L.waitForFunction(() => /\d/.test(document.getElementById('final').textContent), null, { timeout: 20000 });
+        // 폰 카드가 바로 보이고 조 코드는 저절로 (99반) → 조 코드를 바꾸면 QR 도 바뀜
+        await L.waitForSelector('#phone-card #cs-cardqr svg', { state: 'attached' });
+        assert.match(await L.getAttribute('#phone-card a', 'href'), /role=phone&group=99-/);
         await L.click('#phone-box summary');
         await L.fill('#cs-group', G); await L.press('#cs-group', 'Enter');
-        await L.waitForTimeout(400);
-        await L.click('#cs-phone');
-        await L.waitForSelector('.cs-dlg:not([hidden]) #cs-qr svg', { state: 'attached' });
-        const link = await L.getAttribute('#cs-plink', 'href');
+        await L.waitForFunction(g => /group=/.test(document.querySelector('#phone-card a').href) && document.querySelector('#phone-card a').href.includes('group=' + g), G);
+        const link = await L.getAttribute('#phone-card a', 'href');
         console.log('QR:', link);
         assert.match(link, /projects\/heart-rate\.html\?role=phone&group=3-2-4821/);
-        await L.click('#cs-pclose');
         // ---- 노트북 2: 심박수 숨 참기 탐구 (같은 조 코드) ----
         const L2 = await ctx({ viewport: { width: 1280, height: 800 } }, 'L2');
         await L2.goto(ROOT + 'projects/heart-rate.html#breath-scale=0.2');
+        // 💻 노트북: 측정 기능 없음, '📱 폰으로 측정해 보내기' 카드
+        assert.equal(await L2.evaluate(() => document.documentElement.dataset.device), 'laptop');
+        assert.equal(await L2.isVisible('#cam'), false, '노트북은 카메라 단추 없음');
+        assert.equal(await L2.isVisible('#start'), false);
+        assert.equal(await L2.isVisible('#phone-card-box'), true);
+        await L2.waitForSelector('#phone-card #cs-cardqr', { state: 'attached' });
         await L2.click('#mode-breath');
+        assert.equal(await L2.isVisible('#br-start'), false, '노트북은 숨 참기 시작 없음');
+        assert.equal(await L2.isVisible('#br-runs-box'), true);
         await L2.evaluate(() => document.getElementById('cs-share').open = true);
         await L2.fill('#cs-group', G); await L2.press('#cs-group', 'Enter');
         await L2.waitForTimeout(400);
@@ -131,7 +139,6 @@ test('📱 폰 측정 → 노트북 분석: 데이터 가공 실험실 · 숨 �
         assert.ok('참은 초' in rows[0].summary);
         const d0 = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
         assert.equal(d0.kind, 'raw'); assert.equal(d0.mode, 'breath');
-        if (process.env.DUMP) fs.writeFileSync(process.env.DUMP + '.' + Date.now() + '.json', JSON.stringify(d0));
 
         // ---- 노트북 1: 자료 목록에 📱 폰 + 🆕 → 단계 계산 ----
         await L.waitForFunction(() => !document.getElementById('phone-new').hidden, null, { timeout: 20000 });
@@ -141,7 +148,6 @@ test('📱 폰 측정 → 노트북 분석: 데이터 가공 실험실 · 숨 �
         assert.equal(opts.length, 1); assert.match(opts[0].t, /📱 폰 \w{4} · 1회차/);
         await L.selectOption('#src', opts[0].v);
         await L.waitForFunction(() => /📱 폰/.test(document.getElementById('final-sub').textContent));
-        console.log('L store:', (await L.evaluate(() => JSON.stringify(Object.entries(localStorage)))).slice(0, 800), '| sub:', await L.textContent('#final-sub'));
         const fin = Number(await L.textContent('#final'));
         console.log('데이터 가공 최종:', fin, '|', await L.textContent('#src-note'));
         assert.ok(Math.abs(fin - 75) <= 4, '최종 ' + fin);
@@ -159,12 +165,33 @@ test('📱 폰 측정 → 노트북 분석: 데이터 가공 실험실 · 숨 �
         assert.equal(await L2.isVisible('#br-result'), true);
         assert.match(await L2.textContent('#br-runs'), /📱/);
 
+        // ---- 📟 태블릿: 측정도 분석도 (카드 없이, 측정 단추 있음) ----
+        const T = await ctx(devices['Galaxy Tab S4'], 'T');
+        await T.goto(ROOT + 'projects/heart-rate.html');
+        assert.equal(await T.evaluate(() => document.documentElement.dataset.device), 'tablet');
+        assert.equal(await T.isVisible('#cam'), true); assert.equal(await T.isVisible('#runs-box'), true);
+        assert.equal(await T.isVisible('#phone-card-box'), false);
+        // ---- 📱 QR 없이 폰으로 바로 연 경우: 측정 + 결과까지 (노트북이 없을 때) ----
+        const I = await ctx(devices['iPhone 13'], 'I');
+        await I.goto(ROOT + 'projects/heart-rate.html');
+        assert.equal(await I.evaluate(() => document.documentElement.dataset.device), 'phone');
+        assert.equal(await I.isVisible('#cam'), true); assert.equal(await I.isVisible('#runs-box'), true);
+        assert.equal(await I.isVisible('#phone-card-box'), false);
+        await check(I, 'iPhone 13 (QR 없이)');
+        // 추측이 틀리면 '이 기기' 고르기로 바꿈 → 노트북 화면
+        await I.selectOption('#dev-switch select', 'laptop');
+        assert.equal(await I.isVisible('#cam'), false); assert.equal(await I.isVisible('#phone-card-box'), true);
+        await I.selectOption('#dev-switch select', 'phone');
+        assert.equal(await I.isVisible('#cam'), true);
+
         // ---- 375px: 데이터 가공 실험실 ----
         const S = await ctx({ viewport: { width: 375, height: 760 } }, 'S');
         await S.goto(ROOT + 'projects/data-lab.html');
         await S.waitForFunction(() => /\d/.test(document.getElementById('final').textContent), null, { timeout: 20000 });
+        await S.waitForSelector('#phone-card #cs-cardqr', { state: 'attached' });
         await S.click('#phone-box summary');
         await check(S, 'data-lab 375');
+        await check(L2, 'heart-rate 노트북');
         assert.deepEqual(errors, []);
     } finally {
         await browser.close(); api.close(); stat.close();

@@ -81,3 +81,8 @@ body.mode-breath #start, body.mode-breath #dur, body.mode-breath #runs-box, body
 body.hr-phone #runs-box, body.hr-phone #detail-box, body.hr-phone details.sim,
 body.hr-phone #br-result, body.hr-phone #br-profile-box, body.hr-phone #br-runs-box, body.hr-phone #br-phone-note { display: none !important; }
 #br-phone-note { margin: 0 0 var(--sp-3); }
+/* 💻 노트북·PC (폰 역할이 아닐 때, LabUI.device 'laptop'): 측정 기능을 숨기고 '📱 폰으로 측정해 보내기' 카드만 */
+.hr-laptop-only { display: none; }
+body.hr-laptop .hr-laptop-only { display: block; }
+body.hr-laptop .hr-measure, body.hr-laptop #torch-warn { display: none !important; }
+.hr-devline { display: flex; justify-content: flex-end; margin: 0 0 var(--sp-2); }
