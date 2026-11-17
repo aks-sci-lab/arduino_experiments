@@ -12,7 +12,8 @@
     const KEY = 'face-hr-lab:v1', SKEY = 'face-hr-lab:session', PKEY = 'face-hr-lab:phone';
     const MP_VER = '0.10.14';
     const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + MP_VER;
-    const MP_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+    // 모델은 사이트에 직접 둔 파일(vendor/mediapipe, Apache-2.0) — 외부 주소를 늘리지 않고 학교 망에서도 되게 (2026-11-17 선생님 결정)
+    const MP_MODEL = new URL('../vendor/mediapipe/face_landmarker.task', location.href).href;
     // 얼굴 랜드마크 번호 (MediaPipe 얼굴 478점): 이마(눈썹 위), 화면 왼쪽 볼(사람의 오른볼)·오른쪽 볼 — 눈·입·눈썹은 들어가지 않음
     const LM = {
         fh: [67, 109, 10, 338, 297, 334, 296, 336, 9, 107, 66, 105],
