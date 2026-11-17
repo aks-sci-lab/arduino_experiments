@@ -51,6 +51,7 @@
                 <div class="big small"><b id="bpm-chrom">--</b><small>CHROM</small></div>
                 <div class="big small"><b id="bpm-green">--</b><small>GREEN</small></div>
                 <div class="big gt"><b id="bpm-gt">--</b><small>정답</small></div>
+                <span id="wrist-bar" class="wrist-bar" hidden><button id="wrist-go" class="secondary">⏱ 손목 15초</button><input type="number" id="wrist-n" min="1" max="80" inputmode="numeric" hidden></span>
                 <button id="start" class="good" disabled>▶ 측정 시작</button>
                 <button id="stop" class="danger" hidden>■ 멈추기</button>
             </div>
@@ -210,6 +211,7 @@
 
 <script src="../js/pendulum-config.js"></script>
 <script src="../js/pendulum-cloud.js"></script>
+<script src="../js/dev-collect.js"></script>
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-share.js"></script>
 <script src="../js/heart-rate-math.js"></script>
