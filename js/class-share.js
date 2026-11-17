@@ -596,6 +596,8 @@
             cardEl.hidden = false;
             if (!SERVER.url) { cardEl.innerHTML = '<p class="cs-note">⚠ 선생님 시트가 아직 연결되지 않아 폰에서 바로 보낼 수 없어요. 폰에서 CSV 로 저장해 이 노트북에서 불러오세요.</p>'; return; }
             if (CLASS && !cls.me) { cardEl.innerHTML = '<p class="cs-note">위 🏫 수업 참여에서 조·번호를 고르면 폰용 QR 이 나와요.</p>'; return; }
+            // 카드가 안 보이면(태블릿·폰에서 .show-on-laptop 등) 조 코드를 저절로 만들지 않음 — 보이게 되면('이 기기' 바꿈) 그때
+            if (!cardEl.getClientRects().length) { cardEl.dataset.link = ''; return; }
             if (!autoGroup()) return;
             var link = phoneLink();
             if (cardEl.dataset.link === link && document.getElementById('cs-cardqr')) return;
@@ -614,7 +616,10 @@
             });
         }
         function phoneCard(where) {
+            if (!cardEl) window.addEventListener('lab-device', function () { setTimeout(renderCard, 0); });
             cardEl = typeof where === 'string' ? document.querySelector(where) : where;
+            // 단계 탭·접기 안에 있어 처음엔 안 보이다가 보이게 되면 그때 그림
+            if (cardEl && typeof ResizeObserver === 'function') new ResizeObserver(function () { if (cardEl.getClientRects().length && !cardEl.dataset.link) renderCard(); }).observe(cardEl);
             if (cardEl) cardEl.classList.add('cs-card', 'cs-phonecard');
             renderCard();
             return cardEl;

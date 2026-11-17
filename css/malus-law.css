@@ -121,3 +121,10 @@ body.malus-phone #phone-note,
 body.malus-phone .step-next,
 body.malus-phone .plan-banner [data-go] { display: none !important; }
 #phone-note { margin: 0 0 12px; }
+/* 폰 측정 · 노트북 분석 이원화: 제목 아래 '이 기기' 고르기, 노트북 안내 카드 */
+.device-row { margin: -4px 0 10px; }
+.laptop-guide h2 { margin-top: 0; }
+body.malus-phone .phone-solo { display: none !important; }
+/* ?role=phone 으로 연 화면은 기기 추측과 관계없이 측정 화면 (노트북에서 폰 주소를 열어 볼 때도) */
+html body.malus-phone .card.hide-on-laptop { display: block !important; }
+body.malus-phone .show-on-laptop { display: none !important; }

@@ -11,6 +11,23 @@
     const $ = id => document.getElementById(id);
     const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+    // 기기 종류 (js/lab-ui.js 의 LabUI.device): 노트북·PC 는 분석만, 폰은 측정, 태블릿은 둘 다 (AGENTS.md UI 규칙 '폰 측정 · 노트북 분석 이원화')
+    const isLaptop = () => document.documentElement.classList.contains('device-laptop');
+    // 노트북의 QR 로 연 화면(?role=phone)은 터치가 없는 브라우저여도 폰 화면으로 (이 페이지에서만, 기억하지 않음)
+    function forcePhoneView() {
+        const html = document.documentElement;
+        if (!html.classList.contains('device-laptop')) return;
+        html.classList.remove('device-laptop'); html.classList.add('device-phone'); html.setAttribute('data-device', 'phone');
+    }
+    // 다른 기기 기록을 그래프에 크게 띄우기
+    function view(k) {
+        const it = incoming[k];
+        if (!it || api.isRecording()) return false;
+        fresh.delete(k);
+        api.showSamples(it.rows.map(r => ({ t: 0, rel: r[0] * 1000, ax: r[1], ay: r[2], az: r[3] })), null, it.from + ' · ' + it.title);
+        return true;
+    }
+
     let incoming = {};
     try { incoming = JSON.parse(localStorage.getItem(IN_KEY) || '{}') || {}; } catch (e) { incoming = {}; }
     const shown = new Set(), fresh = new Set();
@@ -74,9 +91,8 @@
             const k = keys[Number(v.dataset.view)], it = incoming[k];
             if (!it) return;
             if (api.isRecording()) { alert('기록을 멈춘 뒤에 보세요.'); return; }
-            fresh.delete(k);
             // 내 회차는 회차 목록에 남아 있으므로 다른 기기 기록을 띄워도 잃지 않음
-            api.showSamples(it.rows.map(r => ({ t: 0, rel: r[0] * 1000, ax: r[1], ay: r[2], az: r[3] })), null, it.from + ' · ' + it.title);
+            view(k);
             renderIncoming();
             $('accChart').scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -92,6 +108,7 @@
             onRole(r) {
                 role = r;
                 document.body.classList.toggle('is-phone', r === 'phone');
+                if (r === 'phone') forcePhoneView();
                 api.hideRunList(r === 'phone');   // 폰은 띠 안의 회차 고르기 목록을 씀
             },
             deleteItem: id => api.deleteRun(id),
@@ -104,11 +121,15 @@
                 });
                 if (!r.changed) return false;
                 // 새로 들어온 기록(특히 📱 폰)은 🆕 표시하고 그래프에 바로 겹쳐 보이게
+                const added = [];
                 Object.keys(r.store).forEach(k => {
-                    if (!incoming[k] || String(incoming[k].sentAt) !== String(r.store[k].sentAt)) { fresh.add(k); shown.add(k); }
+                    if (!incoming[k] || String(incoming[k].sentAt) !== String(r.store[k].sentAt)) { fresh.add(k); shown.add(k); added.push(k); }
                 });
                 incoming = r.store;
                 saveIncoming();
+                // 💻 노트북(직접 재지 않음): 폰에서 새로 온 기록을 바로 그래프에 크게 — 분석은 노트북에서
+                const fromPhone = added.filter(k => /^p/.test(String(incoming[k].device || '')));
+                if (isLaptop() && fromPhone.length) { const k = fromPhone[fromPhone.length - 1]; view(k); fresh.add(k); }
                 renderIncoming();
                 return true;
             },
@@ -120,6 +141,18 @@
         });
     } catch (e) { console.error('조 공유 준비 실패', e); }
     renderIncoming();
+    // 💻 노트북·PC: 연결·상태 띠 아래 '📱 폰으로 측정해 보내기' QR 카드 (폰·태블릿에서는 숨김이라 만들지 않음 — 조 코드를 저절로 만들기 때문)
+    let cardOn = false;
+    function syncDevice() {
+        if (share && isLaptop() && !cardOn) {
+            cardOn = true; share.phoneCard('#phone-card');
+            const sh = document.getElementById('cs-share'); if (sh) sh.open = false;   // 조 공유 칸은 접어 QR 카드가 먼저 보이게
+        }
+        if (isLaptop() && !api.getSamples().length) $('record-status').textContent = '💻 분석 화면 · 폰에서 보낸 기록을 기다리는 중';
+    }
+    if (window.LabUI && LabUI.deviceSwitch) LabUI.deviceSwitch('#device-switch');
+    window.addEventListener('lab-device', syncDevice);
+    syncDevice();
     api.onChange(runChanged => {
         if (!share) return;
         if (runChanged) share.saved();   // 폰: 회차 목록에 쌓임 (노트북: 아무것도 안 함)

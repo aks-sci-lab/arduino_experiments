@@ -109,6 +109,8 @@ test('수업 참여 → 조 공유 보내기·자동 불러오기 → 교사 진
             assert.ok(h >= 44, C.exp + ': 보내기 단추 높이 ' + h);
             // 참여하자마자 하는 첫 불러오기가 끝난 뒤 보낸다 (안 그러면 그 안내가 보내기 결과 글을 덮음)
             await A.page.waitForFunction(() => /연결됨/.test(document.getElementById('cs-status').textContent));
+            // 노트북 화면(터치 없는 창)의 스마트폰 가속도·자유낙하는 조 공유 칸이 접혀 있음 (폰 QR 카드가 먼저) → 펼쳐서 보냄
+            await A.page.evaluate(() => { document.getElementById('cs-share').open = true; });
             await A.page.click('#cs-send');
             await A.page.waitForFunction(() => /✅ 선생님 시트로 보냈습니다/.test(document.getElementById('cs-status').textContent), null, { timeout: 10000 })
                 .catch(async e => { throw new Error(C.exp + ': 보내기 — ' + await A.page.textContent('#cs-status') + ' / ' + A.errors.join(' | ')); });
@@ -119,6 +121,7 @@ test('수업 참여 → 조 공유 보내기·자동 불러오기 → 교사 진
             assert.match(await C.incoming(B.page), C.expectIn, C.exp + ': B 가 받은 값');
             assert.ok(await noSideScroll(B.page), C.exp + ': B 375px');
             // 받은 값은 다시 보내지 않음 (B 에는 보낼 측정값이 없음)
+            await B.page.evaluate(() => { document.getElementById('cs-share').open = true; });
             await B.page.click('#cs-send');
             await B.page.waitForFunction(() => /보낼 측정값이 없습니다/.test(document.getElementById('cs-status').textContent));
 

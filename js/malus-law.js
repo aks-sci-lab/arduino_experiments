@@ -24,6 +24,7 @@
         dark: null,          // { value, ch, gamma }
         points: [],
         ext: {},             // 같은 조 다른 노트북이 보낸 값 (조 공유, js/malus-share.js). 내 기록과 따로 둔다
+        extFile: {},         // 📂 CSV 불러오기로 넣은 값 (시트가 없을 때 폰 → 노트북). 모양은 ext 와 같음
         share: null,         // 조 공유 상태 (조 코드·노트북 번호·보낸 것, js/class-share.js 가 정함)
         busy: false,
         zoom: false,         // 측정 영역 근처만 확대해서 보기
@@ -82,7 +83,7 @@
                 angle: $('angle').value, frames: $('frames').value,
                 zoom: state.zoom, refPos: state.refPos, run: state.run,
                 models: state.models, residModel: state.residModel, normView: state.normView,
-                ext: state.ext, share: state.share
+                ext: state.ext, extFile: state.extFile, share: state.share
             }));
         } catch (e) { /* 저장소를 쓸 수 없어도 동작에는 영향 없음 */ }
     }
@@ -102,6 +103,7 @@
             if (d.residModel && M.MODELS[d.residModel]) state.residModel = d.residModel;
             if (d.normView) state.normView = d.normView;
             if (d.ext && typeof d.ext === 'object') state.ext = d.ext;
+            if (d.extFile && typeof d.extFile === 'object') state.extFile = d.extFile;
             if (d.share && typeof d.share === 'object') state.share = d.share;
             if (d.tab) state.oldTab = d.tab;
             // 이전 버전에서 저장된 점: 회차가 없으면 1회차, 자동 결측은 사유를 붙인다
@@ -484,9 +486,10 @@
     // ---------- 데이터 ----------
     function intensity(p) { return p.ext ? p.y : p.raw - darkFor(p.ch, p.gamma); }
     // 분석·표·내보내기에 쓰는 모든 점: 내가 잰 점(먼저, 순서 그대로) + 📥 불러온 점(회차 101, 102 …)
-    function allPoints() { return MS ? state.points.concat(MS.extPoints(state.ext)) : state.points; }
-    // 불러온 회차 이름: 폰에서 온 것은 '📱 폰 AB12 · 1회차', 다른 노트북은 '📥 노트북 AB12 · 1회차'
-    const extName = p => (/^📱/.test(p.from || '') ? '' : '📥 ') + p.label;
+    const allExt = () => Object.assign({}, state.ext, state.extFile);   // 조 공유로 받은 것 + CSV 파일 (기기 이름이 겹치지 않음: 파일은 'f:파일 이름')
+    function allPoints() { return MS ? state.points.concat(MS.extPoints(allExt())) : state.points; }
+    // 불러온 회차 이름: 폰에서 온 것은 '📱 폰 AB12 · 1회차', 파일은 '📂 malus-law.csv · 1회차', 다른 노트북은 '📥 노트북 AB12 · 1회차'
+    const extName = p => (/^(📱|📂)/.test(p.from || '') ? '' : '📥 ') + p.label;   // 📂 = CSV 파일로 불러온 값
     const runName = p => p.ext ? extName(p) : p.run + '회차';
     // 회차 내용이 바뀌었을 때 (폰: 보낼 회차 목록을 새로 그림, 노트북: 아무 일 없음)
     function savedRun() { if (share) share.saved(); }
@@ -857,7 +860,7 @@
         lines.push('', '■ 결측 처리 (' + ex.length + '개)');
         ex.forEach(p => lines.push('- ' + runName(p) + ' ' + p.theta + '°: ' + (p.reason || '(사유 없음)')));
         const nExt = allPoints().length - state.points.length;
-        if (nExt) lines.push('', '■ 조 공유로 불러온 값: ' + nExt + '개 (' + [...new Set(MS.extPoints(state.ext).map(p => p.label))].join(', ') + ')');
+        if (nExt) lines.push('', '■ 조 공유로 불러온 값: ' + nExt + '개 (' + [...new Set(MS.extPoints(allExt()).map(p => p.label))].join(', ') + ')');
         lines.push('', '■ 모델 비교');
         const pts = pointsI();
         if (!state.models.length) lines.push('(모델을 고르지 않음)');
@@ -1038,8 +1041,20 @@
             getStep: () => state.tab,
             getPoints: () => state.points.length,
             pollWhen: () => ['data', 'result', 'conclusion'].includes(state.tab),
-            incomingCount: () => MS.extCount(state.ext),
-            clearIncoming: () => { state.ext = {}; save(); render(); },
+            incomingCount: () => MS.extCount(allExt()),
+            clearIncoming: () => { state.ext = {}; state.extFile = {}; save(); render(); },
+            // 📂 이 페이지의 CSV(폰에서 6. 결과 → CSV 다운로드) 불러오기: 시트가 없을 때 폰 → 노트북
+            csvImport: async files => {
+                const msgs = [];
+                for (const f of files) {
+                    const r = MS.parseCsv(await f.text());
+                    if (r.error) { msgs.push('⚠ ' + escapeHtml(f.name) + ': ' + escapeHtml(r.error)); continue; }
+                    state.extFile['f:' + f.name] = { from: '📂 ' + f.name, runs: r.runs };
+                    msgs.push('✅ ' + escapeHtml(f.name) + ': 회차 ' + Object.keys(r.runs).length + '개, 측정값 ' + r.points + '개를 6. 결과에 합쳤습니다.');
+                }
+                save(); render();
+                return { html: msgs.join('<br>'), error: msgs.some(m => m.startsWith('⚠')) };
+            },
             // 📱 폰 연결: 노트북 조 공유 칸의 '📱 폰으로 측정하기' QR → 폰(같은 페이지 ?role=phone)에서 회차 여러 번 → 골라 보내기
             phone: true,
             onRole: role => { document.body.classList.toggle('malus-phone', role === 'phone'); },
@@ -1057,6 +1072,18 @@
             }
         });
     }
+    // 💻 노트북·PC 는 측정 화면을 숨기고 5. 데이터 맨 위에 폰용 QR 카드 (폰 측정 · 노트북 분석 이원화)
+    // 노트북일 때만 만든다 (카드가 조 코드를 저절로 정하므로 폰·태블릿에서는 만들지 않음). '이 기기'를 노트북으로 바꾸면 그때 만든다
+    let cardMade = false;
+    function deviceKind() { return window.LabUI && LabUI.device ? LabUI.device().kind : 'tablet'; }
+    function makePhoneCard() {
+        if (cardMade || !share || PHONE || deviceKind() !== 'laptop' || !share.phoneCard) return;
+        cardMade = true;
+        share.phoneCard('#phone-card');
+    }
+    makePhoneCard();
+    window.addEventListener('lab-device', () => { makePhoneCard(); render(); });
+    if (window.LabUI && LabUI.deviceSwitch) LabUI.deviceSwitch('#device-switch');
     $('btn-send2').onclick = () => {
         if (!share) { $('send2-status').textContent = '조 공유를 불러오지 못했습니다. 6. 결과의 CSV 다운로드를 쓰세요.'; return; }
         if (!share.group()) { $('send2-status').textContent = '먼저 5. 데이터 맨 위 \'👥 조 공유\'에서 조 코드를 정하세요.'; return; }
