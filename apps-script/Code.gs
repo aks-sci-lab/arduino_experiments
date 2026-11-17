@@ -43,7 +43,7 @@
  * 4단계(보고서·AI)용 시트 reports·ai_logs·quiz 는 만들어 두기만 한다.
  */
 
-var VERSION = 8;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠  6: 모든 실험 공용 저장(submissions 시트)·수업에 모든 실험  7: 요약 이름에 °·%·한글 등 허용('|'·제어 문자만 막음)  8: 업데이트·되돌리기 오류에 원래 문구와 권한 안내
+var VERSION = 9;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠  6: 모든 실험 공용 저장(submissions 시트)·수업에 모든 실험  7: 요약 이름에 °·%·한글 등 허용('|'·제어 문자만 막음)  8: 업데이트·되돌리기 오류에 원래 문구와 권한 안내  9: 스마트폰 카메라 심박수(heartrate) 공용 저장
 // 스스로 업데이트: 코드는 이 고정 주소에서만 받는다 (요청 값으로 바꿀 수 없음)
 var SITE = 'https://aks-sci-lab.web.app/apps-script/';
 var SCRIPT_API = 'https://script.googleapis.com/v1/projects/';
@@ -75,7 +75,7 @@ var SHEETS = {
 var DEVICE_RE = /^[A-Za-z0-9_-]{4,20}$/;
 var CLASS_RE = /^\d{1,2}-\d{4}$/;                 // 반-4자리 (예: 2-4821)
 // 수업으로 쓸 수 있는 실험 (js/class-cloud.js 의 EXPS 와 같게). 'custom:<실험 id>' 는 선생님이 만든 실험
-var GENERIC_EXPS = { idealgas: 1, accel: 1, env: 1, light: 1, uv: 1, phoneaccel: 1, malus: 1, eminduction: 1, freefall: 1, nano: 1 };
+var GENERIC_EXPS = { idealgas: 1, accel: 1, env: 1, light: 1, uv: 1, phoneaccel: 1, malus: 1, eminduction: 1, freefall: 1, nano: 1, heartrate: 1 };
 var CLASS_EXPS = { planck: 1, pendulum: 1 };
 Object.keys(GENERIC_EXPS).forEach(function (k) { CLASS_EXPS[k] = 1; });
 var CUSTOM_EXP_RE = /^custom:[A-Za-z0-9_-]{1,40}$/;

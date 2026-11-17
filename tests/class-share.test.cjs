@@ -124,6 +124,19 @@ test('수업: 모든 실험으로 만들 수 있고, 진행 보기에 실험별 
     assert.equal(app.ss.getSheetByName('progress').rows[1][10], 'custom:abcDEF_12');
 });
 
+test('9판: 스마트폰 카메라 심박수(heartrate) 저장·목록, 수업도 만들 수 있음', () => {
+    const app = loadCodeGs();
+    assert.ok(app.get({ action: 'ping' }).version >= 9);
+    assert.equal(app.ctx.isGenericExp('heartrate'), true);
+    assert.equal(app.ctx.isClassExp('heartrate'), true);
+    const r = app.post({ action: 'save', exp: 'heartrate', id: 'nabcd12-run1', group: '2-3-5376', device: 'nabcd12', title: '1회', n: 300,
+        summary: { 'BPM': 72, '측정 시간(s)': 30 }, data: JSON.stringify({ t: [0, 1], v: [1, 2] }), sentAt: new Date().toISOString() });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    const l = app.get({ action: 'list', exp: 'heartrate', group: '2-3-5376' });
+    assert.equal(l.items.length, 1); assert.equal(l.items[0].summary.BPM, 72);
+    const c = app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'heartrate' });
+    assert.equal(c.ok, true, JSON.stringify(c));
+});
 test('실험 목록: 서버와 같은 이름, 학생 링크(이미 ?가 있는 주소 포함)', () => {
     const app = loadCodeGs();
     Object.keys(CC.EXPS).forEach(k => assert.equal(app.ctx.isClassExp(k), true, k));
