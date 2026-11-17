@@ -7,14 +7,17 @@
     if (!core || !B || !H) return;
     const $ = id => document.getElementById(id);
     const esc = core.esc;
-    const KEY = 'heart-rate-breath:v1';
+    const PHONE = !!core.isPhone;   // 📱 노트북 QR 로 연 폰: 측정만, 원본을 골라 보냄 (계산·결과는 노트북)
+    const R = window.HeartRateRaw;
+    const KEY = 'heart-rate-breath:v1' + (PHONE ? ':phone' : '');
     const MAX_RUNS = 20, KEEP_RAW = 2;
     // 시험용: 주소 끝 #breath-scale=0.2 면 구간 길이를 0.2 배로 (안정 12초 · 숨 참기 6초 · 회복 12초)
     const SCALE = (() => { const m = /breath-scale=([\d.]+)/.exec(location.hash); const v = m ? Number(m[1]) : 1; return v > 0 && v <= 1 ? v : 1; })();
 
-    let state = { mode: 'live', hold: 30, profile: { exercise: '', height: '', weight: '' }, consent: false, runs: [], ext: {}, view: '', cmp: null, share: null };
+    let state = { mode: 'live', hold: 30, profile: { exercise: '', height: '', weight: '' }, consent: false, runs: [], ext: {}, view: '', cmp: null, share: null, phoneRuns: [] };
     try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && typeof s === 'object') state = Object.assign(state, s); } catch (e) { /* 무시 */ }
     if (!Array.isArray(state.runs)) state.runs = [];
+    if (!Array.isArray(state.phoneRuns)) state.phoneRuns = [];
     function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { core.msg('⚠ 숨 참기 회차를 이 브라우저에 저장하지 못했어요. CSV 로 내려받아 두세요.', 'warn'); } }
 
     // ---------- 모드 바꾸기 ----------
@@ -119,10 +122,22 @@
             core.msg('숨 참기 측정을 그만둬서 저장하지 않았어요. 다시 하려면 ▶ 숨 참기 측정 시작.', 'warn');
             return;
         }
+        const ph0 = { holdStart: round1(t.marks.holdStart), holdEnd: round1(t.marks.holdEnd), end: round1(frameNow(rec)), holdPlanned: t.planned, stopped: t.stopped, scale: SCALE };
+        if (PHONE) {
+            // 폰은 계산하지 않고 원본만 저장 → 위 '📱 노트북과 연결됨' 띠의 회차 목록에서 골라 보냄
+            const id = (() => { let k = 1; const ids = new Set(state.phoneRuns.map(r => r.id)); while (ids.has('b' + k)) k++; return 'b' + k; })();
+            state.phoneRuns.push({ id, mode: 'breath', at: new Date().toISOString(), ph: ph0, raw: H.pack(rec.frames), lock: rec.lock || 'unlocked', why: rec.why || '', lockLog: rec.lockLog || null, scene: rec.scene || null });
+            while (state.phoneRuns.length > 10) state.phoneRuns.shift();
+            save();
+            showRun(false); gate();
+            if (share) share.saved();
+            core.msg(`💾 숨 참기 회차를 저장했어요 (참은 시간 ${Math.round(ph0.holdEnd - ph0.holdStart)}초${ph0.stopped ? ', 멈춤' : ''}). 위 띠에서 보낼 회차를 체크하고 📤 를 누르면 노트북에서 결과를 봐요.`);
+            return;
+        }
         setPhase('rec', 0, '계산하는 중… (몇 초 걸려요)');
         setTimeout(() => {
             const frames = rec.frames;
-            const ph = { holdStart: round1(t.marks.holdStart), holdEnd: round1(t.marks.holdEnd), end: round1(frameNow(rec)), holdPlanned: t.planned, stopped: t.stopped, scale: SCALE };
+            const ph = ph0;
             const curve = B.breathCurve(frames, { lock: rec.lock || 'unlocked', scene: rec.scene });
             const metrics = B.breathMetrics(curve, ph);
             const run = {
@@ -163,7 +178,7 @@
         if (ys.length) { const lo = Math.min(...ys), hi = Math.max(...ys), mid = (lo + hi) / 2, half = Math.max(10, (hi - lo) / 2 + 3); ymin = Math.floor(mid - half); ymax = Math.ceil(mid + half); }
         core.plot(cv, series, { xlabel: o.align ? '숨 참기 시작부터 (초)' : '시간 (초)', ylabel: '심박수 (회/분)', bands, ymin, ymax, empty: '쓸 수 있는 창이 없어요' });
     }
-    function title(r, i) { return `${i + 1}회 · 숨 참기 ${r.ph.holdPlanned}초` + (r.ph.stopped ? ` (${Math.round(r.metrics.heldSec)}초에 멈춤)` : '') + (r.ph.scale && r.ph.scale !== 1 ? ' · 시험' : ''); }
+    function title(r, i) { return `${i + 1}회 · ${r.from ? r.from + ' · ' : ''}숨 참기 ${r.ph.holdPlanned}초` + (r.ph.stopped ? ` (${Math.round(r.metrics.heldSec)}초에 멈춤)` : '') + (r.ph.scale && r.ph.scale !== 1 ? ' · 시험' : ''); }
     function renderResult() {
         const i = state.runs.findIndex(r => r.id === state.view), r = state.runs[i];
         $('br-result').hidden = !r || state.mode !== 'breath';
@@ -234,6 +249,57 @@
         });
     }
 
+    // ---------- 📱 폰 → 노트북 원본 ----------
+    // 폰의 회차 목록 = 한 번 재기(js/heart-rate.js 의 회차) + 숨 참기(이 화면의 phoneRuns)
+    function phoneRawRuns() {
+        const tm = at => R.timeText(at);
+        const once = core.runs().filter(r => r.raw && !r.sim && !String(r.lock).startsWith('csv')).map(r => ({
+            id: r.id, mode: 'once', at: r.at, frames: H.unpack(r.raw), lock: r.lock, why: r.why, lockLog: r.lockLog, scene: r.scene, torch: r.torch,
+            bpm: r.res && r.res.bpm, title: `❤️ 한 번 재기 · ${tm(r.at)}` }));
+        const br = state.phoneRuns.map(r => ({
+            id: r.id, mode: 'breath', at: r.at, frames: H.unpack(r.raw), lock: r.lock, why: r.why, lockLog: r.lockLog, scene: r.scene, ph: r.ph,
+            held: r.ph.holdEnd - r.ph.holdStart, title: `🫁 숨 참기 ${r.ph.holdPlanned}초${r.ph.stopped ? ' (' + Math.round(r.ph.holdEnd - r.ph.holdStart) + '초에 멈춤)' : ''} · ${tm(r.at)}` }));
+        return once.concat(br);
+    }
+    // 노트북: 받은 원본 중 처음 보는 것만 → 숨 참기는 곡선·지표를 여기서 계산해 회차로, 한 번 재기는 심박수 회차 목록으로
+    const seenRaw = new Set();
+    function takeRaw(list) {
+        let got = 0;
+        list.forEach(it => {
+            const sig = it.key + '|' + it.sentAt;
+            if (seenRaw.has(sig)) return;
+            seenRaw.add(sig);
+            const u = R.rawUnpack(it.raw);
+            if (!u || !u.frames.length) return;
+            if (it.mode === 'breath' && u.ph) {
+                const old = state.runs.find(r => r.srcKey === it.key);
+                if (old && old.at === u.at) return;
+                const curve = B.breathCurve(u.frames, { lock: u.lock || 'unlocked', scene: u.scene });
+                const metrics = B.breathMetrics(curve, u.ph);
+                const run = { id: old ? old.id : newId(), at: u.at || new Date().toISOString(), ph: u.ph, curve, metrics, profile: Object.assign({}, state.profile), consent: false,
+                    lock: u.lock === 'locked' ? '🔒 노출 고정됨' : '⚠ 고정 안 됨' + (u.why ? ' (' + u.why + ')' : ''), raw: H.pack(u.frames), from: it.from, srcKey: it.key, decimate: u.decimate };
+                if (old) Object.assign(old, run); else state.runs.push(run);
+                while (state.runs.length > MAX_RUNS) state.runs.shift();
+                state.runs.forEach((r, i) => { if (i < state.runs.length - KEEP_RAW) delete r.raw; });
+                state.view = run.id;
+                got++;
+            } else if (it.mode === 'once') {
+                if (core.runs().some(r => r.srcKey === it.key)) return;
+                core.addRun({ frames: u.frames, lock: u.lock || 'unlocked', why: u.why, lockLog: u.lockLog, scene: u.scene, at: u.at, torch: u.torch, from: it.from, srcKey: it.key, fromPhone: true });
+                got++;
+            }
+        });
+        if (got) { save(); renderRuns(); renderResult(); }
+        return got;
+    }
+    function phoneNote(n) {
+        const el = $('br-phone-note');
+        el.hidden = false;
+        el.innerHTML = `🆕 <b>폰에서 새 회차 ${n}개</b>가 들어왔어요. 숨 참기는 아래 '내 숨 참기 회차'에, 한 번 재기는 '🗂 측정 회차'에 있어요.`;
+    }
+    core.hooks.onRunSaved = () => { if (PHONE && share) share.saved(); };
+    core.hooks.onRunDeleted = () => { if (PHONE && share) share.saved(); };
+
     // ---------- 조 공유 · 수업 참여 (동의한 회차만, exp heartrate 의 kind 'breath') ----------
     let share = null;
     if (window.ClassShare) {
@@ -243,10 +309,23 @@
                 csvHint: '🗂 숨 참기 CSV',
                 sendButtons: ['#br-send'],
                 store: { load: () => state.share, save: o => { state.share = o; save(); } },
-                getItems: () => B.breathItems(state.runs),
-                onIncoming: items => { const ext = B.breathIncoming(items), changed = JSON.stringify(ext) !== JSON.stringify(state.ext); if (changed) { state.ext = ext; save(); } return changed; },
+                // 폰: 잰 원본(한 번 재기 + 숨 참기)을 kind 'raw' 로 / 노트북: 동의한 숨 참기 결과를 kind 'breath' 로
+                getItems: () => (PHONE ? R.rawItems(phoneRawRuns()) : B.breathItems(state.runs)),
+                onIncoming: items => {
+                    const ext = B.breathIncoming(items), changed = JSON.stringify(ext) !== JSON.stringify(state.ext);
+                    if (changed) { state.ext = ext; save(); }
+                    const got = PHONE ? 0 : takeRaw(R.rawIncoming(items));
+                    return changed || got > 0;
+                },
                 getStep: () => state.mode,
-                getPoints: () => state.runs.length
+                getPoints: () => (PHONE ? phoneRawRuns().length : state.runs.length),
+                phone: true,
+                onRole: role => { document.body.classList.toggle('hr-phone', role === 'phone'); },
+                onPhoneData: n => { phoneNote(n); },
+                deleteItem: id => {
+                    if (/^b\d+$/.test(String(id))) { state.phoneRuns = state.phoneRuns.filter(r => r.id !== id); save(); }
+                    else core.deleteRun(String(id));
+                }
             });
         } catch (e) { share = null; }
     }
@@ -256,6 +335,18 @@
         if (!share.group()) { $('br-send-st').textContent = "먼저 아래 '👥 조 공유'에서 조 코드를 정하세요 (수업 QR 로 들어왔으면 저절로)."; return; }
         share.send('#br-send-st');
     });
+
+    // ---------- 기기 종류: 💻 노트북·PC 는 분석만, 📱 폰·태블릿은 측정 (폰 측정 · 노트북 분석 이원화, AGENTS.md UI 규칙) ----------
+    //  폰 역할(?role=phone)이면 기기 추측과 상관없이 측정 화면. 노트북이면 측정 부분(.hr-measure)을 숨기고 '📱 폰으로 측정해 보내기' 카드
+    function applyDevice() {
+        const kind = window.LabUI && LabUI.device ? LabUI.device().kind : 'phone';
+        const laptop = !PHONE && kind === 'laptop';
+        document.body.classList.toggle('hr-laptop', laptop);
+        if (laptop && share && share.phoneCard && !applyDevice.card) { applyDevice.card = true; share.phoneCard('#phone-card'); }
+    }
+    if (!PHONE && window.LabUI && LabUI.deviceSwitch) LabUI.deviceSwitch('#dev-switch');
+    window.addEventListener('lab-device', applyDevice);
+    applyDevice();
 
     setMode(state.mode);
     // 시험용
