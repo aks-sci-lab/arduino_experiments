@@ -82,5 +82,45 @@
         return out;
     }
 
-    return { EXT_RUN_BASE, buildItems, applyIncoming, extCount, extPoints, cleanPoints };
+    /* 이 페이지의 CSV(6. 결과 → CSV 다운로드)를 다시 읽기: 시트가 없을 때 폰 → 노트북 파일로 옮기기
+       이 기기가 잰 줄(source = me, 예전 파일은 source 열 없음)만 회차별로 묶는다 (불러온 값을 또 옮기지 않게)
+       돌려주는 값: { runs: { 'run1': { title, run, points } }, points: 점 수 } 또는 { error } */
+    function parseCsv(text) {
+        const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) return { error: '측정값 줄이 없습니다.' };
+        const cells = line => {
+            const out = []; let cur = '', q = false;
+            for (let i = 0; i < line.length; i++) {
+                const c = line[i];
+                if (q) { if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+                else if (c === '"') q = true;
+                else if (c === ',') { out.push(cur); cur = ''; }
+                else cur += c;
+            }
+            out.push(cur);
+            return out;
+        };
+        const head = cells(lines[0]).map(h => h.trim());
+        const col = n => head.indexOf(n);
+        const iRun = col('run'), iT = col('theta_deg'), iI = col('intensity');
+        if (iRun < 0 || iT < 0 || iI < 0) return { error: '말루스 실험 CSV 가 아닙니다 (run·theta_deg·intensity 열이 필요).' };
+        const iEx = col('excluded'), iWhy = col('reason'), iSd = col('std'), iSat = col('saturated_fraction'), iSrc = col('source');
+        const runs = {};
+        let n = 0;
+        lines.slice(1).forEach(line => {
+            const c = cells(line);
+            if (iSrc >= 0 && c[iSrc] && c[iSrc] !== 'me') return;
+            const run = Number(c[iRun]), theta = Number(c[iT]), y = Number(c[iI]);
+            if (!Number.isFinite(run) || !Number.isFinite(theta) || !Number.isFinite(y)) return;
+            const id = 'run' + run;
+            const r = runs[id] || (runs[id] = { title: run + '회차', run, points: [] });
+            if (r.points.length >= MAX_POINTS) return;
+            r.points.push({ theta, y, sd: Number(c[iSd]) || 0, sat: Number(c[iSat]) || 0, excluded: iEx >= 0 && c[iEx] === '1', reason: iWhy >= 0 ? String(c[iWhy] || '').slice(0, 80) : '', moved: false });
+            n++;
+        });
+        if (!n) return { error: '이 기기가 잰 측정값 줄이 없습니다.' };
+        return { runs, points: n };
+    }
+
+    return { EXT_RUN_BASE, buildItems, applyIncoming, extCount, extPoints, cleanPoints, parseCsv };
 });

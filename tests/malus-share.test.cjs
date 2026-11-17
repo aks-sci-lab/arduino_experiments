@@ -211,7 +211,7 @@ test('?c= 없이 열면 예전처럼: 띠 없음, 조 공유 칸은 있음, 로�
     }
 });
 
-test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7, 가짜 카메라)에서 2회차 측정 → 고른 회차만 보내기 → 노트북 결과 표에 📱 폰 회차', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
+test('📱 폰 측정 · 노트북 분석: 노트북(1280) 폰 카드 QR → 폰(Pixel 7, 가짜 카메라)에서 2회차 측정 → 고른 회차만 보내기 → 노트북 결과 표에 📱 폰 회차', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
     const { devices } = require('playwright');
     const app = loadCodeGs();
     const srv = await staticServer();
@@ -239,15 +239,17 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7, 가짜 카메라)에�
         return page;
     }
     try {
-        // ---- 노트북: 조 코드 → 📱 폰으로 측정하기 ----
+        // ---- 노트북(분석만): 측정 화면은 숨고, 5. 데이터 맨 위 '📱 폰으로 측정해 보내기' 카드에 QR (조 코드는 저절로) ----
         const L = await open({ viewport: { width: 1280, height: 800 } }, 'L', base + '/projects/malus-law.html#step-5');
-        await L.fill('#cs-group', '2-3-5376');
-        await L.waitForFunction(() => /연결됨/.test(document.getElementById('cs-status').textContent));
-        await L.click('#cs-phone');
-        await L.waitForSelector('.cs-dlg:not([hidden]) #cs-qr svg', { state: 'attached' });
-        const link = await L.getAttribute('#cs-plink', 'href');
-        assert.match(link, /malus-law\.html\?role=phone&group=2-3-5376/);
-        await L.click('#cs-pclose');
+        assert.equal(await L.getAttribute('html', 'data-device'), 'laptop');
+        assert.equal(await L.isVisible('#btn-cam'), false, '노트북에는 카메라 켜기 없음');
+        assert.equal(await L.isVisible('#btn-record'), false, '노트북에는 측정 기록 없음');
+        assert.equal(await L.isVisible('#phone-card'), true);
+        assert.match(await L.textContent('#device-switch'), /이 기기/);
+        await L.waitForSelector('#cs-cardqr svg', { state: 'attached' });
+        const link = await L.getAttribute('#phone-card a[href*="role=phone"]', 'href');
+        const G = /group=([\d-]+)/.exec(link)[1];
+        assert.match(link, /malus-law\.html\?role=phone&group=99-\d+-\d{4}/);
 
         // ---- 폰: 측정 화면만, 대기 0초·평균 3프레임으로 빠르게 ----
         const P = await open(devices['Pixel 7'], 'P', link, () => { if (!localStorage.getItem('malus-law-settings-v1')) localStorage.setItem('malus-law-settings-v1', JSON.stringify({ delay: 0 })); });
@@ -255,7 +257,7 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7, 가짜 카메라)에�
         assert.equal(await P.isVisible('nav.steps'), false, '폰은 7단계 탭 없음');
         assert.equal(await P.isVisible('#btn-cam'), true);
         assert.equal(await P.isVisible('#cs-group'), false, '폰은 조 코드를 묻지 않음');
-        assert.match(await P.textContent('.cs-phone'), /노트북과 연결됨 · 조 2-3-5376/);
+        assert.ok((await P.textContent('.cs-phone')).includes('노트북과 연결됨 · 조 ' + G));
         await P.click('#btn-cam');
         await P.waitForFunction(() => !document.getElementById('btn-record').disabled, null, { timeout: 15000 });
         await P.fill('#frames', '3');
@@ -278,12 +280,13 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7, 가짜 카메라)에�
         await P.click('#cs-rsend');
         await P.waitForFunction(() => /보냈/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 15000 });
         assert.deepEqual(await P.locator('.cs-rst').allTextContents(), ['보내기 전', '✅ 보냄']);
-        const rows = app.get({ action: 'list', exp: 'malus', group: '2-3-5376' }).items;
+        const rows = app.get({ action: 'list', exp: 'malus', group: G }).items;
         assert.deepEqual(rows.map(r => r.title), ['2회차']);
         assert.match(rows[0].device, /^p/, '폰 기기 번호');
 
         // ---- 노트북: 자동 불러오기 → 알림 → 6. 결과 표에 📱 폰 회차 ----
         await L.waitForSelector('#phone-note:not([hidden])', { timeout: 20000 });
+        assert.match(await L.textContent('#cs-cardst'), /폰에서 새 측정 1개/);
         assert.match(await L.textContent('#phone-note'), /폰에서 새 회차 1개/);
         await L.click('#phone-note [data-go=result]');
         await L.waitForFunction(() => /불러온 값 2개/.test(document.getElementById('cnt').textContent));
@@ -301,6 +304,91 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7, 가짜 카메라)에�
         assert.equal(await P.evaluate(() => JSON.parse(localStorage.getItem('malus-law-v1:phone')).points.length), 3, '폰 기록에서도 지움');
         assert.equal(await L.evaluate(() => JSON.parse(localStorage.getItem('malus-law-v1')).points.length), 0, '노트북 자기 기록은 그대로(0)');
         if (process.env.SHOT_DIR) { await P.screenshot({ path: process.env.SHOT_DIR + '/malus-phone.png', fullPage: true }); await L.screenshot({ path: process.env.SHOT_DIR + '/malus-laptop.png' }); }
+        assert.deepEqual(errors, []);
+    } finally {
+        await browser.close();
+        srv.close();
+    }
+});
+
+test('태블릿은 측정·분석 둘 다, QR 없이 연 폰도 측정·분석, 노트북 375px·CSV 불러오기', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
+    const { devices } = require('playwright');
+    const app = loadCodeGs();
+    const srv = await staticServer();
+    const base = 'http://127.0.0.1:' + srv.address().port;
+    const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
+    const errors = [];
+    async function open(opt, name, url) {
+        const ctx = await browser.newContext(Object.assign({ permissions: ['camera'] }, opt));
+        await ctx.route('https://script.google.com/**', async route => {
+            const req = route.request(), u = new URL(req.url());
+            let out;
+            try { out = req.method() === 'POST' ? app.post(req.postData() || '{}') : app.get(Object.fromEntries(u.searchParams)); }
+            catch (e) { out = { ok: false, error: e.message }; }
+            await route.fulfill({ contentType: 'application/json', body: JSON.stringify(out) });
+        });
+        await ctx.route(/gstatic\.com|jsdelivr\.net/, r => r.abort());
+        await ctx.addInitScript(() => { if (!localStorage.getItem('malus-law-settings-v1')) localStorage.setItem('malus-law-settings-v1', JSON.stringify({ delay: 0 })); });
+        const page = await ctx.newPage();
+        page.on('pageerror', e => errors.push(name + ': ' + e.message));
+        page.on('dialog', d => d.accept());
+        await page.goto(url);
+        return page;
+    }
+    async function measureTwo(P) {
+        await P.click('#btn-cam');
+        await P.waitForFunction(() => !document.getElementById('btn-record').disabled, null, { timeout: 15000 });
+        await P.fill('#frames', '3');
+        for (const a of [0, 45, 90]) {
+            await P.fill('#angle', String(a));
+            await P.click('#btn-record');
+            await P.waitForFunction(x => document.getElementById('rec-status').textContent.startsWith(x + '° 기록 완료'), a, { timeout: 15000 });
+        }
+    }
+    try {
+        // ---- 태블릿: 측정도 하고 6. 결과도 봄, 폰 카드는 없음 ----
+        const T = await open(devices['Galaxy Tab S4'], 'T', base + '/projects/malus-law.html#step-5');
+        assert.equal(await T.getAttribute('html', 'data-device'), 'tablet');
+        assert.equal(await T.isVisible('#btn-cam'), true);
+        assert.equal(await T.isVisible('#phone-card'), false);
+        assert.equal(await T.isVisible('nav.steps'), true);
+        await measureTwo(T);
+        await T.click('nav.steps button[data-step="result"]');
+        assert.match(await T.textContent('#cnt'), /^\(3개\)$/);
+        assert.equal(await noSideScroll(T), true, '태블릿 가로 스크롤');
+
+        // ---- QR 없이 연 폰: 노트북 안내 한 줄 + 측정 + 분석 단계도 그대로 (노트북이 없을 때) ----
+        const P = await open(devices['iPhone 13'], 'P', base + '/projects/malus-law.html#step-5');
+        assert.equal(await P.getAttribute('html', 'data-device'), 'phone');
+        assert.equal(await P.isVisible('.phone-solo'), true);
+        assert.equal(await P.isVisible('#phone-card'), false);
+        await measureTwo(P);
+        assert.equal(await P.isVisible('nav.steps'), true, '노트북 없이 쓰면 결과 단계도 봄');
+        assert.equal(await noSideScroll(P), true, '폰 가로 스크롤');
+        const small = await P.$$eval('#btn-cam, #btn-record, #btn-new-run, nav.steps button, #device-switch select', els => els.filter(e => e.offsetParent && e.getBoundingClientRect().height < 43.5).map(e => e.id || e.textContent.trim()));
+        assert.deepEqual(small, []);
+        // 폰에서 CSV 로 저장
+        await P.click('nav.steps button[data-step="result"]');
+        const [dl] = await Promise.all([P.waitForEvent('download'), P.click('#btn-csv')]);
+        const csvPath = require('node:path').join(require('node:os').tmpdir(), 'malus-law-' + process.pid + '.csv');
+        await dl.saveAs(csvPath);
+
+        // ---- 노트북 375px(터치 없음): 측정 숨김, 폰 카드, 가로 스크롤 없음 → 폰 CSV 를 📂 로 불러와 결과에 합침 ----
+        const L = await open({ viewport: { width: 375, height: 800 } }, 'L', base + '/projects/malus-law.html#step-5');
+        assert.equal(await L.isVisible('#btn-cam'), false);
+        await L.waitForSelector('#cs-cardqr', { state: 'attached' });
+        assert.equal(await noSideScroll(L), true, '노트북 375px 가로 스크롤');
+        await L.evaluate(() => { document.getElementById('cs-share').open = true; });
+        await L.setInputFiles('#cs-csv', csvPath);
+        await L.waitForFunction(() => /측정값 3개/.test(document.getElementById('cs-status').textContent + document.getElementById('cs-share').textContent), null, { timeout: 10000 });
+        await L.click('nav.steps button[data-step="result"]');
+        assert.match(await L.textContent('#cnt'), /불러온 값 3개/);
+        assert.match(await L.textContent('#tbody'), /📂 malus-law-\d+\.csv · 1회차/);
+        assert.doesNotMatch(await L.textContent('#tbody'), /📥 📂/);
+        // '이 기기'를 태블릿으로 바꾸면 측정 화면이 다시 보임
+        await L.click('nav.steps button[data-step="data"]');
+        await L.selectOption('#device-switch select', 'tablet');
+        assert.equal(await L.isVisible('#btn-cam'), true);
         assert.deepEqual(errors, []);
     } finally {
         await browser.close();
