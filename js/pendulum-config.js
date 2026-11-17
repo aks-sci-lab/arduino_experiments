@@ -11,6 +11,9 @@ window.PENDULUM_CONFIG = {
     // 코드가 든 템플릿 시트의 '사본 만들기' 주소 (https://docs.google.com/spreadsheets/d/…/copy).
     // 넣으면 선생님 설정 화면에 "템플릿 시트 사본 만들기" 단추가 나와 코드 붙여 넣기를 건너뛴다. 만드는 법: 설정 화면 맨 아래
     templateCopyUrl: '',
+    // 개발 데이터 자동 수집 (2026-11-17 선생님 결정: 개발 중에만, 공개 저장소의 dev-data 브랜치로). 관리 열쇠가 있는 선생님 기기에서만 동작.
+    // 개발이 끝나면 false 로 (docs/dev-data.md)
+    devCollect: true,
     // 교사 화면 '🛠 내 서버 만들기'(구글 로그인 한 번으로 시트 + Apps Script 만들고 배포)에 쓰는 구글 OAuth 클라이언트 ID
     // (…apps.googleusercontent.com). 비어 있으면 그 단추 대신 '손으로 만들기' 안내만. 등록 방법: docs/class-teacher-guide.md
     googleClientId: '718758606428-u2gap7oatoamfsk8amo4qcigjj2vjpl6.apps.googleusercontent.com'   // 2026-11-16 사이트 관리자가 등록(web-experiment-f9b24 의 웹 클라이언트, 공개 값)

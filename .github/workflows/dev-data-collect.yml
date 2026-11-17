@@ -1,0 +1,81 @@
+name: Dev data collect
+
+# 개발 데이터 자동 수집 (2026-11-17, 선생님 요청): 선생님 시트(Apps Script 10판)의 devlog 를 매시간 가져와
+# dev-data 브랜치에 파일로 쌓는다. main 이 아니므로 사이트 배포와 상관없음.
+# 켜는 조건: js/pendulum-config.js 의 devCollect: true + 저장소 Secrets DEV_SHEET_URL·DEV_ADMIN_KEY
+# 멈추기: docs/dev-data.md (devCollect: false 로 바꾸면 이 작업은 아무것도 하지 않음)
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dev-data-collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets
+        id: sec
+        env:
+          URL: ${{ secrets.DEV_SHEET_URL }}
+          KEY: ${{ secrets.DEV_ADMIN_KEY }}
+        run: |
+          if [ -n "$URL" ] && [ -n "$KEY" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "ok=false" >> "$GITHUB_OUTPUT"; echo "::notice::DEV_SHEET_URL·DEV_ADMIN_KEY Secret 이 없어 건너뜁니다"; fi
+
+      - name: Checkout main (tool, config)
+        if: steps.sec.outputs.ok == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: site
+
+      - name: Check devCollect switch
+        if: steps.sec.outputs.ok == 'true'
+        id: sw
+        run: |
+          if grep -Eq '^[[:space:]]*devCollect:[[:space:]]*true' site/js/pendulum-config.js; then echo "on=true" >> "$GITHUB_OUTPUT"; else echo "on=false" >> "$GITHUB_OUTPUT"; echo "::notice::devCollect 가 꺼져 있어 건너뜁니다"; fi
+
+      - name: Checkout dev-data branch
+        if: steps.sw.outputs.on == 'true'
+        run: |
+          git clone --quiet "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+          cd data
+          if git ls-remote --exit-code --heads origin dev-data >/dev/null; then
+            git checkout --quiet dev-data
+          else
+            git checkout --quiet --orphan dev-data
+            git rm -rf --quiet . || true
+            printf '# 개발 데이터 (자동 수집)\n\n선생님 기기에서 잰 측정이 매시간 쌓입니다. 이름 없음. 설명: main 의 docs/dev-data.md\n' > README.md
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.sw.outputs.on == 'true'
+        with:
+          node-version: '20'
+
+      - name: Pull from sheet
+        if: steps.sw.outputs.on == 'true'
+        id: pull
+        env:
+          DEV_SHEET_URL: ${{ secrets.DEV_SHEET_URL }}
+          DEV_ADMIN_KEY: ${{ secrets.DEV_ADMIN_KEY }}
+          DEV_OUT: ${{ github.workspace }}/data
+        run: node site/tools/dev-data-pull.cjs
+
+      - name: Commit and push
+        if: steps.sw.outputs.on == 'true'
+        run: |
+          cd data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "바뀐 것 없음"; exit 0; fi
+          git commit --quiet -m "개발 데이터: 새 측정 ${{ steps.pull.outputs.got }}개"
+          git push --quiet origin dev-data

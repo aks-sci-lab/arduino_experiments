@@ -43,7 +43,7 @@
  * 4단계(보고서·AI)용 시트 reports·ai_logs·quiz 는 만들어 두기만 한다.
  */
 
-var VERSION = 9;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠  6: 모든 실험 공용 저장(submissions 시트)·수업에 모든 실험  7: 요약 이름에 °·%·한글 등 허용('|'·제어 문자만 막음)  8: 업데이트·되돌리기 오류에 원래 문구와 권한 안내  9: 스마트폰 카메라 심박수(heartrate) 공용 저장
+var VERSION = 10;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠  6: 모든 실험 공용 저장(submissions 시트)·수업에 모든 실험  7: 요약 이름에 °·%·한글 등 허용('|'·제어 문자만 막음)  8: 업데이트·되돌리기 오류에 원래 문구와 권한 안내  9: 스마트폰 카메라 심박수(heartrate) 공용 저장  10: 개발 데이터 수집(devlog 시트, devSave·devExport, 관리 열쇠 필요)
 // 스스로 업데이트: 코드는 이 고정 주소에서만 받는다 (요청 값으로 바꿀 수 없음)
 var SITE = 'https://aks-sci-lab.web.app/apps-script/';
 var SCRIPT_API = 'https://script.googleapis.com/v1/projects/';
@@ -70,8 +70,12 @@ var SHEETS = {
   // 학생 진행: 수업·조·번호마다 한 줄 (이름 없음). step 은 보고 있는 단계, lastSeen 은 마지막 신호 시각
   progress: ['timestamp', 'classCode', 'groupCode', 'jo', 'num', 'step', 'points', 'submitted', 'lastSeen', 'device', 'exp'],
   // 실험 공용 저장(6판): 플랑크·진자 밖의 실험. 조의 노트북 한 대가 보낸 측정 하나 = 한 줄 (exp 칸으로 실험을 나눔)
-  submissions: ['timestamp', 'exp', 'groupCode', 'title', 'n', 'summary', 'device', 'id', 'sentAt', 'data', 'data2', 'data3', 'data4', 'data5', 'data6']
+  submissions: ['timestamp', 'exp', 'groupCode', 'title', 'n', 'summary', 'device', 'id', 'sentAt', 'data', 'data2', 'data3', 'data4', 'data5', 'data6'],
+  // 개발 데이터(10판): 선생님 기기(관리 열쇠가 있는 브라우저)에서 잰 측정 하나 = 한 줄. GitHub Actions 가 devExport 로 가져가 개발에 씀
+  devlog: ['timestamp', 'exp', 'id', 'measuredAt', 'device', 'summary', 'data', 'data2', 'data3', 'data4', 'data5', 'data6']
 };
+var DEV_EXPS = { heartrate: 1, facehr: 1 };      // 개발 데이터를 받는 실험
+var DEV_MAX_ROWS = 3000, DEV_EXPORT_MAX = 40;    // 시트에 쌓는 줄 한도, devExport 한 번에 돌려주는 줄 수
 var DEVICE_RE = /^[A-Za-z0-9_-]{4,20}$/;
 var CLASS_RE = /^\d{1,2}-\d{4}$/;                 // 반-4자리 (예: 2-4821)
 // 수업으로 쓸 수 있는 실험 (js/class-cloud.js 의 EXPS 와 같게). 'custom:<실험 id>' 는 선생님이 만든 실험
@@ -126,6 +130,8 @@ function doPost(e) {
     if (body.action === 'createClass') return json(createClass(body));
     if (body.action === 'heartbeat') return json(heartbeat(body));
     if (body.action === 'classStatus') return json(classStatus(body));
+    if (body.action === 'devSave') return json(devSave(body));
+    if (body.action === 'devExport') return json(devExport(body));
     if (body.action === 'save') return json(saveMeasurement(body));
     throw new Error('알 수 없는 요청입니다.');
   } catch (err) {
@@ -685,6 +691,58 @@ function rollbackInner(b) {
 
 // ---------- 실험 공용 저장 (6판): submissions 시트 ----------
 // summary: 교사 화면·시트에서 바로 볼 숫자 몇 개 ({ g: 9.79, err: 0.2 } 처럼, 이름 20개까지, 값은 숫자 또는 40자 글)
+// ---------- 개발 데이터 (10판) ----------
+// 관리 열쇠(요청 본문 key)가 맞을 때만 받는다 → 학생 기기는 열쇠가 없어 보낼 수 없다. 같은 id 면 고쳐 쓴다
+function devSave(b) {
+  requireAdmin(b);
+  var exp = String(b.exp || '');
+  if (!DEV_EXPS[exp]) throw new Error('개발 데이터를 받지 않는 실험입니다.');
+  var id = String(b.id || '');
+  if (!ID_RE.test(id)) throw new Error('측정 번호(id)가 올바르지 않습니다.');
+  var device = String(b.device || '');
+  if (!DEVICE_RE.test(device)) throw new Error('기기 번호가 올바르지 않습니다.');
+  var data = b.data == null ? '' : (typeof b.data === 'string' ? b.data : JSON.stringify(b.data));
+  if (data.length > CELL_MAX * DATA_CELLS) throw new Error('보낸 자료가 너무 큽니다 (' + (CELL_MAX * DATA_CELLS) + '자까지).');
+  var rec = { timestamp: new Date(), exp: text(exp, 20), id: text(id, 40), measuredAt: text(b.measuredAt, 40), device: text(device, 20),
+    summary: text(JSON.stringify(cleanSummary(b.summary)), 2000) };
+  for (var k = 0; k < DATA_CELLS; k++) rec[k ? 'data' + (k + 1) : 'data'] = text(data.slice(k * CELL_MAX, (k + 1) * CELL_MAX), CELL_MAX);
+  var row = SHEETS.devlog.map(function (c) { return rec[c] === undefined ? '' : rec[c]; });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = sheet('devlog'), rows = allRows(sh, 'devlog');
+    for (var i = 0; i < rows.length; i++) {
+      if (same(rows[i][idx('exp', 'devlog')], exp) && same(rows[i][idx('id', 'devlog')], id)) { sh.getRange(i + 2, 1, 1, row.length).setValues([row]); return { ok: true, id: id, updated: true }; }
+    }
+    if (rows.length >= DEV_MAX_ROWS) throw new Error('개발 데이터가 너무 많습니다(' + DEV_MAX_ROWS + '줄). devlog 시트의 오래된 줄을 지우세요.');
+    sh.appendRow(row);
+    return { ok: true, id: id, updated: false };
+  } finally {
+    lock.releaseLock();
+  }
+}
+// since(ISO 시각) 뒤에 저장·고친 줄을 시각 순으로 원본까지 (한 번에 DEV_EXPORT_MAX 줄, 더 있으면 more)
+function devExport(b) {
+  requireAdmin(b);
+  var since = b.since ? Date.parse(String(b.since)) : 0;
+  if (b.since && !isFinite(since)) throw new Error('since 시각이 올바르지 않습니다.');
+  var iso = function (v) { return v instanceof Date ? v.toISOString() : String(v); };
+  var list = allRows(sheet('devlog'), 'devlog').map(function (r) {
+    var t = r[idx('timestamp', 'devlog')], ms = t instanceof Date ? t.getTime() : Date.parse(String(t));
+    return { r: r, ms: isFinite(ms) ? ms : 0 };
+  }).filter(function (x) { return x.ms > since; }).sort(function (a, c) { return a.ms - c.ms; });
+  var page = list.slice(0, DEV_EXPORT_MAX);
+  // 같은 시각(ms)의 줄은 한 번에 다 보낸다 (다음 since 가 그 시각이라 남은 줄을 건너뛰지 않게)
+  while (page.length < list.length && list[page.length].ms === page[page.length - 1].ms) page.push(list[page.length]);
+  return { ok: true, more: list.length > page.length, items: page.map(function (x) {
+    var r = x.r, data = '', summary = {};
+    for (var k = 0; k < DATA_CELLS; k++) data += String(r[idx(k ? 'data' + (k + 1) : 'data', 'devlog')] || '');
+    try { summary = JSON.parse(String(r[idx('summary', 'devlog')] || '{}')); } catch (e) { summary = {}; }
+    return { timestamp: new Date(x.ms).toISOString(), exp: String(r[idx('exp', 'devlog')]), id: String(r[idx('id', 'devlog')]),
+      measuredAt: iso(r[idx('measuredAt', 'devlog')]), device: String(r[idx('device', 'devlog')]), summary: summary, data: data };
+  }) };
+}
+
 function cleanSummary(v) {
   if (v == null || v === '') return {};
   if (typeof v !== 'object' || Array.isArray(v)) throw new Error('요약(summary) 형식이 올바르지 않습니다.');

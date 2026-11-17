@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
+    <meta name="robots" content="noindex, nofollow">
+    <title>🛠 얼굴 심박(rPPG) 개발</title>
+    <link rel="stylesheet" href="../css/class-share.css">
+    <link rel="stylesheet" href="../css/face-hr.css">
+</head>
+<body>
+<div class="wrap">
+    <a class="back" href="../index.html">← 메인 페이지</a>
+    <h1>🙂 얼굴 심박(rPPG) <span class="dev-badge">🛠 개발용 · 선생님 전용</span></h1>
+
+    <!-- ===================== 두 번째 폰(손가락 정답) 화면: ?role=phone ===================== -->
+    <section id="phone-view" hidden>
+        <div class="card">
+            <h2>📱 두 번째 폰: 손가락 정답</h2>
+            <p class="note">검지 끝으로 이 폰의 <b>뒤 카메라</b>를 살짝 눌러 덮으세요. 얼굴을 재는 폰에서 ▶ 측정을 시작하기 <b>조금 전에</b> 여기서 ▶ 를 누르고, 얼굴 측정이 끝난 <b>뒤에</b> ■ 를 누르면 됩니다. 저장하면 얼굴 폰으로 바로 보냅니다(밝기 숫자만, 영상은 보내지 않음).</p>
+            <div class="vid-row"><video id="p-video" playsinline muted></video><canvas id="p-wave" class="wave"></canvas></div>
+            <div class="pills"><span class="pill" id="p-q">품질: —</span><span class="pill" id="p-clock">시계: —</span><span class="pill" id="p-time" hidden></span></div>
+            <div class="big-row"><div class="big"><b id="p-bpm">--</b><small>손가락 (회/분)</small></div></div>
+            <div class="row">
+                <button id="p-cam">📷 뒤 카메라 켜기</button>
+                <button id="p-start" class="good" disabled>▶ 손가락 측정 시작</button>
+                <button id="p-stop" class="danger" hidden>■ 멈추고 저장·보내기</button>
+            </div>
+            <p id="p-msg" class="note" role="status" aria-live="polite"></p>
+        </div>
+    </section>
+
+    <!-- ===================== 얼굴 폰(본 화면) ===================== -->
+    <section id="main-view">
+        <p class="note">폰 <b>앞 카메라</b>를 거치대에 세우고 얼굴에서 30~50 cm 떨어져 앉습니다. 이마·양 볼 피부의 색이 심장이 뛸 때마다 아주 조금 바뀌는 것으로 심박수를 구하고(GREEN·CHROM·POS 세 방법), <b>손가락·심박계로 잰 정답</b>과 비교합니다. <b>수업 전 개발·시험용</b>이며 의료 진단에 쓰지 않습니다.</p>
+
+        <!-- 측정 중 계속 누르는 단추와 지금 값은 탭 위 띠에 -->
+        <div class="dash-bar" id="bar">
+            <div class="pills">
+                <span class="pill" id="st-path">정답: 아직 안 고름</span>
+                <span class="pill" id="st-face">얼굴: —</span>
+                <span class="pill" id="st-fps">— fps</span>
+                <span class="pill" id="st-exp">노출: —</span>
+                <span class="pill" id="st-move">움직임: —</span>
+                <span class="pill" id="st-time" hidden></span>
+            </div>
+            <div class="bar-row">
+                <div class="big"><b id="bpm-pos">--</b><small>POS</small></div>
+                <div class="big small"><b id="bpm-chrom">--</b><small>CHROM</small></div>
+                <div class="big small"><b id="bpm-green">--</b><small>GREEN</small></div>
+                <div class="big gt"><b id="bpm-gt">--</b><small>정답</small></div>
+                <button id="start" class="good" disabled>▶ 측정 시작</button>
+                <button id="stop" class="danger" hidden>■ 멈추기</button>
+            </div>
+        </div>
+
+        <nav class="subtabs" id="tabs" aria-label="개발 페이지">
+            <button data-tab="prep">① 준비</button>
+            <button data-tab="measure">② 측정</button>
+            <button data-tab="analysis">③ 분석</button>
+            <button data-tab="io">④ 파일</button>
+            <button data-tab="help">⑤ 도움말</button>
+        </nav>
+
+        <!-- ① 준비 · 정답 경로 -->
+        <section class="tab-panel" data-tab="prep">
+            <div class="card box">
+                <h2>🔒 시작 전에</h2>
+                <ul class="text-list">
+                    <li>얼굴 영상은 <b>이 기기 안에서만</b> 처리합니다. 저장·전송하는 것은 프레임마다 이마·양 볼의 <b>색 평균(빨강·초록·파랑)</b>, 움직임 크기, 밝기, 노출 값뿐입니다.</li>
+                    <li>얼굴 위치를 찾는 프로그램(MediaPipe)은 인터넷에서 한 번 내려받지만, 얼굴 사진을 밖으로 보내지 않습니다.</li>
+                    <li>학생 얼굴로 수업에 쓰기 전에는 <b>학교 개인정보 지침</b>을 먼저 확인하세요.</li>
+                </ul>
+                <label class="chk"><input type="checkbox" id="consent"> 위 내용을 읽었고, 이 기기에서 카메라를 켭니다</label>
+                <div class="row">
+                    <button id="cam" disabled>📷 앞 카메라 켜기</button>
+                    <button id="auto" class="info" disabled>🔎 정답 경로 자동 찾기</button>
+                </div>
+                <p id="msg" class="note" role="status" aria-live="polite"></p>
+            </div>
+
+            <div class="card">
+                <h2>정답(손가락·심박계) 경로</h2>
+                <p class="note">자동 찾기는 ① → ② → ③ → ④ 순서로 쓸 수 있는 것을 고릅니다. 직접 골라도 됩니다.</p>
+                <div class="seg pick path-pick" role="group" aria-label="정답 경로">
+                    <button type="button" data-path="dual">① 같은 폰 뒤 카메라</button>
+                    <button type="button" data-path="phone2">② 두 번째 폰</button>
+                    <button type="button" data-path="ble">③ 블루투스 심박계</button>
+                    <button type="button" data-path="wrist">④ 손목 15초×4</button>
+                </div>
+                <ol id="path-log" class="path-log"></ol>
+
+                <div class="path-panel" data-path="dual" hidden>
+                    <h3>① 같은 폰 뒤 카메라 (손가락)</h3>
+                    <p class="note">앞 카메라로 얼굴을 찍는 동안 <b>뒤 카메라</b>를 검지로 덮습니다. 많은 폰이 두 카메라를 한꺼번에 열지 못합니다 — 실패하면 그 문구를 위 기록에 남기고 다른 경로를 고릅니다.</p>
+                    <div class="row"><button id="dual-try" class="secondary">🔁 동시 열기 다시 시험</button><video id="f-video" class="mini" playsinline muted></video></div>
+                    <p id="dual-st" class="note"></p>
+                </div>
+                <div class="path-panel" data-path="phone2" hidden>
+                    <h3>② 두 번째 폰 뒤 카메라 (손가락)</h3>
+                    <p class="note">아래 조 공유 칸에서 조 코드를 정하고 <b>📱 폰으로 측정하기</b> QR 을 두 번째 폰으로 찍습니다. 두 폰의 시계 차이는 선생님 시트(서버)를 오가는 시간으로 재고(⏱ 시계 맞추기), 분석 때 두 곡선을 맞춰 한 번 더 고칩니다. <b>손가락 심박수 수업과 다른 조 코드</b>를 쓰세요(같은 시트의 heartrate 칸을 씀).</p>
+                    <div id="share-mount"></div>
+                    <div class="row"><button id="clock" class="secondary">⏱ 시계 맞추기</button><span class="pill" id="clock-st">시계: 아직</span></div>
+                    <p id="p2-st" class="note"></p>
+                </div>
+                <div class="path-panel" data-path="ble" hidden>
+                    <h3>③ 블루투스 심박계 (가슴 띠·손목 밴드)</h3>
+                    <p class="note">표준 심박 서비스(Heart Rate 0x180D)를 내보내는 기기만 됩니다. 안드로이드 크롬·PC 크롬/엣지에서 되고, 아이폰 사파리는 안 됩니다.</p>
+                    <div class="row"><button id="ble-btn" class="secondary">🔗 심박계 연결</button><span class="pill" id="ble-st">연결 안 됨</span></div>
+                </div>
+                <div class="path-panel" data-path="wrist" hidden>
+                    <h3>④ 손목 맥박 15초 × 4번</h3>
+                    <p class="note">측정 중에 ⏱ 를 누르면 15초를 잽니다(시작·끝에 소리·진동). 그동안 센 맥박 수를 넣으면 ×4 = 분당 심박수로 그 15초 가운데 시각에 찍습니다.</p>
+                    <div id="wrist-rows"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ② 측정 -->
+        <section class="tab-panel" data-tab="measure" hidden>
+            <div class="card">
+                <div class="vid-wrap"><video id="video" playsinline muted></video><canvas id="overlay"></canvas></div>
+                <div class="pills"><span class="pill" id="st-det">얼굴 찾기: 준비 전</span><span class="pill" id="st-skin">피부 화소: —</span></div>
+                <div class="row">
+                    <label>측정 시간 <select id="dur"><option value="30">30초</option><option value="60" selected>1분</option><option value="120">2분</option><option value="300">5분</option></select></label>
+                    <label class="chk"><input type="checkbox" id="oval"> 얼굴 찾기 끄고 안내 타원 쓰기</label>
+                </div>
+                <canvas id="wave" class="wave" aria-label="POS 맥파"></canvas>
+                <p class="note">파형은 최근 8초의 POS 맥파입니다. 측정 중에는 고개를 돌리거나 말하지 않고, 조명이 일정한 곳에서 합니다. 일부러 움직여 보는 구간을 넣으면 분석에 '움직임 많음'으로 표시됩니다.</p>
+            </div>
+        </section>
+
+        <!-- ③ 분석 · 비교 -->
+        <section class="tab-panel" data-tab="analysis" hidden>
+            <div class="card">
+                <h2>분석 · 비교</h2>
+                <p id="a-src" class="note">아직 측정이 없습니다. ② 측정, ④ 불러오기 또는 🧪 시뮬레이션을 하세요.</p>
+                <div class="seg roi-pick" role="group" aria-label="얼굴 영역">
+                    <button type="button" data-roi="all">합침</button><button type="button" data-roi="fh">이마</button><button type="button" data-roi="lc">왼볼</button><button type="button" data-roi="rc">오른볼</button>
+                </div>
+                <div class="row">
+                    <label class="chk"><input type="checkbox" id="lag-fit"> 곡선 맞추기로 시각 보정 (±15초, ② 두 번째 폰)</label>
+                    <label class="chk"><input type="checkbox" id="exp-norm"> 노출 정규화 (노출 고정 안 됐을 때)</label>
+                </div>
+                <canvas id="hr-chart" class="chart" aria-label="시간에 따른 심박수"></canvas>
+                <p class="legend"><span style="color:#212529">━ 정답</span> <span style="color:#2f9e44">━ GREEN</span> <span style="color:#e8590c">━ CHROM</span> <span style="color:#1565c0">━ POS</span> <span class="mv">▒ 움직임 많음</span></p>
+                <p id="a-sum" class="note"></p>
+                <div class="tbl-wrap"><table id="a-table"><thead><tr><th>방법·영역</th><th>평균 오차</th><th>RMSE</th><th>±5</th><th>r</th><th>가만히</th><th>SNR</th></tr></thead><tbody></tbody></table></div>
+                <p class="note">오차 단위는 회/분. '평균 오차'는 평균 절대 오차, '±5'는 정답과 5회/분 안으로 맞은 창의 비율, '가만히'는 움직임 많은 창을 뺀 평균 절대 오차입니다. r 은 정답과의 상관, SNR(dB)은 맥파가 얼마나 뚜렷한지. 창: 10초를 1초씩 옮김, 0.6~3.5 Hz. 곡선 맞추기는 ② 두 번째 폰·불러온 파일에만 씁니다(같은 시계면 하지 않음).</p>
+            </div>
+        </section>
+
+        <!-- ④ 내보내기 · 불러오기 -->
+        <section class="tab-panel" data-tab="io" hidden>
+            <div class="card">
+                <h2>내보내기 · 불러오기</h2>
+                <p class="note">프레임별 영역 RGB·움직임·밝기·노출과 정답 시계열을 파일로 받아, 나중에 이 페이지에 다시 불러와 계산 방법을 고쳐 볼 수 있습니다. 영상은 들어 있지 않습니다.</p>
+                <div class="row">
+                    <button id="ex-json" class="info" disabled>💾 JSON 내보내기</button>
+                    <button id="ex-csv" class="info" disabled>💾 CSV 내보내기</button>
+                    <label class="btn secondary" for="im-file">📂 불러오기 (JSON·CSV)</label>
+                    <input type="file" id="im-file" accept=".json,.csv,application/json,text/csv" hidden>
+                </div>
+                <p id="io-msg" class="note" role="status" aria-live="polite"></p>
+            </div>
+            <div class="card">
+                <h2>🧪 시뮬레이션</h2>
+                <p class="note">카메라 없이 가짜 얼굴 색 자료 + 손가락 정답을 만들어 분석해 봅니다. 조명 출렁임을 키우면 GREEN 은 틀리고 CHROM·POS 는 버티는지 볼 수 있습니다.</p>
+                <div class="row">
+                    <label>심박 <input type="number" id="sim-bpm" value="72" min="40" max="180"></label>
+                    <label>조명 출렁임 <select id="sim-illum"><option value="0">없음</option><option value="0.003">약하게</option><option value="0.008" selected>보통</option><option value="0.02">세게</option></select></label>
+                    <label>움직임 <select id="sim-move"><option value="0">없음</option><option value="0.3" selected>조금</option><option value="1">많이</option></select></label>
+                    <button id="sim" class="secondary">🧪 시뮬레이션</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ⑤ 도움말 -->
+        <section class="tab-panel" data-tab="help" hidden>
+            <div class="card">
+                <h2>원리</h2>
+                <p>피(헤모글로빈)는 초록 빛을 잘 흡수합니다. 심장이 뛰면 얼굴 피부 속 피의 양이 아주 조금 늘었다 줄어, 카메라에 찍힌 피부의 색이 0.1~0.5 % 정도 오르내립니다. 이것을 <b>원격 광용적맥파(rPPG)</b>라고 합니다. 하지만 조명·그림자·번들거림(흰빛)의 변화가 이보다 훨씬 커서, 그것을 지우는 계산이 중요합니다.</p>
+                <ul class="text-list">
+                    <li><b>GREEN</b>: 초록 평균만 씁니다. 가장 단순하지만, 조명이 출렁이면 그대로 따라 틀립니다.</li>
+                    <li><b>CHROM</b> (de Haan, 2013): 빨강·초록·파랑을 평균으로 나눈 뒤 두 색차 신호 X = 3R − 2G, Y = 1.5R + G − 1.5B 를 만들고, X − αY (α = X 흔들림 ÷ Y 흔들림)로 흰빛 변화를 지웁니다.</li>
+                    <li><b>POS</b> (Wang, 2017): 1.6초 창마다 색을 평균으로 나눠 피부색 방향에 수직인 평면에 투영(G − B, −2R + G + B)하고 두 신호를 섞어 밝기 변화를 지운 뒤 창들을 겹쳐 더합니다.</li>
+                    <li>그다음 0.6~3.5 Hz(분당 36~210회)만 남기고, 10초 창을 1초씩 옮기며 주파수 분석(FFT)의 가장 큰 봉우리 = 그 시각의 심박수.</li>
+                </ul>
+                <h3>얼굴 영역</h3>
+                <p>얼굴 점 찾기(MediaPipe 얼굴 랜드마크, 478점)로 이마와 양 볼을 고르고(눈·입·눈썹은 뺌), 그 안에서도 피부색 화소만 평균합니다. 얼굴 찾기를 못 쓰면 화면의 안내 타원에 얼굴을 맞추고 고정된 위치를 씁니다.</p>
+                <h3>잘 재려면</h3>
+                <ul class="text-list">
+                    <li>창가 햇빛보다 일정한 실내 조명, 얼굴 정면에서 고르게. 형광등 깜빡임이 보이면 다른 조명으로.</li>
+                    <li>폰을 거치대에 고정하고 30~50 cm, 얼굴이 화면 가운데 크게.</li>
+                    <li>노출이 고정되지 않는 폰(대부분의 앞 카메라)은 노출 값이 읽히면 '노출 정규화'를 켜 비교해 보세요.</li>
+                </ul>
+                <h3>정답 경로</h3>
+                <ol class="text-list">
+                    <li>같은 폰 뒤 카메라: 같은 시계라 시각 맞추기가 필요 없음. 지원하는 폰이 적음.</li>
+                    <li>두 번째 폰: 선생님 시트를 거쳐 자료를 받음. 두 폰 시계 차이는 서버 왕복으로 재고, 분석에서 곡선 맞추기로 한 번 더 고침.</li>
+                    <li>블루투스 심박계: 가장 정확한 편(가슴 띠). Web Bluetooth 가 되는 브라우저만.</li>
+                    <li>손목 15초 × 4: 기계 없이. 점이 4개뿐이라 대략적인 비교만.</li>
+                </ol>
+            </div>
+        </section>
+    </section>
+</div>
+
+<script src="../js/pendulum-config.js"></script>
+<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/class-cloud.js"></script>
+<script src="../js/class-share.js"></script>
+<script src="../js/heart-rate-math.js"></script>
+<script src="../js/face-hr-math.js"></script>
+<script src="../js/face-hr-lab.js"></script>
+</body>
+</html>
