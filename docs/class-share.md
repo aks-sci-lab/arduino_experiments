@@ -126,6 +126,7 @@ saveRun(run); share.saved();
 | `accel` | 가속도계 | `projects/accelerometer-lab.html` | 공용 (붙임 완료) |
 | `nano` | Nano 33 BLE Sense | `projects/arduino-nano-lab.html` | 공용 |
 | `phoneaccel` | 스마트폰 가속도 | `projects/phone-accelerometer.html` | 공용 (붙임 완료, 📱 폰 연결: 시작→중지 한 번 = 회차, `js/phone-accel-share.js`) |
+| `heartrate` | 스마트폰 카메라 심박수 | `projects/heart-rate.html` | 공용 (붙임 완료, 📱 폰 연결: 회차 골라 보내기, 원본 포함, `js/heart-rate-share.js`). **서버 `GENERIC_EXPS` 에 아직 없음** (`EXPS.heartrate.needServer`) |
 | `custom:<실험 id>` | 선생님이 만든 실험 | `projects/custom-lab.html?id=…` | 공용 |
 
 새 실험 이름을 더하려면 **서버(`apps-script/Code.gs` 의 `GENERIC_EXPS`)와 `js/class-cloud.js` 의 `EXPS` 를 같이** 고칩니다(시험 `tests/class-share.test.cjs` 가 둘이 같은지 확인). 서버를 고치면 `VERSION` 을 올리고 `node tools/build-apps-script-release.cjs` → 선생님은 교사 화면의 🔄 업데이트.
