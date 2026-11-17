@@ -89,9 +89,18 @@ test('신호 품질: 덮지 않음·어두움·포화·움직임', () => {
     assert.equal(H.quality(base.map(f => Object.assign({}, f, { s: 0.9 }))).level, 'fair');
     const moved = base.map((f, i) => Object.assign({}, f, { y: i === 15 ? 110 : 72 }));
     assert.match(H.quality(moved).text, /움직임/);
-    // 손가락 없이 잰 것은 신뢰도 나쁨
+    // 손가락 없이 잰 것: 맥파가 뚜렷해도 'good' 이 아니고 까닭을 적음, 맥파가 없으면 🔴
     const empty = H.simulate({ bpm: 70, dur: 20 }).map(f => Object.assign({}, f, { r: 120, g: 118, b: 117 }));
-    assert.equal(H.analyze(empty).level, 'bad');
+    const ea = H.analyze(empty);
+    assert.notEqual(ea.level, 'good'); assert.ok(ea.reasons.some(r => /덮지 않은/.test(r)));
+    const flat = H.simulate({ bpm: 70, dur: 20, amp: 0 }).map(f => Object.assign({}, f, { r: 120, g: 118, b: 117, y: 118 + Math.sin(f.t * 40) }));
+    assert.equal(H.analyze(flat).level, 'bad');
+    // 갤럭시 Z 플립6 실내처럼 빨강이 초록의 1.3 배뿐이어도 덮임으로 봄, 1.15 배는 '확인하세요'(🟡), 근거 숫자를 돌려줌
+    const flip = H.quality(base.map(f => Object.assign({}, f, { r: 65, g: 50, b: 40 })));
+    assert.equal(flip.covered, true); assert.equal(flip.level, 'good'); assert.equal(flip.rg, 1.3);
+    const maybe = H.quality(base.map(f => Object.assign({}, f, { r: 57.5, g: 50, b: 40 })));
+    assert.equal(maybe.level, 'fair'); assert.match(maybe.text, /덮었는지 확인/);
+    assert.ok('R' in flip && 'G' in flip && 'B' in flip);
 });
 
 test('손목 맥박 ×4 · 오차 %', () => {
@@ -261,5 +270,45 @@ test('어두워서 초록이 한 값(7)으로 굳고 빨강도 몇 단계뿐일 
         assert.notEqual(a.channel, 'g', '평평한 초록은 쓰지 않음');
         near(a.bpm, bpm, 3, `${bpm} seed ${seed}`);
         assert.notEqual(a.light.level, 'ok', '어두움 표시');
+    }
+});
+
+// ---------- 선생님 실측(갤럭시 Z 플립6): 그래프는 80회로 깨끗한데 '노출 보정으로 계산' 결과 39회 ----------
+// 흉내: 화면 밝기에는 영향이 없는데 폰이 알려 주는 노출 값만 분당 40회로 출렁임(자동 노출 중 옛 값·딴 값) →
+//  그 값으로 나누면 오히려 40회 가짜 흔들림이 생김 (main 의 계산은 40.2회·신뢰도 98% 로 잘못 냄)
+test('노출 값이 엉터리여도(그림과 무관하게 40회로 출렁임) 보정 경로에서 80회가 39로 떨어지지 않음', () => {
+    for (const amp of [0.02, 0.006]) for (let seed = 1; seed <= 4; seed++) {
+        const fr = H.simulate({ bpm: 80, dur: 30, seed, amp, noise: 0.004, expBpm: 40, expAmp: 0.3, expFollow: 0, fps: 24, jitter: 0.4 });
+        const a = H.analyzeRun('unlocked', fr);
+        near(a.bpm, 80, 3, `amp ${amp} seed ${seed}`);
+        assert.ok(a.alt && a.alt.raw && a.alt.corrected, '보정 전·후 결과를 둘 다 남김');
+        assert.ok(['raw', 'corrected'].includes(a.alt.chosen));
+    }
+});
+
+test('analyzeRun: 노출이 진짜로 밝기를 바꾸면(실제 67, 노출 40) 보정 쪽을 고름 · 고정됨이면 보정 안 함', () => {
+    for (let seed = 1; seed <= 3; seed++) {
+        const fr = H.simulate({ bpm: 67, dur: 30, seed, physical: true, expBpm: 40, expAmp: 0.3, expFollow: 0, fps: 24, jitter: 0.4, noise: 0.004 });
+        const a = H.analyzeRun('unlocked', fr);
+        near(a.bpm, 67, 3); assert.equal(a.alt.chosen, 'corrected'); assert.equal(a.mode.mode, 'corrected');
+        near(a.alt.raw.bpm, 40, 3, '보정 전은 40');
+    }
+    const still = H.analyzeRun('locked', H.simulate({ bpm: 72, dur: 20, seed: 1, physical: true }));
+    assert.equal(still.mode.mode, 'locked'); assert.equal(still.alt, undefined); near(still.bpm, 72, 3);
+    const none = H.analyzeRun('unlocked', H.simulate({ bpm: 72, dur: 20, seed: 1 }).map(f => Object.assign({}, f, { e: null, exposureTime: null, iso: null })));
+    assert.equal(none.mode.mode, 'nocorrect'); near(none.bpm, 72, 3);
+});
+
+test('그래프에 보이는 봉우리 간격이 고르면 두 배로 (넓은 대역 봉우리 검사)', () => {
+    // 약한 80회 맥파 + 더 센 40회 흔들림, 중복맥파 없음 → 눈에 보이는 봉우리는 0.75초 간격
+    for (let seed = 1; seed <= 4; seed++) {
+        const a = H.analyze(H.simulate({ bpm: 80, dur: 30, seed, amp: 0.006, noise: 0.002, subharm: 0.008, dicrotic: 0, fps: 30, jitter: 0.3, hrv: 0.03 }));
+        near(a.bpm, 80, 3, 'seed ' + seed);
+    }
+    // 중복맥파가 같은 높이(1.0)여도 간격이 0.35·0.65 로 번갈아 넓은 대역 검사에 안 걸림
+    for (let seed = 1; seed <= 4; seed++) {
+        const a = H.analyze(H.simulate({ bpm: 55, dur: 30, seed, dicrotic: 1.0, noise: 0.004 }));
+        near(a.bpm, 55, 3, '중복맥파 55 seed ' + seed);
+        assert.ok(!(a.doubleCheck.cvBroad < 0.12), '번갈아 간격 ' + a.doubleCheck.cvBroad);
     }
 });

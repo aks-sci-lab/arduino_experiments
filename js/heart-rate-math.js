@@ -202,6 +202,20 @@
         out.f2 = f2; out.ratio = p1 ? round(p2 / p1, 3) : null; out.snr = floor ? round(p2 / floor, 1) : null;
         // 두 배 쪽 세기는 절반 쪽보다 훨씬 약할 수 있음(절반 흔들림이 셀 때) → 세기 비율은 보지 않고, 바닥 잡음보다 뚜렷한지만
         if (!Number.isFinite(f2) || p2 < 8 * floor) return out;
+        // (2') 넓은 대역(0.6~3.5 Hz) 그대로에서 2f1 간격(최소 0.6/f2)으로 봉우리를 찾아, 간격이 고르고 높이가 번갈아 크게 다르지 않으면
+        //  → 눈으로 보이는 맥파 봉우리가 2f1 로 뛴다는 뜻이라 바로 두 배 (선생님 실측: 그래프 봉우리 0.75 초 간격인데 결과 39회)
+        //  중복맥파(진짜 f1)는 봉우리 간격이 0.35·0.65 주기로 번갈아 고르지 않아 여기서 걸리지 않음
+        {
+            const pb = findPeaks(y, fs, 1 / f2), ibb = [];
+            for (let i = 1; i < pb.length; i++) ibb.push(pb[i] - pb[i - 1]);
+            const okb = ibb.filter(x => x > 0.6 / f2 && x < 1.6 / f2);
+            const hs = pb.map(t => y[Math.min(y.length - 1, Math.round(t * fs))]);
+            const odd = mean(hs.filter((_, i) => i % 2)), even = mean(hs.filter((_, i) => !(i % 2)));
+            const alt = Math.min(odd, even) / Math.max(odd, even);
+            out.cvBroad = okb.length >= 3 ? round(std(okb) / mean(okb), 3) : null;
+            out.altHeight = Number.isFinite(alt) ? round(alt, 2) : null;
+            if (okb.length >= Math.max(4, 0.7 * (y.length / fs) * f2) && std(okb) / mean(okb) < 0.12 && alt > 0.6) { out.switch = true; out.why = 'broad'; return out; }
+        }
         // (2) 2f1 둘레만 남겨 봉우리 간격이 고른지
         const y2 = bandpass(y, fs, [Math.max(BAND[0], 0.7 * f2), Math.min(BAND[1], 1.3 * f2)]);
         const pk = findPeaks(y2, fs, 1 / f2), ib = [];
@@ -230,7 +244,7 @@
         // 박자가 묶여 있으면 보통 배음(진짜 f1 박동). 단, f1 쪽이 사인파처럼 매끈하면(배음 거의 없음) 묶여 있어도
         //  '한 박동 걸러 세기가 다른 맥파'일 수 있어 2f1 로 봄 — 진짜 맥파는 모양이 뾰족해 배음이 크므로 여기에 걸리지 않음
         if (lock >= 0.5 && !sine) return out;
-        out.switch = true;
+        out.switch = true; out.why = sine ? 'sine' : 'unlocked';
         return out;
     }
 
@@ -257,12 +271,20 @@
         const jumps = [];
         for (let i = 1; i < Y.length; i++) jumps.push(Math.abs(Y[i] - Y[i - 1]) / Math.max(1, Y[i - 1]));
         const jump = jumps.length ? Math.max(...jumps) : 0;
-        const covered = R > 25 && R > 1.6 * G;
-        if (R < 8) return { level: 'bad', text: '너무 어두워요 — 밝은 곳에서 하거나 플래시를 켜세요', covered, R, G, S, jump };
-        if (!covered) return { level: 'bad', text: '손가락으로 카메라를 완전히 덮어 주세요', covered, R, G, S, jump };
-        if (S > 0.6) return { level: 'fair', text: '너무 밝아 빨강이 꽉 찼어요 — 손가락을 조금 더 세게 누르거나 플래시를 끄세요', covered, R, G, S, jump };
-        if (jump > 0.12) return { level: 'fair', text: '움직임이 커요 — 폰과 손가락을 가만히', covered, R, G, S, jump };
-        return { level: 'good', text: '좋아요 — 그대로 가만히', covered, R, G, S, jump };
+        // 덮임: 손가락을 지나온 빛은 빨강이 가장 셈. 예전 기준(빨강 > 25, 빨강 > 1.6 × 초록)은 갤럭시 Z 플립6 실내에서
+        //  그래프가 깨끗한데도 '덮어 주세요'(🔴)가 나와(선생님 실측) 낮춤: 빨강 > 12 이고 빨강 ≥ 1.25 × 초록 이면 덮임,
+        //  1.1~1.25 배는 '덮였는지 확인'(🟡). 판정 근거 숫자(R·G·B·rg)를 함께 돌려줌(회차·CSV 에 남김)
+        const B = mean(frames.map(f => Number(f.b)).filter(Number.isFinite));
+        const rg = G > 0.5 ? R / G : (R > 12 ? 99 : 0);
+        const covered = R > 12 && rg >= 1.25 && !(Number.isFinite(B) && B > 0.5 && R < 1.1 * B);
+        const maybe = !covered && R > 12 && rg >= 1.1;
+        const nums = { covered, R: round(R, 1), G: round(G, 1), B: Number.isFinite(B) ? round(B, 1) : null, rg: round(rg, 2), S: round(S, 3), jump: round(jump, 3) };
+        if (R < 8) return Object.assign({ level: 'bad', text: '너무 어두워요 — 밝은 곳에서 하거나 플래시를 켜세요' }, nums);
+        if (maybe) return Object.assign({ level: 'fair', text: `손가락이 카메라를 다 덮었는지 확인하세요 (빨강/초록 ${round(rg, 2)})` }, nums);
+        if (!covered) return Object.assign({ level: 'bad', text: `손가락으로 카메라를 완전히 덮어 주세요 (빨강/초록 ${round(rg, 2)})` }, nums);
+        if (S > 0.6) return Object.assign({ level: 'fair', text: '너무 밝아 빨강이 꽉 찼어요 — 손가락을 조금 더 세게 누르거나 플래시를 끄세요' }, nums);
+        if (jump > 0.12) return Object.assign({ level: 'fair', text: '움직임이 커요 — 폰과 손가락을 가만히' }, nums);
+        return Object.assign({ level: 'good', text: '좋아요 — 그대로 가만히' }, nums);
     }
 
     // ---------- 노출 출렁임 점검 ----------
@@ -474,7 +496,10 @@
         const q = quality(fr);
         const exp = exposureCheck(t, fr.map(f => (f.e == null ? NaN : Number(f.e))), bpm / 60, filt, fs);
         let level = conf >= 0.65 ? 'good' : conf >= 0.45 ? 'fair' : 'bad';
-        if (badShare > 0.3 || !q.covered) level = 'bad';
+        // 덮임 판정이 틀릴 수 있어(기종·밝기), 맥파가 뚜렷하면(신뢰도 0.6 이상) 🔴 대신 🟡 로
+        if (badShare > 0.3 && conf < 0.6) level = 'bad';
+        else if (!q.covered && !(conf >= 0.6)) level = 'bad';
+        else if ((badShare > 0.3 || !q.covered) && level === 'good') level = 'fair';
         else if (badShare > 0.1 && level === 'good') level = 'fair';
         // 보정해서 계산했으면 출렁임은 알려 주되 경고로 치지 않음
         exp.wobble = exp.warn;
@@ -501,6 +526,28 @@
             fs, t0: best.rs.t0, wave: smooth, spec: { f: sp.f, p: sp.p }, quality: q, exposure: exp, light, badShare: round(badShare, 2)
         });
         return out;
+    }
+
+    // ---------- 회차 하나 계산: 노출 처리 방식을 정하고, 보정할 때는 보정 전·후를 둘 다 계산해 믿을 만한 쪽 ----------
+    // 선생님 실측(갤럭시 Z 플립6): 실시간 그래프(보정 전 밝기)는 80회로 깨끗한데 '노출 보정으로 계산' 결과가 39회 🔴 →
+    //  폰이 알려 주는 노출 값이 실제와 달라(자동 노출 중 옛 값 등) 보정이 오히려 신호를 망가뜨릴 수 있음.
+    //  보정 쪽을 기본으로 하되, 보정 전 쪽이 신뢰도가 0.1 넘게 높고 노출이 그 빠르기로 출렁이지 않으면 보정 전을 씀
+    // lock: 'locked' | 'unlocked' | 'csv-locked' …, opts: { scene }
+    function analyzeRun(lock, frames, opts) {
+        opts = opts || {};
+        const mode = exposureMode(lock === 'locked' || lock === 'csv-locked' ? 'locked' : 'unlocked', frames);
+        const a1 = analyze(frames, { correct: mode.correct, scene: opts.scene });
+        let a = a1;
+        if (mode.correct) {
+            const a0 = analyze(frames, { correct: false, scene: opts.scene });
+            const pick0 = a0.ok && (!a1.ok || (a0.conf >= a1.conf + 0.1 && !(a0.exposure && a0.exposure.warn && a0.exposure.same)));
+            a = pick0 ? a0 : a1;
+            a.alt = { raw: { bpm: a0.bpm, conf: a0.conf, level: a0.level, method: a0.method }, corrected: { bpm: a1.bpm, conf: a1.conf, level: a1.level, method: a1.method }, chosen: pick0 ? 'raw' : 'corrected' };
+            if (pick0) a.reasons.push(`노출 보정 결과(${a1.bpm == null ? '-' : round(a1.bpm, 0)}회/분, 신뢰도 ${Math.round((a1.conf || 0) * 100)}%)보다 보정 전 결과가 더 믿을 만해 보정 전을 씀`);
+        }
+        a.mode = mode.correct && a.alt && a.alt.chosen === 'raw' ? { mode: 'raw', correct: false, text: '⚠ 고정 안 됨 → 노출 보정이 신호를 흐려 보정 전 밝기로 계산' } : mode;
+        if (mode.mode === 'nocorrect') a.reasons.push('노출 값이 없어 보정 못 함 — 노출 출렁임이 섞였을 수 있음');
+        return a;
     }
 
     // ---------- 손목 맥박 ----------
@@ -617,5 +664,5 @@
             f.exposureTime == null ? null : round(f.exposureTime, 3), f.iso == null ? null : round(f.iso, 0), round(f.s, 2) || 0]);
     }
 
-    return { lightCheck, doubleCheck, toLinear, toSrgb, correctExposure, exposureVariation, exposureShare, exposureMode, pack, unpack, BAND, FS, resample, detrend, bandpass, spectrum, autocorr, findPeaks, quality, exposureCheck, analyze, palpBpm, errorPct, simulate, toCsv, parseCsv, fft, mean, median, std, round };
+    return { analyzeRun, lightCheck, doubleCheck, toLinear, toSrgb, correctExposure, exposureVariation, exposureShare, exposureMode, pack, unpack, BAND, FS, resample, detrend, bandpass, spectrum, autocorr, findPeaks, quality, exposureCheck, analyze, palpBpm, errorPct, simulate, toCsv, parseCsv, fft, mean, median, std, round };
 });

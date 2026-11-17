@@ -2,6 +2,8 @@
 //  A. 노출 고정이 되는 폰(Pixel 7): 잠금 → 1.5초 확인 → 🔒 고정됨 → 75 회/분, 손목 비교, CSV(locked 1)
 //  B. '고정된다'고 하지만 노출이 분당 40회로 계속 출렁이는 폰(실제 심박 67): 확인 단계에서 '고정 안 됨' → 노출 보정 → 67 회/분
 //  C. 노출 고정도, 노출 값 읽기도 안 되는 폰(아이폰처럼, 375px): '보정 불가' 표시 → 90 회/분, 시뮬레이션(노출 출렁임) → 67, 가로 스크롤 없음·단추 44px
+//  E. 자동 노출 중 노출 값을 틀리게(짧게) 알려 주는 폰: 잠그면 어두워짐 → 밝기 맞추기로 잠그기 전 밝기 ±10% → 🔒
+//  F. 셔터·ISO 범위가 좁아 다시 밝힐 수 없는 폰: 맞추기 실패 → 자동 노출 + 보정으로, 까닭 표시
 //  D. 어두운 곳(손가락 밝기 빨강 ≈ 70): 측정 전 '🌙 어두워요' 안내, 결과·회차에 어두움 표시, CSV light 열 dim
 const http = require('http'), path = require('path'), fs = require('fs');
 const REPO = path.join(__dirname, '..');
@@ -30,11 +32,16 @@ function fakeCamera(bpm, kind, scale) {
         navigator.mediaDevices.getUserMedia = async () => {
             const cv = document.createElement('canvas'); cv.width = 160; cv.height = 120;
             const c = cv.getContext('2d');
+            let st = { exposureMode: 'continuous', exposureTime: 330, iso: 800, whiteBalanceMode: 'continuous', torch: false };
+            // stale·capped: 자동 노출 중 getSettings 가 실제(330)보다 짧은 노출(100)을 알려 줌 → 그 값으로 잠그면 어두워짐
+            //  잠근 뒤(manual) 밝기 = 실제 쓰는 노출 ÷ 330 × ISO ÷ 800. capped 는 셔터 최대 120·ISO 최대 800 이라 다시 밝힐 수 없음
+            const STALE = KIND === 'stale' || KIND === 'capped';
+            const bf = () => STALE && st.exposureMode === 'manual' ? (st.exposureTime / 330) * (st.iso / 800) : 1;
             t0 = performance.now();
             const draw = () => {
                 const t = (performance.now() - t0) / 1000, ph = (t * BPM / 60) % 1;
                 const p = Math.exp(-(((ph - 0.15) / 0.09) ** 2)) + 0.35 * Math.exp(-(((ph - 0.5) / 0.08) ** 2));
-                const L = (1 - 0.05 * p) * expo() * SCALE;
+                const L = (1 - 0.05 * p) * expo() * SCALE * bf();
                 // 실제 센서처럼 화소마다 잡음(±1.5 단계)을 섞어, 영역 평균이 0~255 정수 단계보다 고운 값을 갖게 함
                 const R = srgb(0.45 * L), G = srgb(0.015 * L), B = srgb(0.008 * L);
                 const img = c.createImageData(160, 120), d = img.data;
@@ -44,17 +51,17 @@ function fakeCamera(bpm, kind, scale) {
             draw(); setInterval(draw, 16);
             const stream = cv.captureStream(30), tr = stream.getVideoTracks()[0];
             if (KIND === 'none') { tr.getCapabilities = () => ({ width: { min: 1, max: 160 } }); return stream; }
-            let st = { exposureMode: 'continuous', exposureTime: 330, iso: 800, whiteBalanceMode: 'continuous', torch: false };
             const base = tr.getSettings.bind(tr);
-            tr.getCapabilities = () => ({ exposureMode: ['continuous', 'manual'], exposureTime: { min: 1, max: 10000, step: 1 }, iso: { min: 50, max: 3200 }, whiteBalanceMode: ['continuous', 'manual'], torch: true });
-            tr.getSettings = () => Object.assign(base(), st, KIND === 'drift' ? { exposureTime: 330 * expo() } : {});
+            const CAP = KIND === 'capped' ? { et: 120, iso: 800 } : { et: 10000, iso: 3200 };
+            tr.getCapabilities = () => ({ exposureMode: ['continuous', 'manual'], exposureTime: { min: 1, max: CAP.et, step: 1 }, iso: { min: 50, max: CAP.iso }, whiteBalanceMode: ['continuous', 'manual'], torch: true });
+            tr.getSettings = () => Object.assign(base(), st, KIND === 'drift' ? { exposureTime: 330 * expo() } : {}, STALE && st.exposureMode !== 'manual' ? { exposureTime: 100 } : {});
             tr.applyConstraints = async c => { window.__applied.push(JSON.parse(JSON.stringify(c))); (c.advanced || []).forEach(a => Object.assign(st, a)); };
             return stream;
         };
     })();`;
 }
 
-test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 보정 / 보정 불가, 375px', { skip: !chromium && 'playwright 없음', timeout: 200000 }, async () => {
+test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 보정 / 보정 불가, 375px', { skip: !chromium && 'playwright 없음', timeout: 300000 }, async () => {
     await new Promise(r => stat.listen(0, r));
     const ROOT = 'http://127.0.0.1:' + stat.address().port + '/';
     const browser = await chromium.launch(), errors = [];
@@ -115,7 +122,7 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     if (process.env.SHOT_DIR) fs.writeFileSync(process.env.SHOT_DIR + '/run-b.json', JSON.stringify(b));
     console.log('B 출렁임:', b.res.bpm, b.res.level, b.lock, b.why, '|', b.res.modeText, '|', b.res.exposure && b.res.exposure.text);
     assert.equal(b.lock, 'unlocked');
-    assert.match(b.why, /계속 바뀜/);
+    assert.match(b.why, /계속 바뀜|맞출 수 없어/);   // 밝기가 출렁여 맞추기에서 먼저 걸리거나, 값이 계속 바뀜으로 걸림
     assert.equal(b.res.mode, 'corrected');
     assert.ok(Math.abs(b.res.bpm - 67) <= 4, '보정 뒤 67 ≈ ' + b.res.bpm);
     assert.match(await B.textContent('#v-lock'), /고정 안 됨/);
@@ -151,6 +158,47 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     await C.waitForTimeout(200);
     await layout(C, 'C 375px (모두 펼침)');
     await C.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + '/heart-c.png' : '/dev/null', fullPage: true }).catch(() => {});
+
+    // ---- E. 잠그면 어두워지는 폰 → 밝기 맞추기 ----
+    const E = await page(devices['Pixel 7'], 'E', fakeCamera(75, 'stale'));
+    await E.click('#cam');
+    await E.waitForFunction(() => /좋아요/.test(document.getElementById('v-qtext').textContent), null, { timeout: 10000 });
+    await E.selectOption('#dur', '15');
+    await E.click('#start');
+    await E.waitForFunction(() => window.__heartRate.state().runs.length > 0, null, { timeout: 40000 });
+    const e = (await E.evaluate(() => window.__heartRate.state().runs)).pop();
+    const st = e.lockLog.steps;
+    console.log('E 잠금 과정:', st.map(x => `${x.what}(밝기 ${x.y}, 셔터 ${x.et})`).join(' → '), '|', e.lock, e.res.bpm);
+    assert.equal(e.lock, 'locked');
+    assert.ok(e.lockLog.afterLock.y < 0.7 * e.lockLog.before.y, '잠근 직후 어두워짐(흉내) ' + e.lockLog.afterLock.y);
+    assert.ok(Math.abs(e.lockLog.adjusted.y / e.lockLog.before.y - 1) <= 0.1, '맞춘 뒤 잠그기 전 ±10%: ' + e.lockLog.adjusted.y + ' / ' + e.lockLog.before.y);
+    assert.ok(Math.abs(e.res.bpm - 75) <= 4, '75 ≈ ' + e.res.bpm);
+    const [dl3] = await Promise.all([E.waitForEvent('download'), E.click(`[data-csv="${e.id}"]`)]);
+    const csv3 = fs.readFileSync(await dl3.path(), 'utf8');
+    assert.match(csv3, /# 노출 잠금 과정: 잠그기 전: 밝기 [\d.]+ · 셔터 100.*잠근 직후.*밝기 맞추기/);
+    assert.match(csv3, /# 덮임 판정: 덮임 · R /);
+
+    // ---- F. 다시 밝힐 수 없는 폰 → 자동 노출 + 보정 ----
+    const F = await page(devices['Pixel 7'], 'F', fakeCamera(75, 'capped'));
+    await F.click('#cam');
+    await F.waitForFunction(() => /좋아요/.test(document.getElementById('v-qtext').textContent), null, { timeout: 10000 });
+    await F.selectOption('#dur', '15');
+    await F.click('#start');
+    await F.waitForFunction(() => window.__heartRate.state().runs.length > 0, null, { timeout: 40000 });
+    const fr = (await F.evaluate(() => window.__heartRate.state().runs)).pop();
+    console.log('F 맞추기 실패:', fr.lock, fr.why, fr.res.bpm, fr.res.mode, fr.res.alt && fr.res.alt.chosen);
+    assert.equal(fr.lock, 'unlocked'); assert.match(fr.why, /맞출 수 없어/);
+    assert.ok(fr.lockLog.steps.some(x => /자동 노출로 되돌림/.test(x.what)));
+    assert.ok(Math.abs(fr.res.bpm - 75) <= 4, '75 ≈ ' + fr.res.bpm);
+    assert.match(await F.textContent('#v-locktext'), /맞출 수 없어/);
+    // '노출 잠금 끄기' 를 고르면 잠그지 않음
+    await F.check('#nolock');
+    await F.click('#start');
+    await F.waitForFunction(() => window.__heartRate.state().runs.length > 1, null, { timeout: 40000 });
+    const f2 = (await F.evaluate(() => window.__heartRate.state().runs)).pop();
+    assert.equal(f2.lock, 'unlocked'); assert.match(f2.why, /노출 잠금 끔/);
+    assert.ok(!f2.lockLog.steps.some(x => /잠근 직후/.test(x.what)));
+    await layout(F, 'F Pixel 7');
 
     // ---- D. 어두운 곳 ----
     const D = await page(devices['Pixel 7'], 'D', fakeCamera(72, 'lock', 0.15));
