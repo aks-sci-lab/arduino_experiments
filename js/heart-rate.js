@@ -175,7 +175,7 @@
             lastLiveT = now;
             const src = rec && rec.frames.length > 30 ? rec.frames.filter(f => f.t >= rec.frames[rec.frames.length - 1].t - 10) : live;
             liveA = analyzeFrames(rec && rec.lock ? rec.lock : 'unlocked', src);
-            $('live-est').textContent = liveA.ok ? `최근 ${Math.round(liveA.dur)}초: ${Math.round(liveA.bpm)} 회/분 · 봉우리 ${liveA.peaks ? liveA.peaks.length : 0}개 ${LEVEL[liveA.level] || ''} (파란 점 = 계산이 찾은 봉우리)` : '최근 10초: 아직 계산 못 함';
+            $('live-est').textContent = liveA.ok ? `최근 ${Math.round(liveA.dur)}초: ${Math.round(liveA.bpm)} 회/분 · 봉우리 ${liveA.peaks ? liveA.peaks.length : 0}개 ${LEVEL[liveA.level] || ''} · 계산 신호 ${(CH_NAME[liveA.channel] || '?')} · ${liveA.corrected ? '보정 뒤' : '보정 전'}` : '최근 10초: 아직 계산 못 함';
         } else if (!q.covered) { liveA = null; $('live-est').textContent = ''; }
         if (phase === 'idle') status(q.level === 'good' ? (dimNow ? '🌙 어두워요 — 더 밝은 곳이나 플래시를 켜면 정확해요' : '🟢 준비됐어요 — ▶ 측정 시작') : '☝ ' + q.text);
         if (rec && (phase === 'settle' || phase === 'adjust' || phase === 'verify' || phase === 'rec')) {
@@ -387,7 +387,8 @@
             showLock(res.modeText.split(' ')[0] + ' ' + (res.mode === 'locked' ? '고정됨' : '고정 안 됨'), res.modeText.replace(/^\S+\s*/, '') + (run.why ? ' (' + run.why + ')' : ''));
             msg(`✅ 저장했어요: <b>${Math.round(res.bpm)} 회/분</b> ${LEVEL[res.level] || ''} (신뢰도 ${Math.round(res.conf * 100)}%) · ${esc(res.modeText)}` +
                 (res.exposure && res.exposure.warn ? `<br>${esc(res.exposure.text)}` : '') + (res.light && res.light.level !== 'ok' ? `<br>${esc(res.light.text)}` : '') +
-                (res.doubled ? '<br>🔁 처음 찾은 값의 두 배가 더 그럴듯해 바꿨어요 (어두우면 절반으로 잡히기 쉬워요).' : '') + (res.level === 'bad' ? '<br>신뢰도가 낮아요. 손가락을 다시 덮고 가만히 재 보세요.' : ''), res.level === 'bad' || (res.exposure && res.exposure.warn) || (res.light && res.light.level !== 'ok') ? 'warn' : '');
+                (res.doubled ? '<br>🔁 처음 찾은 값의 두 배가 더 그럴듯해 바꿨어요 (어두우면 절반으로 잡히기 쉬워요).' : '') +
+                `<br>${esc(signalNote(res))}` + (res.level === 'bad' ? '<br>신뢰도가 낮아요. 손가락을 다시 덮고 가만히 재 보세요.' : ''), res.level === 'bad' || (res.exposure && res.exposure.warn) || (res.light && res.light.level !== 'ok') ? 'warn' : '');
         } else msg('저장했지만 심박수를 찾지 못했어요: ' + esc((res.reasons || []).join(', ')) + '. 손가락을 다시 덮고 재 보세요.', 'warn');
         return run;
     }
@@ -400,6 +401,15 @@
             light: a.light ? { level: a.light.level, text: a.light.text, R: a.light.R, acdc: a.light.acdc, exposureTime: a.light.exposureTime, iso: a.light.iso } : null,
             exposure: a.exposure ? { warn: a.exposure.warn, wobble: !!a.exposure.wobble, available: a.exposure.available, text: a.exposure.text, bpm: a.exposure.bpm, varPct: a.exposure.varPct } : null
         };
+    }
+
+    // 계산에 쓴 신호 이름 (실시간 그래프는 늘 '빨강 · 보정 전')
+    const CH_NAME = { r: '빨강(R)', g: '초록(G)', y: '밝기(Y)' };
+    function signalName(res) { return (CH_NAME[res.channel] || res.channel || '?') + ' · ' + (res.mode === 'corrected' ? '노출 보정 뒤' : '보정 전'); }
+    function signalNote(res) {
+        if (!res || !res.channel) return '';
+        const same = res.channel === 'r' && res.mode !== 'corrected';
+        return same ? `계산에 쓴 신호: ${signalName(res)} (실시간 그래프와 같음)` : `계산에 쓴 신호: ${signalName(res)} — 실시간 그래프(빨강 · 보정 전)와 달라요`;
     }
 
     // ---------- 회차 목록 ----------
@@ -508,11 +518,13 @@
             `<div>노출 변화<b>${ev != null ? ev.toFixed(1) + '%' : '읽을 수 없음'}</b></div>` +
             (a.alt ? `<div>보정 전 / 보정 후<b>${a.alt.raw.bpm == null ? '-' : a.alt.raw.bpm} / ${a.alt.corrected.bpm == null ? '-' : a.alt.corrected.bpm}</b></div>` : '') +
             (a.quality ? `<div>덮임 (빨강/초록)<b>${a.quality.covered ? '덮임' : '확인'} · ${a.quality.rg}</b></div>` : '') +
+            `<div>계산에 쓴 신호<b>${esc(signalName({ channel: a.channel, mode: a.corrected ? 'corrected' : 'raw' }))}</b></div>` +
             `<div>밝기 판정<b>${a.light ? (a.light.level === 'ok' ? '☀ 좋음' : a.light.level === 'dim' ? '🌙 어두움' : '🌙 아주 어두움') : '-'}</b></div>` +
             `<div>맥파 크기 AC/DC<b>${a.acdc != null ? (a.acdc * 100).toFixed(2) + '%' : '-'}</b></div>` +
             (a.corrected ? `<div>노출 값 어긋남<b>${a.expLag > 0 ? '+' : ''}${a.expLag} 초</b></div>` : '') +
             `<div>사진 수<b>${a.fpsMean != null ? a.fpsMean + '장/초 · ' + a.dur + '초' : '-'}</b></div>`;
         const why = [`<p class="note">노출: ${esc(a.mode.text)}${r.why ? ' (' + esc(r.why) + ')' : ''}</p>`];
+        why.push(`<p class="note">${esc(signalNote({ channel: a.channel, mode: a.corrected ? 'corrected' : 'raw' }))}</p>`);
         if (a.alt) why.push(`<p class="note">보정 전 ${a.alt.raw.bpm == null ? '-' : a.alt.raw.bpm}회/분(신뢰도 ${Math.round((a.alt.raw.conf || 0) * 100)}%) · 보정 후 ${a.alt.corrected.bpm == null ? '-' : a.alt.corrected.bpm}회/분(${Math.round((a.alt.corrected.conf || 0) * 100)}%) → <b>${a.alt.chosen === 'raw' ? '보정 전' : '보정 후'}</b>을 씀</p>`);
         if (r.lockLog && r.lockLog.steps) why.push(`<p class="note">노출 잠금 과정: ${esc(r.lockLog.steps.map(x => `${x.what} (밝기 ${x.y}, 셔터 ${x.et == null ? '?' : x.et}, ISO ${x.iso == null ? '?' : x.iso})`).join(' → '))}</p>`);
         if (a.quality) why.push(`<p class="note">덮임 판정 근거: 빨강 ${a.quality.R} · 초록 ${a.quality.G} · 파랑 ${a.quality.B == null ? '-' : a.quality.B} · 빨강/초록 ${a.quality.rg}</p>`);
