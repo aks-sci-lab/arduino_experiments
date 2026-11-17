@@ -300,7 +300,8 @@
         { id: 'r5', file: 'zflip6-2026-11-17-r5.csv', title: '선생님 실측 2 — 손가락 떨어짐', note: '15초쯤 손가락이 떨어져 밝기가 뜀', src: '실측' },
         { id: 'r6', file: 'zflip6-2026-11-17-r6.csv', title: '선생님 실측 3 (10초)', note: '아주 어두움 · 빨강 평균 2~10', src: '실측' },
         { id: 'r7', file: 'zflip6-2026-11-17-r7.csv', title: '선생님 실측 4 (13초)', note: '아주 어두움 · 앱이 한때 절반(37회)으로 잘못 계산', src: '실측' },
-        { id: 'dark', sim: { bpm: 68, dur: 30, amp: 0.004, noise: 0.012, lfNoise: 0.02, seed: 11, dim: 0.06 }, title: '가짜 자료 — 아주 어두움', note: '맥파가 잡음에 묻힘 (분당 68회로 만듦)', src: '시뮬레이션', truth: 68 },
+        { id: 'dark', sim: { bpm: 68, dur: 30, amp: 0.004, noise: 0.012, lfNoise: 0.02, seed: 11, dim: 0.06 }, title: '가짜 자료 — 아주 어두움', note: '맥파가 잡음에 묻힘 (분당 68회로 만듦)', src: '시뮬레이션', truth: 68,
+          garbage: '어떤 설정으로도 맞지 않는 자료예요. 맥파가 잡음에 묻혀 가공으로는 고칠 수 없으니 다시 재야 해요 (수집 단계가 중요: 밝은 곳·플래시·손가락 꼭 덮기).' },
         { id: 'lift', sim: { bpm: 84, dur: 30, seed: 5, lift: 19, holes: true }, title: '가짜 자료 — 손가락 떨어짐·빈칸', note: '19초에 손가락을 뗌 + 빠진 값·끊긴 곳 (분당 84회로 만듦)', src: '시뮬레이션', truth: 84 },
         { id: 'expo', sim: { bpm: 72, dur: 30, seed: 3, physical: true, expBpm: 42, expAmp: 0.3, expFollow: 1 }, title: '가짜 자료 — 노출 출렁임', note: '자동 노출이 분당 42회로 출렁임 (진짜는 72회로 만듦)', src: '시뮬레이션', truth: 72 }
     ];

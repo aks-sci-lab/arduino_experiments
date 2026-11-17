@@ -69,6 +69,15 @@ test('데이터 가공 실험실 화면', { skip: !chromium && 'playwright 없�
         await page.waitForFunction(() => Math.abs(Number(document.getElementById('final').textContent) - 42) <= 3);
         await page.selectOption('#expo', 'auto');
 
+        // 아주 어두운 예시: 가공으로 고칠 수 없다는 안내 (그 예시일 때만)
+        await page.selectOption('#src', 'dark');
+        await page.waitForFunction(() => /다시 재야/.test(document.getElementById('src-note').textContent));
+        await page.click('nav.steps button[data-step="s6"]');
+        assert.match(await page.textContent('#r6'), /가공으로는 고칠 수 없으니 다시 재야/);
+        await page.selectOption('#src', 'expo');
+        await page.waitForFunction(() => Math.abs(Number(document.getElementById('final').textContent) - 72) <= 3);
+        assert.doesNotMatch(await page.textContent('#r6'), /다시 재야/);
+
         // 6 결과: 손목 맥박 → 오차, 기록 모음에 단계 기록이 모임
         await page.click('nav.steps button[data-step="s6"]');
         for (const [i, v] of [18, 18, 18, 18].entries()) await page.locator('.w').nth(i).fill(String(v));

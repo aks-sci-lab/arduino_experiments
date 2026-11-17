@@ -88,7 +88,7 @@
         const ex = D.EXAMPLES.find(e => e.id === id);
         try {
             if (id.startsWith('csv:')) data = custom[Number(id.slice(4))];
-            else if (ex && ex.sim) data = { id, title: ex.title, note: ex.note + ' · 출처: ' + ex.src, frames: D.makeExample(id), lock: 'unlocked', truth: ex.truth };
+            else if (ex && ex.sim) data = { id, title: ex.title, note: ex.note + ' · 출처: ' + ex.src + (ex.garbage ? ' · 🗑 ' + ex.garbage : ''), frames: D.makeExample(id), lock: 'unlocked', truth: ex.truth, garbage: ex.garbage };
             else if (ex) {
                 const r = await fetch('../data/heart-rate/' + ex.file);
                 if (!r.ok) throw new Error('파일을 받지 못했어요 (' + r.status + ')');
@@ -284,6 +284,7 @@
         $('r6').innerHTML = res.error ? `<p class="note err">${esc(res.error)}</p>` :
             `<div>최종 심박수 <span class="big">${fmt(f.bpm)}</span> 회/분 <span class="note">(${f.used === 'fft' ? '주파수 분석' : '봉우리 간격'})</span></div>
             <div class="note">기본 설정이면 ${fmt(base.final.bpm)} 회/분 · 봉우리 ${fmt(res.s5.bpmPeaks)} · 주파수 분석 ${fmt(res.s5.bpmFFT)}</div>
+            ${data.garbage ? `<p class="note err garbage">🗑 쓰레기가 들어가면 쓰레기가 나온다: ${esc(data.garbage)}</p>` : ''}
             ${truth ? `<div>이 가짜 자료를 만들 때 정한 심박수: <b>${truth}</b> 회/분 → 차이 <b>${fmt(f.bpm - truth)}</b> 회/분 (${fmt((f.bpm - truth) / truth * 100)}%)</div>` : ''}`;
         const w = f.wrist;
         $('w6').innerHTML = w ? `손목 맥박 <b>${fmt(w.bpm)}</b> 회/분 (${w.n}번 평균: ${w.each.join(', ')}) → 카메라와 차이 <b>${fmt(f.error)}</b> 회/분 (<b>${fmt(f.errorPct)}%</b>) ${Math.abs(f.errorPct) <= 5 ? '✅ 5% 안' : '⚠️ 5% 넘음 — 어느 단계 선택이 원인일까?'}` : '';
