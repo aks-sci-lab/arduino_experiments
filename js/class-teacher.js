@@ -75,6 +75,13 @@
     function renderAdmin() {
         var k = server.url && adminKeyOf(server.url);
         $('adminBox').hidden = !k; $('adminKey').textContent = k || '';
+        // 개발 데이터 수집(js/dev-collect.js): 선생님 폰에 열쇠를 넣는 QR. 열쇠는 # 뒤(서버로 안 감)에 두고, 폰이 확인한 뒤 주소에서 지운다
+        var dev = (window.PENDULUM_CONFIG || {}).devCollect === true && k && server.id;
+        $('devKeyBox').hidden = !dev;
+        if (dev) {
+            var link = new URL('heart-rate.html?s=' + encodeURIComponent(server.id) + '#devkey=' + encodeURIComponent(k), location.href).href;
+            $('devKeyQr').innerHTML = qrSvg(link) || '<p class="note">QR 도구를 불러오지 못했어요.</p>';
+        }
     }
     async function checkVersion(ping) {
         var url = server.url;

@@ -94,6 +94,10 @@
                 <summary>🔑 관리 열쇠 (서버 업데이트용)</summary>
                 <p>이 시트의 관리 열쇠 <b class="ct-mono" id="adminKey"></b> — 이 브라우저에 저장되어 있어요. 다른 컴퓨터에서 업데이트하려면 그 컴퓨터의 업데이트 칸에 넣으세요. <b>학생에게 보여 주지 마세요.</b>
                 잃어버리면 Apps Script 편집기 ⚙ 프로젝트 설정 → 스크립트 속성에서 <code>ADMIN_KEY_HASH</code> 를 지우고 다시 연결하면 새로 만들어져요.</p>
+                <div id="devKeyBox" hidden>
+                    <p>🧪 <b>개발 데이터 수집</b>: 심박수를 잴 <b>선생님 폰</b>으로 아래 QR 을 찍으면, 그 폰에 열쇠가 들어가고 심박수 페이지가 열려요(맨 위에 🧪 띠). 학생에게 보여 주지 마세요. <a href="../docs/dev-data.md">설명</a></p>
+                    <div id="devKeyQr" class="ct-qr"></div>
+                </div>
             </details>
         </section>
     </div>

@@ -271,9 +271,23 @@
         if (!r) return;
         const dur = r.frames.length > 1 ? r.frames[r.frames.length - 1].t - r.frames[0].t : 0;
         if (cancel && dur < 8) { msg('8초보다 짧아 저장하지 않았어요.'); return; }
-        addRun({ lock: r.lock || 'unlocked', why: r.why, torch: r.torch, frames: r.frames });
+        const run = addRun({ lock: r.lock || 'unlocked', why: r.why, torch: r.torch, frames: r.frames });
+        devSend(run);   // 선생님 기기에서만 (개발 데이터 자동 수집, js/dev-collect.js)
     }
 
+    // 개발 데이터: 카메라로 잰 회차만 (시뮬레이션·CSV 불러오기는 빼고). 손목 맥박을 넣으면 같은 id 로 다시 보냄
+    function devSend(run) {
+        if (!run || run.sim || String(run.lock).startsWith('csv') || typeof DevCollect === 'undefined' || !DevCollect.active()) return;
+        const res = run.res || {};
+        DevCollect.send('heartrate', {
+            id: 'hr-' + DevCollect.init().device().slice(-6) + '-' + Math.floor((Date.parse(run.at) || Date.now()) / 1000).toString(36) + '-' + run.id,
+            measuredAt: run.at,
+            summary: { '심박수': res.bpm == null ? '' : Math.round(res.bpm * 10) / 10, '신뢰도': res.conf == null ? '' : Math.round(res.conf * 100) / 100, '노출': res.mode || '',
+                '손목': H.palpBpm(run.palp) || '', 'FFT': res.bpmFFT == null ? '' : Math.round(res.bpmFFT), '자기상관': res.bpmAC == null ? '' : Math.round(res.bpmAC), '봉우리': res.bpmPeaks == null ? '' : Math.round(res.bpmPeaks) },
+            data: { csv: csvFor(run), result: res, lock: run.lock, why: run.why, torch: run.torch, palp: run.palp, palpBpm: H.palpBpm(run.palp) || null,
+                device: DevCollect.uaSummary(navigator.userAgent), screen: [screen.width, screen.height, devicePixelRatio] }
+        });
+    }
     function newId() { let k = 1; const ids = new Set(state.runs.map(r => r.id)); while (ids.has('r' + k)) k++; return 'r' + k; }
     function addRun(o) {
         const raw = H.pack(o.frames);
@@ -326,7 +340,7 @@
         if (!r) return;
         const v = e.target.value === '' ? null : Math.round(Number(e.target.value));
         r.palp = Number.isFinite(v) && v > 0 && v <= 80 ? v : null;
-        save(); renderRuns(); renderDetail();
+        save(); renderRuns(); renderDetail(); devSend(r);
     });
     $('runs').addEventListener('click', e => {
         const b = e.target.closest('button');
