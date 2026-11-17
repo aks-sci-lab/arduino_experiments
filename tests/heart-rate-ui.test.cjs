@@ -75,7 +75,8 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
         const pg = await c.newPage();
         pg.on('pageerror', e => errors.push(name + ': ' + e.message));
         pg.on('dialog', d => d.accept());
-        await pg.goto(ROOT + 'projects/heart-rate.html');
+        // 터치 없는 큰 창은 노트북(측정 기능 숨김)으로 보므로, 측정 시험은 기기를 태블릿으로 정함 (폰 에뮬레이션은 저절로 폰)
+        await pg.goto(ROOT + 'projects/heart-rate.html' + (opt.hasTouch ? '' : '?device=tablet'));
         return pg;
     }
     const layout = async (pg, n) => {
