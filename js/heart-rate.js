@@ -61,12 +61,9 @@
 
     // ---------- 계산 (회차 하나) ----------
     // lock: 'locked'(잠금 확인) | 'unlocked' | 'csv-locked' … → 노출 처리 방식을 정하고 계산
-    function analyzeFrames(lock, frames) {
-        const mode = H.exposureMode(lock === 'locked' || lock === 'csv-locked' ? 'locked' : 'unlocked', frames);
-        const a = H.analyze(frames, { correct: mode.correct });
-        a.mode = mode;
-        if (mode.mode === 'nocorrect') a.reasons.push('노출 값이 없어 보정 못 함 — 노출 출렁임이 섞였을 수 있음');
-        return a;
+    // scene: 손가락 대기 전 장면 밝기 { y, exposureTime, iso } (밝기 판정에 씀, 없으면 빼고 판정)
+    function analyzeFrames(lock, frames, scene) {
+        return H.analyzeRun(lock, frames, { scene });   // 보정할 때는 보정 전·후를 둘 다 계산해 믿을 만한 쪽 (a.alt)
     }
 
     // ---------- 카메라 ----------
@@ -78,6 +75,7 @@
     let live = [];               // 최근 6초 (품질·그래프)
     let rec = null;              // 지금 측정 { frames, wall, dur, torch, lock }
     let wakeLock = null;
+    let lastScene = null;        // 손가락 대기 전 장면 { y, exposureTime, iso }
 
     function setCard(id, level) { const c = $(id).closest('.dash-card'); c.classList.remove('good', 'fair', 'bad'); if (level) c.classList.add(level); }
     function showLock(kind, text) {
@@ -134,6 +132,8 @@
         try { const s = track && track.getSettings ? track.getSettings() : {}; if (Number.isFinite(s.exposureTime)) et = s.exposureTime; if (Number.isFinite(s.iso)) iso = s.iso; } catch (e) { /* 무시 */ }
         const f = { t: tSec, r, g, b, y: 0.299 * r + 0.587 * g + 0.114 * b, exposureTime: et, iso, e: et != null ? et * (iso || 1) : null, s: sat / n };
         live.push(f);
+        // 손가락을 대지 않은 동안의 장면 밝기·노출 (최근 값, 손가락을 덮으면 그대로 둠)
+        if (!(r > 25 && r > 1.6 * g)) lastScene = { y: Math.round(f.y * 10) / 10, exposureTime: et, iso, at: tSec };
         while (live.length && live[0].t < tSec - 6) live.shift();
         if (phase === 'rec' && rec) rec.frames.push(f);
     }
@@ -158,7 +158,7 @@
     }
 
     // 화면 고치기 (1초에 몇 번)
-    let lastUi = 0, lastBpmT = 0;
+    let lastUi = 0, lastBpmT = 0, lastLiveT = 0, liveA = null;
     function tick() {
         const now = performance.now();
         if (now - lastUi < 120) return;
@@ -167,11 +167,22 @@
         const tl = live.length ? live[live.length - 1].t : 0;
         const q = H.quality(live.filter(f => f.t >= tl - 2));
         $('v-q').textContent = LEVEL[q.level]; $('v-qtext').textContent = q.text; setCard('v-q', q.level);
-        if (phase === 'idle') status(q.level === 'good' ? '🟢 준비됐어요 — ▶ 측정 시작' : '☝ ' + q.text);
-        if (rec && (phase === 'settle' || phase === 'verify' || phase === 'rec')) {
+        // 손가락을 덮었는데 어두우면(빨강이 낮거나 카메라가 노출을 길게 잡음) 미리 알림
+        const lastF = live[live.length - 1];
+        const dimNow = q.covered && lastF && (q.R < 80 || (Number(lastF.exposureTime) >= 330 && (lastF.iso == null || lastF.iso >= 1600)));
+        // 최근 10초 실시간 추정 (그래프와 같은 프레임으로 계산, 봉우리 점·아래 글에 씀)
+        if (now - lastLiveT > 1000 && live.length > 30 && live[live.length - 1].t - live[0].t >= 5 && q.covered) {
+            lastLiveT = now;
+            const src = rec && rec.frames.length > 30 ? rec.frames.filter(f => f.t >= rec.frames[rec.frames.length - 1].t - 10) : live;
+            liveA = analyzeFrames(rec && rec.lock ? rec.lock : 'unlocked', src);
+            $('live-est').textContent = liveA.ok ? `최근 ${Math.round(liveA.dur)}초: ${Math.round(liveA.bpm)} 회/분 · 봉우리 ${liveA.peaks ? liveA.peaks.length : 0}개 ${LEVEL[liveA.level] || ''} (파란 점 = 계산이 찾은 봉우리)` : '최근 10초: 아직 계산 못 함';
+        } else if (!q.covered) { liveA = null; $('live-est').textContent = ''; }
+        if (phase === 'idle') status(q.level === 'good' ? (dimNow ? '🌙 어두워요 — 더 밝은 곳이나 플래시를 켜면 정확해요' : '🟢 준비됐어요 — ▶ 측정 시작') : '☝ ' + q.text);
+        if (rec && (phase === 'settle' || phase === 'adjust' || phase === 'verify' || phase === 'rec')) {
             const el = (now - rec.wall) / 1000;
             $('time-st').hidden = false;
             if (phase === 'settle') { $('time-st').textContent = '노출 맞추는 중 ' + Math.max(0, 3 - el).toFixed(0) + '초'; status('⏳ 노출을 맞추는 중 — 가만히'); }
+            else if (phase === 'adjust') { $('time-st').textContent = '노출 맞추는 중'; status('⏳ 잠근 뒤 밝기를 잠그기 전과 맞추는 중 — 가만히'); }
             else if (phase === 'verify') { $('time-st').textContent = '노출 잠금 확인 중'; status('🔍 노출이 정말 고정됐는지 확인 중'); }
             else {
                 const left = Math.max(0, rec.dur - (now - rec.recWall) / 1000);
@@ -182,7 +193,8 @@
                 lastBpmT = now;
                 const last = rec.frames[rec.frames.length - 1].t;
                 if (last - rec.frames[0].t >= 6) {
-                    const a = analyzeFrames(rec.lock, rec.frames.filter(f => f.t >= last - 12));
+                    // 큰 숫자 = 그래프의 파란 점과 같은 계산(최근 10초)
+                    const a = liveA && liveA.ok ? liveA : analyzeFrames(rec.lock, rec.frames.filter(f => f.t >= last - 10), rec.scene);
                     if (a.ok) {
                         $('v-bpm').textContent = Math.round(a.bpm);
                         $('v-ibi').textContent = a.ibi && a.ibi.length ? Math.round(H.mean(a.ibi)) : Math.round(60000 / a.bpm);
@@ -198,34 +210,102 @@
         // 1초 이동평균을 빼고 뒤집음 (피가 많을수록 어두워짐 → 봉우리 = 박동)
         const ys = pts.map(f => -Math.log(Math.max(0.5, f.r)));
         const out = pts.map((f, i) => { let s = 0, k = 0; for (let j = 0; j < pts.length; j++) if (Math.abs(pts[j].t - f.t) <= 0.5) { s += ys[j]; k++; } return { x: f.t - tEnd, y: ys[i] - s / k }; });
-        plot($('wave'), [{ pts: out, color: '#c62828', width: 2 }], { xmin: -6, xmax: 0, xlabel: '초 (지금 = 0)', yticks: false, empty: '손가락을 올리면 파형이 나와요' });
+        // 계산이 찾은 봉우리(최근 10초 분석)를 같은 그래프에 점으로 → 학생이 봉우리를 세어 확인
+        const dots = [];
+        if (liveA && liveA.ok && liveA.peaks) liveA.peaks.forEach(tp => {
+            const x = liveA.t0 + tp - tEnd;
+            if (x < -6 || x > 0) return;
+            let best = null; out.forEach(p => { if (!best || Math.abs(p.x - x) < Math.abs(best.x - x)) best = p; });
+            if (best) dots.push({ x, y: best.y });
+        });
+        plot($('wave'), [{ pts: out, color: '#c62828', width: 2 }, { pts: dots, color: '#1565c0', dots: 4, noLine: true }], { xmin: -6, xmax: 0, xlabel: '초 (지금 = 0)', yticks: false, empty: '손가락을 올리면 파형이 나와요' });
     }
 
     // ---------- 노출 고정 ----------
-    // 잠근 뒤 1.5초 동안 getSettings 를 읽어 exposureTime·iso 가 1% 넘게 바뀌지 않아야 '고정됨'
+    // 노출 잠금 (선생님 실측: 갤럭시 Z 플립6 에서 잠그는 순간 화면이 갑자기 어두워짐)
+    //  자동 노출 중 getSettings() 의 exposureTime·iso 가 실제로 쓰는 값이 아닐 수 있어(옛 값·기본값), 그 값으로 잠그면 어두워진다.
+    //  ① 잠그기 전 밝기(Y, 손가락 덮은 상태)를 기억 ② (있으면) single-shot 으로 한 번 맞춘 뒤 manual 로 잠금
+    //  ③ 0.3초마다 밝기를 보고 잠그기 전과 10% 넘게 다르면 셔터(최대 1/30초 = 333, 100 µs 단위)를, 모자라면 ISO 를 바꿔 2초 안에 맞춤
+    //  ④ 못 맞추면(범위 끝·포화) 잠금을 풀고 자동 노출 + 노출 보정으로 ⑤ 맞추면 1.5초 동안 값이 안 바뀌는지 확인해야 '고정됨'
+    //  과정은 log 에 남겨 회차·CSV 머리말에 (원인 분석용)
+    const meanR = sec => { const tl = live.length ? live[live.length - 1].t : 0, fr = live.filter(f => f.t >= tl - sec); return fr.length ? H.mean(fr.map(f => f.r)) : NaN; };
+    const meanY = sec => { const tl = live.length ? live[live.length - 1].t : 0, fr = live.filter(f => f.t >= tl - sec); return fr.length ? H.mean(fr.map(f => f.y)) : NaN; };
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const setNow = () => { try { const g = track.getSettings(); return { mode: g.exposureMode, et: Number.isFinite(g.exposureTime) ? g.exposureTime : null, iso: Number.isFinite(g.iso) ? g.iso : null }; } catch (e) { return {}; } };
     async function lockAndVerify() {
+        const log = { steps: [] };
+        const note = (what, extra) => log.steps.push(Object.assign({ what, y: Math.round(meanY(0.3) * 10) / 10, r: Math.round(meanR(0.3) * 10) / 10 }, setNow(), extra || {}));
         const canLock = track && Array.isArray(caps.exposureMode) && caps.exposureMode.includes('manual');
-        if (!canLock) return { lock: 'unlocked', why: '이 폰은 노출 고정을 지원하지 않아요' };
-        const s = track.getSettings ? track.getSettings() : {};
+        note('잠그기 전');
+        log.before = log.steps[0];
+        if ($('nolock').checked) return { lock: 'unlocked', why: '노출 잠금 끔(선택)', log };
+        if (!canLock) return { lock: 'unlocked', why: '이 폰은 노출 고정을 지원하지 않아요', log };
+        // 목표 밝기: 빨강 평균을 잠그기 전 값으로, 단 60~180 안으로 (선생님 폰은 ISO 27 로 잠겨 빨강 2~10 으로 너무 어두웠음 → 더 밝게)
+        const rBefore = meanR(0.6), rTarget = Math.min(180, Math.max(60, rBefore));
+        log.target = Math.round(rTarget);
+        const etCap = caps.exposureTime || {}, isoCap = caps.iso || {};
+        const etMax = Math.min(etCap.max || Infinity, 10000 / 30);   // 30장/초 를 지키려면 1/30초(333) 보다 길면 안 됨
+        const clampEt = v => Math.min(etMax, Math.max(etCap.min || 0, v));
+        const clampIso = v => Math.min(isoCap.max || Infinity, Math.max(isoCap.min || 0, v));
+        try {
+            if (caps.exposureMode.includes('single-shot')) { await track.applyConstraints({ advanced: [{ exposureMode: 'single-shot' }] }); await wait(800); note('single-shot'); }
+        } catch (e) { note('single-shot 거절'); }
+        if (!rec) return { lock: 'unlocked', why: '', log };
+        const s = setNow();
+        let et = Number.isFinite(s.et) ? clampEt(s.et) : null, iso = Number.isFinite(s.iso) && caps.iso ? clampIso(s.iso) : null;
+        // ISO 하한 100 (폰이 알려 준 값이 27 처럼 아주 낮으면 그대로 쓰지 않음, 너무 밝으면 아래에서 다시 줄임)
+        if (iso != null) iso = clampIso(Math.max(iso, Math.min(100, isoCap.max || 100)));
         const adv = { exposureMode: 'manual' };
-        if (caps.exposureTime && Number.isFinite(s.exposureTime)) adv.exposureTime = Math.min(caps.exposureTime.max || Infinity, Math.max(caps.exposureTime.min || 0, s.exposureTime));
-        if (caps.iso && Number.isFinite(s.iso)) adv.iso = Math.min(caps.iso.max || Infinity, Math.max(caps.iso.min || 0, s.iso));
+        if (et != null && caps.exposureTime) adv.exposureTime = et;
+        if (iso != null) adv.iso = iso;
         if (Array.isArray(caps.whiteBalanceMode) && caps.whiteBalanceMode.includes('manual')) adv.whiteBalanceMode = 'manual';
         if (Array.isArray(caps.focusMode) && caps.focusMode.includes('manual')) adv.focusMode = 'manual';
-        try { await track.applyConstraints({ advanced: [adv] }); } catch (e) { return { lock: 'unlocked', why: '잠그기 요청이 거절됨' }; }
+        try { await track.applyConstraints({ advanced: [adv] }); } catch (e) { return { lock: 'unlocked', why: '잠그기 요청이 거절됨', log }; }
+        phase = 'adjust';
+        await wait(300); note('잠근 직후'); log.afterLock = log.steps[log.steps.length - 1];
+        // 밝기 맞추기 (닫힌 고리)
+        let matched = false;
+        for (let i = 0; i < 7 && rec; i++) {
+            const rNow = meanR(0.25);
+            if (!(rNow > 0) || !(rTarget > 0)) break;
+            const k = H.toLinear(rTarget) / Math.max(1e-6, H.toLinear(rNow));   // 빛의 세기로 몇 배 모자라나 (빨강 기준)
+            if (Math.abs(k - 1) <= 0.1) { matched = true; break; }
+            if (!caps.exposureTime || et == null) break;
+            let want = et * k, nextEt = clampEt(want), nextIso = iso;
+            if (want > nextEt * 1.02 && iso != null) nextIso = clampIso(iso * want / nextEt);      // 셔터가 끝까지 가면 ISO 로
+            if (k < 1 && iso != null && iso > (isoCap.min || 0) && nextEt <= (etCap.min || 0)) nextIso = clampIso(iso * k);
+            if (Math.abs(nextEt - et) < 1e-6 && nextIso === iso) break;   // 더 바꿀 수 없음
+            et = nextEt; iso = nextIso;
+            const a2 = { exposureMode: 'manual', exposureTime: et };
+            if (iso != null) a2.iso = iso;
+            try { await track.applyConstraints({ advanced: [a2] }); } catch (e) { break; }
+            await wait(300); note('밝기 맞추기', { k: Math.round(k * 100) / 100 });
+        }
+        if (!matched && rec) {
+            const rNow = meanR(0.25);
+            matched = rNow > 0 && Math.abs(H.toLinear(rTarget) / H.toLinear(rNow) - 1) <= 0.1;
+            // 목표(60)까지 못 올려도 잠그기 전보다 어둡지 않으면 받아 줌 (원래 어두운 곳)
+            if (!matched && rNow > 0 && rBefore < 60 && H.toLinear(rNow) >= 0.9 * H.toLinear(rBefore)) { matched = true; log.short = '목표 밝기(빨강 60)까지는 못 올림'; }
+        }
+        log.adjusted = log.steps[log.steps.length - 1];
+        if (!rec) return { lock: 'unlocked', why: '', log };
+        if (!matched) {
+            await setAuto(); note('자동 노출로 되돌림');
+            return { lock: 'unlocked', why: '잠그면 잠그기 전 밝기로 맞출 수 없어(셔터·ISO 범위 끝) 자동 노출로 측정', log };
+        }
         phase = 'verify';
         const seen = [];
         for (let i = 0; i < 15; i++) {
-            await new Promise(r => setTimeout(r, 100));
-            if (!rec) return { lock: 'unlocked', why: '' };
-            try { const g = track.getSettings(); seen.push({ m: g.exposureMode, et: g.exposureTime, iso: g.iso }); } catch (e) { /* 무시 */ }
+            await wait(100);
+            if (!rec) return { lock: 'unlocked', why: '', log };
+            seen.push(setNow());
         }
-        if (!seen.length || seen.some(x => x.m !== 'manual')) return { lock: 'unlocked', why: '잠갔는데 자동 노출로 돌아감' };
+        if (!seen.length || seen.some(x => x.mode !== 'manual')) return { lock: 'unlocked', why: '잠갔는데 자동 노출로 돌아감', log };
         const ets = seen.map(x => x.et).filter(Number.isFinite), isos = seen.map(x => x.iso).filter(Number.isFinite);
-        if (!ets.length) return { lock: 'unlocked', why: '노출 값을 읽을 수 없어 고정됐는지 확인 못 함' };
+        if (!ets.length) return { lock: 'unlocked', why: '노출 값을 읽을 수 없어 고정됐는지 확인 못 함', log };
         const changed = a => a.length && (Math.max(...a) - Math.min(...a)) / Math.max(1e-9, Math.abs(H.mean(a))) > 0.01;
-        if (changed(ets) || changed(isos)) return { lock: 'unlocked', why: '잠갔는데 노출 값이 계속 바뀜' };
-        return { lock: 'locked', why: '' };
+        if (changed(ets) || changed(isos)) return { lock: 'unlocked', why: '잠갔는데 노출 값이 계속 바뀜', log };
+        return { lock: 'locked', why: '', log };
     }
     async function setAuto() {
         if (!track) return;
@@ -241,7 +321,7 @@
     let settleTimer = null, endTimer = null;
     async function start() {
         if (phase !== 'idle') return;
-        rec = { frames: [], wall: performance.now(), dur: Number($('dur').value) || 30, torch: !!$('torch').checked, lock: '' };
+        rec = { frames: [], wall: performance.now(), dur: Number($('dur').value) || 30, torch: !!$('torch').checked, lock: '', scene: lastScene };
         phase = 'settle';
         $('start').hidden = true; $('stop').hidden = false; $('cam').disabled = true;
         $('v-bpm').textContent = '--'; $('v-ibi').textContent = '--';
@@ -252,7 +332,7 @@
             if (!rec) return;
             const v = await lockAndVerify();
             if (!rec) return;
-            rec.lock = v.lock; rec.why = v.why;
+            rec.lock = v.lock; rec.why = v.why; rec.lockLog = v.log;
             const hasExp = live.some(f => Number(f.e) > 0);
             if (v.lock === 'locked') showLock('🔒 고정됨', '밝기 그대로 계산');
             else if (hasExp) showLock('⚠ 고정 안 됨', (v.why ? v.why + ' → ' : '') + '노출 보정으로 계산');
@@ -271,7 +351,7 @@
         if (!r) return;
         const dur = r.frames.length > 1 ? r.frames[r.frames.length - 1].t - r.frames[0].t : 0;
         if (cancel && dur < 8) { msg('8초보다 짧아 저장하지 않았어요.'); return; }
-        const run = addRun({ lock: r.lock || 'unlocked', why: r.why, torch: r.torch, frames: r.frames });
+        const run = addRun({ lock: r.lock || 'unlocked', why: r.why, torch: r.torch, frames: r.frames, scene: r.scene, lockLog: r.lockLog });
         devSend(run);   // 선생님 기기에서만 (개발 데이터 자동 수집, js/dev-collect.js)
     }
 
@@ -284,15 +364,17 @@
             measuredAt: run.at,
             summary: { '심박수': res.bpm == null ? '' : Math.round(res.bpm * 10) / 10, '신뢰도': res.conf == null ? '' : Math.round(res.conf * 100) / 100, '노출': res.mode || '',
                 '손목': H.palpBpm(run.palp) || '', 'FFT': res.bpmFFT == null ? '' : Math.round(res.bpmFFT), '자기상관': res.bpmAC == null ? '' : Math.round(res.bpmAC), '봉우리': res.bpmPeaks == null ? '' : Math.round(res.bpmPeaks) },
-            data: { csv: csvFor(run), result: res, lock: run.lock, why: run.why, torch: run.torch, palp: run.palp, palpBpm: H.palpBpm(run.palp) || null,
+            // 판단 근거 모두: 보정 전·후 결과(alt: 각 FFT·자기상관·봉우리·신뢰도), 두 배 검사, 노출 출렁임 빠르기, 덮임·밝기 판정, 잠금 과정, 손가락 대기 전 장면
+            data: { csv: csvFor(run), result: res, lock: run.lock, why: run.why, lockLog: run.lockLog || null, scene: run.scene || null, torch: run.torch, palp: run.palp, palpBpm: H.palpBpm(run.palp) || null,
                 device: DevCollect.uaSummary(navigator.userAgent), screen: [screen.width, screen.height, devicePixelRatio] }
         });
     }
     function newId() { let k = 1; const ids = new Set(state.runs.map(r => r.id)); while (ids.has('r' + k)) k++; return 'r' + k; }
     function addRun(o) {
         const raw = H.pack(o.frames);
-        const a = analyzeFrames(o.lock, H.unpack(raw));
-        const run = { id: newId(), at: o.at || new Date().toISOString(), lock: o.lock, why: o.why || '', torch: !!o.torch, sim: !!o.sim, palp: null, raw, res: summarize(a) };
+        const scene = o.scene ? { y: o.scene.y, exposureTime: o.scene.exposureTime, iso: o.scene.iso } : null;
+        const a = analyzeFrames(o.lock, H.unpack(raw), scene);
+        const run = { id: newId(), at: o.at || new Date().toISOString(), lock: o.lock, why: o.why || '', torch: !!o.torch, sim: !!o.sim, palp: null, scene, lockLog: o.lockLog || null, raw, res: summarize(a) };
         state.runs.push(run);
         while (state.runs.length > MAX_RUNS) state.runs.shift();
         state.pick = run.id;
@@ -302,23 +384,27 @@
         if (res.bpm != null) {
             $('v-bpm').textContent = Math.round(res.bpm);
             $('v-ibi').textContent = res.ibi && res.ibi.length ? Math.round(H.mean(res.ibi)) : Math.round(60000 / res.bpm);
-            showLock(res.modeText.split(' ')[0] + ' ' + (res.mode === 'locked' ? '고정됨' : '고정 안 됨'), res.modeText.replace(/^\S+\s*/, ''));
+            showLock(res.modeText.split(' ')[0] + ' ' + (res.mode === 'locked' ? '고정됨' : '고정 안 됨'), res.modeText.replace(/^\S+\s*/, '') + (run.why ? ' (' + run.why + ')' : ''));
             msg(`✅ 저장했어요: <b>${Math.round(res.bpm)} 회/분</b> ${LEVEL[res.level] || ''} (신뢰도 ${Math.round(res.conf * 100)}%) · ${esc(res.modeText)}` +
-                (res.exposure && res.exposure.warn ? `<br>${esc(res.exposure.text)}` : '') + (res.level === 'bad' ? '<br>신뢰도가 낮아요. 손가락을 다시 덮고 가만히 재 보세요.' : ''), res.level === 'bad' || (res.exposure && res.exposure.warn) ? 'warn' : '');
+                (res.exposure && res.exposure.warn ? `<br>${esc(res.exposure.text)}` : '') + (res.light && res.light.level !== 'ok' ? `<br>${esc(res.light.text)}` : '') +
+                (res.doubled ? '<br>🔁 처음 찾은 값의 두 배가 더 그럴듯해 바꿨어요 (어두우면 절반으로 잡히기 쉬워요).' : '') + (res.level === 'bad' ? '<br>신뢰도가 낮아요. 손가락을 다시 덮고 가만히 재 보세요.' : ''), res.level === 'bad' || (res.exposure && res.exposure.warn) || (res.light && res.light.level !== 'ok') ? 'warn' : '');
         } else msg('저장했지만 심박수를 찾지 못했어요: ' + esc((res.reasons || []).join(', ')) + '. 손가락을 다시 덮고 재 보세요.', 'warn');
         return run;
     }
     function summarize(a) {
         return {
             ok: a.ok, bpm: a.bpm, level: a.level, conf: a.conf, method: a.method, channel: a.channel, bpmFFT: a.bpmFFT, bpmAC: a.bpmAC, bpmPeaks: a.bpmPeaks,
-            ibi: a.ibi, cv: a.cv, dur: a.dur, fpsMean: a.fpsMean, reasons: a.reasons, mode: a.mode.mode, modeText: a.mode.text,
+            ibi: a.ibi, cv: a.cv, dur: a.dur, fpsMean: a.fpsMean, reasons: a.reasons, mode: a.mode.mode, modeText: a.mode.text, doubled: !!a.doubled, acdc: a.acdc, alt: a.alt || null, cutAt: a.cutAt == null ? null : a.cutAt,
+            doubleCheck: a.doubleCheck || null, expLag: a.expLag == null ? null : a.expLag, expBeta: a.expBeta == null ? null : a.expBeta,
+            quality: a.quality ? { covered: a.quality.covered, R: a.quality.R, G: a.quality.G, B: a.quality.B, rg: a.quality.rg, level: a.quality.level } : null,
+            light: a.light ? { level: a.light.level, text: a.light.text, R: a.light.R, acdc: a.light.acdc, exposureTime: a.light.exposureTime, iso: a.light.iso } : null,
             exposure: a.exposure ? { warn: a.exposure.warn, wobble: !!a.exposure.wobble, available: a.exposure.available, text: a.exposure.text, bpm: a.exposure.bpm, varPct: a.exposure.varPct } : null
         };
     }
 
     // ---------- 회차 목록 ----------
     const runTime = at => { const d = new Date(at); return isNaN(d) ? '' : d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
-    const MODE_SHORT = { locked: '🔒 노출 고정', corrected: '⚠ 노출 보정', nocorrect: '⚠ 보정 불가' };
+    const MODE_SHORT = { locked: '🔒 노출 고정', corrected: '⚠ 노출 보정', raw: '⚠ 보정 전 밝기', nocorrect: '⚠ 보정 불가' };
     function runName(r, i) { return (i + 1) + '회' + (r.sim ? ' 🧪' : r.lock.startsWith('csv') ? ' 📂' : ''); }
     function renderRuns() {
         const ul = $('runs');
@@ -327,7 +413,7 @@
         $('runs-sum').textContent = state.runs.length ? '— ' + state.runs.length + '개' : '';
         ul.innerHTML = state.runs.map((r, i) => {
             const res = r.res || {}, palp = H.palpBpm(r.palp), err = palp && res.bpm != null ? H.errorPct(res.bpm, palp) : null;
-            return `<li data-id="${esc(r.id)}"><span class="ttl">${runName(r, i)} <small>${runTime(r.at)} · ${res.dur ? Math.round(res.dur) + '초' : ''} · ${MODE_SHORT[res.mode] || ''}${r.torch ? ' · 플래시' : ''}</small></span>` +
+            return `<li data-id="${esc(r.id)}"><span class="ttl">${runName(r, i)} <small>${runTime(r.at)} · ${res.dur ? Math.round(res.dur) + '초' : ''} · ${MODE_SHORT[res.mode] || ''}${res.light && res.light.level !== 'ok' ? ' · 🌙 어두움' : ''}${res.doubled ? ' · 🔁 두 배' : ''}${r.torch ? ' · 플래시' : ''}</small></span>` +
                 `<span class="bpm">${res.bpm != null ? Math.round(res.bpm) : '--'}</span><span>회/분 ${LEVEL[res.level] || '🔴'}</span>` +
                 `<label>손목 15초 <input type="number" min="0" max="80" step="1" inputmode="numeric" data-palp="${esc(r.id)}" value="${r.palp == null ? '' : esc(r.palp)}"></label>` +
                 `<span>${palp ? '= ' + palp + ' 회/분' + (err != null ? ` (오차 ${err > 0 ? '+' : ''}${err}%)` : '') : ''}</span>` +
@@ -367,7 +453,13 @@
     function csvFor(r) {
         const i = state.runs.indexOf(r);
         return H.toCsv(H.unpack(r.raw), { '실험': '스마트폰 카메라 심박수', '회차': runName(r, i), '시각': r.at, '노출': r.res && r.res.modeText, '심박수': r.res && r.res.bpm, '손목 15초': r.palp,
-            locked: r.lock === 'locked' || r.lock === 'csv-locked' });
+            locked: r.lock === 'locked' || r.lock === 'csv-locked', light: r.res && r.res.light ? r.res.light.level : '',
+            '밝기 판정': r.res && r.res.light ? r.res.light.text : '', 'AC/DC': r.res && r.res.acdc,
+            '보정 전·후 결과': r.res && r.res.alt ? `보정 전 ${r.res.alt.raw.bpm}회/분(${Math.round((r.res.alt.raw.conf || 0) * 100)}%) · 보정 후 ${r.res.alt.corrected.bpm}회/분(${Math.round((r.res.alt.corrected.conf || 0) * 100)}%) · 고른 쪽 ${r.res.alt.chosen === 'raw' ? '보정 전' : '보정 후'}` : '',
+            '덮임 판정': r.res && r.res.quality ? `${r.res.quality.covered ? '덮임' : '안 덮임'} · R ${r.res.quality.R} · G ${r.res.quality.G} · B ${r.res.quality.B} · R/G ${r.res.quality.rg}` : '',
+            '노출 잠금 과정': r.lockLog ? r.lockLog.steps.map(x => `${x.what}: 밝기 ${x.y} · 셔터 ${x.et == null ? '?' : x.et} · ISO ${x.iso == null ? '?' : x.iso}${x.k ? ' · ×' + x.k : ''}`).join(' → ') : '',
+            '잠금 실패 까닭': r.why || '',
+            '손가락 대기 전 장면': r.scene ? `밝기 ${r.scene.y} · 노출 ${r.scene.exposureTime == null ? '?' : r.scene.exposureTime} · ISO ${r.scene.iso == null ? '?' : r.scene.iso}` : '' });
     }
     function downloadRunCsv(id) { const r = state.runs.find(x => x.id === id); if (r) download('heart_rate_' + r.id + '.csv', csvFor(r)); }
     $('csv-all').addEventListener('click', () => download('heart_rate_all.csv', state.runs.map(csvFor).join('\n')));
@@ -400,7 +492,7 @@
         const r = state.runs.find(x => x.id === state.pick);
         $('detail').hidden = !r; $('detail-empty').hidden = !!r;
         if (!r || !$('detail-box').open) return;
-        const frames = H.unpack(r.raw), a = analyzeFrames(r.lock, frames);
+        const frames = H.unpack(r.raw), a = analyzeFrames(r.lock, frames, r.scene);
         const palp = H.palpBpm(r.palp), err = palp && a.bpm != null ? H.errorPct(a.bpm, palp) : null;
         const avgIbi = a.ibi && a.ibi.length ? Math.round(H.mean(a.ibi)) : null;
         const ev = H.exposureVariation(frames);
@@ -414,9 +506,18 @@
             `<div>손목 맥박<b>${palp ? palp + ' 회/분' + (err != null ? ` (${err > 0 ? '+' : ''}${err}%)` : '') : '안 넣음'}</b></div>` +
             `<div>노출 처리<b>${esc(MODE_SHORT[a.mode.mode] || '')}</b></div>` +
             `<div>노출 변화<b>${ev != null ? ev.toFixed(1) + '%' : '읽을 수 없음'}</b></div>` +
+            (a.alt ? `<div>보정 전 / 보정 후<b>${a.alt.raw.bpm == null ? '-' : a.alt.raw.bpm} / ${a.alt.corrected.bpm == null ? '-' : a.alt.corrected.bpm}</b></div>` : '') +
+            (a.quality ? `<div>덮임 (빨강/초록)<b>${a.quality.covered ? '덮임' : '확인'} · ${a.quality.rg}</b></div>` : '') +
+            `<div>밝기 판정<b>${a.light ? (a.light.level === 'ok' ? '☀ 좋음' : a.light.level === 'dim' ? '🌙 어두움' : '🌙 아주 어두움') : '-'}</b></div>` +
+            `<div>맥파 크기 AC/DC<b>${a.acdc != null ? (a.acdc * 100).toFixed(2) + '%' : '-'}</b></div>` +
             (a.corrected ? `<div>노출 값 어긋남<b>${a.expLag > 0 ? '+' : ''}${a.expLag} 초</b></div>` : '') +
             `<div>사진 수<b>${a.fpsMean != null ? a.fpsMean + '장/초 · ' + a.dur + '초' : '-'}</b></div>`;
         const why = [`<p class="note">노출: ${esc(a.mode.text)}${r.why ? ' (' + esc(r.why) + ')' : ''}</p>`];
+        if (a.alt) why.push(`<p class="note">보정 전 ${a.alt.raw.bpm == null ? '-' : a.alt.raw.bpm}회/분(신뢰도 ${Math.round((a.alt.raw.conf || 0) * 100)}%) · 보정 후 ${a.alt.corrected.bpm == null ? '-' : a.alt.corrected.bpm}회/분(${Math.round((a.alt.corrected.conf || 0) * 100)}%) → <b>${a.alt.chosen === 'raw' ? '보정 전' : '보정 후'}</b>을 씀</p>`);
+        if (r.lockLog && r.lockLog.steps) why.push(`<p class="note">노출 잠금 과정: ${esc(r.lockLog.steps.map(x => `${x.what} (밝기 ${x.y}, 셔터 ${x.et == null ? '?' : x.et}, ISO ${x.iso == null ? '?' : x.iso})`).join(' → '))}</p>`);
+        if (a.quality) why.push(`<p class="note">덮임 판정 근거: 빨강 ${a.quality.R} · 초록 ${a.quality.G} · 파랑 ${a.quality.B == null ? '-' : a.quality.B} · 빨강/초록 ${a.quality.rg}</p>`);
+        if (a.light && a.light.level !== 'ok') why.push(`<div class="note warn">${esc(a.light.text)}</div>`);
+        if (a.doubled) why.push(`<p class="note">🔁 두 배 후보 검사: 처음 찾은 ${Math.round(a.doubleCheck.from)}회/분의 두 배 쪽에 따로 고른 박동이 있고, 절반 쪽 파형이 맥박 모양(뾰족함)이 아니라 두 배로 바꿨어요.</p>`);
         if (a.exposure) why.push(`<div class="note${a.exposure.warn ? ' warn' : ''}">노출 점검: ${esc(a.exposure.text)}</div>`);
         if (a.reasons && a.reasons.length) why.push(`<p class="note">참고: ${esc(a.reasons.join(' · '))}</p>`);
         $('res-why').innerHTML = why.join('');

@@ -149,6 +149,105 @@
         return m;
     }
 
+    // ---------- 밝기(어두움) 판정 ----------
+    // 어두우면 맥파가 잡음에 묻혀 심박이 절반으로 잡히는 등 틀리기 쉽다 (선생님 실측: 갤럭시 Z 플립6 어두운 곳에서 절반)
+    //  - 손가락 댄 뒤 빨강 평균(R, 0~255): 40 아래 아주 어두움, 80 아래 어두움
+    //  - 맥파 크기 AC/DC(심박 빠르기 둘레만 남긴 맥파의 표준편차, -ln 단위라 밝기에 대한 비율): 0.06% 아래 아주 약함, 0.12% 아래 약함
+    //    (시뮬레이션: 보통 맥파 0.15~0.31%, 약한 맥파 0.09~0.13%)
+    //  - 노출: exposureTime ≥ 330(=33 ms, 100 µs 단위) 이면서 ISO ≥ 1600 이면 카메라가 '어둡다'고 본 것
+    //  - scene: 손가락 대기 전 장면 { y(밝기 0~255), exposureTime, iso } — 방 자체가 어두운지
+    // 값의 기준은 시뮬레이션·선생님 설명으로 정한 첫 값이라, 모은 CSV 로 고쳐 나갈 것
+    function lightCheck(frames, acdc, scene) {
+        const R = mean(frames.map(f => Number(f.r)).filter(Number.isFinite));
+        const ets = frames.map(f => Number(f.exposureTime)).filter(v => Number.isFinite(v) && v > 0);
+        const isos = frames.map(f => Number(f.iso)).filter(v => Number.isFinite(v) && v > 0);
+        const et = ets.length ? median(ets) : null, iso = isos.length ? median(isos) : null;
+        const longExp = et != null && et >= 330 && (iso == null || iso >= 1600);
+        const sc = scene && Number.isFinite(Number(scene.y)) ? scene : null;
+        const roomDark = !!sc && (Number(sc.y) < 40 || (Number(sc.exposureTime) >= 330 && Number(sc.iso) >= 1600));
+        const why = [];
+        let level = 'ok';
+        if (R < 40) { level = 'dark'; why.push(`손가락 밝기가 낮아요 (빨강 ${round(R, 0)})`); }
+        else if (R < 80) { level = 'dim'; why.push(`손가락 밝기가 조금 낮아요 (빨강 ${round(R, 0)})`); }
+        if (Number.isFinite(acdc)) {
+            if (acdc < 0.0006) { level = longExp || level !== 'ok' ? 'dark' : 'dim'; why.push(`맥파가 아주 약해요 (AC/DC ${round(acdc * 100, 2)}%)`); }
+            else if (acdc < 0.0012) { if (level === 'ok') level = 'dim'; why.push(`맥파가 약해요 (AC/DC ${round(acdc * 100, 2)}%)`); }
+        }
+        if (longExp) { if (level === 'ok') level = 'dim'; why.push(`카메라가 노출을 길게 잡음 (${round(et / 10, 1)} ms · ISO ${iso == null ? '?' : round(iso, 0)})`); }
+        if (roomDark) { if (level === 'ok') level = 'dim'; why.push('손가락을 대기 전 방이 어두웠어요'); }
+        return {
+            level, R: round(R, 1), acdc: round(acdc, 5), exposureTime: et, iso, scene: sc, why,
+            text: level === 'ok' ? '밝기 좋아요' : (level === 'dark' ? '🌙 아주 어두워요' : '🌙 어두워요') + ' — 더 밝은 곳(창가)에서 하거나 플래시를 켜세요. ' + why.join(' · ')
+        };
+    }
+
+    // ---------- 두 배 후보 검사 ----------
+    // 지금 찾은 빠르기 f1(Hz) 의 두 배 f2 가 (1) 따로 뚜렷한 주파수 봉우리이고 (2) 그 간격으로 박동이 고르게 찾아지고
+    // (3) f1 과 박자가 묶여 있지 않으면(배음이 아니면) 두 배로 본다.
+    //  - 중복맥파가 있는 진짜 f1 박동은 2f1 성분이 f1 과 늘 같은 박자(위상 고정)라 (3) 에서 걸러짐
+    //  - 어두울 때처럼 맥파가 약하고 그 절반 빠르기 흔들림(숨·누르는 힘 등)이 더 세면, 두 성분이 서로 따로 놀아 (3) 을 통과
+    //  - f1 쪽이 배음 없는 사인파(2f1 세기가 f1 의 5% 아래)면 맥박 모양이 아니므로 (3) 없이도 두 배로 봄
+    function doubleCheck(y, fs, f1, sp) {
+        const out = { switch: false, from: f1 * 60 };
+        if (!(2 * f1 <= BAND[1]) || y.length < 6 * fs) return out;
+        // (1) 2f1 ±8% 안의 가장 센 봉우리
+        let f2 = NaN, p2 = 0;
+        for (let i = 1; i < sp.f.length - 1; i++) {
+            if (Math.abs(sp.f[i] - 2 * f1) / (2 * f1) > 0.08) continue;
+            if (sp.p[i] >= sp.p[i - 1] && sp.p[i] >= sp.p[i + 1] && sp.p[i] > p2) { p2 = sp.p[i]; f2 = sp.f[i]; }
+        }
+        const p1 = powAt(sp, f1);
+        const band = sp.p.filter((_, i) => sp.f[i] >= BAND[0] && sp.f[i] <= BAND[1]);
+        const floor = median(band);
+        out.f2 = f2; out.ratio = p1 ? round(p2 / p1, 3) : null; out.snr = floor ? round(p2 / floor, 1) : null;
+        // 두 배 쪽 세기는 절반 쪽보다 훨씬 약할 수 있음(절반 흔들림이 셀 때) → 세기 비율은 보지 않고, 바닥 잡음보다 뚜렷한지만
+        if (!Number.isFinite(f2) || p2 < 8 * floor) return out;
+        // (2') 넓은 대역(0.6~3.5 Hz) 그대로에서 2f1 간격(최소 0.6/f2)으로 봉우리를 찾아, 간격이 고르고 높이가 번갈아 크게 다르지 않으면
+        //  → 눈으로 보이는 맥파 봉우리가 2f1 로 뛴다는 뜻이라 바로 두 배 (선생님 실측: 그래프 봉우리 0.75 초 간격인데 결과 39회)
+        //  중복맥파(진짜 f1)는 봉우리 간격이 0.35·0.65 주기로 번갈아 고르지 않아 여기서 걸리지 않음
+        {
+            const pb = findPeaks(y, fs, 1 / f2), ibb = [];
+            for (let i = 1; i < pb.length; i++) ibb.push(pb[i] - pb[i - 1]);
+            const okb = ibb.filter(x => x > 0.6 / f2 && x < 1.6 / f2);
+            const hs = pb.map(t => y[Math.min(y.length - 1, Math.round(t * fs))]);
+            const odd = mean(hs.filter((_, i) => i % 2)), even = mean(hs.filter((_, i) => !(i % 2)));
+            const alt = Math.min(odd, even) / Math.max(odd, even);
+            out.cvBroad = okb.length >= 3 ? round(std(okb) / mean(okb), 3) : null;
+            out.altHeight = Number.isFinite(alt) ? round(alt, 2) : null;
+            if (okb.length >= Math.max(4, 0.7 * (y.length / fs) * f2) && std(okb) / mean(okb) < 0.12 && alt > 0.6) { out.switch = true; out.why = 'broad'; return out; }
+        }
+        // (2) 2f1 둘레만 남겨 봉우리 간격이 고른지
+        const y2 = bandpass(y, fs, [Math.max(BAND[0], 0.7 * f2), Math.min(BAND[1], 1.3 * f2)]);
+        const pk = findPeaks(y2, fs, 1 / f2), ib = [];
+        for (let i = 1; i < pk.length; i++) ib.push(pk[i] - pk[i - 1]);
+        const ok = ib.filter(x => x > 0.6 / f2 && x < 1.6 / f2);
+        out.cv2 = ok.length >= 3 ? round(std(ok) / mean(ok), 3) : null;
+        // f1 쪽 파형이 배음 없는 사인파에 가까우면(2f1 세기가 f1 의 5% 아래) 맥박이 아닌 흔들림일 가능성이 커 조금 덜 고른 간격도 받아 줌
+        //  진짜 맥파는 모양이 뾰족해 배음이 늘 있음(시험: 중복맥파 60회 비율 ≈ 1, 40회 ≈ 0.4)
+        const sine = p1 > 0 && p2 / p1 < 0.05;
+        out.sineLike = sine;
+        if (!(ok.length >= 3 && std(ok) / mean(ok) < (sine ? 0.25 : 0.12))) return out;
+        // (3) 4초 창마다 f1·2f1 의 위상을 재어, 2f1 위상 − 2 × f1 위상이 일정한지(묶임) — 묶임 정도 0~1
+        const W = Math.round(4 * fs), S = Math.round(1 * fs), z = [];
+        for (let a = 0; a + W <= y.length; a += S) {
+            let c1 = 0, s1 = 0, c2 = 0, s2 = 0;
+            for (let i = 0; i < W; i++) {
+                const t = (a + i) / fs, v = y[a + i];
+                c1 += v * Math.cos(2 * Math.PI * f1 * t); s1 += v * Math.sin(2 * Math.PI * f1 * t);
+                c2 += v * Math.cos(2 * Math.PI * 2 * f1 * t); s2 += v * Math.sin(2 * Math.PI * 2 * f1 * t);
+            }
+            const d = Math.atan2(s2, c2) - 2 * Math.atan2(s1, c1);
+            z.push([Math.cos(d), Math.sin(d)]);
+        }
+        const lock = z.length ? Math.hypot(mean(z.map(q => q[0])), mean(z.map(q => q[1]))) : 1;
+        out.lock = round(lock, 2);
+        // 박자가 묶여 있으면 보통 배음(진짜 f1 박동). 단, f1 쪽이 사인파처럼 매끈하면(배음 거의 없음) 묶여 있어도
+        //  '한 박동 걸러 세기가 다른 맥파'일 수 있어 2f1 로 봄 — 진짜 맥파는 모양이 뾰족해 배음이 크므로 여기에 걸리지 않음
+        if (lock >= 0.5 && !sine) return out;
+        out.switch = true; out.why = sine ? 'sine' : 'unlocked';
+        return out;
+    }
+
     // ---------- 봉우리: 최소 간격 = 0.6 × 주기, 높은 것부터 고름 ----------
     function findPeaks(y, fs, period) {
         const n = y.length, minGap = Math.max(1, 0.6 * period * fs), sd = std(y), cand = [];
@@ -172,12 +271,44 @@
         const jumps = [];
         for (let i = 1; i < Y.length; i++) jumps.push(Math.abs(Y[i] - Y[i - 1]) / Math.max(1, Y[i - 1]));
         const jump = jumps.length ? Math.max(...jumps) : 0;
-        const covered = R > 25 && R > 1.6 * G;
-        if (R < 8) return { level: 'bad', text: '너무 어두워요 — 밝은 곳에서 하거나 플래시를 켜세요', covered, R, G, S, jump };
-        if (!covered) return { level: 'bad', text: '손가락으로 카메라를 완전히 덮어 주세요', covered, R, G, S, jump };
-        if (S > 0.6) return { level: 'fair', text: '너무 밝아 빨강이 꽉 찼어요 — 손가락을 조금 더 세게 누르거나 플래시를 끄세요', covered, R, G, S, jump };
-        if (jump > 0.12) return { level: 'fair', text: '움직임이 커요 — 폰과 손가락을 가만히', covered, R, G, S, jump };
-        return { level: 'good', text: '좋아요 — 그대로 가만히', covered, R, G, S, jump };
+        // 덮임: 손가락을 지나온 빛은 빨강이 가장 셈. 예전 기준(빨강 > 25, 빨강 > 1.6 × 초록)은 갤럭시 Z 플립6 실내에서
+        //  그래프가 깨끗한데도 '덮어 주세요'(🔴)가 나와(선생님 실측) 낮춤: 빨강 > 1 이고 빨강 ≥ 1.25 × 초록 이면 덮임,
+        //  1.1~1.25 배는 '덮였는지 확인'(🟡). 판정 근거 숫자(R·G·B·rg)를 함께 돌려줌(회차·CSV 에 남김)
+        const B = mean(frames.map(f => Number(f.b)).filter(Number.isFinite));
+        // 아주 어두운 폰(빨강 2~10, 초록 0.1~0.5)도 판정되게: 비율은 초록을 0.05 아래로 내리지 않고 셈, 빨강은 1 보다 크면 됨
+        const rg = R / Math.max(G, 0.05);
+        const covered = R > 1 && rg >= 1.25 && !(Number.isFinite(B) && B > 0.5 && R < 1.1 * B);
+        const maybe = !covered && R > 1 && rg >= 1.1;
+        const nums = { covered, R: round(R, 1), G: round(G, 1), B: Number.isFinite(B) ? round(B, 1) : null, rg: round(rg, 2), S: round(S, 3), jump: round(jump, 3) };
+        if (R < 8) return Object.assign({ level: covered ? 'fair' : 'bad', text: '너무 어두워요 — 밝은 곳에서 하거나 플래시를 켜세요' }, nums);
+        if (maybe) return Object.assign({ level: 'fair', text: `손가락이 카메라를 다 덮었는지 확인하세요 (빨강/초록 ${round(rg, 2)})` }, nums);
+        if (!covered) return Object.assign({ level: 'bad', text: `손가락으로 카메라를 완전히 덮어 주세요 (빨강/초록 ${round(rg, 2)})` }, nums);
+        if (S > 0.6) return Object.assign({ level: 'fair', text: '너무 밝아 빨강이 꽉 찼어요 — 손가락을 조금 더 세게 누르거나 플래시를 끄세요' }, nums);
+        if (jump > 0.12) return Object.assign({ level: 'fair', text: '움직임이 커요 — 폰과 손가락을 가만히' }, nums);
+        return Object.assign({ level: 'good', text: '좋아요 — 그대로 가만히' }, nums);
+    }
+
+    // ---------- 손가락이 떨어진 곳 찾기 ----------
+    // 처음 3초의 밝기(중앙값)를 기준으로, 0.5초 동안의 중앙값이 2배 넘게 밝아지거나 절반 아래로 어두워져 1초 넘게 그대로면 그 시각
+    //  남는 앞부분이 6초보다 짧으면 자르지 않음(그때는 품질 판정이 알려 줌)
+    function liftCut(fr) {
+        if (fr.length < 30) return null;
+        const t0 = fr[0].t, base = median(fr.filter(f => f.t - t0 < 3).map(f => Number(f.y)).filter(Number.isFinite));
+        if (!(base > 0)) return null;
+        const med = i => { const a = fr.filter(f => f.t >= fr[i].t && f.t < fr[i].t + 0.5).map(f => Number(f.y)); return median(a); };
+        for (let i = 0; i < fr.length; i++) {
+            if (fr[i].t - t0 < 3) continue;
+            const m = med(i);
+            if (!(m > 2 * base || m < 0.5 * base)) continue;
+            // 1초 뒤에도 그대로인지
+            const j = fr.findIndex(f => f.t >= fr[i].t + 1);
+            if (j < 0) break;
+            const m2 = med(j);
+            if (!(m2 > 2 * base || m2 < 0.5 * base)) continue;
+            const at = fr[i].t - 0.2;
+            return at - t0 >= 6 ? { at, base: round(base, 2), after: round(m, 2) } : null;
+        }
+        return null;
     }
 
     // ---------- 노출 출렁임 점검 ----------
@@ -211,7 +342,8 @@
 
     // ---------- 채널 신호: 밝기 I → -ln(I) (피가 많을수록 어두워지므로 뒤집어 봉우리 = 수축기) ----------
     function channelSeries(frames, ch) {
-        return frames.map(f => -Math.log(Math.max(0.5, Number(f[ch]))));
+        // 아주 어두운 폰(선생님 Z 플립6: 빨강 평균 2~10, 선형으로 바꾸면 0.1 근처)도 잘리지 않게 바닥을 아주 낮게 (예전 0.5 는 보정 신호를 통째로 평평하게 만들었음)
+        return frames.map(f => -Math.log(Math.max(1e-3, Number(f[ch]))));
     }
 
     // ---------- 노출 보정 (노출을 고정하지 못했을 때) ----------
@@ -281,6 +413,8 @@
     function exposureMode(lock, frames) {
         const share = exposureShare(frames), v = exposureVariation(frames);
         if (lock === 'locked' && !(v > 1)) return { mode: 'locked', correct: false, text: '🔒 노출 고정됨' };
+        // 잠금 확인은 못 했어도 노출 값이 측정 동안 1% 넘게 안 바뀌었으면 보정할 것이 없음 (선생님 자료: 셔터·ISO 가 회차 내내 그대로인데 '고정 안 됨 → 보정')
+        if (v != null && v <= 1 && share >= 0.5) return { mode: 'steady', correct: false, text: '노출 값이 측정 동안 바뀌지 않음 → 보정 없이 그대로 계산' };
         if (share >= 0.5) return { mode: 'corrected', correct: true, text: lock === 'locked' ? '⚠ 잠갔지만 노출이 바뀜 → 노출 보정으로 계산' : '⚠ 고정 안 됨 → 노출 보정으로 계산' };
         return { mode: 'nocorrect', correct: false, text: '⚠ 고정 안 됨 · 노출 값을 읽을 수 없어 보정 못 함 (노출 출렁임 가능성)' };
     }
@@ -290,8 +424,11 @@
     function analyze(frames, opts) {
         opts = opts || {};
         const fs = opts.fs || FS;
-        const fr = (frames || []).filter(f => f && Number.isFinite(f.t));
+        let fr = (frames || []).filter(f => f && Number.isFinite(f.t));
         const out = { ok: false, n: fr.length, bpm: null, level: 'bad', reasons: [] };
+        // 도중에 손가락이 떨어지면(밝기가 갑자기 2배 넘게 뛰거나 절반 아래로) 그 뒤를 잘라 앞부분으로 계산 (선생님 자료 r5: 16초 뒤)
+        const cut = liftCut(fr);
+        if (cut) { fr = fr.filter(f => f.t < cut.at); out.cutAt = round(cut.at - (frames[0] ? frames[0].t : 0), 1); out.reasons.push(`${out.cutAt}초쯤 손가락이 떨어진 것 같아 그 뒤는 빼고 계산했어요`); }
         if (fr.length < 20) { out.reasons.push('자료가 너무 적어요'); return out; }
         const t = fr.map(f => f.t), dur = t[t.length - 1] - t[0];
         out.dur = round(dur, 2);
@@ -306,17 +443,30 @@
         if (cor) { out.expLag = cor.lag; out.expBeta = cor.beta; }
         const chans = opts.channel && opts.channel !== 'auto' ? [opts.channel] : ['r', 'g', 'y'];
         let best = null;
-        chans.forEach(ch => {
+        // strict: 어둡거나 평평한 채널을 뺌. 모두 빠지면 빼지 않고 한 번 더 (그래도 계산은 하되 결과는 어두움 경고로)
+        // 채널별 평균 밝기 (어두운 채널을 '가장 밝은 채널에 견줘' 판단)
+        const chMean = {};
+        chans.forEach(ch => { const v = fr.map(f => Number(f[ch])).filter(Number.isFinite); chMean[ch] = v.length ? mean(v) : 0; });
+        const maxMean = Math.max(...chans.map(ch => chMean[ch]));
+        const pick = strict => chans.forEach(ch => {
             const vals = fr.map(f => Number(f[ch]));
             if (!vals.every(Number.isFinite)) return;
             const satFrac = vals.filter(v => v >= 250).length / vals.length;
             if (chans.length > 1 && satFrac > 0.5) return;
+            // 어두운 채널 빼기: 가장 밝은 채널의 0.2 배보다 어둡거나, 0.01 단위로 밝기 단계가 4가지도 안 되면 맥파 대신 계단·계산 잡음만 남아
+            //  주파수 분석이 엉뚱한 봉우리를 뾰족하게 잡을 수 있다 (가짜 카메라 시험: 초록이 늘 7 → 37회, 선생님 자료 r5: 초록 0.5·빨강 2.4 → 초록을 골라 36회)
+            //  절대 문턱(예: 12)은 쓰지 않음 — 선생님 폰은 빨강도 평균 2~10 이라 빨강까지 빠졌음
+            const levels = new Set(vals.map(v => Math.round(v * 100))).size;
+            if (strict && chans.length > 1 && (chMean[ch] < 0.2 * maxMean || levels < 4)) return;
             const rs = resample(t, channelSeries(cor || fr, ch), fs);
             const filt = bandpass(detrend(rs.y, 2 * fs), fs);
+            if (chans.length > 1 && !(std(filt) > 1e-6)) return;   // 거의 평평함 (맥파 없음) — 다시 할 때도 뺌
             const sp = spectrum(filt, fs);
             const score = sp.ratio * (1 - satFrac);
             if (!best || score > best.score) best = { ch, rs, filt, sp, score };
         });
+        pick(true);
+        if (!best) pick(false);
         if (!best) { out.reasons.push('쓸 수 있는 색 채널이 없어요 (모두 꽉 참)'); return out; }
         const { filt, sp } = best;
         const ac = autocorr(filt, fs);
@@ -334,12 +484,12 @@
         } else f0 = Number.isFinite(fA) ? fA : fF;
         const P = 1 / f0;
         // 봉우리: 기본 주파수의 2.2 배 위를 한 번 더 걸러 잡음 봉우리를 줄이고, 최소 간격 0.6 × 주기
-        const smooth = Number.isFinite(P) ? bandpass(filt, fs, [BAND[0], Math.min(BAND[1], Math.max(1.2, 2.2 * f0))]) : filt;
-        const peaks = Number.isFinite(P) ? findPeaks(smooth, fs, P) : [];
+        let smooth = Number.isFinite(P) ? bandpass(filt, fs, [BAND[0], Math.min(BAND[1], Math.max(1.2, 2.2 * f0))]) : filt;
+        let peaks = Number.isFinite(P) ? findPeaks(smooth, fs, P) : [];
         const ibi = []; for (let i = 1; i < peaks.length; i++) ibi.push(peaks[i] - peaks[i - 1]);
-        const ibiOk = ibi.filter(x => x > 0.6 * P && x < 1.6 * P);
-        const bpmPeaks = ibiOk.length >= 2 ? 60 / mean(ibiOk) : NaN;   // 평균 간격 (중앙값은 30 Hz 칸에 걸려 치우침)
-        const cv = ibiOk.length >= 2 ? std(ibiOk) / mean(ibiOk) : NaN;
+        let ibiOk = ibi.filter(x => x > 0.6 * P && x < 1.6 * P);
+        let bpmPeaks = ibiOk.length >= 2 ? 60 / mean(ibiOk) : NaN;   // 평균 간격 (중앙값은 30 Hz 칸에 걸려 치우침)
+        let cv = ibiOk.length >= 2 ? std(ibiOk) / mean(ibiOk) : NaN;
         // 최종: 봉우리 평균 간격이 기준(fRef)과 3% 안에서 맞으면 봉우리(박동 하나하나), 아니면 기준(주파수 분석 또는 자기상관)
         const cands = [bpmPeaks, bpmAC, bpmFFT].filter(Number.isFinite);
         let bpm = NaN, method = '';
@@ -348,6 +498,25 @@
         if (Number.isFinite(bpmPeaks) && Number.isFinite(fRef) && Math.abs(bpmPeaks - fRef * 60) / (fRef * 60) < 0.03) { bpm = bpmPeaks; method = '봉우리 간격'; }
         else if (Number.isFinite(fRef)) { bpm = fRef * 60; method = fRef === fF ? '주파수 분석' : '자기상관'; }
         if (!Number.isFinite(bpm)) { out.reasons.push('주기를 찾지 못했어요'); return out; }
+        // 두 배 후보 검사: 맥파가 약하면(어두울 때) 심박의 절반 빠르기 흔들림이 더 세게 잡혀 X/2 로 나올 수 있다 → 2X 가 그럴듯하면 2X
+        //  단, 노출이 바로 그 빠르기로 출렁이면(보정 안 한 계산) 그 값은 카메라가 만든 것이라 두 배로 바꾸지 않고 노출 경고로 둔다
+        const expPre = cor ? null : exposureCheck(t, fr.map(f => (f.e == null ? NaN : Number(f.e))), bpm / 60, filt, fs);
+        const dbl = expPre && expPre.warn && expPre.same ? { switch: false, from: bpm, skipped: '노출 출렁임과 같은 빠르기' } : doubleCheck(filt, fs, bpm / 60, sp);
+        out.doubleCheck = dbl;
+        if (dbl.switch) {
+            const P2 = 30 / bpm;
+            smooth = bandpass(filt, fs, [BAND[0], Math.min(BAND[1], 2.2 * 2 * bpm / 60)]);
+            peaks = findPeaks(smooth, fs, P2);
+            const ib = []; for (let i = 1; i < peaks.length; i++) ib.push(peaks[i] - peaks[i - 1]);
+            ibiOk = ib.filter(x => x > 0.6 * P2 && x < 1.6 * P2);
+            bpmPeaks = ibiOk.length >= 2 ? 60 / mean(ibiOk) : NaN;
+            cv = ibiOk.length >= 2 ? std(ibiOk) / mean(ibiOk) : NaN;
+            const b2 = dbl.f2 * 60;
+            bpm = Number.isFinite(bpmPeaks) && Math.abs(bpmPeaks - b2) / b2 < 0.03 ? bpmPeaks : b2;
+            method += ' → 두 배 후보 검사로 바꿈';
+            out.doubled = true;
+            out.reasons.push(`처음 찾은 ${round(dbl.from, 0)}회/분보다 두 배인 ${round(bpm, 0)}회/분이 더 그럴듯해 바꿨어요`);
+        }
         // FFT 가 심박의 2배(중복맥파 때문에 두 번째 배음)를 잡았으면 맞는 것으로 봄
         const fftAgree = Number.isFinite(bpmFFT) && [1, 2, 3].some(k => Math.abs(bpmFFT / k - bpm) / bpm < 0.08);
         const spread = cands.length > 1 ? (Math.max(...cands) - Math.min(...cands)) / bpm : 0;
@@ -362,7 +531,10 @@
         const q = quality(fr);
         const exp = exposureCheck(t, fr.map(f => (f.e == null ? NaN : Number(f.e))), bpm / 60, filt, fs);
         let level = conf >= 0.65 ? 'good' : conf >= 0.45 ? 'fair' : 'bad';
-        if (badShare > 0.3 || !q.covered) level = 'bad';
+        // 덮임 판정이 틀릴 수 있어(기종·밝기), 맥파가 뚜렷하면(신뢰도 0.6 이상) 🔴 대신 🟡 로
+        if (badShare > 0.3 && conf < 0.6) level = 'bad';
+        else if (!q.covered && !(conf >= 0.6)) level = 'bad';
+        else if ((badShare > 0.3 || !q.covered) && level === 'good') level = 'fair';
         else if (badShare > 0.1 && level === 'good') level = 'fair';
         // 보정해서 계산했으면 출렁임은 알려 주되 경고로 치지 않음
         exp.wobble = exp.warn;
@@ -371,6 +543,14 @@
             exp.text = `노출이 ${round(exp.varPct, 0)}% 바뀌었어요` + (exp.bpm ? ` (분당 약 ${exp.bpm}회로 출렁임)` : '') + ` → 노출 보정으로 계산했어요 (노출 값 어긋남 ${cor.lag} 초)`;
         }
         if (exp.warn && level === 'good') level = 'fair';
+        // AC/DC: 찾은 심박 빠르기 둘레(0.7~1.3 배)만 남긴 맥파의 크기 (다른 흔들림은 빼고)
+        const fHR = bpm / 60, acdc = std(bandpass(filt, fs, [Math.max(0.3, 0.7 * fHR), Math.min(4.5, 1.3 * fHR)]));
+        out.acdc = round(acdc, 5);
+        const light = lightCheck(fr, acdc, opts.scene);
+        // 아주 어두워도 맥파가 뚜렷하면(신뢰도 0.7 이상, 선생님 자료 r3·r6·r7) 🔴 대신 🟡
+        if (light.level === 'dark') level = conf >= 0.7 ? (level === 'bad' ? 'bad' : 'fair') : 'bad';
+        else if (light.level === 'dim' && level === 'good') level = 'fair';
+        if (light.level !== 'ok') out.reasons.push(light.level === 'dark' ? '아주 어두워서 신뢰도 낮음' : '어두워서 신뢰도 낮음');
         if (!q.covered) out.reasons.push('손가락이 카메라를 덮지 않은 것 같아요');
         if (badShare > 0.1) out.reasons.push(`품질 나쁜 구간 ${Math.round(badShare * 100)}%`);
         if (exp.warn) out.reasons.push('노출이 심박 빠르기로 출렁임');
@@ -379,9 +559,33 @@
             ok: true, bpm: round(bpm, 1), method, channel: best.ch, bpmFFT: round(bpmFFT, 1), bpmAC: round(bpmAC, 1), bpmPeaks: round(bpmPeaks, 1),
             acValue: round(ac.value, 3), peakRatio: round(sp.ratio, 3), conf: round(conf, 2), level, cv: round(cv, 3),
             ibi: ibiOk.map(x => Math.round(x * 1000)), peaks: peaks.map(x => round(x, 3)),
-            fs, t0: best.rs.t0, wave: smooth, spec: { f: sp.f, p: sp.p }, quality: q, exposure: exp, badShare: round(badShare, 2)
+            fs, t0: best.rs.t0, wave: smooth, spec: { f: sp.f, p: sp.p }, quality: q, exposure: exp, light, badShare: round(badShare, 2)
         });
         return out;
+    }
+
+    // ---------- 회차 하나 계산: 노출 처리 방식을 정하고, 보정할 때는 보정 전·후를 둘 다 계산해 믿을 만한 쪽 ----------
+    // 선생님 실측(갤럭시 Z 플립6): 실시간 그래프(보정 전 밝기)는 80회로 깨끗한데 '노출 보정으로 계산' 결과가 39회 🔴 →
+    //  폰이 알려 주는 노출 값이 실제와 달라(자동 노출 중 옛 값 등) 보정이 오히려 신호를 망가뜨릴 수 있음.
+    //  보정 쪽을 기본으로 하되, 보정 전 쪽이 신뢰도가 0.1 넘게 높고 노출이 그 빠르기로 출렁이지 않으면 보정 전을 씀
+    // lock: 'locked' | 'unlocked' | 'csv-locked' …, opts: { scene }
+    function analyzeRun(lock, frames, opts) {
+        opts = opts || {};
+        const mode = exposureMode(lock === 'locked' || lock === 'csv-locked' ? 'locked' : 'unlocked', frames);
+        const a1 = analyze(frames, { correct: mode.correct, scene: opts.scene });
+        let a = a1;
+        if (mode.correct) {
+            const a0 = analyze(frames, { correct: false, scene: opts.scene });
+            const pick0 = a0.ok && (!a1.ok || (a0.conf >= a1.conf + 0.1 && !(a0.exposure && a0.exposure.warn && a0.exposure.same)));
+            a = pick0 ? a0 : a1;
+            const brief = x => ({ bpm: x.bpm, conf: x.conf, level: x.level, method: x.method, channel: x.channel, bpmFFT: x.bpmFFT, bpmAC: x.bpmAC, bpmPeaks: x.bpmPeaks,
+                doubled: !!x.doubled, expBpm: x.exposure ? x.exposure.bpm : null, expWarn: !!(x.exposure && x.exposure.wobble) });
+            a.alt = { raw: brief(a0), corrected: brief(a1), chosen: pick0 ? 'raw' : 'corrected' };
+            if (pick0) a.reasons.push(`노출 보정 결과(${a1.bpm == null ? '-' : round(a1.bpm, 0)}회/분, 신뢰도 ${Math.round((a1.conf || 0) * 100)}%)보다 보정 전 결과가 더 믿을 만해 보정 전을 씀`);
+        }
+        a.mode = mode.correct && a.alt && a.alt.chosen === 'raw' ? { mode: 'raw', correct: false, text: '⚠ 고정 안 됨 → 노출 보정이 신호를 흐려 보정 전 밝기로 계산' } : mode;
+        if (mode.mode === 'nocorrect') a.reasons.push('노출 값이 없어 보정 못 함 — 노출 출렁임이 섞였을 수 있음');
+        return a;
     }
 
     // ---------- 손목 맥박 ----------
@@ -392,10 +596,14 @@
     function rng(seed) { let a = (seed >>> 0) || 1; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
     // opts: { bpm, dur(초), fps, jitter(0~1: 간격이 1/fps 의 몇 배까지 흔들림), noise(밝기 비율), amp(맥파 크기 비율), dicrotic(0~1),
     //         expBpm(노출 출렁임 회/분, 0 이면 없음), expAmp(노출 변화 비율), expFollow(노출이 밝기에 남기는 몫), seed, hrv(박동 간격 흔들림 비율),
-    //         physical(true: 선형 빛 × 노출 → 감마, 노출 보정 시험용), expLag(노출 값이 늦게 기록되는 시간, 초) }
+    //         physical(true: 선형 빛 × 노출 → 감마, 노출 보정 시험용), expLag(노출 값이 늦게 기록되는 시간, 초), lfNoise(느린 흔들림 크기, 비율), subharm(심박의 절반 빠르기 흔들림 크기 — 반 배수로 잘못 잡는 시험용) }
     function simulate(opts) {
         const o = Object.assign({ bpm: 72, dur: 30, fps: 30, jitter: 0.3, noise: 0.002, amp: 0.02, dicrotic: 0.35, expBpm: 0, expAmp: 0.3, expFollow: 0.15, seed: 1, hrv: 0.03, drift: 0.03 }, opts || {});
         const rand = rng(o.seed), frames = [];
+        // lfNoise: 느린 흔들림(0.3~0.9 Hz, 숨쉬기·누르는 힘) — 어두울 때 약한 맥파가 이것에 묻힘
+        const rand2 = rng((o.seed >>> 0) + 7919);   // 따로 뽑아 기존 시험의 가짜 신호가 바뀌지 않게
+        const lf = Array.from({ length: 8 }, () => ({ f: 0.3 + 0.6 * rand2(), ph: 2 * Math.PI * rand2(), a: 0.5 + rand2() }));
+        const lfAt = t => o.lfNoise ? o.lfNoise * lf.reduce((s, c) => s + c.a * Math.sin(2 * Math.PI * c.f * t + c.ph), 0) / 4 : 0;
         // 박동 시각 (간격이 조금씩 흔들림)
         const beats = [];
         let tb = -rand() * 60 / o.bpm;
@@ -414,7 +622,7 @@
         while (t <= o.dur) {
             const p = pulse(t);
             const expo = o.expBpm ? 1 + o.expAmp * Math.sin(2 * Math.PI * o.expBpm / 60 * t) : 1;
-            const light = (1 + o.drift * Math.sin(2 * Math.PI * t / 23)) * (1 - o.amp * p) * (1 + o.expFollow * (expo - 1)) * (1 + o.noise * (rand() * 2 - 1));
+            const light = (1 + o.drift * Math.sin(2 * Math.PI * t / 23)) * (1 + lfAt(t) + (o.subharm || 0) * Math.sin(Math.PI * o.bpm / 60 * t + 1)) * (1 - o.amp * p) * (1 + o.expFollow * (expo - 1)) * (1 + o.noise * (rand() * 2 - 1));
             let r, g, b;
             if (o.physical) {
                 // 실제 카메라처럼: 센서에 닿는 빛(선형) × 노출 → 감마(sRGB) 를 걸어 0~255. 자동 노출이 출렁이면 밝기도 그만큼 바뀜
@@ -430,16 +638,18 @@
         return frames;
     }
 
-    // ---------- CSV (원본: t, R, G, Y, Y_corr, exposureTime, iso, locked) ----------
+    // ---------- CSV (원본: t, R, G, Y, Y_corr, exposureTime, iso, locked, light) ----------
     function toCsv(frames, meta) {
         const lines = [];
         Object.keys(meta || {}).forEach(k => { if (meta[k] != null && meta[k] !== '') lines.push('# ' + k + ': ' + String(meta[k]).replace(/[\r\n]/g, ' ')); });
         // Y_corr: 노출 보정 밝기 (선형 밝기 × 기준 노출 ÷ 노출), 노출 값이 없으면 빈칸. locked: 노출 고정 여부(1/0)
         const cor = correctExposure(frames || []) || [];
         const locked = meta && meta.locked != null ? (meta.locked ? 1 : 0) : '';
-        lines.push('t_s,R,G,Y,Y_corr,exposureTime,iso,locked');
+        // light: 밝기 판정(ok/dim/dark, meta.light 로 받음 — 회차 전체에 하나라 모든 줄에 같은 값)
+        const light = meta && meta.light ? String(meta.light) : '';
+        lines.push('t_s,R,G,Y,Y_corr,exposureTime,iso,locked,light');
         (frames || []).forEach((f, i) => lines.push([round(f.t, 4), round(f.r, 3), round(f.g, 3), round(f.y, 3),
-            cor[i] && Number(f.e) > 0 ? round(cor[i].y, 4) : '', f.exposureTime == null ? '' : f.exposureTime, f.iso == null ? '' : f.iso, locked].join(',')));
+            cor[i] && Number(f.e) > 0 ? round(cor[i].y, 4) : '', f.exposureTime == null ? '' : f.exposureTime, f.iso == null ? '' : f.iso, locked, light].join(',')));
         return lines.join('\n') + '\n';
     }
     // 이 페이지의 CSV 와 phyphox 같은 다른 앱의 CSV(열 이름에 Time·Luma·Shutter·ISO)를 읽음 → { frames, meta, from }
@@ -492,5 +702,5 @@
             f.exposureTime == null ? null : round(f.exposureTime, 3), f.iso == null ? null : round(f.iso, 0), round(f.s, 2) || 0]);
     }
 
-    return { toLinear, toSrgb, correctExposure, exposureVariation, exposureShare, exposureMode, pack, unpack, BAND, FS, resample, detrend, bandpass, spectrum, autocorr, findPeaks, quality, exposureCheck, analyze, palpBpm, errorPct, simulate, toCsv, parseCsv, fft, mean, median, std, round };
+    return { liftCut, analyzeRun, lightCheck, doubleCheck, toLinear, toSrgb, correctExposure, exposureVariation, exposureShare, exposureMode, pack, unpack, BAND, FS, resample, detrend, bandpass, spectrum, autocorr, findPeaks, quality, exposureCheck, analyze, palpBpm, errorPct, simulate, toCsv, parseCsv, fft, mean, median, std, round };
 });

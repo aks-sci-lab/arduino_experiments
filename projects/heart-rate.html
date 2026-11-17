@@ -22,6 +22,7 @@
         <button id="stop" class="danger" hidden>■ 멈춤</button>
         <select id="dur" aria-label="측정 길이"><option value="15">15초</option><option value="30" selected>30초</option><option value="60">60초</option></select>
         <label class="chk" id="torch-wrap" hidden><input type="checkbox" id="torch"> 플래시</label>
+        <label class="chk" title="잠그면 화면이 어두워지는 폰은 끄고, 자동 노출 + 노출 보정으로 계산"><input type="checkbox" id="nolock"> 노출 잠금 끄기</label>
     </div>
     <div id="torch-warn" class="warn" hidden>⚠️ 플래시를 켜면 폰과 손가락이 뜨거워질 수 있어요. 한 번에 60초까지만, 뜨거우면 바로 멈추세요.</div>
     <p id="msg" class="note" role="status" aria-live="polite"></p>
@@ -40,6 +41,8 @@
         </div>
     </div>
 
+    <p id="live-est" class="note live-est" aria-live="polite"></p>
+
     <div class="dash-more">
         <details id="runs-box" open>
             <summary>🗂 측정 회차 · 손목 맥박 비교 · CSV <span id="runs-sum" class="note"></span></summary>
@@ -50,7 +53,7 @@
                 <button id="csv-all" class="info" disabled>⬇ 원본 CSV (모든 회차)</button>
                 <label class="btn secondary file">📂 CSV 불러오기<input type="file" id="csv-in" accept=".csv,.txt,text/csv" multiple hidden></label>
             </div>
-            <p class="note">원본 CSV 열: t_s(초), R, G, Y(화면 밝기 0~255), Y_corr(노출 보정 밝기), exposureTime(노출 시간, 100 µs 단위), iso, locked(노출 고정 1/0). phyphox CSV(Time·Luma·Shutter Speed·ISO)도 불러와 같은 방법으로 계산합니다.</p>
+            <p class="note">원본 CSV 열: t_s(초), R, G, Y(화면 밝기 0~255), Y_corr(노출 보정 밝기), exposureTime(노출 시간, 100 µs 단위), iso, locked(노출 고정 1/0), light(밝기 판정 ok·dim·dark). phyphox CSV(Time·Luma·Shutter Speed·ISO)도 불러와 같은 방법으로 계산합니다.</p>
         </details>
 
         <details id="detail-box">
@@ -97,8 +100,11 @@
             <ul class="text-list">
                 <li>🔒 <b>고정됨</b>: 밝기 그대로 계산</li>
                 <li>⚠ <b>고정 안 됨</b>: 프레임마다 노출 시간·ISO 를 기록해, 화면 밝기를 빛의 세기(선형)로 바꾼 뒤 <b>노출(노출 시간 × ISO)로 나눠 보정</b>하고 계산. 폰이 알려 주는 노출 값은 사진보다 조금 늦게(또는 이르게) 기록될 수 있어, ±0.5초 안에서 어긋남을 찾아 맞춘 뒤 나눕니다</li>
+                <li>잠그는 순간 화면이 <b>어두워지는</b> 폰이 있어(폰이 알려 주는 노출 값이 실제와 다름), 잠근 뒤 밝기를 잠그기 전과 같게 셔터·ISO 를 다시 맞춥니다. 못 맞추면 잠금을 풀고 노출 보정으로 계산합니다. 맨 위 '노출 잠금 끄기'로 처음부터 잠그지 않을 수도 있어요</li>
+                <li>보정할 때는 <b>보정 전·후를 둘 다 계산</b>해, 폰의 노출 값이 엉터리라 보정이 오히려 신호를 흐리면 보정 전 결과를 씁니다(🔍 자세히에 둘 다 보임)</li>
                 <li>⚠ <b>노출 값을 못 읽는 폰</b>(아이폰 등): 원래 밝기로 계산하고 '노출 출렁임 가능성'을 알립니다</li>
             </ul>
+            <p><b>어두울 때</b>: 빛이 약하면 맥파가 작아져 잡음·숨쉬기 같은 느린 흔들림에 묻히고, 심박수가 <b>절반</b>으로 잡히기 쉽습니다. 그래서 ① 손가락 밝기·맥파 크기(AC/DC)·카메라 노출·손가락 대기 전 방 밝기로 '🌙 어두움'을 알려 주고 ② 처음 찾은 값의 두 배 쪽에 따로 고른 박동이 있으면 두 배로 바꿉니다(🔁). 어두우면 창가로 가거나 플래시를 켜세요.</p>
             <div class="ok">🔒 <b>개인정보</b>: 이름을 받지 않고, 영상은 저장·전송하지 않습니다. 밝기 숫자와 결과만 이 기기에 남습니다.</div>
             <p class="note">수업용 측정이에요. 의료 진단에 쓰지 않습니다. 심박수가 걱정되면 보건 선생님께 여쭤 보세요.</p>
         </details>
