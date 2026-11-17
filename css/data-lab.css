@@ -87,3 +87,7 @@ figure canvas.pix { image-rendering: pixelated; height: 190px; background: #000;
     body.print-sheet .step-panel[data-step="s6"] > *:not(.sheet):not(h3) { display: none !important; }
     body.print-sheet .step-panel { border: 0; padding: 0; }
 }
+/* 📱 폰으로 측정해 보내기 (share.phoneCard) */
+.dl-phone { background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-3); margin: var(--sp-2) 0; }
+.dl-phone h2 { font-size: var(--fs-h2); margin: 0 0 var(--sp-2); }
+.dl-phone .dl-more { margin-top: var(--sp-2); }
