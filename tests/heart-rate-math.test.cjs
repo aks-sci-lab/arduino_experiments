@@ -152,7 +152,9 @@ test('노출 처리 방식: 고정됨 / 잠갔는데 바뀜 / 고정 안 됨 / �
     near(H.analyze(still).bpm, 67, 3, '고정됨: 그대로');
     assert.equal(H.exposureMode('locked', wob).mode, 'corrected', '잠갔다는데 노출이 바뀌면 보정');
     assert.match(H.exposureMode('locked', wob).text, /바뀜/);
-    assert.equal(H.exposureMode('unlocked', still).mode, 'corrected');
+    // 잠금 확인은 못 했어도 노출 값이 안 바뀌었으면 보정할 것이 없음 (선생님 자료)
+    assert.equal(H.exposureMode('unlocked', still).mode, 'steady'); assert.equal(H.exposureMode('unlocked', still).correct, false);
+    assert.equal(H.exposureMode('unlocked', wob).mode, 'corrected');
     const none = still.map(f => Object.assign({}, f, { e: null, exposureTime: null, iso: null }));
     const m = H.exposureMode('unlocked', none);
     assert.equal(m.mode, 'nocorrect'); assert.equal(m.correct, false);
@@ -252,7 +254,10 @@ test('밝기 판정: 밝음 / 맥파 약함(어두움) / 방이 어두움 / 아�
     assert.equal(longE.light.level, 'dim'); assert.match(longE.light.text, /노출을 길게/);
     // 손가락 밝기(빨강)가 아주 낮음
     const dark = H.analyze(H.simulate({ bpm: 70, dur: 30, seed: 1 }).map(f => Object.assign({}, f, { r: f.r / 6, g: f.g / 6, y: f.y / 6 })));
-    assert.equal(dark.light.level, 'dark'); assert.equal(dark.level, 'bad');
+    // 아주 어두워도 맥파가 뚜렷하면 🟡, 약하면 🔴
+    assert.equal(dark.light.level, 'dark'); assert.notEqual(dark.level, 'good');
+    const darkWeak = H.analyze(H.simulate({ bpm: 70, dur: 30, seed: 1, amp: 0.003, noise: 0.01 }).map(f => Object.assign({}, f, { r: f.r / 6, g: f.g / 6, y: f.y / 6 })));
+    assert.equal(darkWeak.light.level, 'dark'); assert.equal(darkWeak.level, 'bad');
     // CSV 에 밝기 판정 열
     const csv = H.toCsv(H.simulate({ bpm: 70, dur: 6, seed: 1 }), { locked: true, light: 'dim' }).trim().split('\n');
     assert.match(csv.find(l => l.startsWith('t_s')), /,light$/);
@@ -310,5 +315,28 @@ test('그래프에 보이는 봉우리 간격이 고르면 두 배로 (넓은 �
         const a = H.analyze(H.simulate({ bpm: 55, dur: 30, seed, dicrotic: 1.0, noise: 0.004 }));
         near(a.bpm, 55, 3, '중복맥파 55 seed ' + seed);
         assert.ok(!(a.doubleCheck.cvBroad < 0.12), '번갈아 간격 ' + a.doubleCheck.cvBroad);
+    }
+});
+
+// ---------- 선생님 실측 원본 4회차 (갤럭시 Z 플립6, 어두움·ISO 27 잠금, tests/fixtures/heart-rate/README.md) ----------
+// 정답에 가까운 값: 네 회차 모두 약 77~79 회/분 (통합 관리 세션 분석, 빨강 채널 봉우리·FFT). 앱은 r5·r6 을 37 로 절반 계산했었음
+test('선생님 실측 4회차: 모두 77~79 ± 3, 절반으로 떨어지지 않음', () => {
+    const fs = require('node:fs'), path = require('node:path');
+    const dir = path.join(__dirname, 'fixtures', 'heart-rate');
+    const want = { r3: 77, r5: 77, r6: 78, r7: 79 };
+    for (const r of Object.keys(want)) {
+        const p = H.parseCsv(fs.readFileSync(path.join(dir, 'zflip6-2026-11-17-' + r + '.csv'), 'utf8'));
+        const a = H.analyzeRun('csv', p.frames);
+        near(a.bpm, want[r], 3, r);
+        assert.equal(a.channel !== 'g', true, r + ' 초록(가장 어두움)은 쓰지 않음');
+        assert.equal(a.mode.mode, 'steady', r + ' 노출 값이 그대로라 보정 안 함');
+        assert.equal(a.quality.covered, true, r + ' 덮임');
+        assert.notEqual(a.level, 'bad', r + ' 맥파가 뚜렷하니 🔴 아님');
+        assert.equal(a.light.level, 'dark', r + ' 아주 어두움 알림');
+        if (r === 'r5') { assert.ok(a.cutAt > 12 && a.cutAt < 19, 'r5 손가락 떨어진 곳 ' + a.cutAt); assert.ok(a.reasons.some(x => /손가락이 떨어진/.test(x))); }
+        else assert.equal(a.cutAt, undefined, r + ' 자르지 않음');
+        // 예전처럼 억지로 보정 경로로 계산해도 절반이 되지 않음
+        const c = H.analyze(p.frames, { correct: true });
+        near(c.bpm, want[r], 3, r + ' 보정 경로');
     }
 });

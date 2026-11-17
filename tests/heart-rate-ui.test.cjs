@@ -4,6 +4,7 @@
 //  C. 노출 고정도, 노출 값 읽기도 안 되는 폰(아이폰처럼, 375px): '보정 불가' 표시 → 90 회/분, 시뮬레이션(노출 출렁임) → 67, 가로 스크롤 없음·단추 44px
 //  E. 자동 노출 중 노출 값을 틀리게(짧게) 알려 주는 폰: 잠그면 어두워짐 → 밝기 맞추기로 잠그기 전 밝기 ±10% → 🔒
 //  F. 셔터·ISO 범위가 좁아 다시 밝힐 수 없는 폰: 맞추기 실패 → 자동 노출 + 보정으로, 까닭 표시
+//  G. 선생님 폰처럼 자동 노출 중 ISO 를 27 로 알려 주는 폰: 그대로 잠그면 아주 어두움 → ISO 하한·밝기 맞추기로 ISO 를 올려 고정
 //  D. 어두운 곳(손가락 밝기 빨강 ≈ 70): 측정 전 '🌙 어두워요' 안내, 결과·회차에 어두움 표시, CSV light 열 dim
 const http = require('http'), path = require('path'), fs = require('fs');
 const REPO = path.join(__dirname, '..');
@@ -35,7 +36,7 @@ function fakeCamera(bpm, kind, scale) {
             let st = { exposureMode: 'continuous', exposureTime: 330, iso: 800, whiteBalanceMode: 'continuous', torch: false };
             // stale·capped: 자동 노출 중 getSettings 가 실제(330)보다 짧은 노출(100)을 알려 줌 → 그 값으로 잠그면 어두워짐
             //  잠근 뒤(manual) 밝기 = 실제 쓰는 노출 ÷ 330 × ISO ÷ 800. capped 는 셔터 최대 120·ISO 최대 800 이라 다시 밝힐 수 없음
-            const STALE = KIND === 'stale' || KIND === 'capped';
+            const STALE = KIND === 'stale' || KIND === 'capped' || KIND === 'iso27';
             const bf = () => STALE && st.exposureMode === 'manual' ? (st.exposureTime / 330) * (st.iso / 800) : 1;
             t0 = performance.now();
             const draw = () => {
@@ -54,14 +55,14 @@ function fakeCamera(bpm, kind, scale) {
             const base = tr.getSettings.bind(tr);
             const CAP = KIND === 'capped' ? { et: 120, iso: 800 } : { et: 10000, iso: 3200 };
             tr.getCapabilities = () => ({ exposureMode: ['continuous', 'manual'], exposureTime: { min: 1, max: CAP.et, step: 1 }, iso: { min: 50, max: CAP.iso }, whiteBalanceMode: ['continuous', 'manual'], torch: true });
-            tr.getSettings = () => Object.assign(base(), st, KIND === 'drift' ? { exposureTime: 330 * expo() } : {}, STALE && st.exposureMode !== 'manual' ? { exposureTime: 100 } : {});
+            tr.getSettings = () => Object.assign(base(), st, KIND === 'drift' ? { exposureTime: 330 * expo() } : {}, STALE && st.exposureMode !== 'manual' ? (KIND === 'iso27' ? { exposureTime: 330, iso: 27 } : { exposureTime: 100 }) : {});
             tr.applyConstraints = async c => { window.__applied.push(JSON.parse(JSON.stringify(c))); (c.advanced || []).forEach(a => Object.assign(st, a)); };
             return stream;
         };
     })();`;
 }
 
-test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 보정 / 보정 불가, 375px', { skip: !chromium && 'playwright 없음', timeout: 300000 }, async () => {
+test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 보정 / 보정 불가, 375px', { skip: !chromium && 'playwright 없음', timeout: 360000 }, async () => {
     await new Promise(r => stat.listen(0, r));
     const ROOT = 'http://127.0.0.1:' + stat.address().port + '/';
     const browser = await chromium.launch(), errors = [];
@@ -105,6 +106,9 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     assert.ok(Math.abs(a.res.bpm - 75) <= 4, '75 ≈ ' + a.res.bpm);
     assert.match(await A.textContent('#v-lock'), /🔒 고정됨/);
     assert.equal(await A.textContent('#v-bpm'), String(Math.round(a.res.bpm)));
+    const est = await A.textContent('#live-est');
+    console.log('A 실시간:', est);
+    assert.match(est, /최근 \d+초: (7[2-8]) 회\/분 · 봉우리 \d+개/);
     assert.ok(Number(await A.textContent('#v-ibi')) > 700 && Number(await A.textContent('#v-ibi')) < 900, '박동 간격');
     assert.ok(a.raw.every(f => f[4] === 330 && f[5] === 800), '프레임마다 노출 값');
     await A.fill(`[data-palp="${a.id}"]`, '19'); await A.press(`[data-palp="${a.id}"]`, 'Tab');
@@ -177,6 +181,21 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     const csv3 = fs.readFileSync(await dl3.path(), 'utf8');
     assert.match(csv3, /# 노출 잠금 과정: 잠그기 전: 밝기 [\d.]+ · 셔터 100.*잠근 직후.*밝기 맞추기/);
     assert.match(csv3, /# 덮임 판정: 덮임 · R /);
+
+    // ---- G. ISO 27 로 알려 주는 폰 ----
+    const G = await page(devices['Pixel 7'], 'G', fakeCamera(78, 'iso27'));
+    await G.click('#cam');
+    await G.waitForFunction(() => /좋아요/.test(document.getElementById('v-qtext').textContent), null, { timeout: 10000 });
+    await G.selectOption('#dur', '15');
+    await G.click('#start');
+    await G.waitForFunction(() => window.__heartRate.state().runs.length > 0, null, { timeout: 40000 });
+    const gr = (await G.evaluate(() => window.__heartRate.state().runs)).pop();
+    console.log('G ISO 27:', gr.lockLog.steps.map(x => `${x.what}(빨강 ${x.r}, 셔터 ${x.et}, ISO ${x.iso})`).join(' → '), '|', gr.lock, gr.res.bpm);
+    assert.equal(gr.lock, 'locked');
+    const last = gr.lockLog.adjusted;
+    assert.ok(last.iso >= 600, 'ISO 를 올림 ' + last.iso);
+    assert.ok(Math.abs(last.r / gr.lockLog.before.r - 1) <= 0.15, '잠그기 전 밝기로 ' + last.r + ' / ' + gr.lockLog.before.r);
+    assert.ok(Math.abs(gr.res.bpm - 78) <= 4, '78 ≈ ' + gr.res.bpm);
 
     // ---- F. 다시 밝힐 수 없는 폰 → 자동 노출 + 보정 ----
     const F = await page(devices['Pixel 7'], 'F', fakeCamera(75, 'capped'));
