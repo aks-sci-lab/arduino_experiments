@@ -13,6 +13,7 @@
 <div class="wrap">
     <a class="back" href="../index.html">← 메인 페이지</a>
     <h1>🔦 말루스 법칙 실험 (스마트폰 카메라)</h1>
+    <div class="device-row" id="device-switch"></div>
     <div id="class-bar-mount"></div>
     <p class="note">레이저 → 편광판(회전) → 종이/휴지 스크린 → 카메라 순으로 놓고, 편광판을 돌릴 때 스크린의 밝기가 어떻게 변하는지 탐구합니다. 카메라 접근은 <b>https</b> 주소에서만 동작합니다.</p>
 
@@ -208,9 +209,17 @@
 
     <!-- ===================== 5. 데이터 ===================== -->
     <section class="step-panel" data-step="data" hidden>
+    <!-- 💻 노트북·PC 는 분석만: 폰으로 재서 보낸 회차를 받는다 (폰 측정 · 노트북 분석 이원화, 2026-11-17) -->
+    <div class="card show-on-laptop laptop-guide">
+        <h2>📱 폰으로 측정해 보내기</h2>
+        <p class="note">이 노트북은 <b>분석용</b>입니다. 측정은 폰 카메라로 합니다. 아래 QR 을 폰으로 찍어 각도별 밝기를 재고, 보낼 회차를 골라 📤 보내면 <b>6. 결과</b> 표·그래프에 저절로 들어옵니다.</p>
+        <div id="phone-card" class="show-on-laptop"></div>
+        <p class="note">선생님 시트가 없거나 인터넷이 안 되면: 폰에서 <b>6. 결과 → CSV 다운로드</b> 로 저장한 파일을 아래 '👥 조 공유' 칸의 <b>📂 CSV 불러오기</b>로 넣으세요. 이 기기가 노트북이 아니면 맨 위 '이 기기'를 바꾸세요.</p>
+    </div>
+    <p class="note show-on-phone phone-solo">📱 노트북이 있으면 노트북에서 이 페이지를 열고 '📱 폰으로 측정해 보내기' QR 을 찍으세요. 노트북이 없으면 이 폰에서 측정·분석을 모두 할 수 있습니다.</p>
     <div id="share-mount"></div>
     <div id="phone-note" class="ok" role="status" hidden></div>
-    <div class="card">
+    <div class="card hide-on-laptop">
         <h2>1. 카메라 준비</h2>
         <details class="tip">
             <summary>📖 정확하게 측정하는 요령</summary>
@@ -266,7 +275,7 @@
         <div id="chan-warn" class="warn" hidden>ℹ️ 데이터가 있으면 채널/감마를 바꿀 수 없습니다. 바꾸려면 데이터를 지우세요.</div>
     </div>
 
-        <div class="card">
+        <div class="card hide-on-laptop">
             <h2>2. 측정</h2>
             <div id="plan-banner" class="plan-banner"></div>
             <div class="row run-row">
