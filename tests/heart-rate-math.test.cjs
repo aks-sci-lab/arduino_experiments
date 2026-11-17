@@ -103,7 +103,7 @@ test('손목 맥박 ×4 · 오차 %', () => {
 test('CSV: 내보내기 → 다시 읽기, phyphox 열 이름', () => {
     const fr = H.simulate({ bpm: 66, dur: 12, seed: 4 });
     const csv = H.toCsv(fr, { '회차': '안정 시' });
-    assert.match(csv.split('\n')[1], /^t_s,R,G,Y,Y_corr,exposureTime,iso,locked$/);
+    assert.match(csv.split('\n')[1], /^t_s,R,G,Y,Y_corr,exposureTime,iso,locked,light$/);
     const back = H.parseCsv(csv);
     assert.equal(back.meta['회차'], '안정 시');
     assert.equal(back.frames.length, fr.length);
@@ -170,7 +170,7 @@ test('CSV: 보정 밝기·고정 여부 열', () => {
     const fr = H.simulate({ bpm: 67, dur: 10, seed: 1, physical: true, expBpm: 40, expFollow: 0 });
     const lines = H.toCsv(fr, { locked: false }).trim().split('\n').filter(l => !l.startsWith('#'));
     const row = lines[1].split(',');
-    assert.equal(row.length, 8);
+    assert.equal(row.length, 9);
     assert.ok(Number(row[4]) > 0, 'Y_corr');
     assert.equal(row[7], '0');
     assert.equal(H.toCsv(fr, { locked: true }).trim().split('\n').pop().split(',')[7], '1');
@@ -186,5 +186,80 @@ test('노출 값이 사진보다 늦게 기록돼도(0.05~0.3초) 어긋남을 �
         near(a.bpm, 67, 3, 'lag ' + lag);
         // 어긋남을 무시하면(0 으로 고정) 노출 출렁임이 남음
         if (lag >= 0.2) assert.ok(Math.abs(H.analyze(H.correctExposure(fr, { lag: 0 }).map(f => Object.assign({}, f, { e: null }))).bpm - 67) > 3, '어긋남 무시하면 틀림 ' + lag);
+    }
+});
+
+// ---------- 어두울 때 반(1/2) 배수로 잡히던 문제 (선생님 실측: 갤럭시 Z 플립6, 어두우면 심박의 절반) ----------
+// 가짜 신호: 약한 맥파(amp 0.004) + 그 절반 빠르기의 더 센 흔들림(subharm 0.01) → 고치기 전에는 X/2 로 잡혔음
+const weakHalf = (bpm, seed) => H.simulate({ bpm, dur: 30, seed, amp: 0.004, noise: 0.004, subharm: 0.01, fps: 24, jitter: 0.4, dicrotic: 0.4, hrv: 0.04 });
+
+test('약한 맥파 + 절반 빠르기 흔들림: 80~120 회/분이 절반으로 나오지 않음 (두 배 후보 검사)', () => {
+    for (const bpm of [80, 90, 100, 120]) for (let seed = 1; seed <= 4; seed++) {
+        const a = H.analyze(weakHalf(bpm, seed));
+        near(a.bpm, bpm, 3, `${bpm} seed ${seed}`);
+        assert.equal(a.doubled, true, '두 배로 바꿈 표시');
+        assert.match(a.method, /두 배 후보 검사로 바꿈/);
+        assert.ok(a.reasons.some(r => /두 배인/.test(r)));
+        assert.equal(a.doubleCheck.sineLike, true, '절반 쪽이 사인파 같음');
+    }
+});
+
+test('두 배 후보 검사가 멀쩡한 값을 망가뜨리지 않음: 밝은 맥파, 중복맥파 60회, 진짜 40회, 노출 출렁임', () => {
+    for (let seed = 1; seed <= 4; seed++) {
+        const a = H.analyze(H.simulate({ bpm: 70, dur: 30, seed }));
+        near(a.bpm, 70, 3, '밝은 70'); assert.notEqual(a.doubled, true);
+    }
+    for (const d of [0.5, 0.8, 1.0]) for (let seed = 1; seed <= 4; seed++) {
+        const a = H.analyze(H.simulate({ bpm: 60, dur: 30, seed, dicrotic: d, noise: 0.004 }));
+        near(a.bpm, 60, 3, `중복맥파 ${d} seed ${seed} → 120 으로 바뀌면 안 됨`);
+        assert.notEqual(a.doubled, true);
+        assert.ok(a.doubleCheck.lock >= 0.9, '배음은 박자가 묶여 있음 ' + a.doubleCheck.lock);
+    }
+    let wrong = 0;
+    for (const bpm of [36, 40, 45, 50, 55, 60, 70, 80, 90, 100]) for (const d of [0, 0.35, 0.6, 0.8, 1]) for (let seed = 1; seed <= 2; seed++) {
+        const a = H.analyze(H.simulate({ bpm, dur: 30, seed, dicrotic: d, noise: 0.004 }));
+        if (Math.abs(a.bpm - bpm) > 3) wrong++;
+    }
+    assert.equal(wrong, 0, '깨끗한 신호 100개');
+    // 보정 안 한 노출 출렁임(40)은 두 배(80)로 바꾸지 않고 노출 경고로 둠
+    const wob = H.analyze(H.simulate({ bpm: 67, dur: 30, seed: 1, physical: true, expBpm: 40, expFollow: 0 }));
+    near(wob.bpm, 40, 3); assert.notEqual(wob.doubled, true); assert.equal(wob.exposure.warn, true);
+    assert.equal(wob.doubleCheck.skipped, '노출 출렁임과 같은 빠르기');
+});
+
+test('밝기 판정: 밝음 / 맥파 약함(어두움) / 방이 어두움 / 아주 어두움', () => {
+    const ok = H.analyze(H.simulate({ bpm: 70, dur: 30, seed: 1 }));
+    assert.equal(ok.light.level, 'ok'); assert.equal(ok.level, 'good');
+    assert.ok(!ok.reasons.some(r => /어두워/.test(r)));
+    const weak = H.analyze(weakHalf(90, 1));
+    assert.equal(weak.light.level, 'dim');
+    assert.match(weak.light.text, /플래시/);
+    assert.notEqual(weak.level, 'good');
+    assert.ok(weak.reasons.some(r => /어두워서 신뢰도 낮음/.test(r)));
+    const room = H.analyze(H.simulate({ bpm: 70, dur: 30, seed: 1 }), { scene: { y: 20, exposureTime: 500, iso: 3200 } });
+    assert.equal(room.light.level, 'dim'); assert.match(room.light.text, /방이 어두웠/);
+    // 노출을 길게(50 ms, ISO 3200) 잡은 카메라
+    const longE = H.analyze(H.simulate({ bpm: 70, dur: 30, seed: 1 }).map(f => Object.assign({}, f, { exposureTime: 500, iso: 3200, e: 500 * 3200 })));
+    assert.equal(longE.light.level, 'dim'); assert.match(longE.light.text, /노출을 길게/);
+    // 손가락 밝기(빨강)가 아주 낮음
+    const dark = H.analyze(H.simulate({ bpm: 70, dur: 30, seed: 1 }).map(f => Object.assign({}, f, { r: f.r / 6, g: f.g / 6, y: f.y / 6 })));
+    assert.equal(dark.light.level, 'dark'); assert.equal(dark.level, 'bad');
+    // CSV 에 밝기 판정 열
+    const csv = H.toCsv(H.simulate({ bpm: 70, dur: 6, seed: 1 }), { locked: true, light: 'dim' }).trim().split('\n');
+    assert.match(csv.find(l => l.startsWith('t_s')), /,light$/);
+    assert.match(csv[csv.length - 1], /,1,dim$/);
+});
+
+test('어두워서 초록이 한 값(7)으로 굳고 빨강도 몇 단계뿐일 때: 초록을 쓰지 않아 절반으로 잡지 않음', () => {
+    for (const bpm of [60, 72, 90]) for (let seed = 1; seed <= 3; seed++) {
+        // 가짜 카메라 시험에서 실제로 나온 모양: 빨강 72·73 두 단계, 초록 늘 7
+        const fr = H.simulate({ bpm, dur: 15, seed, amp: 0.02, noise: 0.002 }).map(f => {
+            const r = Math.round(f.r / 180 * 72.5 * 4) / 4;
+            return Object.assign({}, f, { r, g: 7, y: 0.299 * r + 0.587 * 7 });
+        });
+        const a = H.analyze(fr);
+        assert.notEqual(a.channel, 'g', '평평한 초록은 쓰지 않음');
+        near(a.bpm, bpm, 3, `${bpm} seed ${seed}`);
+        assert.notEqual(a.light.level, 'ok', '어두움 표시');
     }
 });

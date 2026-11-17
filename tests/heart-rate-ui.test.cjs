@@ -2,6 +2,7 @@
 //  A. 노출 고정이 되는 폰(Pixel 7): 잠금 → 1.5초 확인 → 🔒 고정됨 → 75 회/분, 손목 비교, CSV(locked 1)
 //  B. '고정된다'고 하지만 노출이 분당 40회로 계속 출렁이는 폰(실제 심박 67): 확인 단계에서 '고정 안 됨' → 노출 보정 → 67 회/분
 //  C. 노출 고정도, 노출 값 읽기도 안 되는 폰(아이폰처럼, 375px): '보정 불가' 표시 → 90 회/분, 시뮬레이션(노출 출렁임) → 67, 가로 스크롤 없음·단추 44px
+//  D. 어두운 곳(손가락 밝기 빨강 ≈ 70): 측정 전 '🌙 어두워요' 안내, 결과·회차에 어두움 표시, CSV light 열 dim
 const http = require('http'), path = require('path'), fs = require('fs');
 const REPO = path.join(__dirname, '..');
 let chromium = null, devices = null;
@@ -19,9 +20,9 @@ const stat = http.createServer((req, res) => {
 });
 
 // 가짜 카메라. kind: 'lock'(잠그면 노출이 멈춤) | 'drift'(잠근다고 하지만 노출이 분당 40회로 계속 출렁이고 밝기도 따라감) | 'none'(노출 기능 없음)
-function fakeCamera(bpm, kind) {
+function fakeCamera(bpm, kind, scale) {
     return `(() => {
-        const BPM = ${bpm}, KIND = ${JSON.stringify(kind)};
+        const BPM = ${bpm}, KIND = ${JSON.stringify(kind)}, SCALE = ${scale || 1};
         window.__applied = [];
         const srgb = l => { const c = Math.min(1, Math.max(0, l)); return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055); };
         let t0 = performance.now();
@@ -33,9 +34,12 @@ function fakeCamera(bpm, kind) {
             const draw = () => {
                 const t = (performance.now() - t0) / 1000, ph = (t * BPM / 60) % 1;
                 const p = Math.exp(-(((ph - 0.15) / 0.09) ** 2)) + 0.35 * Math.exp(-(((ph - 0.5) / 0.08) ** 2));
-                const L = (1 - 0.05 * p) * expo();
-                c.fillStyle = 'rgb(' + Math.round(srgb(0.45 * L)) + ',' + Math.round(srgb(0.015 * L)) + ',' + Math.round(srgb(0.008 * L)) + ')';
-                c.fillRect(0, 0, 160, 120);
+                const L = (1 - 0.05 * p) * expo() * SCALE;
+                // 실제 센서처럼 화소마다 잡음(±1.5 단계)을 섞어, 영역 평균이 0~255 정수 단계보다 고운 값을 갖게 함
+                const R = srgb(0.45 * L), G = srgb(0.015 * L), B = srgb(0.008 * L);
+                const img = c.createImageData(160, 120), d = img.data;
+                for (let i = 0; i < d.length; i += 4) { d[i] = R + 3 * (Math.random() - 0.5); d[i + 1] = G + 3 * (Math.random() - 0.5); d[i + 2] = B + 3 * (Math.random() - 0.5); d[i + 3] = 255; }
+                c.putImageData(img, 0, 0);
             };
             draw(); setInterval(draw, 16);
             const stream = cv.captureStream(30), tr = stream.getVideoTracks()[0];
@@ -50,7 +54,7 @@ function fakeCamera(bpm, kind) {
     })();`;
 }
 
-test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 보정 / 보정 불가, 375px', { skip: !chromium && 'playwright 없음', timeout: 150000 }, async () => {
+test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 보정 / 보정 불가, 375px', { skip: !chromium && 'playwright 없음', timeout: 200000 }, async () => {
     await new Promise(r => stat.listen(0, r));
     const ROOT = 'http://127.0.0.1:' + stat.address().port + '/';
     const browser = await chromium.launch(), errors = [];
@@ -100,8 +104,8 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     assert.match(await A.textContent('#runs'), /= 76 회\/분/);
     const [dl] = await Promise.all([A.waitForEvent('download'), A.click(`[data-csv="${a.id}"]`)]);
     const csv = fs.readFileSync(await dl.path(), 'utf8');
-    assert.match(csv, /t_s,R,G,Y,Y_corr,exposureTime,iso,locked/);
-    assert.match(csv.trim().split('\n').pop(), /,330,800,1$/);
+    assert.match(csv, /t_s,R,G,Y,Y_corr,exposureTime,iso,locked,light/);
+    assert.match(csv.trim().split('\n').pop(), /,330,800,1,ok$/);
     await layout(A, 'A Pixel 7');
     await A.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + '/heart-a.png' : '/dev/null' }).catch(() => {});
 
@@ -147,6 +151,28 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     await C.waitForTimeout(200);
     await layout(C, 'C 375px (모두 펼침)');
     await C.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + '/heart-c.png' : '/dev/null', fullPage: true }).catch(() => {});
+
+    // ---- D. 어두운 곳 ----
+    const D = await page(devices['Pixel 7'], 'D', fakeCamera(72, 'lock', 0.15));
+    await D.click('#cam');
+    await D.waitForFunction(() => /어두워요/.test(document.getElementById('status').textContent), null, { timeout: 10000 });
+    console.log('D 측정 전:', await D.textContent('#status'));
+    await D.selectOption('#dur', '15');
+    await D.click('#start');
+    await D.waitForFunction(() => window.__heartRate.state().runs.length > 0, null, { timeout: 30000 });
+    const d = (await D.evaluate(() => window.__heartRate.state().runs)).pop();
+    if (process.env.SHOT_DIR) fs.writeFileSync(process.env.SHOT_DIR + '/run-d.json', JSON.stringify(d));
+    console.log('D 어두움:', d.res.bpm, d.res.level, d.res.light && d.res.light.level, d.res.light && d.res.light.text);
+    assert.equal(d.res.light.level, 'dim');
+    assert.notEqual(d.res.level, 'good');
+    assert.ok(Math.abs(d.res.bpm - 72) <= 4, '72 ≈ ' + d.res.bpm);
+    assert.match(await D.textContent('#msg'), /어두워요/);
+    assert.match(await D.textContent('#runs'), /🌙 어두움/);
+    const [dl2] = await Promise.all([D.waitForEvent('download'), D.click(`[data-csv="${d.id}"]`)]);
+    const csv2 = fs.readFileSync(await dl2.path(), 'utf8');
+    assert.match(csv2, /# 밝기 판정: 🌙 어두워요/);
+    assert.match(csv2.trim().split('\n').pop(), /,1,dim$/);
+    await layout(D, 'D Pixel 7');
 
     assert.deepEqual(errors, []);
     } finally {
