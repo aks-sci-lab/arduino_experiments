@@ -112,6 +112,15 @@ saveRun(run); share.saved();
 - 같은 기기로 노트북과 폰을 모두 쓰면 둘이 따로 기억합니다(시험할 때 편함)
 - `share.role()`·`share.isPhone()`·`share.openPhone()`·`share.phoneLink()` 도 있음
 
+
+### 폰 측정 · 노트북 분석 이원화 (2026-11-17 사용자 결정)
+
+폰 센서·카메라로 재는 보고서 실험은 **노트북·PC = 분석만, 폰 = 측정, 태블릿 = 둘 다** (AGENTS.md UI 규칙).
+
+- 기기 종류: `LabUI.device().kind`(`'phone'|'tablet'|'laptop'`, `js/lab-ui.js`), `<html class="device-…">`. 측정 부분에 `class="hide-on-laptop"`, 노트북 안내에 `show-on-laptop`. 추측이 틀리면 `LabUI.deviceSwitch('#자리')` 또는 `?device=`.
+- 노트북 화면: 5. 데이터 맨 위에 `<div id="phone-card" class="show-on-laptop"></div>` 를 두고 `share.phoneCard('#phone-card')` — QR 을 대화창 없이 크게, 조 코드가 없으면 이 노트북용 조 코드를 저절로(반·조가 있으면 그것, 없으면 99반), 폰이 보내면 '🆕 폰에서 새 측정 N개'. 수업(`?c=`)이면 조·번호를 고른 뒤 나옴. 선생님 시트가 없으면 CSV 안내.
+- 폰 화면(`?role=phone`, 또는 QR 없이 폰으로 연 경우): 측정과 회차 고르기·보내기. QR 없이 폰으로 열었으면 폰에서 결과까지 볼 수 있게 두어도 됨(노트북이 없을 때).
+- 시험: `tests/class-share-phonecard.test.cjs`, 기기는 Playwright `devices['iPhone 13']`·`['Galaxy Tab S4']` 또는 `?device=`.
 ## 실험 이름 (`exp`)
 
 | exp | 실험 | 페이지 | 서버 저장 |
