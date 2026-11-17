@@ -84,6 +84,24 @@ test('📱 폰 카드: 조 코드 없이도 QR 주소 → 폰이 보내면 노�
         assert.equal(await lp.evaluate(() => got.length), 1);
         assert.deepEqual(L.errors, []); assert.deepEqual(P.errors, []);
 
+        // 태블릿: 카드(.show-on-laptop)가 숨어 있으면 조 코드를 만들지 않고, '이 기기'를 노트북으로 바꾸면 그때 만듦
+        const T = await open(browser, app, base + '?s=' + SCRIPT_ID + '&device=tablet', { viewport: { width: 1024, height: 768 } });
+        await T.page.waitForTimeout(300);
+        assert.equal(await T.page.isVisible('#pc'), false);
+        assert.equal(await T.page.evaluate(() => share.group()), '', '숨은 카드는 조 코드를 만들지 않음');
+        await T.page.evaluate(() => LabUI.setDevice('laptop'));
+        await T.page.waitForSelector('#pc .cs-pcard');
+        assert.match(await T.page.evaluate(() => share.group()), /^99-\d{1,2}-\d{4}$/);
+        assert.deepEqual(T.errors, []);
+
+        // 숨은 단계 안에 있다가 보이게 되면 그때 그림 (노트북)
+        const H = await open(browser, app, base + '?s=' + SCRIPT_ID, { viewport: { width: 1280, height: 800 } });
+        await H.page.evaluate(() => { const pc = document.getElementById('pc'); pc.style.display = 'none'; pc.innerHTML = ''; pc.dataset.link = ''; });
+        await H.page.waitForTimeout(200);
+        await H.page.evaluate(() => { document.getElementById('pc').style.display = ''; });
+        await H.page.waitForSelector('#pc .cs-pcard');
+        assert.deepEqual(H.errors, []);
+
         // 수업(?c=) 으로 열었는데 아직 조·번호를 안 골랐으면 QR 대신 안내
         const C = await open(browser, app, base + '?s=' + SCRIPT_ID + '&c=3-1234', { viewport: { width: 1280, height: 800 } });
         await C.page.waitForFunction(() => document.getElementById('pc').textContent.length > 0);
