@@ -34,7 +34,9 @@
         uv: { name: '자외선 센서', icon: '🟣', page: 'projects/environment-lab.html?sensor=uv', steps: DASH, ready: true },
         accel: { name: '가속도계 데이터 분석', icon: '📐', page: 'projects/accelerometer-lab.html', steps: DASH, ready: true },
         nano: { name: '아두이노 Nano 33 BLE Sense', icon: '🔷', page: 'projects/arduino-nano-lab.html', steps: DASH, ready: true },
-        phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: true }
+        phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: true },
+        // 서버 9판부터 공용 저장에 heartrate. 숨 참기 탐구 회차는 kind 'breath' 자료 (js/heart-rate-breath.js)
+        heartrate: { name: '스마트폰 카메라 심박수 (숨 참기 탐구)', icon: '❤️', page: 'projects/heart-rate.html', steps: { live: '심박수 재기', breath: '숨 참기 탐구' }, ready: true }
     };
     var CUSTOM_RE = /^custom:([A-Za-z0-9_-]{1,40})$/;
     var CUSTOM_STEPS = Object.assign({ live: '한 화면' }, STEPS7);
