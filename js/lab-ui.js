@@ -235,5 +235,82 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { autoSubtabs(); });
     else autoSubtabs();
 
-    window.LabUI = { toggleBigView: toggle, initSteps: initSteps, initTabs: initTabs, autoSubtabs: autoSubtabs };
+
+    /* 기기 종류: 폰 측정 · 노트북 분석 이원화 (2026-11-17 사용자 결정)
+       "스마트폰으로 측정하는 보고서 실험은 측정은 스마트폰, 분석은 노트북. 태블릿은 둘 다, 노트북은 완전히 나눔.
+        노트북으로 측정하는 실험은 외부 블루투스 센서를 쓰는 경우뿐"
+       LabUI.device() → { kind: 'phone'|'tablet'|'laptop', auto: 추측한 종류, manual: 사용자가 바꿨는지 }
+       - 추측: 터치가 주 입력(pointer: coarse)이고 화면 짧은 변 < 600 이면 폰, ≥ 600 이면 태블릿(아이패드가 맥처럼 보여도 터치 점 2개 이상이면 태블릿), 아니면 노트북
+       - 틀리면 사용자가 고침: 주소 ?device=phone|tablet|laptop 또는 LabUI.deviceSwitch(자리) 의 고르기 → 이 브라우저에 기억
+       - <html> 에 class device-phone / device-tablet / device-laptop 과 data-device 를 붙인다 (head 에서 불러오므로 처음부터)
+         css/lab-base.css: .hide-on-laptop · .hide-on-phone · .show-on-laptop · .show-on-phone 로 페이지가 보이고 숨길 것을 정함
+       - 바뀌면 window 에 'lab-device' 이벤트 (detail = LabUI.device()) */
+    var DEV_KEY = 'lab-ui:device', DEV_KINDS = ['phone', 'tablet', 'laptop'];
+    function guessDevice() {
+        var nav = window.navigator || {}, touch = (nav.maxTouchPoints || 0) > 0;
+        var coarse = false;
+        try { coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches; } catch (e) { /* 옛 브라우저 */ }
+        var ipad = /Macintosh/.test(nav.userAgent || '') && (nav.maxTouchPoints || 0) > 1;
+        var sc = window.screen || {}, short = Math.min(sc.width || window.innerWidth || 0, sc.height || window.innerHeight || 0);
+        if (ipad) return 'tablet';
+        if (coarse && touch) return short && short < 600 ? 'phone' : 'tablet';
+        if (/Android|iPhone|iPod/.test(nav.userAgent || '') && short && short < 600) return 'phone';
+        return 'laptop';
+    }
+    function readDevice() {
+        var q = null;
+        try { q = new URLSearchParams(location.search).get('device'); } catch (e) { /* 무시 */ }
+        if (DEV_KINDS.indexOf(q) >= 0) { try { localStorage.setItem(DEV_KEY, q); } catch (e) { /* 무시 */ } return q; }
+        try { var v = localStorage.getItem(DEV_KEY); if (DEV_KINDS.indexOf(v) >= 0) return v; } catch (e) { /* 무시 */ }
+        return null;
+    }
+    function device() {
+        var auto = guessDevice(), m = readDevice();
+        return { kind: m || auto, auto: auto, manual: !!m };
+    }
+    function applyDevice() {
+        var d = device();
+        DEV_KINDS.forEach(function (k) { root.classList.toggle('device-' + k, k === d.kind); });
+        root.setAttribute('data-device', d.kind);
+        return d;
+    }
+    function setDevice(kind) {
+        try {
+            if (DEV_KINDS.indexOf(kind) >= 0) localStorage.setItem(DEV_KEY, kind);
+            else localStorage.removeItem(DEV_KEY);
+        } catch (e) { /* 저장 안 되면 이 페이지에서만 */ }
+        var d = applyDevice();
+        if (DEV_KINDS.indexOf(kind) >= 0 && d.kind !== kind) {   // 저장이 막힌 브라우저: 이 페이지에서만이라도
+            DEV_KINDS.forEach(function (k) { root.classList.toggle('device-' + k, k === kind); });
+            root.setAttribute('data-device', kind);
+            d = { kind: kind, auto: d.auto, manual: true };
+        }
+        window.dispatchEvent(new CustomEvent('lab-device', { detail: d }));
+        return d;
+    }
+    var DEV_NAME = { phone: '📱 스마트폰', tablet: '📟 태블릿', laptop: '💻 노트북·PC' };
+    // 작은 고르기 '이 기기: 💻 노트북·PC ▾' — 추측이 틀렸을 때 고치는 곳. mount: 요소 또는 선택자
+    function deviceSwitch(mount) {
+        var el = typeof mount === 'string' ? document.querySelector(mount) : mount;
+        if (!el) return null;
+        var d = device(), box = document.createElement('label');
+        box.className = 'device-switch';
+        box.appendChild(document.createTextNode('이 기기: '));
+        var sel = document.createElement('select');
+        sel.setAttribute('aria-label', '이 기기의 종류');
+        DEV_KINDS.forEach(function (k) {
+            var o = document.createElement('option');
+            o.value = k; o.textContent = DEV_NAME[k] + (k === d.auto ? ' (자동)' : '');
+            if (k === d.kind) o.selected = true;
+            sel.appendChild(o);
+        });
+        sel.addEventListener('change', function () { setDevice(sel.value === d.auto ? null : sel.value); });
+        box.appendChild(sel);
+        el.appendChild(box);
+        return sel;
+    }
+    applyDevice();
+
+    window.LabUI = { toggleBigView: toggle, initSteps: initSteps, initTabs: initTabs, autoSubtabs: autoSubtabs,
+        device: device, setDevice: setDevice, deviceSwitch: deviceSwitch, DEVICE_NAME: DEV_NAME };
 })();

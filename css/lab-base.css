@@ -282,6 +282,17 @@ html.big-view body { zoom: 1.35; }
 }
 .lab-toast.show { opacity: 1; }
 
+/* 기기 종류별 보이기 (js/lab-ui.js 의 LabUI.device, <html class="device-phone|device-tablet|device-laptop">)
+   폰 측정 · 노트북 분석 이원화: 폰 센서·카메라로 재는 부분은 .hide-on-laptop, 노트북 전용 분석 안내는 .show-on-laptop 등 */
+html.device-laptop .hide-on-laptop,
+html.device-phone .hide-on-phone,
+html.device-tablet .hide-on-tablet { display: none !important; }
+html:not(.device-laptop) .show-on-laptop,
+html:not(.device-phone) .show-on-phone,
+html:not(.device-tablet) .show-on-tablet { display: none !important; }
+.device-switch { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--c-muted); }
+.device-switch select { min-height: 44px; font: inherit; }
+
 @media print {
     html.big-view body { zoom: 1; }
     .lab-toast { display: none; }
