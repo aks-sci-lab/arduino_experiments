@@ -13,8 +13,8 @@ const assert = require('node:assert/strict');
 const F = require(REPO + '/js/face-hr-math.js');
 
 const app = loadCodeGs();
-// 서버 9판(heartrate 허용) 전까지 시험에서만 허용 목록에 더함
-app.ctx.GENERIC_EXPS.heartrate = 1; app.ctx.CLASS_EXPS.heartrate = 1;
+// 서버 9판부터 heartrate 허용 (두 번째 폰 자료가 이 칸을 씀)
+assert.equal(app.ctx.GENERIC_EXPS.heartrate, 1);
 const api = http.createServer((req, res) => {
     const send = o => { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(o)); };
     const u = new URL(req.url, 'http://x');
