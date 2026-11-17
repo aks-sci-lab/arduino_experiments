@@ -523,7 +523,7 @@
 
     // ---------- ③ 블루투스 심박계 ----------
     async function connectBle() {
-        if (!cap.bluetooth) { pill($('ble-st'), '이 브라우저는 블루투스를 쓸 수 없어요', 'bad'); log('블루투스(Web Bluetooth) 없음: ' + navigator.userAgent.slice(0, 60), false); return; }
+        if (!cap.bluetooth) { pill($('ble-st'), '이 브라우저는 블루투스를 쓸 수 없어요', 'bad'); log('블루투스(Web Bluetooth) 없음 (이 브라우저)', false); return; }
         try {
             const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: ['heart_rate'] }] });
             pill($('ble-st'), '연결 중… ' + (dev.name || ''));
@@ -562,19 +562,42 @@
                 '<span class="note">' + (Number.isFinite(c.t0) ? fmt(c.t0, 0) + '~' + fmt(c.t1, 0) + '초' + (c.count ? ' → ' + Math.round(c.count * 60 / (c.t1 - c.t0)) + '회/분' : '') : '') + '</span></div>';
         }).join('') + '<p class="note">' + (rec ? '측정 중이에요. ⏱ 를 누르고 15초 동안 손목 맥박을 세세요.' : '▶ 측정을 시작하면 ⏱ 가 켜져요. 측정 뒤에도 수를 고칠 수 있어요.') + '</p>';
     }
+    // 15초 세기: ① 준비 탭의 칸 또는 측정 중 띠의 ⏱ (측정 중에는 ② 측정 탭이 보여서 띠에도 둠)
+    let wristLast = -1;
+    function wristStart(i) {
+        const r = rec; if (!r || phase !== 'rec' || i < 0 || i > 3) return;
+        const t0 = nowS() - r.t0;
+        r.counts[i] = { t0: +t0.toFixed(2), t1: null, count: null };
+        beep(880); renderWrist(); renderWristBar();
+        setTimeout(() => { r.counts[i].t1 = +(t0 + 15).toFixed(2); wristLast = i; beep(440); renderWrist(); renderWristBar(); const inp = rec ? $('wrist-n') : document.querySelector('[data-wc="' + i + '"]'); if (inp) inp.focus(); }, 15000);
+    }
+    function renderWristBar() {
+        const on = pref.path === 'wrist' && !!rec && phase === 'rec';
+        $('wrist-bar').hidden = !on;
+        if (!on) return;
+        const cs = rec.counts, counting = cs.findIndex(c => c && c.t0 != null && c.t1 == null), next = [0, 1, 2, 3].find(i => !cs[i]);
+        $('wrist-go').disabled = counting >= 0 || next == null;
+        $('wrist-go').textContent = counting >= 0 ? '⏱ 세는 중…' : next == null ? '⏱ 4번 다 셈' : '⏱ 손목 15초 (' + (next + 1) + '/4)';
+        const wait = wristLast >= 0 && cs[wristLast] && cs[wristLast].count == null;
+        $('wrist-n').hidden = !wait;
+        if (wait) $('wrist-n').placeholder = (wristLast + 1) + '번 센 수';
+    }
+    $('wrist-go').addEventListener('click', () => { if (rec) wristStart([0, 1, 2, 3].find(i => !rec.counts[i])); });
+    $('wrist-n').addEventListener('change', () => {
+        const v = Number($('wrist-n').value), cs = wristCounts();
+        if (wristLast >= 0 && cs[wristLast] && Number.isFinite(v) && v > 0) { cs[wristLast].count = v; $('wrist-n').value = ''; }
+        renderWrist(); renderWristBar();
+    });
     $('wrist-rows').addEventListener('click', ev => {
         const b = ev.target.closest('[data-wst]'); if (!b || !rec) return;
-        const i = +b.dataset.wst, t0 = nowS() - rec.t0;
-        rec.counts[i] = { t0: +t0.toFixed(2), t1: null, count: null };
-        beep(880); b.disabled = true; b.textContent = '⏱ 세는 중…';
-        setTimeout(() => { if (!rec) return; rec.counts[i].t1 = +(t0 + 15).toFixed(2); beep(440); renderWrist(); const inp = document.querySelector('[data-wc="' + i + '"]'); if (inp) inp.focus(); }, 15000);
+        wristStart(+b.dataset.wst);
     });
     $('wrist-rows').addEventListener('change', ev => {
         const inp = ev.target.closest('[data-wc]'); if (!inp) return;
         const i = +inp.dataset.wc, cs = wristCounts(), v = Number(inp.value);
         if (!cs[i] || !Number.isFinite(cs[i].t1)) { inp.value = ''; return; }
         cs[i].count = Number.isFinite(v) && v > 0 ? v : null;
-        if (!rec && session) { saveSession(); renderAnalysis(); }
+        if (!rec && session) { saveSession(); renderAnalysis(); devSend(session); }
         renderWrist();
     });
 
@@ -585,7 +608,7 @@
         p2items = got;
         if (changed) {
             renderP2();
-            if (session && session.truth && session.truth.source === 'phone2' && !(session.truth.finger || []).length) { if (attachPhone2()) { saveSession(); renderAnalysis(); } }
+            if (session && session.truth && session.truth.source === 'phone2' && !(session.truth.finger || []).length) { if (attachPhone2()) { saveSession(); renderAnalysis(); devSend(session); } }
         }
         return changed;
     }
@@ -655,7 +678,7 @@
             rec.t0 = nowS(); rec.wall0 = Math.round(performance.timeOrigin + rec.t0 * 1000);
             rec.frames = []; rec.finger = []; rec.points = [];
             phase = 'rec';
-            if (pref.path === 'wrist') renderWrist();
+            if (pref.path === 'wrist') { wristLast = -1; renderWrist(); renderWristBar(); }
             endT = setTimeout(() => finish(false), rec.dur * 1000 + 200);
         }, 3000);
     }
@@ -666,7 +689,7 @@
         $('start').hidden = false; $('stop').hidden = true; $('cam').disabled = false; $('auto').disabled = !front; BAR.time.hidden = true;
         if (wakeLock) { try { wakeLock.release(); } catch (e) { /* 무시 */ } wakeLock = null; }
         if (!r) return;
-        if (pref.path === 'wrist') renderWrist();
+        if (pref.path === 'wrist') { renderWrist(); renderWristBar(); }
         const dur = r.frames.length > 1 ? r.frames[r.frames.length - 1].t - r.frames[0].t : 0;
         if (dur < 12) { msg('msg', '12초보다 짧아 저장하지 않았어요.', 'warn'); return; }
         const fps = (r.frames.length - 1) / dur;
@@ -681,7 +704,44 @@
         if (r.path === 'phone2') attachPhone2();
         if (r.lock !== 'locked' && r.frames.some(f => f.et != null)) { pref.expNorm = true; savePref(); }
         saveSession(); renderAnalysis(); tabs && tabs.show('analysis');
+        devSend(session);   // 선생님 기기에서만 (개발 데이터 자동 수집, js/dev-collect.js)
         msg('msg', '측정을 저장했어요 (' + dur.toFixed(0) + '초). ③ 분석·비교에서 보세요.' + (r.path === 'phone2' && !session.truth.finger.length ? ' 두 번째 폰에서 ■ 저장하면 자료가 들어와요.' : ''), 'okmsg');
+    }
+
+    // ---------- 개발 데이터 자동 수집 (docs/dev-data.md) ----------
+    // 카메라로 잰 측정만 (시뮬레이션·불러온 파일은 빼고). 정답이 나중에 붙거나(② 두 번째 폰) 손목 수를 고치면 같은 id 로 다시 보내 고쳐 씀
+    // 보내는 것: CSV(프레임별 영역 RGB·움직임·밝기·노출 + 정답 손가락·심박계·손목) + 방법별 결과표 + 정답 경로·경로 시험 기록·기기 정보. 영상은 없음
+    const DEV_MAX = 250000;
+    function devPayload(s) {
+        const res = F.analyze(s.frames, { expNorm: pref.expNorm }), truth = F.truthSeries(s.truth);
+        const rows = res.ok ? F.table(res, truth) : [];
+        const all = m => rows.find(r => r.method === m && r.roi === 'all') || {};
+        const meanBpm = m => res.ok && res.series[m].all ? F.round(F.mean(res.series[m].all.map(w => w.bpm)), 1) : '';
+        // 서버 한도(27만 자)에 맞게: 넘으면 얼굴·손가락 프레임을 고르게 솎음 (솎은 배수는 thin 에)
+        const meta = Object.assign({}, s.meta); delete meta.ua;   // 긴 기기 문자열 대신 짧은 기기 정보(device)만
+        s = Object.assign({}, s, { meta });
+        let thin = 1, csv = F.toCsv(s);
+        while (csv.length > DEV_MAX && thin < 8) {
+            thin++;
+            csv = F.toCsv(Object.assign({}, s, { frames: s.frames.filter((_, i) => i % thin === 0),
+                truth: Object.assign({}, s.truth, { finger: (s.truth.finger || []).filter((_, i) => i % thin === 0) }) }));
+        }
+        return {
+            summary: { '정답 경로': s.truth.source || '없음', '시간(초)': s.meta.dur || '', 'fps': res.ok ? res.fps : '', '정답 평균': truth.length ? F.round(F.mean(truth.map(p => p.bpm)), 1) : '',
+                'POS': meanBpm('pos'), 'CHROM': meanBpm('chrom'), 'GREEN': meanBpm('green'),
+                'POS 오차': all('pos').mae == null ? '' : all('pos').mae, 'CHROM 오차': all('chrom').mae == null ? '' : all('chrom').mae, 'GREEN 오차': all('green').mae == null ? '' : all('green').mae,
+                '얼굴 찾기': s.meta.detector || '', '노출': s.meta.lock || '' },
+            data: { csv, thin, meta, path: s.truth.source || '', truthNote: s.truth.note || '', truth, table: rows,
+                motionHigh: res.ok ? res.motion.filter(w => w.high).length : null, expNorm: !!pref.expNorm,
+                device: DevCollect.uaSummary(navigator.userAgent), screen: [screen.width, screen.height, devicePixelRatio] }
+        };
+    }
+    function devSend(s) {
+        if (!s || !s.meta || s.meta.sim || s.meta.file || !s.frames || !s.frames.length || typeof DevCollect === 'undefined' || !DevCollect.active()) return;
+        if (!s.meta.id) { s.meta.id = 'fh-' + DevCollect.init().device().slice(-6) + '-' + Math.floor((s.meta.wall0 || Date.now()) / 1000).toString(36); saveSession(); }
+        let p;
+        try { p = devPayload(s); } catch (e) { console.error(e); return; }
+        DevCollect.send('facehr', { id: s.meta.id, measuredAt: s.meta.at, summary: p.summary, data: p.data });
     }
 
     // ---------- ③ 분석 ----------
@@ -788,5 +848,5 @@
     else initMain();
 
     // 시험용 (상태 보기)
-    window.__faceHr = { session: () => session, cap, pref, p2: () => p2items, tryDual, autoPath, setPath, renderAnalysis };
+    window.__faceHr = { devPayload, session: () => session, cap, pref, p2: () => p2items, tryDual, autoPath, setPath, renderAnalysis };
 })();

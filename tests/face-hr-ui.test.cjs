@@ -228,3 +228,74 @@ test('얼굴 심박 개발 페이지: 동시 카메라 → 측정·비교, 실�
     assert.deepEqual(errors, []);
     await browser.close(); api.close(); stat.close();
 });
+
+// 개발 데이터 자동 수집 (docs/dev-data.md): 선생님 기기(관리 열쇠 있음)에서 카메라로 잰 측정만 'facehr' 로, 손목 수를 고치면 같은 id 로 고쳐 씀
+test('얼굴 심박: 개발 데이터 자동 수집 (카메라 측정만, 같은 id 고쳐 쓰기)', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
+    const app2 = loadCodeGs(), key = app2.post({ action: 'claimAdmin' }).key;
+    const api2 = http.createServer((req, res) => {
+        const send = o => { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(o)); };
+        const u = new URL(req.url, 'http://x');
+        if (req.method === 'GET') return send(app2.get(Object.fromEntries(u.searchParams)));
+        let b = ''; req.on('data', c => b += c); req.on('end', () => send(app2.post(b)));
+    });
+    await new Promise(r => api2.listen(0, r)); await new Promise(r => stat.listen(0, r));
+    const API = 'http://127.0.0.1:' + api2.address().port + '/exec', ROOT = 'http://127.0.0.1:' + stat.address().port + '/';
+    const browser = await chromium.launch(), errors = [];
+    const layout375 = async pg => {
+        assert.equal(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '375px 가로 스크롤');
+        const small = await pg.evaluate(() => [...document.querySelectorAll('button, select, input[type=number]')].filter(e => e.offsetParent && !e.closest('td, th') && e.getBoundingClientRect().height < 43.5).map(e => e.id || e.textContent.trim().slice(0, 20)));
+        assert.deepEqual(small, [], '44px 보다 작은 단추');
+    };
+    try {
+        const c = await browser.newContext({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
+        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.PENDULUM_CONFIG={appsScriptUrl:${JSON.stringify(API)},pollSeconds:3,devCollect:true};` }));
+        await c.route(/qrcode-generator/, r => r.fulfill({ contentType: 'text/javascript', body: QR }));
+        await c.route(/gstatic|jsdelivr|storage\.googleapis/, r => r.abort());
+        await c.addInitScript(`localStorage.setItem('class-teacher:admin:v1', JSON.stringify({ ${JSON.stringify(API)}: ${JSON.stringify(key)} }));`);
+        await c.addInitScript(fakeCams(72, 'fail'));
+        const pg = await c.newPage(); pg.on('pageerror', e => errors.push(e.message));
+        await pg.goto(ROOT + 'projects/face-hr-lab.html');
+        await pg.waitForSelector('.dev-collect');
+        assert.match(await pg.textContent('.dev-collect'), /개발 데이터 자동 수집 중/);
+        // 시뮬레이션은 보내지 않음
+        await pg.click('#tabs [data-tab=io]'); await pg.click('#sim');
+        await pg.waitForTimeout(500);
+        assert.equal(app2.post({ action: 'devExport', key }).items.length, 0, '시뮬레이션은 안 보냄');
+        // 카메라 측정 (손목 경로, 시험이라 15초)
+        await pg.click('#tabs [data-tab=prep]');
+        await pg.check('#consent'); await pg.click('#cam');
+        await pg.waitForFunction(() => !document.getElementById('start').disabled);
+        await pg.click('.path-pick [data-path=wrist]');
+        await pg.evaluate(() => { const s = document.getElementById('dur'); s.add(new Option('15초', '15')); s.value = '15'; });
+        await pg.click('#start');
+        await pg.waitForSelector('#wrist-go:not([disabled])', { state: 'visible', timeout: 10000 });
+        assert.match(await pg.textContent('#wrist-go'), /1\/4/);
+        await pg.click('#wrist-go');
+        await layout375(pg);
+        await pg.waitForFunction(() => window.__faceHr.session() && window.__faceHr.session().meta.id, null, { timeout: 30000 });
+        await pg.waitForFunction(() => /보냄 1/.test(document.querySelector('.dev-collect').textContent), null, { timeout: 10000 });
+        let items = app2.post({ action: 'devExport', key }).items;
+        assert.equal(items.length, 1);
+        const it = items[0], d = typeof it.data === 'string' ? JSON.parse(it.data) : it.data;
+        const sm = typeof it.summary === 'string' ? JSON.parse(it.summary) : it.summary;
+        console.log('개발 데이터:', it.exp, it.id, JSON.stringify(sm));
+        assert.equal(it.exp, 'facehr');
+        assert.match(it.id, /^fh-/);
+        assert.equal(sm['정답 경로'], 'wrist');
+        assert.ok(Number(sm['POS']) > 40, 'POS 평균 ' + sm['POS']);
+        const csv = F.parseCsv(d.csv);
+        assert.ok(csv.frames.length > 300, '프레임 ' + csv.frames.length);
+        assert.equal(d.table.length, 12);
+        assert.ok(!/Mozilla/.test(JSON.stringify(d)), '긴 기기 문자열(UA)은 보내지 않음');
+        // 손목 수를 나중에 넣으면(① 준비 탭) 같은 id 로 다시 보내 고쳐 씀
+        await pg.click('#tabs [data-tab=prep]');
+        await pg.fill('[data-wc="0"]', '18'); await pg.press('[data-wc="0"]', 'Tab');
+        await pg.waitForFunction(() => /보냄 2/.test(document.querySelector('.dev-collect').textContent), null, { timeout: 10000 });
+        items = app2.post({ action: 'devExport', key }).items;
+        assert.equal(items.length, 1, '같은 id 는 한 줄');
+        const sm2 = typeof items[0].summary === 'string' ? JSON.parse(items[0].summary) : items[0].summary;
+        assert.equal(Number(sm2['정답 평균']), 72);
+        assert.equal(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0);
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); api2.close(); stat.close(); }
+});
