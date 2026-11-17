@@ -50,13 +50,16 @@ function fakeCamera(bpm, kind) {
     })();`;
 }
 
-test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 보정 / 보정 불가, 375px', { skip: !chromium && 'playwright 없음', timeout: 240000 }, async () => {
+test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 보정 / 보정 불가, 375px', { skip: !chromium && 'playwright 없음', timeout: 150000 }, async () => {
     await new Promise(r => stat.listen(0, r));
     const ROOT = 'http://127.0.0.1:' + stat.address().port + '/';
     const browser = await chromium.launch(), errors = [];
+    // 실패해도 브라우저·서버를 닫아 시험이 멈춰 있지 않게
+    try {
     async function page(opt, name, cam) {
         const c = await browser.newContext(Object.assign({ acceptDownloads: true }, opt));
         await c.addInitScript(cam);
+        c.setDefaultTimeout(15000);
         const pg = await c.newPage();
         pg.on('pageerror', e => errors.push(name + ': ' + e.message));
         pg.on('dialog', d => d.accept());
@@ -70,6 +73,7 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
         assert.deepEqual(small, [], n + ' 44px 보다 작은 단추');
     };
     async function measure(pg, dur) {
+        console.log('  측정 시작', dur + '초');
         await pg.click('#cam');
         await pg.waitForFunction(() => /좋아요/.test(document.getElementById('v-qtext').textContent), null, { timeout: 10000 });
         await pg.selectOption('#dur', String(dur));
@@ -104,6 +108,7 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     // ---- B. 잠근다고 하지만 노출이 계속 출렁이는 폰 (실제 심박 67, 노출 40) ----
     const B = await page({ viewport: { width: 1280, height: 860 } }, 'B', fakeCamera(67, 'drift'));
     const b = await measure(B, 30);
+    if (process.env.SHOT_DIR) fs.writeFileSync(process.env.SHOT_DIR + '/run-b.json', JSON.stringify(b));
     console.log('B 출렁임:', b.res.bpm, b.res.level, b.lock, b.why, '|', b.res.modeText, '|', b.res.exposure && b.res.exposure.text);
     assert.equal(b.lock, 'unlocked');
     assert.match(b.why, /계속 바뀜/);
@@ -116,7 +121,9 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     await B.waitForTimeout(300);
     assert.equal(await B.isVisible('#res-cmp'), true);
     assert.match(await B.textContent('#res-grid'), /노출 보정/);
-    const before = await B.evaluate(() => { const H = window.HeartRateMath, r = window.__heartRate.state().runs.pop(); return H.analyze(H.unpack(r.raw)).bpm; });
+    assert.equal(await B.isHidden('#detail-empty'), true);
+    assert.match(await B.textContent('#res-why'), /분당 약 40회로 출렁임/);
+    const before = await B.evaluate(() => { const H = window.HeartRateMath, r = window.__heartRate.state().runs.slice(-1)[0]; return H.analyze(H.unpack(r.raw)).bpm; });
     console.log('B 보정 전 계산:', before);
     assert.ok(Math.abs(before - 40) <= 5, '보정 전에는 노출 출렁임(40)을 잡음: ' + before);
     await layout(B, 'B 노트북');
@@ -142,5 +149,8 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     await C.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + '/heart-c.png' : '/dev/null', fullPage: true }).catch(() => {});
 
     assert.deepEqual(errors, []);
-    await browser.close(); stat.close();
+    } finally {
+        await browser.close().catch(() => {});
+        stat.close();
+    }
 });

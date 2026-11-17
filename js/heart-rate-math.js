@@ -216,7 +216,7 @@
 
     // ---------- 노출 보정 (노출을 고정하지 못했을 때) ----------
     // 화면 밝기(0~255)는 감마가 걸린 값(sRGB)이라 먼저 빛의 세기에 비례하는 값(선형)으로 바꾼 뒤 노출(exposureTime × iso)로 나눈다.
-    //  보정 밝기 = 선형 밝기 × (기준 노출 ÷ 이 프레임 노출) × 255   (기준 = 노출 값의 중앙값, 크기를 0~255 근처로 맞추려고)
+    //  보정 밝기 = 선형 밝기 × (기준 노출 ÷ 이 프레임 노출)^β × 255   (기준 = 노출 값의 중앙값, β 는 보통 1 — 자료에서 맞춤)
     //  phyphox 의 Luminance(노출 보정 밝기)와 같은 생각
     const toLinear = v => { const c = Math.min(1, Math.max(0, v / 255)); return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
     const toSrgb = l => { const c = Math.min(1, Math.max(0, l)); return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055); };
@@ -224,14 +224,52 @@
         const fr = frames || [];
         return fr.length ? fr.filter(f => Number.isFinite(Number(f.e)) && Number(f.e) > 0).length / fr.length : 0;
     }
-    function correctExposure(frames) {
-        const es = frames.map(f => Number(f.e)).filter(e => Number.isFinite(e) && e > 0);
-        if (!es.length) return null;
-        const ref = median(es);
-        return frames.map(f => {
-            const e = Number(f.e), k = Number.isFinite(e) && e > 0 ? ref / e : 1;
+    // 노출 값은 사진보다 조금 늦거나 이르게 읽힐 수 있다(폰이 알려 주는 설정 값 ↔ 실제 그 사진을 찍은 노출).
+    //  그래서 노출 값을 −0.5~+0.5 초 밀어 보며, 보정한 밝기(로그)의 느리지 않은 흔들림이 가장 작아지는 밀기(lag)를 고른다.
+    //  돌려주는 배열에 .lag(초) 를 붙임 (+ 면 노출 값이 사진보다 늦게 기록됨)
+    function correctExposure(frames, opts) {
+        opts = opts || {};
+        const ok = frames.map((f, i) => (Number.isFinite(Number(f.e)) && Number(f.e) > 0 ? i : -1)).filter(i => i >= 0);
+        if (!ok.length) return null;
+        const ref = median(ok.map(i => Number(frames[i].e)));
+        const te = ok.map(i => frames[i].t), le = ok.map(i => Math.log(Number(frames[i].e)));
+        // 시각 t 의 노출(로그): 선형 보간, 범위 밖은 끝 값
+        const eAt = t => {
+            if (t <= te[0]) return le[0];
+            if (t >= te[te.length - 1]) return le[le.length - 1];
+            let lo = 0, hi = te.length - 1;
+            while (hi - lo > 1) { const m = (lo + hi) >> 1; if (te[m] <= t) lo = m; else hi = m; }
+            const f = (t - te[lo]) / Math.max(1e-9, te[hi] - te[lo]);
+            return le[lo] + (le[hi] - le[lo]) * f;
+        };
+        const ly = frames.map(f => Math.log(Math.max(1e-6, toLinear(f.y))));
+        let lag = Number.isFinite(opts.lag) ? opts.lag : 0, beta = Number.isFinite(opts.beta) ? opts.beta : 1;
+        if (!Number.isFinite(opts.lag) && frames.length > 60 && (Math.max(...le) - Math.min(...le)) > 0.01) {
+            // 어긋남 d 마다: 보정 밝기 = 로그 선형 밝기 − β × 로그 노출(t + d), β 는 최소제곱으로 (폰의 밝기 곡선이 sRGB 와 조금 달라도 맞게)
+            //  1/60초 간격으로 찾은 뒤 그 둘레를 2 ms 간격으로 다시 (몇 ms 만 어긋나도 30% 출렁임이면 맥파만큼 남음)
+            const t = frames.map(f => f.t), Y = detrend(resample(t, ly, FS).y, 2 * FS);
+            const tryLag = d => {
+                const E = detrend(resample(t, t.map(x => eAt(x + d)), FS).y, 2 * FS);
+                let sxy = 0, sxx = 0;
+                for (let i = 0; i < Y.length; i++) { sxy += Y[i] * E[i]; sxx += E[i] * E[i]; }
+                const b = sxx > 0 ? Math.min(1.5, Math.max(0.3, sxy / sxx)) : 1;
+                let v = 0; for (let i = 0; i < Y.length; i++) v += (Y[i] - b * E[i]) ** 2;
+                return { v, b };
+            };
+            let best = { v: Infinity };
+            for (let d = -0.5; d <= 0.5001; d += 1 / 60) { const r = tryLag(d); if (r.v < best.v) best = Object.assign(r, { d }); }
+            const c0 = best.d;
+            for (let d = c0 - 1 / 60; d <= c0 + 1 / 60 + 1e-9; d += 0.002) { const r = tryLag(d); if (r.v < best.v) best = Object.assign(r, { d }); }
+            lag = best.d; beta = Number.isFinite(opts.beta) ? opts.beta : best.b;
+        }
+        const lref = Math.log(ref);
+        const out = frames.map(f => {
+            const k = Math.exp(beta * (lref - eAt(f.t + lag)));
             return Object.assign({}, f, { r: 255 * toLinear(f.r) * k, g: 255 * toLinear(f.g) * k, y: 255 * toLinear(f.y) * k });
         });
+        out.lag = round(lag, 3) || 0;
+        out.beta = round(beta, 3);
+        return out;
     }
     // 노출 값이 측정 동안 바뀌었는지 (최대−최소)/평균 %
     function exposureVariation(frames) {
@@ -265,6 +303,7 @@
         // opts.correct: 노출 보정한 밝기로 계산 (포화·품질은 원래 밝기로 판단)
         const cor = opts.correct ? correctExposure(fr) : null;
         out.corrected = !!cor;
+        if (cor) { out.expLag = cor.lag; out.expBeta = cor.beta; }
         const chans = opts.channel && opts.channel !== 'auto' ? [opts.channel] : ['r', 'g', 'y'];
         let best = null;
         chans.forEach(ch => {
@@ -327,7 +366,10 @@
         else if (badShare > 0.1 && level === 'good') level = 'fair';
         // 보정해서 계산했으면 출렁임은 알려 주되 경고로 치지 않음
         exp.wobble = exp.warn;
-        if (cor && exp.warn) { exp.warn = false; exp.text = exp.text.replace(/^⚠ /, '').replace(/ 찾은 심박수가.*$/, ' → 노출 보정으로 계산했어요.'); }
+        if (cor && exp.available && exp.varPct >= 1) {
+            exp.warn = false;
+            exp.text = `노출이 ${round(exp.varPct, 0)}% 바뀌었어요` + (exp.bpm ? ` (분당 약 ${exp.bpm}회로 출렁임)` : '') + ` → 노출 보정으로 계산했어요 (노출 값 어긋남 ${cor.lag} 초)`;
+        }
         if (exp.warn && level === 'good') level = 'fair';
         if (!q.covered) out.reasons.push('손가락이 카메라를 덮지 않은 것 같아요');
         if (badShare > 0.1) out.reasons.push(`품질 나쁜 구간 ${Math.round(badShare * 100)}%`);
@@ -350,7 +392,7 @@
     function rng(seed) { let a = (seed >>> 0) || 1; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
     // opts: { bpm, dur(초), fps, jitter(0~1: 간격이 1/fps 의 몇 배까지 흔들림), noise(밝기 비율), amp(맥파 크기 비율), dicrotic(0~1),
     //         expBpm(노출 출렁임 회/분, 0 이면 없음), expAmp(노출 변화 비율), expFollow(노출이 밝기에 남기는 몫), seed, hrv(박동 간격 흔들림 비율),
-    //         physical(true: 선형 빛 × 노출 → 감마, 노출 보정 시험용) }
+    //         physical(true: 선형 빛 × 노출 → 감마, 노출 보정 시험용), expLag(노출 값이 늦게 기록되는 시간, 초) }
     function simulate(opts) {
         const o = Object.assign({ bpm: 72, dur: 30, fps: 30, jitter: 0.3, noise: 0.002, amp: 0.02, dicrotic: 0.35, expBpm: 0, expAmp: 0.3, expFollow: 0.15, seed: 1, hrv: 0.03, drift: 0.03 }, opts || {});
         const rand = rng(o.seed), frames = [];
@@ -379,7 +421,9 @@
                 const L = light / (1 + o.expFollow * (expo - 1)) * expo;
                 r = toSrgb(0.45 * L); g = toSrgb(0.012 * L); b = toSrgb(0.006 * L);
             } else { r = Math.min(255, 180 * light); g = Math.min(255, 30 * light); b = 20 * light; }
-            const exposureTime = 333 * expo, iso = 800;
+            // expLag: 폰이 알려 주는 노출 값이 사진보다 늦음(초) — 실제 폰·브라우저에서 생길 수 있는 어긋남
+            const expoR = o.expBpm && o.expLag ? 1 + o.expAmp * Math.sin(2 * Math.PI * o.expBpm / 60 * (t - o.expLag)) : expo;
+            const exposureTime = 333 * expoR, iso = 800;
             frames.push({ t: round(t, 4), r: round(r, 3), g: round(g, 3), b: round(b, 3), y: round(0.299 * r + 0.587 * g + 0.114 * b, 3), exposureTime: round(exposureTime, 2), iso, e: round(exposureTime * iso, 1), s: r >= 250 ? 1 : 0 });
             t += dt * (1 + o.jitter * (rand() * 2 - 1));
         }

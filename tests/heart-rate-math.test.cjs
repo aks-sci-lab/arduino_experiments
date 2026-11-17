@@ -177,3 +177,14 @@ test('CSV: 보정 밝기·고정 여부 열', () => {
     const nf = H.toCsv(fr.map(f => Object.assign({}, f, { e: null, exposureTime: null, iso: null })), {}).trim().split('\n').pop().split(',');
     assert.equal(nf[4], '', '노출 값이 없으면 보정 밝기 빈칸');
 });
+
+test('노출 값이 사진보다 늦게 기록돼도(0.05~0.3초) 어긋남을 찾아 보정 → 67회', () => {
+    for (const lag of [0.05, 0.1, 0.2, 0.3, -0.1]) {
+        const fr = H.simulate({ bpm: 67, dur: 30, seed: 1, physical: true, expBpm: 40, expAmp: 0.3, expFollow: 0, fps: 24, jitter: 0.4, noise: 0.004, expLag: lag });
+        const a = H.analyze(fr, { correct: true });
+        near(a.expLag, lag, 0.04, '찾은 어긋남');
+        near(a.bpm, 67, 3, 'lag ' + lag);
+        // 어긋남을 무시하면(0 으로 고정) 노출 출렁임이 남음
+        if (lag >= 0.2) assert.ok(Math.abs(H.analyze(H.correctExposure(fr, { lag: 0 }).map(f => Object.assign({}, f, { e: null }))).bpm - 67) > 3, '어긋남 무시하면 틀림 ' + lag);
+    }
+});

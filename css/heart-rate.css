@@ -33,7 +33,7 @@ label.chk input { width: 20px; height: 20px; }
 @keyframes hr-beat { 50% { transform: scale(1.1); } }
 .dash-chart canvas { width: 100%; height: 100%; display: block; }
 .chart-badge { position: absolute; left: 12px; top: 10px; background: rgba(255,255,255,.9); border-radius: 999px; padding: 4px 10px; font-size: var(--fs-sm); font-weight: 600; }
-#video { position: absolute; right: 10px; bottom: 10px; width: 48px; height: 36px; object-fit: cover; border-radius: 4px; opacity: .8; background: #000; }
+#video { position: absolute; right: 10px; top: 10px; width: 48px; height: 36px; object-fit: cover; border-radius: 4px; opacity: .8; background: #000; }
 #video:not(.on) { display: none; }
 
 /* 회차 */

@@ -400,6 +400,7 @@
             `<div>손목 맥박<b>${palp ? palp + ' 회/분' + (err != null ? ` (${err > 0 ? '+' : ''}${err}%)` : '') : '안 넣음'}</b></div>` +
             `<div>노출 처리<b>${esc(MODE_SHORT[a.mode.mode] || '')}</b></div>` +
             `<div>노출 변화<b>${ev != null ? ev.toFixed(1) + '%' : '읽을 수 없음'}</b></div>` +
+            (a.corrected ? `<div>노출 값 어긋남<b>${a.expLag > 0 ? '+' : ''}${a.expLag} 초</b></div>` : '') +
             `<div>사진 수<b>${a.fpsMean != null ? a.fpsMean + '장/초 · ' + a.dur + '초' : '-'}</b></div>`;
         const why = [`<p class="note">노출: ${esc(a.mode.text)}${r.why ? ' (' + esc(r.why) + ')' : ''}</p>`];
         if (a.exposure) why.push(`<div class="note${a.exposure.warn ? ' warn' : ''}">노출 점검: ${esc(a.exposure.text)}</div>`);
