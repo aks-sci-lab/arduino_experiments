@@ -126,8 +126,7 @@ test('수업: 모든 실험으로 만들 수 있고, 진행 보기에 실험별 
 
 test('실험 목록: 서버와 같은 이름, 학생 링크(이미 ?가 있는 주소 포함)', () => {
     const app = loadCodeGs();
-    // needServer: 서버에 아직 넣지 않은 실험 (서버 판을 올릴 때 GENERIC_EXPS 에 넣고 needServer 를 지움)
-    Object.keys(CC.EXPS).forEach(k => assert.equal(app.ctx.isClassExp(k), !CC.EXPS[k].needServer, k));
+    Object.keys(CC.EXPS).forEach(k => assert.equal(app.ctx.isClassExp(k), true, k));
     assert.equal(app.ctx.isClassExp('custom:abc'), true);
     assert.equal(CC.studentUrl('https://x', 'light', '2-4821', 'SID'), 'https://x/projects/environment-lab.html?sensor=light&c=2-4821&s=SID');
     assert.equal(CC.studentUrl('https://x', 'custom:abc_1', '2-4821'), 'https://x/projects/custom-lab.html?id=abc_1&c=2-4821');

@@ -279,7 +279,7 @@
     // 실험 고르기: js/class-cloud.js 의 EXPS 전체 + 선생님이 만든 실험(번호 넣기)
     $('inExp').innerHTML = Object.keys(CC.EXPS).map(function (k) {
         var e = CC.EXPS[k];
-        return '<option value="' + k + '">' + e.icon + ' ' + esc(e.name) + (e.ready ? '' : ' (페이지 연결 준비 중)') + (e.needServer ? ' (서버 ' + e.needServer + '판 필요)' : '') + '</option>';
+        return '<option value="' + k + '">' + e.icon + ' ' + esc(e.name) + (e.ready ? '' : ' (페이지 연결 준비 중)') + '</option>';
     }).join('') + '<option value="custom">👩‍🏫 선생님이 만든 실험…</option>';
     function chosenExp() {
         var v = $('inExp').value;
@@ -295,7 +295,6 @@
         $('customRow').hidden = $('inExp').value !== 'custom';
         var e = o.exp && CC.expInfo(o.exp);
         $('expNote').innerHTML = $('inExp').value === 'custom' && !o.exp ? '선생님이 만든 실험의 번호(또는 학생 화면 주소)를 넣어 주세요.'
-            : e && e.needServer ? '⚠️ 이 실험은 서버 ' + e.needServer + '판부터 쓸 수 있어요. 맨 위 띠에서 🔄 업데이트가 보이면 먼저 업데이트하세요. (예전 서버면 수업 만들기·보내기가 "이 실험은 아직…" 오류로 막혀요)'
             : e && !e.ready ? '⚠️ 이 실험 페이지는 아직 수업 참여 띠를 붙이는 중이에요. 수업은 만들 수 있지만, 학생 화면에 조·번호 고르기가 아직 안 나올 수 있어요.' : '';
         $('preview').innerHTML = ok
             ? '👥 ' + o.nStudents + '명 → <b>' + g.length + '개 조</b>: ' + g.map(function (k, i) { return (i + 1) + '조 ' + k + '명'; }).join(', ')

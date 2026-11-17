@@ -1,58 +1,43 @@
-/* 스마트폰 카메라 심박수 페이지 (색·글꼴·간격은 lab-base.css 변수) */
-body { display: block; font-family: var(--font); background: var(--c-bg); margin: 0; padding: var(--sp-3); color: var(--c-text); }
-.wrap { max-width: var(--w-step); margin: 0 auto; }
-h1 { font-size: var(--fs-h1); margin: 4px 0 8px; }
-h2 { font-size: var(--fs-h2); margin: 0 0 10px; }
+/* 스마트폰 카메라 심박수 (한 화면형 .dash 는 lab-base.css, 여기는 이 페이지에만 필요한 것) */
+body { padding: var(--sp-3) var(--sp-4); background: var(--c-bg); font-family: var(--font); color: var(--c-text); }
+.lead { margin: 0 0 var(--sp-2); color: var(--c-muted); font-size: var(--fs-sm); line-height: 1.5; }
 h3 { font-size: 1rem; margin: 14px 0 4px; }
-.back { display: inline-block; margin-bottom: 4px; }
-.card { background: var(--c-card); border-radius: var(--r-card); padding: 14px; margin-bottom: var(--sp-3); box-shadow: var(--shadow); }
-.card.box { background: var(--c-primary-soft); }
-.text-list { padding-left: 20px; line-height: 1.65; }
-.text-list ul { padding-left: 18px; }
-.formula { text-align: center; font-weight: 700; background: var(--c-fill); border-radius: var(--r-ctl); padding: 8px; }
-.warn { background: var(--c-warn-bg); color: var(--c-warn-text); padding: 8px 10px; border-radius: var(--r-ctl); font-size: .9em; margin: 8px 0; }
-.ok { background: var(--c-ok-bg); color: var(--c-ok-text); padding: 8px 10px; border-radius: var(--r-ctl); font-size: .9em; margin: 8px 0; }
-.err { background: var(--c-err-bg); color: var(--c-err-text); padding: 8px 10px; border-radius: var(--r-ctl); font-size: .9em; margin: 8px 0; }
-.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
-.row label { display: flex; align-items: center; gap: 6px; }
-.row label.grow { flex: 1; min-width: 0; white-space: nowrap; }
-label.chk { min-height: var(--tap); }
-label.chk input { width: 20px; height: 20px; }
-button { padding: 10px 14px; border: none; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: .95em; cursor: pointer; }
+button, .btn { padding: 8px 14px; border: 1px solid transparent; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: var(--fs-base); cursor: pointer; }
 button.secondary, .btn.secondary { background: var(--c-secondary); }
 button.good { background: var(--c-success); }
 button.danger { background: var(--c-danger); }
 button.info { background: var(--c-info); }
-.btn { display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 14px; border-radius: var(--r-ctl); color: #fff; cursor: pointer; font-size: .95em; }
-select, input[type=number] { padding: 8px; border: 1px solid #ccc; border-radius: var(--r-ctl); font-size: 1em; min-height: var(--tap); }
-select.wide { width: 100%; max-width: 100%; }
+.btn { display: inline-flex; align-items: center; min-height: var(--tap); }
+select, input[type=number] { padding: 8px; border: 1px solid #ccc; border-radius: var(--r-ctl); font-size: var(--fs-base); min-height: var(--tap); }
 input[type=number] { width: 84px; }
-table { width: 100%; border-collapse: collapse; font-size: .9em; }
-th, td { padding: 6px 4px; border-bottom: 1px solid var(--c-line); text-align: right; }
-th:first-child, td:first-child { text-align: left; }
-table.plan th, table.plan td { text-align: left; }
-.tbl-wrap { overflow-x: auto; }
+select.wide { width: 100%; max-width: 100%; }
+label.chk { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); }
+label.chk input { width: 20px; height: 20px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.row label { display: flex; align-items: center; gap: 6px; }
+.row label.grow { flex: 1; min-width: 0; white-space: nowrap; }
+.note { font-size: var(--fs-sm); color: var(--c-muted); line-height: 1.5; }
+.note.warn, .warn { background: var(--c-warn-bg); color: var(--c-warn-text); padding: 8px 10px; border-radius: var(--r-ctl); }
+.note.err { background: var(--c-err-bg); color: var(--c-err-text); padding: 8px 10px; border-radius: var(--r-ctl); }
+.ok { background: var(--c-ok-bg); color: var(--c-ok-text); padding: 8px 10px; border-radius: var(--r-ctl); font-size: var(--fs-sm); }
+#msg:empty { display: none; }
+.text-list { padding-left: 20px; line-height: 1.6; }
 
-/* 측정 */
-.hr-status { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
-.pill { background: var(--c-fill); border-radius: 999px; padding: 6px 12px; font-size: .88em; }
-.pill.good { background: var(--c-ok-bg); color: var(--c-ok-text); }
-.pill.fair { background: var(--c-warn-bg); color: var(--c-warn-text); }
-.pill.bad { background: var(--c-err-bg); color: var(--c-err-text); }
-.hr-live { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; position: relative; }
-.hr-big { text-align: center; min-width: 96px; }
-.hr-big b { display: block; font-size: var(--fs-reading); color: var(--c-danger); font-variant-numeric: tabular-nums; line-height: 1.1; }
-.hr-big small { color: var(--c-muted); }
-.hr-big.beat b { animation: hr-beat .25s ease-out; }
-@keyframes hr-beat { 50% { transform: scale(1.12); } }
-canvas.chart { width: 100%; height: 260px; display: block; background: #fff; border: 1px solid var(--c-line); border-radius: var(--r-ctl); }
-canvas.chart.small { height: 150px; }
-#video { position: absolute; right: 6px; bottom: 6px; width: 48px; height: 36px; object-fit: cover; border-radius: 4px; opacity: .8; background: #000; }
-#video:not([src]):not(.on) { display: none; }
-details.sim { margin-top: 8px; }
-details summary { cursor: pointer; font-weight: 600; min-height: var(--tap); display: flex; align-items: center; }
+/* 숫자 카드 */
+.dash-card.heart .value { color: var(--c-danger); }
+.dash-card .value.small { font-size: 1.25rem; }
+.dash-card.good { border-color: var(--c-success); background: var(--c-ok-bg); }
+.dash-card.fair { border-color: #e0b000; background: var(--c-warn-bg); }
+.dash-card.bad { border-color: var(--c-danger); background: var(--c-err-bg); }
+.dash-card.beat .value { animation: hr-beat .25s ease-out; }
+@keyframes hr-beat { 50% { transform: scale(1.1); } }
+.dash-chart canvas { width: 100%; height: 100%; display: block; }
+.chart-badge { position: absolute; left: 12px; top: 10px; background: rgba(255,255,255,.9); border-radius: 999px; padding: 4px 10px; font-size: var(--fs-sm); font-weight: 600; }
+#video { position: absolute; right: 10px; bottom: 10px; width: 48px; height: 36px; object-fit: cover; border-radius: 4px; opacity: .8; background: #000; }
+#video:not(.on) { display: none; }
 
-/* 회차 목록 */
+/* 회차 */
+.dash details > summary { min-height: var(--tap); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .hr-runs { list-style: none; padding: 0; margin: 0; }
 .hr-runs li { border: 1px solid var(--c-line); border-radius: var(--r-ctl); padding: 8px 10px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
 .hr-runs li .ttl { flex: 1 1 100%; font-weight: 700; }
@@ -63,25 +48,6 @@ details summary { cursor: pointer; font-weight: 600; min-height: var(--tap); dis
 .hr-runs li .acts { display: flex; gap: 6px; margin-left: auto; }
 .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 10px 0; }
 .results div { background: var(--c-fill); border-radius: var(--r-ctl); padding: 8px 10px; font-size: .85em; }
-.results b { display: block; font-size: 1.2em; margin-top: 2px; font-variant-numeric: tabular-nums; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .88em; margin: 6px 0; }
-.legend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
-#phone-note { margin: 0 0 12px; }
-
-/* 📱 폰 화면: 측정(5. 데이터)만 */
-body.hr-phone nav.steps,
-body.hr-phone .step-panel:not([data-step="data"]),
-body.hr-phone #share-mount,
-body.hr-phone #phone-note,
-body.hr-phone .step-next { display: none !important; }
-
-@media (max-width: 480px) {
-    .hr-live { grid-template-columns: 1fr; }
-    .hr-big { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
-    .hr-big b { display: inline; }
-}
-@media print {
-    nav.steps, .step-next, #share-mount, #class-bar-mount, button, .btn, details.sim { display: none !important; }
-    .step-panel { display: block !important; }
-    .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
-}
+.results b { display: block; font-size: 1.15em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+canvas.chart { width: 100%; height: 240px; display: block; background: #fff; border: 1px solid var(--c-line); border-radius: var(--r-ctl); }
+canvas.chart.small { height: 140px; margin-top: 6px; }

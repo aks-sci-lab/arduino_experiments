@@ -11,7 +11,6 @@
 
     const BAND = [0.6, 3.5];          // Hz (분당 36~210회). 0.7 Hz 로 자르면 분당 40회가 잘린다
     const FS = 30;                    // 보간 간격 (Hz)
-    const LABELS = ['안정 시', '운동 직후', '1분 뒤', '2분 뒤', '3분 뒤', '5분 뒤', '기타'];
 
     const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN;
     const median = a => { if (!a.length) return NaN; const b = a.slice().sort((x, y) => x - y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
@@ -215,6 +214,39 @@
         return frames.map(f => -Math.log(Math.max(0.5, Number(f[ch]))));
     }
 
+    // ---------- 노출 보정 (노출을 고정하지 못했을 때) ----------
+    // 화면 밝기(0~255)는 감마가 걸린 값(sRGB)이라 먼저 빛의 세기에 비례하는 값(선형)으로 바꾼 뒤 노출(exposureTime × iso)로 나눈다.
+    //  보정 밝기 = 선형 밝기 × (기준 노출 ÷ 이 프레임 노출) × 255   (기준 = 노출 값의 중앙값, 크기를 0~255 근처로 맞추려고)
+    //  phyphox 의 Luminance(노출 보정 밝기)와 같은 생각
+    const toLinear = v => { const c = Math.min(1, Math.max(0, v / 255)); return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const toSrgb = l => { const c = Math.min(1, Math.max(0, l)); return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055); };
+    function exposureShare(frames) {
+        const fr = frames || [];
+        return fr.length ? fr.filter(f => Number.isFinite(Number(f.e)) && Number(f.e) > 0).length / fr.length : 0;
+    }
+    function correctExposure(frames) {
+        const es = frames.map(f => Number(f.e)).filter(e => Number.isFinite(e) && e > 0);
+        if (!es.length) return null;
+        const ref = median(es);
+        return frames.map(f => {
+            const e = Number(f.e), k = Number.isFinite(e) && e > 0 ? ref / e : 1;
+            return Object.assign({}, f, { r: 255 * toLinear(f.r) * k, g: 255 * toLinear(f.g) * k, y: 255 * toLinear(f.y) * k });
+        });
+    }
+    // 노출 값이 측정 동안 바뀌었는지 (최대−최소)/평균 %
+    function exposureVariation(frames) {
+        const es = (frames || []).map(f => Number(f.e)).filter(e => Number.isFinite(e) && e > 0);
+        return es.length ? (Math.max(...es) - Math.min(...es)) / mean(es) * 100 : null;
+    }
+    // 어떻게 계산할지: lock 'locked'(잠금 확인됨) 이면서 실제로 노출이 1% 넘게 바뀌지 않았으면 그대로,
+    //  아니면 노출 값을 프레임마다 읽었을 때(절반 이상) 노출 보정, 못 읽었으면 보정 불가(원래 밝기 + 경고)
+    function exposureMode(lock, frames) {
+        const share = exposureShare(frames), v = exposureVariation(frames);
+        if (lock === 'locked' && !(v > 1)) return { mode: 'locked', correct: false, text: '🔒 노출 고정됨' };
+        if (share >= 0.5) return { mode: 'corrected', correct: true, text: lock === 'locked' ? '⚠ 잠갔지만 노출이 바뀜 → 노출 보정으로 계산' : '⚠ 고정 안 됨 → 노출 보정으로 계산' };
+        return { mode: 'nocorrect', correct: false, text: '⚠ 고정 안 됨 · 노출 값을 읽을 수 없어 보정 못 함 (노출 출렁임 가능성)' };
+    }
+
     // ---------- 한 번에 분석 ----------
     // frames: [{ t(초), r, g, y, e?(노출: exposureTime×iso), s? }], opts: { channel: 'auto'|'r'|'g'|'y', fs }
     function analyze(frames, opts) {
@@ -230,6 +262,9 @@
         out.gapMax = round(Math.max(...gaps), 3);
         if (dur < 5) { out.reasons.push('5초보다 짧아요'); return out; }
         // 채널 고르기: 셋 다 계산해 주파수 최대가 가장 뚜렷한 것 (포화된 채널은 뺌)
+        // opts.correct: 노출 보정한 밝기로 계산 (포화·품질은 원래 밝기로 판단)
+        const cor = opts.correct ? correctExposure(fr) : null;
+        out.corrected = !!cor;
         const chans = opts.channel && opts.channel !== 'auto' ? [opts.channel] : ['r', 'g', 'y'];
         let best = null;
         chans.forEach(ch => {
@@ -237,7 +272,7 @@
             if (!vals.every(Number.isFinite)) return;
             const satFrac = vals.filter(v => v >= 250).length / vals.length;
             if (chans.length > 1 && satFrac > 0.5) return;
-            const rs = resample(t, channelSeries(fr, ch), fs);
+            const rs = resample(t, channelSeries(cor || fr, ch), fs);
             const filt = bandpass(detrend(rs.y, 2 * fs), fs);
             const sp = spectrum(filt, fs);
             const score = sp.ratio * (1 - satFrac);
@@ -290,6 +325,9 @@
         let level = conf >= 0.65 ? 'good' : conf >= 0.45 ? 'fair' : 'bad';
         if (badShare > 0.3 || !q.covered) level = 'bad';
         else if (badShare > 0.1 && level === 'good') level = 'fair';
+        // 보정해서 계산했으면 출렁임은 알려 주되 경고로 치지 않음
+        exp.wobble = exp.warn;
+        if (cor && exp.warn) { exp.warn = false; exp.text = exp.text.replace(/^⚠ /, '').replace(/ 찾은 심박수가.*$/, ' → 노출 보정으로 계산했어요.'); }
         if (exp.warn && level === 'good') level = 'fair';
         if (!q.covered) out.reasons.push('손가락이 카메라를 덮지 않은 것 같아요');
         if (badShare > 0.1) out.reasons.push(`품질 나쁜 구간 ${Math.round(badShare * 100)}%`);
@@ -311,7 +349,8 @@
     // ---------- 시뮬레이션: 가짜 맥파 + (선택) 가짜 노출 출렁임 ----------
     function rng(seed) { let a = (seed >>> 0) || 1; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
     // opts: { bpm, dur(초), fps, jitter(0~1: 간격이 1/fps 의 몇 배까지 흔들림), noise(밝기 비율), amp(맥파 크기 비율), dicrotic(0~1),
-    //         expBpm(노출 출렁임 회/분, 0 이면 없음), expAmp(노출 변화 비율), expFollow(노출이 밝기에 남기는 몫), seed, hrv(박동 간격 흔들림 비율) }
+    //         expBpm(노출 출렁임 회/분, 0 이면 없음), expAmp(노출 변화 비율), expFollow(노출이 밝기에 남기는 몫), seed, hrv(박동 간격 흔들림 비율),
+    //         physical(true: 선형 빛 × 노출 → 감마, 노출 보정 시험용) }
     function simulate(opts) {
         const o = Object.assign({ bpm: 72, dur: 30, fps: 30, jitter: 0.3, noise: 0.002, amp: 0.02, dicrotic: 0.35, expBpm: 0, expAmp: 0.3, expFollow: 0.15, seed: 1, hrv: 0.03, drift: 0.03 }, opts || {});
         const rand = rng(o.seed), frames = [];
@@ -334,7 +373,12 @@
             const p = pulse(t);
             const expo = o.expBpm ? 1 + o.expAmp * Math.sin(2 * Math.PI * o.expBpm / 60 * t) : 1;
             const light = (1 + o.drift * Math.sin(2 * Math.PI * t / 23)) * (1 - o.amp * p) * (1 + o.expFollow * (expo - 1)) * (1 + o.noise * (rand() * 2 - 1));
-            const r = Math.min(255, 180 * light), g = Math.min(255, 30 * light), b = 20 * light;
+            let r, g, b;
+            if (o.physical) {
+                // 실제 카메라처럼: 센서에 닿는 빛(선형) × 노출 → 감마(sRGB) 를 걸어 0~255. 자동 노출이 출렁이면 밝기도 그만큼 바뀜
+                const L = light / (1 + o.expFollow * (expo - 1)) * expo;
+                r = toSrgb(0.45 * L); g = toSrgb(0.012 * L); b = toSrgb(0.006 * L);
+            } else { r = Math.min(255, 180 * light); g = Math.min(255, 30 * light); b = 20 * light; }
             const exposureTime = 333 * expo, iso = 800;
             frames.push({ t: round(t, 4), r: round(r, 3), g: round(g, 3), b: round(b, 3), y: round(0.299 * r + 0.587 * g + 0.114 * b, 3), exposureTime: round(exposureTime, 2), iso, e: round(exposureTime * iso, 1), s: r >= 250 ? 1 : 0 });
             t += dt * (1 + o.jitter * (rand() * 2 - 1));
@@ -342,13 +386,16 @@
         return frames;
     }
 
-    // ---------- CSV (원본: t, R, G, Y, exposureTime, iso) ----------
+    // ---------- CSV (원본: t, R, G, Y, Y_corr, exposureTime, iso, locked) ----------
     function toCsv(frames, meta) {
         const lines = [];
         Object.keys(meta || {}).forEach(k => { if (meta[k] != null && meta[k] !== '') lines.push('# ' + k + ': ' + String(meta[k]).replace(/[\r\n]/g, ' ')); });
-        lines.push('t_s,R,G,Y,exposureTime,iso');
-        (frames || []).forEach(f => lines.push([round(f.t, 4), round(f.r, 3), round(f.g, 3), round(f.y, 3),
-            f.exposureTime == null ? '' : f.exposureTime, f.iso == null ? '' : f.iso].join(',')));
+        // Y_corr: 노출 보정 밝기 (선형 밝기 × 기준 노출 ÷ 노출), 노출 값이 없으면 빈칸. locked: 노출 고정 여부(1/0)
+        const cor = correctExposure(frames || []) || [];
+        const locked = meta && meta.locked != null ? (meta.locked ? 1 : 0) : '';
+        lines.push('t_s,R,G,Y,Y_corr,exposureTime,iso,locked');
+        (frames || []).forEach((f, i) => lines.push([round(f.t, 4), round(f.r, 3), round(f.g, 3), round(f.y, 3),
+            cor[i] && Number(f.e) > 0 ? round(cor[i].y, 4) : '', f.exposureTime == null ? '' : f.exposureTime, f.iso == null ? '' : f.iso, locked].join(',')));
         return lines.join('\n') + '\n';
     }
     // 이 페이지의 CSV 와 phyphox 같은 다른 앱의 CSV(열 이름에 Time·Luma·Shutter·ISO)를 읽음 → { frames, meta, from }
@@ -387,15 +434,19 @@
         return { frames, meta, from: phyphox ? 'phyphox' : 'heart-rate' };
     }
 
-    // ---------- 회복 그래프: 회차들 → 분(운동 직후 기준)–심박수 ----------
-    // runs: [{ at(ISO), label, bpm }] → [{ x(분), y, label }] (기준: 첫 '운동 직후', 없으면 첫 회차)
-    function recovery(runs) {
-        const rs = (runs || []).filter(r => r && Number.isFinite(Number(r.bpm)) && !isNaN(Date.parse(r.at))).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-        if (!rs.length) return [];
-        const ref = rs.find(r => r.label === '운동 직후') || rs[0];
-        const t0 = Date.parse(ref.at);
-        return rs.map(r => ({ x: round((Date.parse(r.at) - t0) / 60000, 2), y: Number(r.bpm), label: r.label || '' }));
+    // 저장 모양 프레임 [t(ms), R, G, Y, exposureTime, iso, s] ↔ 계산 모양 { t(초), r, g, y, exposureTime, iso, e, s }
+    function unpack(raw) {
+        return (Array.isArray(raw) ? raw : []).filter(a => Array.isArray(a) && Number.isFinite(Number(a[0]))).map(a => {
+            const et = a[4] == null || a[4] === '' ? null : Number(a[4]), iso = a[5] == null || a[5] === '' ? null : Number(a[5]);
+            return { t: Number(a[0]) / 1000, r: Number(a[1]), g: Number(a[2]), y: Number(a[3]), exposureTime: et, iso,
+                e: Number.isFinite(et) && et > 0 ? et * (Number.isFinite(iso) && iso > 0 ? iso : 1) : null, s: Number(a[6]) || 0 };
+        });
+    }
+    function pack(frames) {
+        const t0 = frames.length ? frames[0].t : 0;
+        return frames.map(f => [Math.round((f.t - t0) * 1000), round(f.r, 2), round(f.g, 2), round(f.y, 2),
+            f.exposureTime == null ? null : round(f.exposureTime, 3), f.iso == null ? null : round(f.iso, 0), round(f.s, 2) || 0]);
     }
 
-    return { BAND, FS, LABELS, resample, detrend, bandpass, spectrum, autocorr, findPeaks, quality, exposureCheck, analyze, palpBpm, errorPct, simulate, toCsv, parseCsv, recovery, fft, mean, median, std, round };
+    return { toLinear, toSrgb, correctExposure, exposureVariation, exposureShare, exposureMode, pack, unpack, BAND, FS, resample, detrend, bandpass, spectrum, autocorr, findPeaks, quality, exposureCheck, analyze, palpBpm, errorPct, simulate, toCsv, parseCsv, fft, mean, median, std, round };
 });

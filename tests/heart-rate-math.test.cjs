@@ -1,8 +1,7 @@
-// 스마트폰 카메라 심박수 계산 (js/heart-rate-math.js) · 조 공유 자료 (js/heart-rate-share.js)
+// 스마트폰 카메라 심박수 계산 (js/heart-rate-math.js)
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const H = require('../js/heart-rate-math.js');
-const HS = require('../js/heart-rate-share.js');
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg || ''} ${a} ≈ ${b} ± ${tol}`);
 
@@ -104,7 +103,7 @@ test('손목 맥박 ×4 · 오차 %', () => {
 test('CSV: 내보내기 → 다시 읽기, phyphox 열 이름', () => {
     const fr = H.simulate({ bpm: 66, dur: 12, seed: 4 });
     const csv = H.toCsv(fr, { '회차': '안정 시' });
-    assert.match(csv.split('\n')[1], /^t_s,R,G,Y,exposureTime,iso$/);
+    assert.match(csv.split('\n')[1], /^t_s,R,G,Y,Y_corr,exposureTime,iso,locked$/);
     const back = H.parseCsv(csv);
     assert.equal(back.meta['회차'], '안정 시');
     assert.equal(back.frames.length, fr.length);
@@ -120,50 +119,61 @@ test('CSV: 내보내기 → 다시 읽기, phyphox 열 이름', () => {
     assert.match(H.parseCsv('a,b\n1,2').error, /열을 찾지/);
 });
 
-test('회복 그래프: 운동 직후 기준 분', () => {
-    const t0 = Date.parse('2026-11-17T01:00:00Z');
-    const at = m => new Date(t0 + m * 60000).toISOString();
-    const pts = H.recovery([{ at: at(-5), label: '안정 시', bpm: 72 }, { at: at(0), label: '운동 직후', bpm: 140 }, { at: at(1), label: '1분 뒤', bpm: 110 }, { at: at(3), label: '3분 뒤', bpm: 90 }]);
-    assert.deepEqual(pts.map(p => p.x), [-5, 0, 1, 3]);
-    assert.deepEqual(pts.map(p => p.y), [72, 140, 110, 90]);
-    // 운동 직후가 없으면 첫 회차 기준
-    assert.equal(H.recovery([{ at: at(2), label: '기타', bpm: 80 }, { at: at(4), label: '기타', bpm: 75 }])[1].x, 2);
+test('노출 보정: 실제 67회 + 노출 출렁임 40회 → 보정 전 40회, 보정 뒤 67회 (±3)', () => {
+    for (let seed = 1; seed <= 6; seed++) {
+        const fr = H.simulate({ bpm: 67, dur: 30, seed, physical: true, expBpm: 40, expAmp: 0.3, expFollow: 0, fps: 24, jitter: 0.4, noise: 0.004 });
+        const raw = H.analyze(fr);
+        near(raw.bpm, 40, 3, '보정 전 seed ' + seed);
+        assert.equal(raw.exposure.warn, true, '보정 전 경고');
+        const m = H.exposureMode('unlocked', fr);
+        assert.equal(m.mode, 'corrected'); assert.equal(m.correct, true);
+        const cor = H.analyze(fr, { correct: m.correct });
+        assert.equal(cor.corrected, true);
+        near(cor.bpm, 67, 3, '보정 뒤 seed ' + seed);
+        assert.equal(cor.exposure.warn, false); assert.equal(cor.exposure.wobble !== undefined, true);
+        assert.notEqual(cor.level, 'bad');
+    }
 });
 
-test('조 공유 자료: 보내기 → 받기 (원본 포함, 서버 한도 안)', () => {
-    const fr = H.simulate({ bpm: 88, dur: 60, fps: 30, seed: 7 });
-    const raw = HS.fromFrames(fr);
-    const res = H.analyze(HS.toFrames(raw));
-    near(res.bpm, 88, 3);
-    const runs = [{ id: 'r1', at: '2026-11-17T01:00:00.000Z', label: '운동 직후', lock: 'locked', palp: 22, raw, res: { bpm: res.bpm, conf: res.conf, level: res.level, ibi: res.ibi, exposure: res.exposure } },
-        { id: 'r2', at: '2026-11-17T01:01:00.000Z', label: '1분 뒤', lock: 'sim', sim: true, raw: raw.slice(0, 300), res: { bpm: 70 } }];
-    const items = HS.buildItems(runs);
-    assert.equal(items.length, 2);
-    assert.equal(items[0].title, '운동 직후');
-    assert.equal(items[1].title, '1분 뒤 (시뮬레이션)');
-    assert.equal(items[0].summary['손목(회/분)'], 88);
-    assert.equal(items[0].summary['노출 고정'], '됨');
-    assert.equal('손목(회/분)' in items[1].summary, false, '빈 값은 뺌');
-    assert.equal(items[0].at, runs[0].at);
-    Object.keys(items[0].summary).forEach(k => assert.ok(k.length <= 30 && !k.includes('|'), k));
-    assert.ok(JSON.stringify(items[0].data).length < 270000, '자료 크기');
-    assert.equal(items[0].data.raw.length, raw.length, '60초 30장/초는 줄이지 않음');
-    // 받는 쪽 (ClassShare.incomingFrom 모양)
-    const inc = items.map(it => Object.assign({}, it, { device: 'pAB12', from: '📱 폰 AB12' }));
-    const r1 = HS.applyIncoming({}, inc);
-    assert.equal(r1.changed, true);
-    const e = r1.ext['pAB12/r1'];
-    assert.equal(e.label, '운동 직후'); assert.equal(e.palp, 22); assert.equal(e.bpm, res.bpm);
-    near(H.analyze(HS.toFrames(e.raw)).bpm, 88, 3);
-    assert.equal(HS.applyIncoming(r1.ext, inc).changed, false);
-    // 지운 회차(n=0)는 빠짐
-    const r2 = HS.applyIncoming(r1.ext, [Object.assign({}, inc[0], { n: 0 }), inc[1]]);
-    assert.deepEqual(Object.keys(r2.ext), ['pAB12/r2']);
-    // 회복 그래프 묶음: 시뮬레이션은 빼고, 출처별
-    const g = HS.recoveryGroups(runs, r1.ext);
-    assert.deepEqual(g.map(x => x.name), ['내 기록', '📱 폰 AB12']);
-    assert.equal(g[0].points.length, 1);
-    // 아주 긴 원본은 고르게 솎아 한도 안
-    const big = Array.from({ length: 12000 }, (_, i) => [i * 33, 180.12, 30.45, 72.33, 333.333, 800, 0]);
-    assert.ok(JSON.stringify(HS.fitRaw(big)).length <= HS.MAX_CHARS);
+test('노출 처리 방식: 고정됨 / 잠갔는데 바뀜 / 고정 안 됨 / 노출 값 없음', () => {
+    const still = H.simulate({ bpm: 67, dur: 20, seed: 1, physical: true });
+    const wob = H.simulate({ bpm: 67, dur: 20, seed: 1, physical: true, expBpm: 40, expFollow: 0 });
+    assert.equal(H.exposureMode('locked', still).mode, 'locked');
+    assert.equal(H.exposureMode('locked', still).correct, false);
+    near(H.analyze(still).bpm, 67, 3, '고정됨: 그대로');
+    assert.equal(H.exposureMode('locked', wob).mode, 'corrected', '잠갔다는데 노출이 바뀌면 보정');
+    assert.match(H.exposureMode('locked', wob).text, /바뀜/);
+    assert.equal(H.exposureMode('unlocked', still).mode, 'corrected');
+    const none = still.map(f => Object.assign({}, f, { e: null, exposureTime: null, iso: null }));
+    const m = H.exposureMode('unlocked', none);
+    assert.equal(m.mode, 'nocorrect'); assert.equal(m.correct, false);
+    assert.match(m.text, /보정 못 함/);
+    assert.equal(H.analyze(none, { correct: true }).corrected, false, '노출 값이 없으면 보정 안 함');
+});
+
+test('감마: sRGB ↔ 선형, 보정 밝기 = 선형 × 기준 노출 ÷ 노출', () => {
+    [0, 10, 50, 128, 200, 255].forEach(v => near(H.toSrgb(H.toLinear(v)), v, 1e-6));
+    near(H.toLinear(255), 1, 1e-12); near(H.toLinear(128), 0.2158, 1e-3);
+    const fr = [{ t: 0, r: 128, g: 128, y: 128, e: 100 }, { t: 0.1, r: 128, g: 128, y: 128, e: 200 }, { t: 0.2, r: 128, g: 128, y: 128, e: 200 }];
+    const c = H.correctExposure(fr);
+    near(c[0].y / c[1].y, 2, 1e-9, '노출이 두 배면 보정 밝기는 반');
+    assert.equal(H.correctExposure([{ t: 0, r: 1, g: 1, y: 1 }]), null);
+    near(H.exposureVariation(fr), 100 / (500 / 3) * 100, 1e-9);
+    // 저장 모양 왕복
+    const sim = H.simulate({ bpm: 70, dur: 10, seed: 2 });
+    const back = H.unpack(H.pack(sim));
+    assert.equal(back.length, sim.length);
+    near(back[10].t, sim[10].t - sim[0].t, 0.001); near(back[10].e, sim[10].e, 1);
+});
+
+test('CSV: 보정 밝기·고정 여부 열', () => {
+    const fr = H.simulate({ bpm: 67, dur: 10, seed: 1, physical: true, expBpm: 40, expFollow: 0 });
+    const lines = H.toCsv(fr, { locked: false }).trim().split('\n').filter(l => !l.startsWith('#'));
+    const row = lines[1].split(',');
+    assert.equal(row.length, 8);
+    assert.ok(Number(row[4]) > 0, 'Y_corr');
+    assert.equal(row[7], '0');
+    assert.equal(H.toCsv(fr, { locked: true }).trim().split('\n').pop().split(',')[7], '1');
+    const nf = H.toCsv(fr.map(f => Object.assign({}, f, { e: null, exposureTime: null, iso: null })), {}).trim().split('\n').pop().split(',');
+    assert.equal(nf[4], '', '노출 값이 없으면 보정 밝기 빈칸');
 });

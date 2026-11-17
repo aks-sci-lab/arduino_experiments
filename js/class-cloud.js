@@ -34,9 +34,7 @@
         uv: { name: '자외선 센서', icon: '🟣', page: 'projects/environment-lab.html?sensor=uv', steps: DASH, ready: true },
         accel: { name: '가속도계 데이터 분석', icon: '📐', page: 'projects/accelerometer-lab.html', steps: DASH, ready: true },
         nano: { name: '아두이노 Nano 33 BLE Sense', icon: '🔷', page: 'projects/arduino-nano-lab.html', steps: DASH, ready: true },
-        phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: true },
-        // needServer: 서버 Code.gs 의 GENERIC_EXPS 에 아직 없음 → 그 판 이상으로 업데이트해야 수업·보내기가 됨 (서버를 고친 세션이 지움)
-        heartrate: { name: '스마트폰 카메라 심박수', icon: '❤️', page: 'projects/heart-rate.html', steps: STEPS7, ready: true, needServer: 9 }
+        phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: true }
     };
     var CUSTOM_RE = /^custom:([A-Za-z0-9_-]{1,40})$/;
     var CUSTOM_STEPS = Object.assign({ live: '한 화면' }, STEPS7);

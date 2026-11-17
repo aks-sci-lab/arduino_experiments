@@ -6,256 +6,105 @@
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
     <title>스마트폰 카메라 심박수</title>
-    <link rel="stylesheet" href="../css/class-share.css">
     <link rel="stylesheet" href="../css/heart-rate.css">
 </head>
 <body>
-<div class="wrap">
-    <a class="back" href="../index.html">← 메인 페이지</a>
+<main class="dash">
+    <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
     <h1>❤️ 스마트폰 카메라 심박수</h1>
-    <div id="class-bar-mount"></div>
-    <p class="note">손가락으로 폰 뒤 카메라를 덮으면, 심장이 뛸 때마다 손가락 속 피의 양이 바뀌어 화면 밝기가 아주 조금 오르내립니다. 이것으로 심박수를 구합니다. <b>수업용이에요 — 의료 진단에 쓰지 마세요.</b> 영상은 저장·전송하지 않고 밝기 숫자만 씁니다. 카메라는 <b>https</b> 주소에서만 켜집니다.</p>
+    <p class="lead">뒤 카메라를 검지로 덮으면 심장이 뛸 때마다 밝기가 아주 조금 오르내립니다. 그 맥파로 심박수를 구해요. <b>수업용 — 의료 진단에 쓰지 마세요.</b> 영상은 저장·전송하지 않습니다.</p>
 
-    <nav class="steps" role="tablist" aria-label="실험 단계">
-        <button role="tab" data-step="purpose"><b>1</b><span>목적</span></button>
-        <button role="tab" data-step="theory"><b>2</b><span>이론</span></button>
-        <button role="tab" data-step="materials"><b>3</b><span>준비물</span></button>
-        <button role="tab" data-step="procedure"><b>4</b><span>과정</span></button>
-        <button role="tab" data-step="data"><b>5</b><span>데이터</span></button>
-        <button role="tab" data-step="result"><b>6</b><span>결과</span></button>
-        <button role="tab" data-step="conclusion"><b>7</b><span>결론</span></button>
-    </nav>
+    <!-- 연결·상태 띠 -->
+    <div class="dash-bar">
+        <span id="status" class="dash-status" role="status" aria-live="polite">📷 카메라를 켜세요</span>
+        <button id="cam" class="primary">📷 카메라 켜기</button>
+        <button id="start" class="good" disabled>▶ 측정 시작</button>
+        <button id="stop" class="danger" hidden>■ 멈춤</button>
+        <select id="dur" aria-label="측정 길이"><option value="15">15초</option><option value="30" selected>30초</option><option value="60">60초</option></select>
+        <label class="chk" id="torch-wrap" hidden><input type="checkbox" id="torch"> 플래시</label>
+    </div>
+    <div id="torch-warn" class="warn" hidden>⚠️ 플래시를 켜면 폰과 손가락이 뜨거워질 수 있어요. 한 번에 60초까지만, 뜨거우면 바로 멈추세요.</div>
+    <p id="msg" class="note" role="status" aria-live="polite"></p>
 
-    <!-- ===================== 1. 목적 ===================== -->
-    <section class="step-panel" data-step="purpose" hidden>
-        <div class="card">
-            <h2>1. 실험 목적</h2>
-            <ol class="text-list">
-                <li>스마트폰 카메라로 손가락의 <b>밝기 변화(맥파)</b>를 재어 심박수를 구하고, 손목 맥박을 직접 센 값과 비교한다.</li>
-                <li><b>운동 전후</b>에 심박수가 어떻게 바뀌고, 운동을 멈춘 뒤 얼마나 빨리 <b>회복</b>되는지 시간–심박수 그래프로 알아본다.</li>
-                <li>측정값이 믿을 만한지(신호 품질, 노출 고정, 여러 계산 방법이 맞는지) 따져 보는 방법을 익힌다.</li>
-            </ol>
+    <div class="dash-grid">
+        <div class="dash-readouts" aria-label="지금 값">
+            <div class="dash-card heart"><span class="label">심박수</span><span id="v-bpm" class="value num">--</span><span class="unit">회/분</span></div>
+            <div class="dash-card"><span class="label">박동 간격</span><span id="v-ibi" class="value num">--</span><span class="unit">ms</span></div>
+            <div class="dash-card"><span class="label">신호 품질</span><span id="v-q" class="value small">—</span><span id="v-qtext" class="unit"></span></div>
+            <div class="dash-card"><span class="label">노출</span><span id="v-lock" class="value small">—</span><span id="v-locktext" class="unit">카메라를 켜면 확인</span></div>
         </div>
-        <div class="card box">
-            <h2>수업 주제: 운동 전후 심박수와 회복</h2>
-            <ol class="text-list">
-                <li><b>안정 시</b> — 의자에 앉아 1분 쉰 뒤 잰다.</li>
-                <li><b>운동</b> — 제자리 뛰기 1분 (선생님이 정한 운동).</li>
-                <li><b>운동 직후 · 1분 뒤 · 3분 뒤</b> — 쉬면서 몇 번 더 잰다.</li>
-                <li>조원들의 회복 그래프를 비교하고 결론을 쓴다.</li>
-            </ol>
-            <p class="note">⚠️ 몸이 불편하거나 운동을 하면 안 되는 학생은 운동하지 않고 안정 시 측정·분석만 합니다. 어지럽거나 가슴이 아프면 바로 멈추고 선생님께 알리세요.</p>
+        <div class="dash-chart">
+            <canvas id="wave" aria-label="실시간 맥파 그래프"></canvas>
+            <span id="time-st" class="chart-badge" hidden></span>
+            <video id="video" muted playsinline aria-hidden="true"></video>
         </div>
-        <div class="step-next"><button data-go="theory">다음: 2. 이론 →</button></div>
-    </section>
+    </div>
 
-    <!-- ===================== 2. 이론 ===================== -->
-    <section class="step-panel" data-step="theory" hidden data-subtabs="이론 나눠 보기">
-        <div class="card" data-subtab="맥파(PPG)">
-            <h2>2-1. 빛으로 맥박 재기 — 광용적맥파(PPG)</h2>
-            <p>심장이 수축하면 피가 온몸으로 밀려 나가 손가락 끝의 혈관이 살짝 부풀고, 이완하면 다시 줄어듭니다. 피(헤모글로빈)는 빛을 잘 흡수하므로, 손가락을 지나온 빛은 <b>피가 많을 때 조금 어두워지고 적을 때 조금 밝아집니다</b>.</p>
-            <p>카메라가 1초에 약 30장씩 찍은 사진의 평균 밝기를 이어 그리면, 심장 박동마다 오르내리는 파형이 나옵니다. 이것을 <b>광용적맥파(PPG, photoplethysmogram)</b>라고 하며, 스마트워치의 심박 센서도 같은 원리입니다.</p>
-            <p class="note">빨강 빛은 손가락을 잘 통과해 밝게 보이고, 초록 빛은 피에 더 잘 흡수됩니다. 이 페이지는 빨강(R)·초록(G)·밝기(Y) 중 맥파가 가장 뚜렷한 것을 저절로 고릅니다.</p>
-        </div>
-        <div class="card" data-subtab="운동과 회복">
-            <h2>2-2. 심박수와 운동·회복</h2>
-            <p><b>심박수</b>는 1분 동안 심장이 뛰는 횟수(회/분, bpm)입니다. 쉬고 있는 청소년은 보통 분당 60~100회입니다.</p>
-            <p>운동을 하면 근육이 산소를 더 많이 쓰므로, 심장이 더 빨리 뛰어 피를 더 많이 보냅니다. 운동을 멈추면 심박수가 점점 안정 시 값으로 돌아오는데, 이것을 <b>회복</b>이라고 합니다. 처음 1분 동안 많이 떨어지고 그 뒤로는 천천히 떨어집니다. 운동을 꾸준히 한 사람일수록 회복이 빠른 편입니다.</p>
-            <p class="formula">회복량(1분) = 운동 직후 심박수 − 1분 뒤 심박수</p>
-        </div>
-        <div class="card" data-subtab="계산 방법">
-            <h2>2-3. 파형에서 심박수 구하기</h2>
-            <ol class="text-list">
-                <li><b>고른 간격으로 맞추기</b>: 폰이 사진을 고르지 않은 간격(33~67 ms)으로 찍어서, 찍은 시각을 기록하고 1/30초 간격으로 다시 맞춥니다(보간).</li>
-                <li><b>느린 변화 빼기 · 거르기</b>: 손가락을 누르는 힘이 바뀌어 생기는 느린 변화를 빼고, 분당 36~210회(0.6~3.5 Hz) 빠르기만 남깁니다.</li>
-                <li><b>세 가지로 주기 찾기</b>
-                    <ul>
-                        <li><b>주파수 분석(FFT)</b>: 파형을 여러 빠르기의 사인파로 나누어 가장 센 빠르기를 찾습니다.</li>
-                        <li><b>자기상관</b>: 파형을 조금씩 밀어 원래 파형과 가장 잘 겹치는 밀기 시간 = 한 주기.</li>
-                        <li><b>봉우리 간격</b>: 박동마다 봉우리를 찾아 간격(박동 간격, IBI)을 잽니다. 한 박동 안에 작은 두 번째 봉우리(중복맥파)가 있어 두 번 세지 않도록, 봉우리 사이를 주기의 0.6배 이상 띄웁니다.</li>
-                    </ul>
-                </li>
-                <li>세 값이 서로 맞을수록 <b>신뢰도</b>가 높습니다.</li>
-            </ol>
-            <p class="formula">심박수(회/분) = 60 ÷ 박동 간격(초)</p>
-        </div>
-        <div class="card" data-subtab="노출 고정">
-            <h2>2-4. 왜 노출을 고정하나요?</h2>
-            <p>카메라는 보통 화면이 어두워지면 셔터를 길게 열고(노출 시간↑), 감도(ISO)를 올려 <b>밝기를 스스로 맞춥니다(자동 노출)</b>. 그러면 맥박 때문에 생긴 아주 작은 밝기 변화를 카메라가 지워 버리거나, 반대로 자동 노출이 스스로 출렁여서 맥박처럼 보이는 가짜 파형을 만들 수 있습니다.</p>
-            <p>실제로 선생님이 다른 앱으로 재 본 자료에서 셔터 속도가 맥파와 같은 빠르기(분당 약 40회)로 오르내렸습니다. 그래서 이 페이지는 손가락을 덮고 2~3초 동안 자동으로 맞춘 뒤 <b>그 노출 값으로 잠급니다</b>. 잠글 수 없는 폰(아이폰 등)은 결과에 '노출 고정 안 됨'이 표시되고, 노출 값이 심박과 같은 빠르기로 출렁이면 경고합니다.</p>
-        </div>
-        <div class="step-next"><button class="secondary" data-go="purpose">← 이전: 1. 목적</button><button data-go="materials">다음: 3. 준비물 →</button></div>
-    </section>
-
-    <!-- ===================== 3. 준비물 ===================== -->
-    <section class="step-panel" data-step="materials" hidden>
-        <div class="card">
-            <h2>3. 준비물</h2>
-            <ul class="text-list">
-                <li><b>스마트폰</b> (안드로이드 + 크롬 권장. 아이폰도 측정은 되지만 노출을 고정할 수 없어요)</li>
-                <li><b>노트북</b> (조별 1대: QR 을 띄우고 결과를 모아 분석)</li>
-                <li><b>초시계</b> (폰 시계·교실 시계 가능) — 손목 맥박을 15초 동안 세기</li>
-                <li>밝은 곳 (창가 햇빛이면 플래시 없이도 됨) 또는 폰 플래시</li>
-                <li>운동할 공간 (제자리 뛰기)</li>
-            </ul>
-            <div class="warn">⚠️ <b>플래시</b>를 켜고 오래 재면 폰과 손가락이 뜨거워질 수 있어요. 플래시를 쓸 때는 한 번에 60초까지만, 뜨거우면 바로 멈추세요.</div>
-            <div class="ok">🔒 <b>개인정보</b>: 이름은 받지 않고, 영상은 저장하거나 보내지 않습니다. 밝기 숫자와 심박수만 조 코드로 선생님 시트에 보냅니다.</div>
-        </div>
-        <div class="step-next"><button class="secondary" data-go="theory">← 이전: 2. 이론</button><button data-go="procedure">다음: 4. 과정 →</button></div>
-    </section>
-
-    <!-- ===================== 4. 과정 ===================== -->
-    <section class="step-panel" data-step="procedure" hidden data-subtabs="과정 나눠 보기">
-        <div class="card" data-subtab="폰 연결">
-            <h2>4-1. 노트북과 폰 연결</h2>
-            <ol class="text-list">
-                <li>노트북에서 <b>5. 데이터</b> → '👥 조 공유'에 조 코드를 정합니다 (선생님 수업 QR 로 들어왔으면 저절로).</li>
-                <li><b>📱 폰으로 측정하기</b>를 눌러 나온 QR 을 폰 카메라로 찍어 엽니다.</li>
-                <li>폰에서 잰 회차를 골라 <b>📤 고른 회차 보내기</b>를 누르면 노트북에 저절로 들어옵니다.</li>
-            </ol>
-        </div>
-        <div class="card" data-subtab="재는 법">
-            <h2>4-2. 카메라로 재는 법</h2>
-            <ol class="text-list">
-                <li>📷 <b>카메라 켜기</b> → 카메라 권한을 허용합니다.</li>
-                <li><b>검지 끝</b>으로 뒤 카메라(렌즈)를 <b>살짝 눌러 완전히</b> 덮습니다. 너무 세게 누르면 피가 안 통해 맥파가 약해집니다.</li>
-                <li>품질 표시가 🟢 가 되면 회차 이름(안정 시 등)을 고르고 ▶ <b>측정 시작</b>. 처음 3초는 노출을 맞추고 잠급니다.</li>
-                <li>측정하는 동안 말하거나 움직이지 않습니다. 폰을 책상에 놓고 손가락만 올려도 좋아요.</li>
-                <li>끝나면 회차가 저장됩니다. 신뢰도가 🔴 이면 다시 잽니다.</li>
-            </ol>
-        </div>
-        <div class="card" data-subtab="운동 순서">
-            <h2>4-3. 운동 전후 순서 (예)</h2>
-            <table class="plan">
-                <thead><tr><th>회차 이름</th><th>언제</th></tr></thead>
-                <tbody>
-                    <tr><td>안정 시</td><td>앉아서 1분 쉰 뒤</td></tr>
-                    <tr><td>운동 직후</td><td>제자리 뛰기 1분을 마치자마자</td></tr>
-                    <tr><td>1분 뒤</td><td>운동을 마치고 1분 뒤</td></tr>
-                    <tr><td>3분 뒤</td><td>운동을 마치고 3분 뒤</td></tr>
-                </tbody>
-            </table>
-            <p class="note">회복 그래프의 가로축은 '운동 직후' 회차를 잰 시각부터 지난 시간(분)입니다. 측정 길이는 15초면 빨리 바뀌는 운동 직후 값을 잡기 좋고, 30초는 더 정확합니다.</p>
-        </div>
-        <div class="card" data-subtab="손목 맥박">
-            <h2>4-4. 손목 맥박 세기 (비교용)</h2>
-            <p>손바닥을 위로 하고, 엄지 쪽 손목 안쪽에 다른 손의 검지·중지를 가볍게 대면 맥박이 느껴집니다. <b>15초 동안 센 수 × 4</b> = 1분 동안의 심박수입니다.</p>
-            <p class="note">카메라 측정과 같은 때에 다른 조원이 세어 주면 비교하기 좋습니다. 센 수는 회차 목록의 '손목 15초' 칸에 넣습니다.</p>
-        </div>
-        <div class="step-next"><button class="secondary" data-go="materials">← 이전: 3. 준비물</button><button data-go="data">다음: 5. 데이터 →</button></div>
-    </section>
-
-    <!-- ===================== 5. 데이터 ===================== -->
-    <section class="step-panel" data-step="data" hidden>
-        <div id="share-mount"></div>
-        <div id="phone-note" class="ok" hidden></div>
-
-        <div class="card" id="measure">
-            <h2>📷 측정하기</h2>
-            <div class="row">
-                <label>회차 <select id="label"></select></label>
-                <label>길이 <select id="dur"><option value="15">15초</option><option value="30" selected>30초</option><option value="60">60초</option></select></label>
-                <label class="chk" id="torch-wrap" hidden><input type="checkbox" id="torch"> 플래시</label>
-            </div>
-            <div class="row">
-                <button id="cam">📷 카메라 켜기</button>
-                <button id="start" class="good" disabled>▶ 측정 시작</button>
-                <button id="stop" class="danger" hidden>■ 멈춤</button>
-            </div>
-            <div class="hr-status">
-                <span id="lock-st" class="pill">노출: 카메라를 켜면 확인</span>
-                <span id="q-st" class="pill">품질: —</span>
-                <span id="time-st" class="pill" hidden></span>
-            </div>
-            <div class="hr-live">
-                <div class="hr-big" aria-live="polite"><b id="bpm-now">--</b><small>회/분</small></div>
-                <canvas id="wave" class="chart small" aria-label="실시간 맥파"></canvas>
-                <video id="video" muted playsinline aria-hidden="true"></video>
-            </div>
-            <p id="msg" class="note" role="status" aria-live="polite"></p>
-            <div id="torch-warn" class="warn" hidden>⚠️ 플래시를 켜면 폰과 손가락이 뜨거워질 수 있어요. 한 번에 60초까지만, 뜨거우면 바로 멈추세요.</div>
-            <details class="sim">
-                <summary>🧪 카메라 없이 시뮬레이션으로 해 보기</summary>
-                <div class="row">
-                    <label>가짜 심박수 <input type="number" id="sim-bpm" value="72" min="36" max="210" step="1"> 회/분</label>
-                    <label class="chk"><input type="checkbox" id="sim-exp"> 가짜 노출 출렁임 (분당 40회)</label>
-                </div>
-                <div class="row"><button id="sim" class="secondary">🧪 가짜 측정 만들기</button></div>
-                <p class="note">카메라 대신 계산으로 만든 맥파(잡음·고르지 않은 간격 포함)를 지금 고른 회차 이름·길이로 저장합니다. 결과에는 '시뮬레이션'으로 표시되고 회복 그래프에는 넣지 않습니다.</p>
-            </details>
-        </div>
-
-        <div class="card" id="last-card" hidden>
-            <h2>방금 잰 결과</h2>
-            <div id="last"></div>
-        </div>
-
-        <div class="card">
-            <h2>📋 내 회차</h2>
+    <div class="dash-more">
+        <details id="runs-box" open>
+            <summary>🗂 측정 회차 · 손목 맥박 비교 · CSV <span id="runs-sum" class="note"></span></summary>
+            <p class="note">측정 한 번이 회차 하나로 이 기기에 남습니다. 손목 맥박을 15초 동안 센 수를 넣으면 ×4 해서 비교해요.</p>
             <ul id="runs" class="hr-runs"></ul>
             <p id="runs-empty" class="note">아직 잰 회차가 없어요.</p>
             <div class="row">
                 <button id="csv-all" class="info" disabled>⬇ 원본 CSV (모든 회차)</button>
                 <label class="btn secondary file">📂 CSV 불러오기<input type="file" id="csv-in" accept=".csv,.txt,text/csv" multiple hidden></label>
             </div>
-            <p class="note">원본 CSV 열: t_s(초), R, G, Y(밝기), exposureTime(노출 시간, 100 µs 단위), iso. phyphox 같은 다른 앱의 CSV(Time·Luma·Shutter Speed·ISO 열)도 불러와 같은 방법으로 계산할 수 있어요.</p>
-        </div>
-        <div class="step-next"><button class="secondary" data-go="procedure">← 이전: 4. 과정</button><button data-go="result">다음: 6. 결과 →</button></div>
-    </section>
+            <p class="note">원본 CSV 열: t_s(초), R, G, Y(화면 밝기 0~255), Y_corr(노출 보정 밝기), exposureTime(노출 시간, 100 µs 단위), iso, locked(노출 고정 1/0). phyphox CSV(Time·Luma·Shutter Speed·ISO)도 불러와 같은 방법으로 계산합니다.</p>
+        </details>
 
-    <!-- ===================== 6. 결과 ===================== -->
-    <section class="step-panel" data-step="result" hidden>
-        <div class="card">
-            <h2>📈 운동 뒤 회복 그래프</h2>
-            <p class="note">가로축: '운동 직후' 회차부터 지난 시간(분, 없으면 첫 회차부터), 세로축: 카메라로 잰 심박수. 같은 조 기기에서 불러온 기록도 함께 그립니다(시뮬레이션은 빼요).</p>
-            <canvas id="rec" class="chart" aria-label="회복 그래프"></canvas>
-            <div id="rec-legend" class="legend"></div>
-            <div class="tbl-wrap"><table id="rec-table"><thead><tr><th>기록</th><th>회차</th><th>분</th><th>카메라</th><th>손목</th><th>신뢰도</th></tr></thead><tbody></tbody></table></div>
-            <div class="row"><button id="rec-csv" class="info">⬇ 결과 표 CSV</button></div>
-        </div>
-        <div class="card">
-            <h2>🔍 회차 자세히 보기</h2>
+        <details id="detail-box">
+            <summary>🔍 회차 자세히 (맥파·봉우리·주파수·노출 보정 전후)</summary>
             <div class="row"><label class="grow">회차 <select id="pick" class="wide"></select></label></div>
-            <div id="detail-empty" class="note">회차를 재거나 불러오면 여기서 맥파·봉우리·주파수를 볼 수 있어요.</div>
+            <div id="detail-empty" class="note">회차를 재면 여기서 볼 수 있어요.</div>
             <div id="detail" hidden>
                 <div class="results" id="res-grid"></div>
                 <div id="res-why"></div>
                 <h3>맥파와 찾은 봉우리</h3>
                 <canvas id="res-wave" class="chart" aria-label="맥파와 봉우리"></canvas>
-                <h3>주파수 분석 (가장 센 빠르기)</h3>
+                <h3>주파수 분석</h3>
                 <canvas id="res-spec" class="chart small" aria-label="주파수 분석"></canvas>
+                <div id="cmp-box">
+                    <h3>노출 보정 전·후 비교</h3>
+                    <p class="note">위: 원래 밝기로 거른 맥파(회색)와 노출 보정 뒤 맥파(빨강), 아래: 노출(exposureTime × ISO, 처음 값 = 1).</p>
+                    <canvas id="res-cmp" class="chart" aria-label="보정 전후 맥파"></canvas>
+                    <canvas id="res-exp" class="chart small" aria-label="노출 값"></canvas>
+                </div>
                 <div class="row"><button id="res-csv" class="info">⬇ 이 회차 원본 CSV</button></div>
             </div>
-        </div>
-        <div class="step-next"><button class="secondary" data-go="data">← 이전: 5. 데이터</button><button data-go="conclusion">다음: 7. 결론 →</button></div>
-    </section>
+        </details>
 
-    <!-- ===================== 7. 결론 ===================== -->
-    <section class="step-panel" data-step="conclusion" hidden>
-        <div class="card">
-            <h2>7. 결론 및 검토</h2>
-            <p class="note">보고서에 손으로 씁니다.</p>
+        <details class="sim">
+            <summary>🧪 카메라 없이 시뮬레이션</summary>
+            <div class="row">
+                <label>가짜 심박수 <input type="number" id="sim-bpm" value="67" min="36" max="210" step="1"> 회/분</label>
+                <label class="chk"><input type="checkbox" id="sim-exp"> 노출이 고정 안 된 폰 (노출이 분당 40회로 출렁임)</label>
+            </div>
+            <div class="row"><button id="sim" class="secondary">🧪 가짜 측정 만들기</button></div>
+            <p class="note">계산으로 만든 맥파(잡음·고르지 않은 간격·중복맥파 포함)를 지금 고른 길이로 저장합니다. '노출이 고정 안 된 폰'을 고르면 노출 보정이 어떻게 가짜 박동을 없애는지 볼 수 있어요.</p>
+        </details>
+
+        <details>
+            <summary>📖 재는 법 · 원리 · 알아 두기</summary>
             <ol class="text-list">
-                <li>안정 시와 운동 직후의 심박수는 각각 얼마였나요? 운동 직후 몇 % 늘었나요?</li>
-                <li>운동을 멈춘 뒤 1분 동안과 그 뒤 2분 동안 심박수가 떨어진 빠르기를 비교해 보세요. 왜 그럴까요?</li>
-                <li>조원들의 회복 그래프는 어떻게 다른가요? 차이가 생긴 까닭을 추측해 보세요.</li>
-                <li>카메라 값과 손목 맥박 값의 오차는 몇 % 였나요? 어느 쪽을 더 믿을 수 있나요? 그 근거는?</li>
-                <li>신뢰도가 낮았던 회차가 있었다면 그 까닭(움직임·누르는 힘·밝기·노출 출렁임)은 무엇이었나요?</li>
-                <li>노출을 고정하지 않으면 어떤 문제가 생길 수 있는지 2-4 를 바탕으로 설명해 보세요.</li>
+                <li>📷 <b>카메라 켜기</b> → 카메라 권한 허용 (https 주소에서만 됩니다).</li>
+                <li><b>검지 끝</b>으로 뒤 카메라를 살짝 눌러 <b>완전히</b> 덮습니다. 너무 세게 누르면 피가 안 통해 맥파가 약해져요. 밝은 곳(창가)이면 플래시 없이도 됩니다.</li>
+                <li>품질이 🟢 이면 ▶ <b>측정 시작</b>. 처음 3초 동안 노출을 맞추고 <b>잠근 뒤 1.5초 동안 정말 안 바뀌는지 확인</b>합니다.</li>
+                <li>측정하는 동안 말하거나 움직이지 않습니다. 폰을 책상에 놓고 손가락만 올려도 좋아요.</li>
             </ol>
-            <div class="row"><button id="btn-send2" class="good">📤 선생님께 보내기</button><button id="btn-print" class="secondary">🖨 인쇄 · PDF</button></div>
-            <p id="send2-status" class="note"></p>
+            <p><b>원리 (광용적맥파, PPG)</b>: 심장이 수축하면 손가락 끝 혈관에 피가 많아져 빛을 더 흡수하므로 조금 어두워집니다. 고르지 않은 사진 간격을 1/30초로 맞추고(보간), 느린 변화를 뺀 뒤 분당 36~210회 빠르기만 남겨, <b>주파수 분석(FFT)·자기상관·봉우리 간격</b> 세 방법으로 주기를 찾습니다. 셋이 맞을수록 신뢰도가 높습니다. 심박수(회/분) = 60 ÷ 박동 간격(초).</p>
+            <p><b>노출</b>: 카메라는 어두워지면 셔터를 길게 열고 감도(ISO)를 올려 밝기를 스스로 맞춥니다(자동 노출). 그러면 맥박 때문에 생긴 작은 밝기 변화가 지워지거나, 자동 노출이 스스로 출렁여 가짜 박동을 만듭니다. 그래서 먼저 <b>노출 고정</b>을 시도하고,</p>
+            <ul class="text-list">
+                <li>🔒 <b>고정됨</b>: 밝기 그대로 계산</li>
+                <li>⚠ <b>고정 안 됨</b>: 프레임마다 노출 시간·ISO 를 기록해, 화면 밝기를 빛의 세기(선형)로 바꾼 뒤 <b>노출(노출 시간 × ISO)로 나눠 보정</b>하고 계산</li>
+                <li>⚠ <b>노출 값을 못 읽는 폰</b>(아이폰 등): 원래 밝기로 계산하고 '노출 출렁임 가능성'을 알립니다</li>
+            </ul>
+            <div class="ok">🔒 <b>개인정보</b>: 이름을 받지 않고, 영상은 저장·전송하지 않습니다. 밝기 숫자와 결과만 이 기기에 남습니다.</div>
             <p class="note">수업용 측정이에요. 의료 진단에 쓰지 않습니다. 심박수가 걱정되면 보건 선생님께 여쭤 보세요.</p>
-        </div>
-        <div class="step-next"><button class="secondary" data-go="result">← 이전: 6. 결과</button></div>
-    </section>
-</div>
-<script src="../js/pendulum-config.js"></script>
-<script src="../js/pendulum-cloud.js"></script>
-<script src="../js/class-cloud.js"></script>
-<script src="../js/class-share.js"></script>
+        </details>
+    </div>
+</main>
 <script src="../js/heart-rate-math.js"></script>
-<script src="../js/heart-rate-share.js"></script>
 <script src="../js/heart-rate.js"></script>
 </body>
 </html>
