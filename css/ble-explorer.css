@@ -1,0 +1,107 @@
+/* 블루투스 센서 해석 도구 (projects/ble-explorer.html) — 공통 css/lab-base.css 위에 이 페이지만 필요한 것 */
+body { padding: var(--sp-3) var(--sp-4); }
+.bx { max-width: var(--w-dash); margin: 0 auto; }
+.bx h1 { font-size: var(--fs-h1); margin: var(--sp-1) 0 var(--sp-2); }
+.bx h2 { font-size: var(--fs-h2); margin: var(--sp-3) 0 var(--sp-2); }
+.bx h3 { font-size: var(--fs-base); margin: var(--sp-3) 0 var(--sp-1); }
+.bx-top { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2); margin: 0; flex-wrap: wrap; }
+.dev-badge {
+    display: inline-block; padding: 2px var(--sp-2); border-radius: 999px; font-size: var(--fs-sm); font-weight: 700;
+    background: var(--c-warn-bg); color: var(--c-warn-text); border: 1px solid currentColor;
+}
+.lead { margin: 0 0 var(--sp-2); color: var(--c-muted); font-size: var(--fs-sm); }
+.note { color: var(--c-muted); font-size: var(--fs-sm); font-weight: 400; }
+.mono, .bytes td, .log td.hex { font-family: var(--font-mono); }
+
+.bx-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3); background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card);
+}
+.bx-bar .dash-status { flex: 1 1 100%; }
+.bx-bar .dash-status.ok { color: var(--c-ok-text); }
+.bx-bar .dash-status.error { color: var(--c-err-text); }
+.bx-count { font-size: var(--fs-sm); color: var(--c-muted); margin-left: auto; }
+
+/* 단추 */
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: var(--tap);
+    padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); border: 1px solid var(--c-line);
+    background: var(--c-card); color: var(--c-text); font-size: var(--fs-base); cursor: pointer;
+}
+.btn:disabled { opacity: .55; }
+.btn.primary { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+.btn.danger { background: var(--c-danger); border-color: var(--c-danger); color: #fff; }
+.btn.info { background: var(--c-info); border-color: var(--c-info); color: #fff; }
+.btn.on { background: var(--c-success); border-color: var(--c-success); color: #fff; }
+.btn.small { min-height: var(--tap); padding: 4px var(--sp-2); font-size: var(--fs-sm); }
+.file-btn { cursor: pointer; }
+.row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin: var(--sp-2) 0; }
+.inline { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); }
+.inline input[type="checkbox"], .chk-list input { width: 20px; height: 20px; }
+
+label { display: block; margin-top: var(--sp-2); font-size: var(--fs-sm); }
+label.inline, label.btn { margin-top: 0; }
+input[type="text"], input[type="number"], textarea, select {
+    width: 100%; min-height: var(--tap); padding: var(--sp-2); font-size: var(--fs-base);
+    border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-card); color: var(--c-text);
+}
+.row select, .row input[type="number"] { width: auto; flex: 1 1 160px; min-width: 0; }
+textarea { font-family: var(--font-mono); font-size: var(--fs-sm); }
+
+.card, .box { background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-3); margin: var(--sp-2) 0; }
+.box { background: var(--c-fill); }
+.box.warn { background: var(--c-warn-bg); color: var(--c-warn-text); border-color: transparent; }
+.box.ok { background: var(--c-ok-bg); color: var(--c-ok-text); border-color: transparent; }
+.box:empty { display: none; }
+details.card > summary { cursor: pointer; min-height: var(--tap); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.warn-box { border-color: var(--c-danger); }
+.chk-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 var(--sp-3); }
+.chk-list label { display: flex; gap: 6px; align-items: center; min-height: var(--tap); margin: 0; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px var(--sp-3); margin: 0; font-size: var(--fs-sm); }
+.kv dt { color: var(--c-muted); }
+.kv dd { margin: 0; word-break: break-all; }
+
+/* 서비스·특성 나무 */
+.tree .svc { border-left: 3px solid var(--c-primary); padding: var(--sp-1) 0 var(--sp-1) var(--sp-2); margin: var(--sp-2) 0; }
+.tree .svc-head { font-weight: 700; word-break: break-all; }
+.tree .chr { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); padding: var(--sp-1) 0 var(--sp-1) var(--sp-3); border-top: 1px dashed var(--c-line); }
+.tree .chr-name { flex: 1 1 200px; min-width: 0; font-size: var(--fs-sm); word-break: break-all; }
+.tree .props { font-size: .75rem; color: var(--c-muted); }
+.tree .val { flex: 1 1 100%; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--c-muted); word-break: break-all; }
+
+/* 표 */
+.tbl-wrap { overflow-x: auto; max-width: 100%; border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-card); margin: var(--sp-1) 0 var(--sp-2); max-height: 50vh; }
+table { border-collapse: collapse; width: 100%; font-size: var(--fs-sm); }
+th, td { padding: 4px 6px; border-bottom: 1px solid var(--c-line); text-align: left; white-space: nowrap; }
+thead th { position: sticky; top: 0; background: var(--c-fill); z-index: 1; }
+.bytes th, .bytes td { text-align: right; }
+.bytes .chg, mark.chg, .hex .chg { background: var(--c-warn-bg); color: var(--c-warn-text); font-weight: 700; }
+.bytes th.chg { border-bottom: 3px solid var(--c-warn-text); }
+.log td.hex { white-space: normal; word-break: break-all; min-width: 12em; }
+.chg-summary { font-size: var(--fs-sm); }
+.chg-summary p { margin: var(--sp-1) 0; }
+
+/* 필드 편집 */
+.field-list { display: grid; gap: var(--sp-2); }
+.field {
+    display: grid; gap: var(--sp-1) var(--sp-2); grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: var(--sp-2); border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-card);
+}
+.field label { margin: 0; }
+.field .full { grid-column: 1 / -1; }
+.field .fval { grid-column: 1 / -1; font-family: var(--font-mono); color: var(--c-primary); font-weight: 700; }
+@media (min-width: 900px) { .field { grid-template-columns: 1.4fr .7fr 1.6fr .8fr .8fr .7fr .8fr auto; align-items: end; } .field .full, .field .fval { grid-column: auto; } }
+
+.chart-box { position: relative; height: var(--chart-h); background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-2); }
+.saved { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--sp-1); }
+.saved li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-2); border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-card); }
+.saved li b { flex: 1 1 160px; min-width: 0; }
+.pre { white-space: pre-wrap; word-break: break-all; font-size: .78rem; max-height: 40vh; overflow: auto; background: var(--c-fill); padding: var(--sp-2); border-radius: var(--r-ctl); }
+.legal li { margin-bottom: var(--sp-1); }
+
+@media (max-width: 639px) {
+    body { padding: var(--sp-2) var(--sp-3); }
+    .bx-bar .btn { font-size: var(--fs-sm); padding: var(--sp-2); }
+}
+/* 맨 위 다섯 탭: 휴대폰에서도 한 줄, 낱말 중간에서 줄바꿈하지 않게 */
+#bxTabs button { white-space: nowrap; padding-left: 2px; padding-right: 2px; letter-spacing: -.02em; }
