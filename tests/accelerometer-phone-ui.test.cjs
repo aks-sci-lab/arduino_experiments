@@ -4,70 +4,8 @@
 // Playwright 가 없는 컴퓨터에서는 건너뛴다.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('node:http');
-const fs = require('node:fs');
-const path = require('node:path');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
-
-let chromium = null, devices = null;
-try { ({ chromium, devices } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
-const ROOT = path.join(__dirname, '..');
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
-const CHART_STUB = `
-window.Chart = class Chart {
-  constructor(el, cfg) { this.config = cfg; this.data = cfg.data; this.options = cfg.options || {}; window.__charts = (window.__charts || []).concat(this);
-    this.scales = { x: { getPixelForValue: () => 0, getValueForPixel: () => 0 } }; this.chartArea = { left: 0, right: 1, top: 0, bottom: 1 }; }
-  update() {} destroy() {} resize() {}
-};
-window.Chart.helpers = { getRelativePosition: () => ({ x: 0, y: 0 }) };`;
-const QR = 'window.qrcode=function(){return{addData(){},make(){},createSvgTag(){return "<svg viewBox=\\"0 0 10 10\\"></svg>"}}};';
-
-function servers(app) {
-    const api = http.createServer((req, res) => {
-        const send = o => { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(o)); };
-        const u = new URL(req.url, 'http://x');
-        if (req.method === 'GET') return send(app.get(Object.fromEntries(u.searchParams)));
-        let b = ''; req.on('data', c => { b += c; }); req.on('end', () => send(app.post(b)));
-    });
-    const site = http.createServer((req, res) => {
-        const file = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-        if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
-        res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
-        fs.createReadStream(file).pipe(res);
-    });
-    return Promise.all([api, site].map(s => new Promise(r => s.listen(0, '127.0.0.1', r)))).then(() => ({
-        api, site, API: 'http://127.0.0.1:' + api.address().port + '/exec', BASE: 'http://127.0.0.1:' + site.address().port
-    }));
-}
-
-async function open(browser, S, opt, name, errors) {
-    const ctx = await browser.newContext(opt);
-    await ctx.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.PENDULUM_CONFIG={appsScriptUrl:${JSON.stringify(S.API)},pollSeconds:3};` }));
-    await ctx.route(/^https:\/\/(cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|www\.gstatic\.com)\//, r => {
-        const u = r.request().url();
-        r.fulfill({ contentType: 'text/javascript', body: /chart\.umd/.test(u) ? CHART_STUB : /qrcode/.test(u) ? QR : '' });
-    });
-        // 시험 브라우저의 Pixel 7 흉내는 동작 센서 허용 창(requestPermission)이 늘 '거절'이라 '허용'으로 바꿔 둔다
-    await ctx.addInitScript(() => {
-        if (typeof window.DeviceMotionEvent === 'undefined') window.DeviceMotionEvent = class extends Event {};
-        if (typeof window.DeviceMotionEvent.requestPermission === 'function') window.DeviceMotionEvent.requestPermission = async () => 'granted';
-    });
-    const page = await ctx.newPage();
-    page.on('pageerror', e => errors.push(name + ': ' + e.message));
-    return { ctx, page };
-}
-const overflow = page => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-const smallButtons = page => page.evaluate(() => [...document.querySelectorAll('button, select, .cs-btn')]
-    .filter(e => e.offsetParent && !e.closest('table, .steps') && e.getBoundingClientRect().height < 43.5).map(e => e.id || e.textContent.trim()));
-async function phoneLink(L, group) {
-    await L.fill('#cs-group', group);
-    await L.waitForTimeout(300);
-    await L.click('#cs-phone');
-    await L.waitForSelector('.cs-dlg:not([hidden]) #cs-plink', { state: 'attached' });
-    const link = await L.getAttribute('#cs-plink', 'href');
-    await L.keyboard.press('Escape').catch(() => {});
-    return link;
-}
+const H = require('./accelerometer-ui-helpers.cjs');
+const { loadCodeGs, chromium, devices, servers, open, overflow, smallButtons, phoneLink } = H;
 
 test('📱 스마트폰 가속도: 폰에서 3회 → 1·3회만 보내기 → 노트북에 📱 폰 기록, 📈 보기', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
     const app = loadCodeGs(), S = await servers(app), browser = await chromium.launch(), errors = [];

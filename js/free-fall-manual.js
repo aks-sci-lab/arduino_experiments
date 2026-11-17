@@ -124,9 +124,11 @@ function measuredRows() {
 
 function renderDataTable() {
     const body = document.getElementById('data-table-body');
-    const rows = measuredRows().slice().sort((a, b) => a.t - b.t);
+    // 📈 보기로 고른 회차(폰에서 온 회차 포함)가 있으면 그 점, 아니면 지금 찍은 점
+    const v = typeof viewRun !== 'undefined' ? viewRun : null;
+    const rows = (v ? v.rows : measuredRows()).slice().sort((a, b) => a.t - b.t);
     if (rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="4" style="text-align:center">아직 찍은 점이 없습니다.</td></tr>';
+        body.innerHTML = '<tr><td colspan="4" style="text-align:center">' + (isLaptop() ? '아직 들어온 회차가 없습니다. 위 QR 로 폰에서 측정해 보내세요.' : '아직 찍은 점이 없습니다.') + '</td></tr>';
         return;
     }
     body.innerHTML = rows.map((r, i) =>
@@ -951,6 +953,17 @@ let share = null, currentStep = 'purpose', steps = null, role = 'laptop';
 let videoTag = Date.now().toString(36);     // 지금 연 영상 (새 영상을 추출할 때 바뀜)
 let viewRun = null;                         // 📈 보기로 띄운 회차 { key, who, title, mode, rows, mmPerPx }
 
+// 기기 종류 (js/lab-ui.js 의 LabUI.device): 노트북·PC 는 분석만, 폰은 측정, 태블릿은 둘 다
+function isLaptop() {
+    return document.documentElement.classList.contains('device-laptop');
+}
+// 노트북의 QR 로 연 화면(?role=phone)은 터치가 없는 브라우저여도 폰 화면으로 (이 페이지에서만, 기억하지 않음)
+function forcePhoneView() {
+    const html = document.documentElement;
+    if (!html.classList.contains('device-laptop')) return;
+    html.classList.remove('device-laptop'); html.classList.add('device-phone'); html.setAttribute('data-device', 'phone');
+}
+
 function setRun(mode, rows, mmPerPx, fit) {
     if (!rows.length) return;
     const id = 'v' + videoTag + (mode === 'projectile' ? 'p' : 'f');
@@ -978,6 +991,7 @@ function shareItems() {
 // 📈 보기: 고른 회차로 6. 결과의 그래프·맞춤을 다시 그림 (null 이면 지금 찍은 점으로)
 function setViewRun(v) {
     viewRun = v;
+    renderDataTable();
     const bar = document.getElementById('view-bar');
     if (bar) {
         bar.hidden = !v;
@@ -1046,6 +1060,7 @@ function initShare() {
             onRole: r => {
                 role = r;
                 document.body.classList.toggle('is-phone', r === 'phone');
+                if (r === 'phone') forcePhoneView();
                 if (steps && r === 'phone') steps.show('data');
             },
             deleteItem: id => deleteRun(id),
@@ -1057,10 +1072,18 @@ function initShare() {
                     return v ? Object.assign(v, { mmPerPx: it.data && it.data.mmPerPx }) : null;
                 });
                 if (!r.changed) return false;
+                const old = incomingFF;
                 incomingFF = r.store;
                 writeJson(IN_KEY, incomingFF);
                 if (viewRun && viewRun.key.startsWith('in:') && !incomingFF[viewRun.key.slice(3)]) setViewRun(null);
                 renderGroupResults();
+                // 💻 노트북: 폰에서 새로 온 회차를 바로 표·그래프·결과로 (내 점을 찍고 있지 않을 때)
+                const fresh = Object.keys(r.store).filter(k => /^p/.test(String(r.store[k].device || '')) && (!old[k] || String(old[k].sentAt) !== String(r.store[k].sentAt)));
+                if (isLaptop() && fresh.length && (!viewRun || viewRun.key.startsWith('in:'))) {
+                    const k = fresh[fresh.length - 1], it = incomingFF[k];
+                    showRun({ key: 'in:' + k, who: '📥 ' + it.from, title: it.title, mode: it.mode, rows: it.rows, mmPerPx: it.mmPerPx });
+                    return true;
+                }
                 if (((analysisDone && dataPoints.length > 0) || viewRun) && typeof Chart !== 'undefined') drawGraph();
                 return true;
             },
@@ -1135,6 +1158,18 @@ btnReset.addEventListener('click', () => { location.reload(); });
 
     share = initShare();
     renderGroupResults();
+    // 💻 노트북·PC 는 측정 없이 분석만: 5. 데이터 맨 위에 '📱 폰으로 측정해 보내기' QR 카드 (폰·태블릿에서는 숨김이라 만들지 않음 — 조 코드를 저절로 만들기 때문)
+    let cardOn = false;
+    const syncDevice = () => {
+        if (share && isLaptop() && !cardOn) {
+            cardOn = true; share.phoneCard('#phone-card');
+            const sh = document.getElementById('cs-share'); if (sh) sh.open = false;   // 조 공유 칸은 접어 QR 카드가 먼저 보이게
+        }
+        renderDataTable();
+    };
+    if (window.LabUI && LabUI.deviceSwitch) LabUI.deviceSwitch('#device-switch');
+    window.addEventListener('lab-device', syncDevice);
+    syncDevice();
     if (window.LabUI && LabUI.initSteps) {
         steps = LabUI.initSteps({
             key: 'free-fall',

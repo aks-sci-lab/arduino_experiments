@@ -56,6 +56,7 @@
         #group-table td.acts { white-space: nowrap; }
         #group-table td.acts button { margin: 2px; }
         #group-table td.acts .del { background: var(--c-danger); }
+        #device-switch .device-switch { white-space: nowrap; margin-bottom: var(--sp-2); }
         .phone-only { display: none; }
         body.is-phone .phone-only { display: block; }
         .phone-only ol { margin: var(--sp-1) 0 0; padding-left: 1.3em; }
@@ -187,6 +188,7 @@
 <body>
     <main class="container">
         <h1>자유낙하 및 2차원 운동 분석</h1>
+        <div id="device-switch"></div>
         <!-- 수업 참여 띠 (?c=수업코드 일 때만): js/class-share.js 가 채움 -->
         <div id="class-bar-mount"></div>
         <p class="note">스마트폰 영상에서 물체의 중심을 직접 골라 다중섬광사진을 만들고, 위치–시간 그래프로 운동을 분석합니다.</p>
@@ -295,6 +297,8 @@
         <!-- ===== 5. 데이터 ===== -->
         <section class="step-panel" data-step="data" role="tabpanel" hidden>
             <h2>5. 데이터 <small class="note" id="data-mode-label">(자유낙하)</small></h2>
+            <!-- 💻 노트북·PC: 측정(영상 찍기·점 찍기)은 폰에서 — 폰 측정 · 노트북 분석 이원화 (AGENTS.md UI 규칙) -->
+            <div id="phone-card" class="show-on-laptop"></div>
             <!-- 👥 조 공유 (구글 로그인 없이 조 코드로 선생님 시트에 보내기·같은 조 노트북에서 불러오기): js/class-share.js 가 채움 -->
             <div id="share-mount"></div>
 
@@ -310,6 +314,11 @@
                 </ol>
             </div>
 
+            <p class="box show-on-laptop" id="laptop-note">💻 이 노트북에서는 <b>분석만</b> 합니다. 위 QR 을 폰으로 찍어 폰에서 영상을 찍고 점을 찍은 뒤, 보낼 회차를 골라 📤 보내면 아래 표와 6. 결과에 들어옵니다.
+                영상 파일을 이 기기에서 직접 열어 점을 찍으려면 맨 위 '이 기기'를 <b>태블릿</b>으로 바꾸세요.</p>
+
+            <!-- 측정 (폰·태블릿) -->
+            <div class="hide-on-laptop">
             <!-- 영상 로드 -->
             <div class="controls">
                 <input type="file" id="video-upload" accept="video/*">
@@ -374,6 +383,8 @@
             </div>
 
             <!-- 측정값 표 -->
+            </div>
+
             <h3>측정값 표</h3>
             <p class="note" id="table-note">t 는 첫 프레임부터 지난 시간, x·y 는 화면 왼쪽 위를 원점으로 한 위치(아래가 +)입니다.</p>
             <div class="table-wrap">
@@ -384,7 +395,7 @@
             </div>
 
             <!-- 합성된 다중섬광사진 -->
-            <div id="strobo-container">
+            <div id="strobo-container" class="hide-on-laptop">
                 <h2>합성된 다중섬광사진</h2>
                 <canvas id="canvas-strobo"></canvas>
                 <button id="btn-download-strobo" style="background-color: var(--c-info);">🖼️ 사진 다운로드</button>
@@ -397,6 +408,7 @@
         <!-- ===== 6. 결과 ===== -->
         <section class="step-panel" data-step="result" role="tabpanel" hidden>
             <h2>6. 결과</h2>
+            <p class="box phone-only">📱 분석은 노트북의 6. 결과에서 합니다(보낸 회차가 그쪽에 들어가요). 여기서는 확인만 해도 됩니다.</p>
             <p class="box" id="result-empty">아직 결과가 없습니다. 5. 데이터에서 점을 찍고 '✓ 합성 실행'을 누르세요.</p>
 
             <!-- 📈 보기로 다른 회차(내 예전 회차·📥 받은 회차)를 띄웠을 때 -->

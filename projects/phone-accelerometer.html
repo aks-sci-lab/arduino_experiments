@@ -53,12 +53,18 @@
         .in-list .sm { color: var(--c-muted); font-size: var(--fs-sm); }
         .in-list li.on b { color: var(--c-primary); }
         .in-list li.new { background: var(--c-warn-bg); }
+        #device-switch .device-switch { white-space: nowrap; margin-bottom: var(--sp-1); }
+        /* 노트북: 지금 값 카드가 없으니 그래프를 한 칸 전체로 */
+        html.device-laptop .dash-grid { grid-template-columns: minmax(0, 1fr); }
+        /* 노트북의 QR 로 연 폰 화면: 측정·회차 고르기만 (불러온 기록 분석은 노트북에서) */
+        body.is-phone #in-box { display: none !important; }
     </style>
 </head>
 <body>
     <main class="dash">
         <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
         <h1>스마트폰 가속도 센서 실험</h1>
+        <div id="device-switch"></div>
         <!-- 수업 참여 띠 (?c=수업코드 일 때만): js/class-share.js 가 채움 -->
         <div id="class-bar-mount"></div>
         <p class="lead">스마트폰 안의 가속도 센서 값을 기록해 그래프로 보고, 필요한 구간만 골라 같은 조·선생님과 나눕니다.</p>
@@ -66,16 +72,20 @@
         <!-- 상태 + 주요 단추 (위에 붙어 있음) -->
         <div class="dash-bar">
             <span id="record-status" class="dash-status" role="status" aria-live="polite">⏸ 대기 중</span>
-            <button id="btn-start" class="btn-primary" title="아이폰은 처음에 동작 센서 허용 창이 뜹니다">▶ 시작 (센서 허용)</button>
-            <button id="btn-stop" class="btn-danger" disabled>■ 중지</button>
+            <button id="btn-start" class="btn-primary hide-on-laptop" title="아이폰은 처음에 동작 센서 허용 창이 뜹니다">▶ 시작 (센서 허용)</button>
+            <button id="btn-stop" class="btn-danger hide-on-laptop" disabled>■ 중지</button>
             <button id="btn-download" class="btn-info" disabled>CSV 다운로드</button>
         </div>
+
+        <!-- 💻 노트북·PC: 측정은 폰에서 — 폰 측정 · 노트북 분석 이원화 (AGENTS.md UI 규칙). QR 카드는 js/class-share.js 가 채움 -->
+        <div id="phone-card" class="show-on-laptop"></div>
+        <p class="note show-on-laptop" id="laptop-note">💻 이 노트북에서는 <b>분석만</b> 합니다. 위 QR 을 폰으로 찍어 폰에서 '▶ 시작 → ■ 중지'로 여러 번 재고, 보낼 회차를 골라 📤 보내면 아래 그래프와 '📥 같은 조에서 불러온 기록'에 들어옵니다. 이 기기로 직접 재려면 맨 위 '이 기기'를 바꾸세요.</p>
 
         <div id="sensor-warning" role="alert">⚠️ 센서 데이터가 수신되지 않고 있습니다. https 주소로 접속했는지, 브라우저의 동작 센서 권한이 허용되어 있는지 확인하고 기기를 움직여보세요.</div>
 
         <!-- 큰 숫자(왼쪽) + 그래프·구간 선택(오른쪽), 휴대폰에서는 위아래 -->
         <div class="dash-grid">
-            <div class="dash-readouts" aria-label="지금 값">
+            <div class="dash-readouts hide-on-laptop" aria-label="지금 값">
                 <div class="dash-card"><span class="label">Ax</span><span id="ax" class="value num">0.00</span><span class="unit">g</span></div>
                 <div class="dash-card"><span class="label">Ay</span><span id="ay" class="value num">0.00</span><span class="unit">g</span></div>
                 <div class="dash-card"><span class="label">Az</span><span id="az" class="value num">0.00</span><span class="unit">g</span></div>
