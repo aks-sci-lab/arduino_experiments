@@ -42,3 +42,9 @@ html.big-view .cs-dlg { zoom: calc(1 / 1.35); }
 .cs-link { font-size: var(--fs-sm); word-break: break-all; }
 .cs-dlg .cs-row { justify-content: center; }
 .cs-row:has(> [hidden]:only-child) { display: none; }
+
+/* 📱 노트북의 '폰으로 측정해 보내기' 카드 (share.phoneCard) — 폰 측정 · 노트북 분석 이원화 */
+.cs-phonecard .cs-pcard { display: flex; gap: var(--sp-3, 16px); align-items: center; flex-wrap: wrap; }
+.cs-phonecard .cs-qr { width: min(220px, 70vw); margin: 0; flex: 0 0 auto; }
+.cs-phonecard .cs-pcard-txt { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.cs-phonecard .cs-pcard-txt p { margin: 0 0 var(--sp-1, 6px); }

@@ -168,6 +168,7 @@
         function setStatus(html, err) { if (!els.status) return; els.status.innerHTML = html; els.status.classList.toggle('cs-err', !!err); }
         function incoming() { return typeof opts.incomingCount === 'function' ? opts.incomingCount() : 0; }
         function render() {
+            if (cardEl && !PHONE) renderCard();
             if (!mount) return;
             if (document.activeElement !== els.group) els.group.value = st.group;
             if (document.activeElement !== els.ban) els.ban.value = st.ban;
@@ -354,6 +355,7 @@
                 .then(function (r) { els.cmsg.innerHTML = r.ok ? '' : '⚠ 선생님께 진행 상황을 보내지 못했습니다: ' + esc(r.error); });
         }
         function renderBar() {
+            if (cardEl) renderCard();
             if (!bar) return;
             var i = cls.info, me = cls.me;
             if (!i) return;
@@ -574,8 +576,52 @@
             render(); pull(true);
         }
         if (els.phone) els.phone.addEventListener('click', function () { openPhone(); });
+        // 📱 노트북 화면의 '폰으로 측정해 보내기' 카드 (폰 측정 · 노트북 분석 이원화, AGENTS.md UI 규칙)
+        //  share.phoneCard(자리): QR 을 대화창 없이 그 자리에 크게. 조 코드가 없으면 이 노트북용 조 코드를 저절로 만든다
+        //  (반·조를 넣어 두었으면 그 반·조로, 없으면 99반 아무 조). 수업(?c=)이면 수업 참여 뒤에 나온다.
+        var cardEl = null, cardBusy = false;
+        function autoGroup() {
+            if (groupOk() || CLASS) return groupOk();
+            var code = PCF.makeGroupCode(st.ban, st.jo) || PCF.makeGroupCode(99, 1 + Math.floor(Math.random() * 99));
+            setGroup(code, true);
+            return groupOk();
+        }
+        function renderCard() {
+            if (!cardEl || cardBusy) return;
+            cardBusy = true;
+            try { return drawCard(); } finally { cardBusy = false; }
+        }
+        function drawCard() {
+            if (PHONE) { cardEl.hidden = true; return; }
+            cardEl.hidden = false;
+            if (!SERVER.url) { cardEl.innerHTML = '<p class="cs-note">⚠ 선생님 시트가 아직 연결되지 않아 폰에서 바로 보낼 수 없어요. 폰에서 CSV 로 저장해 이 노트북에서 불러오세요.</p>'; return; }
+            if (CLASS && !cls.me) { cardEl.innerHTML = '<p class="cs-note">위 🏫 수업 참여에서 조·번호를 고르면 폰용 QR 이 나와요.</p>'; return; }
+            if (!autoGroup()) return;
+            var link = phoneLink();
+            if (cardEl.dataset.link === link && document.getElementById('cs-cardqr')) return;
+            cardEl.dataset.link = link;
+            cardEl.innerHTML = '<div class="cs-pcard"><div class="cs-qr" id="cs-cardqr"></div><div class="cs-pcard-txt">' +
+                '<p><b>폰 카메라로 QR 을 찍으세요.</b> 폰에서 측정하고 보낼 회차를 골라 📤 보내면 몇 초 안에 이 노트북에 들어와요.</p>' +
+                '<p class="cs-note">조 코드 <b>' + esc(st.group) + '</b> · <a target="_blank" rel="noopener" href="' + esc(link) + '">폰 주소</a></p>' +
+                '<p class="cs-note" id="cs-cardst">⏳ 폰에서 오는 측정을 기다리는 중</p></div></div>';
+            if (!st.auto) { st.auto = true; saveSt(); render(); }
+            pull(true);
+            ensureQr().then(function (ok) {
+                var box = document.getElementById('cs-cardqr');
+                if (!box || cardEl.dataset.link !== link) return;
+                if (ok) { var qr = window.qrcode(0, 'M'); qr.addData(link); qr.make(); box.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 3, scalable: true }); }
+                else box.innerHTML = '<p class="cs-note">QR 도구를 불러오지 못했어요(인터넷 확인). 위 폰 주소를 폰에서 열어도 돼요.</p>';
+            });
+        }
+        function phoneCard(where) {
+            cardEl = typeof where === 'string' ? document.querySelector(where) : where;
+            if (cardEl) cardEl.classList.add('cs-card', 'cs-phonecard');
+            renderCard();
+            return cardEl;
+        }
         function notifyPhone(n) {
             if (typeof opts.onPhoneData === 'function') { try { opts.onPhoneData(n); } catch (e) { /* 무시 */ } }
+            var cst = document.getElementById('cs-cardst'); if (cst) cst.innerHTML = '🆕 <b>폰에서 새 측정 ' + n + '개</b>가 들어왔어요!';
             if (dlg && !dlg.hidden) { var p = dlg.querySelector('.cs-note'); if (p) p.innerHTML = '🆕 <b>폰에서 새 측정 ' + n + '개</b>가 들어왔어요! 창을 닫고 표를 보세요.'; }
         }
 
@@ -585,7 +631,7 @@
         return {
             send: send, pull: pull, render: render, beat: beat,
             role: function () { return role; }, isPhone: function () { return !!PHONE; },
-            openPhone: openPhone, phoneLink: phoneLink,
+            openPhone: openPhone, phoneLink: phoneLink, phoneCard: phoneCard,
             // 실험이 측정 하나를 저장했을 때 부른다: 폰 화면(또는 autoSendOnSave)이면 바로 보내기
             // 폰은 기본으로 회차 목록에 쌓기만 하고(고른 회차 보내기), autoSendOnSave: true 면 바로 보낸다
             saved: function () {
