@@ -19,8 +19,18 @@
 </head>
 <body>
 <main class="dash pendulum">
-    <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
-    <h1>스마트폰 진자 – 주기 측정</h1>
+    <a href="../index.html" class="pd-keep">&laquo; 메인 페이지로 돌아가기</a>
+    <div class="pd-titlebar pd-keep"><h1>스마트폰 진자 – 주기 측정</h1><span id="pdDevice"></span></div>
+    <!-- 폰 측정 · 노트북 분석 이원화: 노트북·PC 로 열면 측정 대신 분석 화면으로 안내 (태블릿은 둘 다 됨) -->
+    <section id="laptopNotice" class="pd-device-note show-on-laptop pd-keep" aria-labelledby="laptopNoticeTitle">
+        <h2 id="laptopNoticeTitle">💻 노트북에서는 잴 수 없어요</h2>
+        <p>진자 주기는 <b>스마트폰 센서</b>로 재요. 노트북에서는 <b>분석 화면</b>을 열고, 화면에 뜨는 QR 을 폰으로 찍어 측정하세요.</p>
+        <div class="pd-row">
+            <a id="toReport" class="pd-btnlink primary" href="pendulum-report.html">📊 분석 화면 열기</a>
+            <button id="btnPractice" type="button">🧪 연습용 시뮬레이션만 해 보기</button>
+        </div>
+        <p class="note">기기 종류가 틀렸다면 위의 '이 기기'에서 바꿔 주세요.</p>
+    </section>
     <p class="lead">스마트폰을 줄에 매달아 흔들면, 폰 안의 센서(가속도·회전 속도)로 진자가 한 번 왕복하는 시간(주기 T)을 잽니다.</p>
 
     <!-- 상태 + 주요 단추: 어느 탭에서나 보임 -->

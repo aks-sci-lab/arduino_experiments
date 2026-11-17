@@ -71,6 +71,18 @@
     }
     function forgetServer(store) { try { store.removeItem(SERVER_KEY); } catch (e) { /* 저장 불가 */ } }
 
+    /* 폰 측정 · 노트북 분석 이원화: 측정 화면 ↔ 분석 화면으로 갈 때 선생님 시트(s)·수업 코드(c)를 그대로 넘긴다
+       otherPage('pendulum-report.html', '?s=AK…&c=ABC&group=…&device=phone') → 'pendulum-report.html?s=AK…&c=ABC' */
+    function otherPage(page, search, keys) {
+        keys = keys || ['s', 'c'];
+        var q = [];
+        try {
+            var p = new URLSearchParams(search || '');
+            keys.forEach(function (k) { var v = p.get(k); if (v) q.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); });
+        } catch (e) { /* 옛 브라우저: 그냥 페이지만 */ }
+        return page + (q.length ? '?' + q.join('&') : '');
+    }
+
     // ---------- 원본 데이터 줄이기 ----------
     function encode(samples, step) {
         var pick = [];
@@ -207,7 +219,7 @@
     return {
         GROUP_RE: GROUP_RE, CELL_MAX: CELL_MAX, RAW_CELLS: RAW_CELLS,
         isScriptId: isScriptId, scriptIdFromUrl: scriptIdFromUrl, urlFromScriptId: urlFromScriptId,
-        resolveServer: resolveServer, forgetServer: forgetServer, SERVER_KEY: SERVER_KEY,
+        resolveServer: resolveServer, otherPage: otherPage, forgetServer: forgetServer, SERVER_KEY: SERVER_KEY,
         normalizeGroup: normalizeGroup, isGroupCode: isGroupCode, makeGroupCode: makeGroupCode, groupParts: groupParts, newId: newId,
         packSamples: packSamples, unpackSamples: unpackSamples, buildSavePayload: buildSavePayload,
         parseResponse: parseResponse, itemFromServer: itemFromServer, mergeItems: mergeItems,
