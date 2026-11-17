@@ -108,6 +108,9 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     assert.equal(await A.textContent('#v-bpm'), String(Math.round(a.res.bpm)));
     const est = await A.textContent('#live-est');
     console.log('A 실시간:', est);
+    assert.match(est, /계산 신호 /);
+    assert.match(await A.textContent('#wave-label'), /빨강\(R\) 밝기 · 노출 보정 전/);
+    assert.match(await A.textContent('#msg'), /계산에 쓴 신호: .* · /);
     assert.match(est, /최근 \d+초: (7[2-8]) 회\/분 · 봉우리 \d+개/);
     assert.ok(Number(await A.textContent('#v-ibi')) > 700 && Number(await A.textContent('#v-ibi')) < 900, '박동 간격');
     assert.ok(a.raw.every(f => f[4] === 330 && f[5] === 800), '프레임마다 노출 값');
@@ -128,6 +131,7 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     assert.equal(b.lock, 'unlocked');
     assert.match(b.why, /계속 바뀜|맞출 수 없어/);   // 밝기가 출렁여 맞추기에서 먼저 걸리거나, 값이 계속 바뀜으로 걸림
     assert.equal(b.res.mode, 'corrected');
+    assert.match(await B.textContent('#msg'), /노출 보정 뒤 — 실시간 그래프\(빨강 · 보정 전\)와 달라요/);
     assert.ok(Math.abs(b.res.bpm - 67) <= 4, '보정 뒤 67 ≈ ' + b.res.bpm);
     assert.match(await B.textContent('#v-lock'), /고정 안 됨/);
     assert.match(await B.textContent('#v-locktext'), /노출 보정/);
