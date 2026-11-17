@@ -186,7 +186,7 @@
             else if (phase === 'verify') { $('time-st').textContent = '노출 잠금 확인 중'; status('🔍 노출이 정말 고정됐는지 확인 중'); }
             else {
                 const left = Math.max(0, rec.dur - (now - rec.recWall) / 1000);
-                $('time-st').textContent = '⏱ 남은 시간 ' + Math.ceil(left) + '초';
+                if (!rec.breath) $('time-st').textContent = '⏱ 남은 시간 ' + Math.ceil(left) + '초';
                 status('🔴 측정 중 — 움직이지 마세요');
             }
             if (phase === 'rec' && rec.frames.length > 10 && now - lastBpmT > 1000) {
@@ -319,9 +319,11 @@
 
     // ---------- 측정 ----------
     let settleTimer = null, endTimer = null;
-    async function start() {
-        if (phase !== 'idle') return;
-        rec = { frames: [], wall: performance.now(), dur: Number($('dur').value) || 30, torch: !!$('torch').checked, lock: '', scene: lastScene };
+    // opts (숨 참기 탐구, js/heart-rate-breath-ui.js): { breath: true, onRec(rec) 기록 시작 때, onFinish(rec, cancel) 끝날 때 } — 숨 참기는 길이를 그쪽이 정하고 끝냄
+    async function start(opts) {
+        if (phase !== 'idle') return false;
+        opts = opts && opts.breath ? opts : {};
+        rec = { frames: [], wall: performance.now(), dur: Number($('dur').value) || 30, torch: !!$('torch').checked, lock: '', scene: lastScene, breath: !!opts.breath, onRec: opts.onRec, onFinish: opts.onFinish };
         phase = 'settle';
         $('start').hidden = true; $('stop').hidden = false; $('cam').disabled = true;
         $('v-bpm').textContent = '--'; $('v-ibi').textContent = '--';
@@ -338,7 +340,8 @@
             else if (hasExp) showLock('⚠ 고정 안 됨', (v.why ? v.why + ' → ' : '') + '노출 보정으로 계산');
             else showLock('⚠ 고정 안 됨', (v.why ? v.why + ' · ' : '') + '노출 값을 못 읽어 보정 불가 (출렁임 가능성)');
             phase = 'rec'; rec.frames = []; rec.recWall = performance.now();
-            endTimer = setTimeout(() => finish(false), rec.dur * 1000 + 150);
+            if (rec.breath) { if (typeof rec.onRec === 'function') rec.onRec(rec); }
+            else endTimer = setTimeout(() => finish(false), rec.dur * 1000 + 150);
         }, 3000);
     }
     function finish(cancel) {
@@ -349,6 +352,7 @@
         torchOff();
         if (wakeLock) { try { wakeLock.release(); } catch (e) { /* 무시 */ } wakeLock = null; }
         if (!r) return;
+        if (r.breath) { if (typeof r.onFinish === 'function') r.onFinish(r, !!cancel); return; }
         const dur = r.frames.length > 1 ? r.frames[r.frames.length - 1].t - r.frames[0].t : 0;
         if (cancel && dur < 8) { msg('8초보다 짧아 저장하지 않았어요.'); return; }
         const run = addRun({ lock: r.lock || 'unlocked', why: r.why, torch: r.torch, frames: r.frames, scene: r.scene, lockLog: r.lockLog });
@@ -566,7 +570,7 @@
         if (track && caps.torch && phase !== 'off') { try { await track.applyConstraints({ advanced: [{ torch: e.target.checked }] }); } catch (err) { /* 무시 */ } }
     });
     $('cam').addEventListener('click', () => { if (stream) stopCamera(); else startCamera(); });
-    $('start').addEventListener('click', start);
+    $('start').addEventListener('click', () => start());
     $('stop').addEventListener('click', () => finish(true));
     document.addEventListener('visibilitychange', () => { if (document.hidden && rec) { finish(true); msg('화면을 벗어나 측정을 멈췄어요.', 'warn'); } });
     window.addEventListener('resize', () => { drawLive(); renderDetail(); });
@@ -575,4 +579,6 @@
     plot($('wave'), [], { empty: '카메라를 켜고 손가락을 올리면 맥파가 나와요' });
     // 시험용
     window.__heartRate = { state: () => state, addRun, phase: () => phase };
+    // 숨 참기 탐구(js/heart-rate-breath-ui.js)가 같은 카메라·노출 잠금·기록을 쓰도록
+    window.__hrCore = { start, finish, phase: () => phase, rec: () => rec, live: () => live, plot, msg, download, esc, LEVEL, hasCamera: () => !!stream, lastScene: () => lastScene };
 })();

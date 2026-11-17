@@ -6,12 +6,19 @@
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
     <title>스마트폰 카메라 심박수</title>
+    <link rel="stylesheet" href="../css/class-share.css">
     <link rel="stylesheet" href="../css/heart-rate.css">
 </head>
 <body>
 <main class="dash">
     <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
     <h1>❤️ 스마트폰 카메라 심박수</h1>
+    <div id="class-bar-mount"></div>
+    <!-- 화면 고르기: 그냥 심박수 재기 / 숨 참기 탐구 (js/heart-rate-breath-ui.js) -->
+    <div class="seg pick mode-pick" role="group" aria-label="측정 방식">
+        <button type="button" id="mode-live" aria-pressed="true"><span class="ic" aria-hidden="true">❤️</span>심박수 재기<small>한 번 재기 · 손목 비교</small></button>
+        <button type="button" id="mode-breath" aria-pressed="false"><span class="ic" aria-hidden="true">🫁</span>숨 참기 탐구<small>안정 → 숨 참기 → 회복</small></button>
+    </div>
     <p class="lead">뒤 카메라를 검지로 덮으면 심장이 뛸 때마다 밝기가 아주 조금 오르내립니다. 그 맥파로 심박수를 구해요. <b>수업용 — 의료 진단에 쓰지 마세요.</b> 영상은 저장·전송하지 않습니다.</p>
 
     <!-- 연결·상태 띠 -->
@@ -43,6 +50,66 @@
 
     <p id="wave-label" class="note">그래프: 빨강(R) 밝기 · 노출 보정 전 · 1초 평균을 빼고 뒤집음(위 = 피가 많아 어두워진 때) · 파란 점 = 계산이 찾은 봉우리</p>
     <p id="live-est" class="note live-est" aria-live="polite"></p>
+
+    <!-- ===== 숨 참기 탐구 (설계: docs/data-processing-class-design.md 2부) ===== -->
+    <section id="breath" class="breath" hidden>
+        <div class="br-card" id="br-setup">
+            <h2>🫁 숨 참기와 심박수</h2>
+            <p class="note">안정 <b>60초</b> → 숨 참기 <b>30초 또는 60초</b> → 회복 <b>60초</b> 를 끊지 않고 이어서 잽니다. 힘들면 언제든 <b>■ 숨 참기 멈춤</b> — 멈춘 것도 정상 자료예요(실패가 아님).</p>
+            <div class="warn">⚠️ <b>천식·심장 질환·어지럼증이 있거나 최근 아팠던 학생은 숨을 참지 않고</b> 관찰·기록 역할을 맡아요. 60초는 선택이고 30초만 해도 돼요.</div>
+            <fieldset class="br-safety">
+                <legend>시작 전 안전 확인 (셋 다 체크해야 시작돼요)</legend>
+                <label class="chk"><input type="checkbox" id="br-sit"><span>의자에 <b>앉아</b> 있어요</span></label>
+                <label class="chk"><input type="checkbox" id="br-watch"><span>옆에서 지켜볼 <b>조원</b>이 있어요</span></label>
+                <label class="chk"><input type="checkbox" id="br-ok"><span>지금 <b>몸 상태가 괜찮아요</b></span></label>
+            </fieldset>
+            <div class="row">
+                <span>숨 참기</span>
+                <div class="seg br-len" role="group" aria-label="숨 참기 길이">
+                    <button type="button" data-hold="30" aria-pressed="true">30초</button>
+                    <button type="button" data-hold="60" aria-pressed="false">60초 (선택)</button>
+                </div>
+            </div>
+            <div class="row"><button id="br-start" class="good" disabled>▶ 숨 참기 측정 시작</button><span id="br-why" class="note"></span></div>
+        </div>
+
+        <div class="br-card br-run" id="br-run" hidden>
+            <div class="br-phase"><span id="br-phase">안정</span> <b id="br-count">60</b><small>초</small></div>
+            <p id="br-guide" class="br-guide">편하게 앉아 숨 쉬세요</p>
+            <div class="br-steps" aria-hidden="true"><span data-p="rest">안정</span><span data-p="hold">숨 참기</span><span data-p="rec">회복</span></div>
+            <div class="row"><button id="br-stop" class="danger big" hidden>■ 숨 참기 멈춤 (힘들면 바로)</button><button id="br-abort" class="secondary">측정 그만두기</button></div>
+        </div>
+
+        <div class="br-card" id="br-result" hidden>
+            <h2>📈 결과 <small id="br-rtitle" class="note"></small></h2>
+            <div class="results" id="br-metrics"></div>
+            <canvas id="br-curve" class="chart" aria-label="연속 심박 곡선"></canvas>
+            <p class="note">회색 = 숨 참기 구간, 점선 = 안정 평균. 신뢰도가 낮은 10초 창은 빼고 그렸어요.</p>
+        </div>
+
+        <details class="br-card" id="br-profile-box">
+            <summary>📝 함께 적는 항목 (모두 선택 · 이름·학번 없음)</summary>
+            <div class="row">
+                <label>운동 습관 <select id="br-ex"><option value="">안 씀</option></select></label>
+                <label>키(cm) <select id="br-h"><option value="">안 씀</option></select></label>
+                <label>몸무게(kg) <select id="br-w"><option value="">안 씀</option></select></label>
+            </div>
+            <label class="chk"><input type="checkbox" id="br-consent"><span>이 자료를 <b>수업 분석에 써도 돼요</b> (체크하지 않으면 선생님께 보내지 않고 이 화면에서만 봐요)</span></label>
+            <p class="note">성별은 받지 않아요. 키·몸무게는 구간으로만 적어요. 작은 반에서는 구간만으로도 누구인지 알 수 있으니, 적기 싫으면 비워 두세요.</p>
+        </details>
+
+        <details class="br-card" id="br-runs-box" open>
+            <summary>🗂 내 숨 참기 회차 · 비교 · CSV <span id="br-runs-sum" class="note"></span></summary>
+            <ul id="br-runs" class="hr-runs"></ul>
+            <p id="br-runs-empty" class="note">아직 잰 회차가 없어요.</p>
+            <canvas id="br-compare" class="chart" aria-label="회차 비교 그래프"></canvas>
+            <p class="note">숨 참기를 시작한 때를 0초로 맞춰 겹쳐 그려요. 같은 학생의 30초·60초 회차를 비교해 보세요(30초 뒤 충분히 쉬고, 예: 3분 이상).</p>
+            <div class="row"><button id="br-send" class="good" disabled>📤 동의한 회차 선생님께 보내기 (0개)</button><button id="br-csv-all" class="info" disabled>⬇ 숨 참기 CSV (모든 회차)</button></div>
+            <p id="br-send-st" class="note" role="status"></p>
+            <div id="br-share-mount"></div>
+            <p class="note">📤 보내기는 '수업 분석 동의'를 체크한 회차만 보내요. 이름·학번·성별은 보내지 않아요.</p>
+        </details>
+    </section>
 
     <div class="dash-more">
         <details id="runs-box" open>
@@ -113,8 +180,12 @@
 </main>
 <script src="../js/pendulum-config.js"></script>
 <script src="../js/pendulum-cloud.js"></script>
+<script src="../js/class-cloud.js"></script>
+<script src="../js/class-share.js"></script>
 <script src="../js/dev-collect.js"></script>
 <script src="../js/heart-rate-math.js"></script>
 <script src="../js/heart-rate.js"></script>
+<script src="../js/heart-rate-breath.js"></script>
+<script src="../js/heart-rate-breath-ui.js"></script>
 </body>
 </html>
