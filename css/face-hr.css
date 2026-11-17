@@ -68,3 +68,6 @@ canvas.chart { width: 100%; height: 240px; display: block; margin: 8px 0; }
 .wrist-row input { width: 70px; }
 .roi-pick button { background: var(--c-card); color: var(--c-text); font-weight: 600; padding: 6px; }
 .roi-pick button[aria-pressed="true"] { background: var(--c-primary); color: #fff; }
+.wrist-bar { display: inline-flex; gap: 6px; align-items: center; }
+.wrist-bar[hidden] { display: none; }
+.wrist-bar input { width: 90px; }
