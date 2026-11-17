@@ -315,7 +315,26 @@
 
     // ---------- 시작 ----------
     var classShare = null;
+    // ---------- 폰 측정 · 노트북 분석 이원화 (AGENTS.md UI 규칙) ----------
+    /* 폰: '📱 측정 화면으로' 안내만 (css: html.device-phone main.pd-steps-page 의 .pd-keep 만 보임),
+       '그래도 여기서 보기'를 누르면 이 탭(세션) 동안 전부 보임. 노트북·태블릿은 그대로 */
+    var FORCE_KEY = 'pendulum-report:force';
+    function setupDevice() {
+        if (window.LabUI && LabUI.deviceSwitch) LabUI.deviceSwitch('#pdDevice');
+        $('toMeasure').href = PC.otherPage('pendulum-measure.html', location.search);
+        var main = document.querySelector('main.pd-steps-page');
+        var forced = false;
+        try { forced = sessionStorage.getItem(FORCE_KEY) === '1'; } catch (e) { /* 저장 불가 */ }
+        if (forced) main.classList.add('pd-force');
+        $('btnForce').addEventListener('click', function () {
+            main.classList.add('pd-force');
+            try { sessionStorage.setItem(FORCE_KEY, '1'); } catch (e) { /* 저장 불가 */ }
+            window.dispatchEvent(new Event('resize'));   // 숨어 있던 그래프 크기 다시 잡기
+        });
+    }
+
     function init() {
+        setupDevice();
         if (!SERVER.url) $('cfgWarn').hidden = false;
         showServer();
         $('gRef').value = load(GREF_KEY, '9.80');

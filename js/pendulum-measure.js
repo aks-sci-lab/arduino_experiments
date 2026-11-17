@@ -493,6 +493,20 @@
 
     // ---------- 시작 ----------
     var classShare = null;
+    // ---------- 폰 측정 · 노트북 분석 이원화 (AGENTS.md UI 규칙) ----------
+    /* 노트북·PC: 측정 대신 '📊 분석 화면' 안내만 (css: html.device-laptop main.pendulum 의 .pd-keep 만 보임)
+       '🧪 연습용 시뮬레이션'을 누르면 화면을 펼치되 측정 시작·보내기 단추는 계속 숨김. 폰·태블릿은 그대로 */
+    function setupDevice() {
+        if (window.LabUI && LabUI.deviceSwitch) LabUI.deviceSwitch('#pdDevice');
+        $('toReport').href = PC ? PC.otherPage('pendulum-report.html', location.search) : 'pendulum-report.html';
+        $('btnPractice').addEventListener('click', function () {
+            document.querySelector('main.pendulum').classList.add('pd-practice');
+            if (window.LabUI && LabUI.initTabs) { var b = document.querySelector('#pdTabs [data-tab="more"]'); if (b) b.click(); }
+            $('simDetails').open = true;
+            $('simDetails').scrollIntoView({ block: 'start' });
+        });
+    }
+
     function init() {
         restoreFields();
         Object.keys(COND_FIELDS).forEach(function (id) { $(id).addEventListener('input', saveCond); });
@@ -506,6 +520,7 @@
         $('btnSend').addEventListener('click', sendToLaptop);
         ['cL', 'cAmp', 'cNote'].forEach(function (id) { $(id).addEventListener('input', updateSendState); });
         setupLink();
+        setupDevice();
         // 수업 참여 (?c=수업코드): 조·번호를 고르면 그 조 코드로 '노트북으로 보내기'가 켜짐 (공통 부품 js/class-share.js)
         if (window.ClassShare && window.ClassCloud && ClassCloud.readClassParam(location.search)) {
             classShare = ClassShare.init({

@@ -124,3 +124,22 @@ html.big-view .pd-bigqr { zoom: calc(1 / 1.35); }
 }
 .pd-btnlink.primary { background: var(--c-success); border-color: var(--c-success); color: #fff; font-weight: 600; }
 .pd-setup { overflow-wrap: anywhere; }
+
+/* ---------- 폰 측정 · 노트북 분석 이원화 (js/lab-ui.js LabUI.device, css/lab-base.css .show-on-*) ----------
+   측정 화면을 노트북으로 열면 .pd-keep(뒤로·제목·안내)만, '연습용 시뮬레이션'(.pd-practice)이면 측정·보내기 단추만 빼고 다 보임.
+   분석 화면을 폰으로 열면 .pd-keep 만, '그래도 여기서 보기'(.pd-force)면 다 보임. 태블릿은 늘 다 보임 */
+.pd-titlebar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-1) var(--sp-3); }
+.pd-titlebar h1 { margin-right: auto; }
+.pd-device-note {
+    margin: var(--sp-2) 0 var(--sp-3); padding: var(--sp-3) var(--sp-4);
+    background: var(--c-primary-soft); border: 2px solid var(--c-primary); border-radius: var(--r-card);
+}
+.pd-device-note h2 { margin: 0 0 var(--sp-2); }
+.pd-device-note p { margin: var(--sp-1) 0; }
+html.device-laptop main.pendulum.dash:not(.pd-practice) > :not(.pd-keep) { display: none !important; }
+html.device-laptop main.pendulum.dash.pd-practice #btnStart,
+html.device-laptop main.pendulum.dash.pd-practice #btnStop,
+html.device-laptop main.pendulum.dash.pd-practice #btnSend,
+html.device-laptop main.pendulum.dash.pd-practice #laptopNotice { display: none !important; }
+html.device-phone main.pd-steps-page:not(.pd-force) > :not(.pd-keep) { display: none !important; }
+html.device-phone main.pd-steps-page.pd-force #phoneNotice { display: none !important; }
