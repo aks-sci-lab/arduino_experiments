@@ -160,3 +160,24 @@ test('선생님이 만든 실험 공개 확인: 공개·비공개(403)·없음(4
     assert.equal((await CC.checkCustom('abc', async () => { throw new Error('Failed'); })).state, 'unknown');
     assert.equal((await CC.checkCustom('bad id', async () => res(200, {}))).state, 'hidden');
 });
+
+test('📱 폰 연결: 주소 읽기·만들기, 폰 기기 이름, 교사 화면 단계 이름', () => {
+    assert.deepEqual(CS.readPhoneParams('?role=phone&group=2-3-4821&s=AKfy'), { group: '2-3-4821', jo: 0, num: 0 });
+    assert.deepEqual(CS.readPhoneParams('?c=2-4821&role=phone&group=2-3-4821&jo=3&num=2'), { group: '2-3-4821', jo: 3, num: 2 });
+    assert.equal(CS.readPhoneParams('?group=2-3-4821'), null, 'role=phone 이 없으면 노트북');
+    assert.equal(CS.readPhoneParams('?role=phone&group=2-3'), null);
+    assert.equal(CS.readPhoneParams('?role=phonebook&group=2-3-4821'), null);
+    assert.deepEqual(CS.readPhoneParams('?role=phone&group=2-3-4821&jo=0&num=99'), { group: '2-3-4821', jo: 0, num: 0 });
+    assert.equal(CS.phoneUrl('https://x/projects/environment-lab.html?sensor=light&group=9-9-9999#top', { group: '2-3-4821', scriptId: 'SID' }),
+        'https://x/projects/environment-lab.html?sensor=light&role=phone&group=2-3-4821&s=SID');
+    assert.equal(CS.phoneUrl('https://x/projects/a.html', { group: '2-3-4821', classCode: '2-4821', jo: 3, num: 2 }),
+        'https://x/projects/a.html?role=phone&group=2-3-4821&c=2-4821&jo=3&num=2');
+    assert.match(CS.newDeviceId(null, 'p'), /^p[a-z2-9]{6}$/);
+    assert.match(CS.newDeviceId(), /^n/);
+    assert.equal(CS.deviceLabel('pabcd12'), '📱 폰 CD12');
+    assert.equal(CS.deviceLabel('nabcd12'), '노트북 CD12');
+    assert.equal(CS.incomingFrom([{ device: 'pabcd12', id: 'pabcd12-run1', n: 3 }], 'nme1234')[0].from, '📱 폰 CD12');
+    assert.equal(CC.stepName('phoneaccel', 'phone-live'), '📱 측정 중');
+    assert.equal(CC.stepName('malus', 'phone-data'), '📱 5 데이터');
+    assert.equal(CC.stepName('malus', 'data'), '5 데이터');
+});

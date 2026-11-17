@@ -83,6 +83,35 @@ const share = ClassShare.init({
 `js/class-cloud.js` 의 `EXPS` 에서 그 실험의 `ready` 를 `true` 로 바꿉니다. 그러면 교사 화면의 실험 고르기에서 '(페이지 연결 준비 중)' 이 사라집니다.
 시험: 그 실험의 `getItems`/`onIncoming` 을 Node 에서 시험하고, Playwright 로 노트북 두 대(같은 조 코드) → 보내기 → 다른 쪽 표에 합쳐짐, 375px 가로 스크롤 없음·단추 44px 을 확인합니다(가짜 서버: `tests/fake-apps-script.cjs` 의 `loadCodeGs()` 를 작은 HTTP 서버로 띄우고 `pendulum-config.js` 요청을 가로채 그 주소로).
 
+## 📱 폰 연결 (스마트폰으로 재는 실험: 폰 가속도·말루스·자유낙하 등)
+
+진자처럼 **노트북이 QR 을 보여 주고 → 폰이 찍어 측정 → 저장하면 노트북에 저절로** 들어오게 합니다. 서버 변경 없음(같은 공용 저장·목록).
+
+```js
+const share = ClassShare.init({
+    exp: 'phoneaccel', shareMount: '#share-mount', barMount: '#class-bar-mount',
+    phone: true,                              // 또는 { page: 'projects/폰용-페이지.html' } (기본은 같은 페이지)
+    onRole: role => {                         // 'phone' | 'laptop' — 폰이면 측정 화면만, 노트북이면 분석 화면 등
+        document.body.classList.toggle('is-phone', role === 'phone');
+    },
+    onPhoneData: n => { /* (선택) 노트북: 폰에서 새 측정 n개가 들어옴 — 표 탭으로 옮기기 등 */ },
+    deleteItem: id => { /* (선택) 폰 회차 목록의 🗑: 그 회차를 실험 기록에서 지우기 (없으면 🗑 단추 없음) */ },
+    autoSendOnSave: false,                    // (선택) true 면 폰이 저장할 때마다 바로 보냄 ('한 번에 하나'가 자연스러운 실험)
+    getItems, onIncoming, getStep, getPoints   // 위와 같음
+});
+// 측정 하나를 저장할 때마다 (폰: 회차 목록에 쌓임 / autoSendOnSave 면 바로 보냄, 노트북: 아무것도 안 함)
+saveRun(run); share.saved();
+```
+
+- **노트북**: 조 공유 칸(수업이면 수업 참여 띠에도)에 **📱 폰으로 측정하기** → 큰 QR·주소 복사. 주소 = 폰 페이지 + `?role=phone&group=조코드&s=시트ID`(수업이면 `&c=…&jo=…&num=…`, 이름 없음). 열면 자동 불러오기가 켜지고, 폰 측정이 들어오면 "🆕 폰에서 새 측정 N개" (QR 창에도)
+- **폰**(`role=phone`): 조 코드·수업 자리를 묻지 않음, 맨 위에 '📱 노트북과 연결됨 · 조 …' 띠, 조 공유 칸은 접힘.
+- **폰 회차 고르기(기본)**: `share.saved()` 때마다 띠 안의 **회차 목록**(`getItems()` 의 항목마다: 제목·시각(항목에 `at` 이 있으면 그것)·점 수·요약 숫자 3개)에 쌓이고 새 회차는 체크된 상태. 각 회차 체크 → **📤 고른 회차 보내기 (N개)**, ☑ 전체 선택·☐ 전체 해제. 보낸 회차는 '✅ 보냄'(체크가 풀림), 보낸 뒤 내용이 바뀌면 '✏️ 바뀜', 못 보낸 회차는 체크가 남아 다시 누르면 그것만 다시. 다시 보내면 같은 id 로 고쳐 씀. 메모 칸(30자)은 제목 뒤에 ' · 메모' 로 붙어 보냄. 🗑(`deleteItem` 을 줄 때)로 지우면, 이미 보낸 회차는 시트에서도 빠짐. 고르기 상태는 이 폰에 저장(새로고침해도 남음, 회차 자체는 실험이 저장). 안 고른 회차는 시트에 그대로 둠
+- `autoSendOnSave: true`(또는 폰에만 `phoneAutoSend: true`) 면 예전처럼 저장할 때마다 전부 보냄(실패하면 📤 다시 보내기·CSV 안내). 직접 고른 것만 보내려면 `share.sendPicked()`, 고르기 상태는 `share.runs()`
+- 자기 `send(ctx)` 를 주는 실험(전용 시트)은 `ctx.only`(고른 실험 id 배열, 없으면 전부)를 따르면 됩니다 폰 저장은 노트북 화면과 따로(`class-share:<exp>:phone`), 기기 번호는 `p…` → 다른 화면에 '📱 폰 AB12' 로 보임
+- **하트비트**: 폰은 측정·보내기 때만, 단계 앞에 `phone-` → 교사 진행 보기에 '📱 측정 중'
+- 같은 기기로 노트북과 폰을 모두 쓰면 둘이 따로 기억합니다(시험할 때 편함)
+- `share.role()`·`share.isPhone()`·`share.openPhone()`·`share.phoneLink()` 도 있음
+
 ## 실험 이름 (`exp`)
 
 | exp | 실험 | 페이지 | 서버 저장 |
@@ -92,11 +121,11 @@ const share = ClassShare.init({
 | `idealgas` | 이상기체 | `projects/ideal-gas.html` | 공용 `submissions` (붙임 완료: 실험 1·2 한 줄씩, `js/ideal-gas-share.js`) |
 | `eminduction` | 전자기 유도 | `projects/em-induction.html` | 공용 (붙임 완료: 저장한 측정 하나 = 한 줄, 요약 봉우리·∫ε dt·ΔΦ + 줄인 파형) |
 | `malus` | 말루스 법칙 | `projects/malus-law.html` | 공용 (붙임 완료, `js/malus-share.js`) |
-| `freefall` | 자유낙하 | `projects/free-fall.html` | 공용 (붙임 완료) |
+| `freefall` | 자유낙하 | `projects/free-fall.html` | 공용 (붙임 완료, 📱 폰 연결: 폰에서 영상·점 찍기 → 회차(점·기준 길이·FPS, 영상은 안 보냄) 골라 보내기 → 노트북 📈 보기) |
 | `env` · `light` · `uv` | 환경 센서 · 조도 · 자외선 | `projects/environment-lab.html`(`?sensor=light|uv`) | 공용 |
 | `accel` | 가속도계 | `projects/accelerometer-lab.html` | 공용 (붙임 완료) |
 | `nano` | Nano 33 BLE Sense | `projects/arduino-nano-lab.html` | 공용 |
-| `phoneaccel` | 스마트폰 가속도 | `projects/phone-accelerometer.html` | 공용 (붙임 완료) |
+| `phoneaccel` | 스마트폰 가속도 | `projects/phone-accelerometer.html` | 공용 (붙임 완료, 📱 폰 연결: 시작→중지 한 번 = 회차, `js/phone-accel-share.js`) |
 | `custom:<실험 id>` | 선생님이 만든 실험 | `projects/custom-lab.html?id=…` | 공용 |
 
 새 실험 이름을 더하려면 **서버(`apps-script/Code.gs` 의 `GENERIC_EXPS`)와 `js/class-cloud.js` 의 `EXPS` 를 같이** 고칩니다(시험 `tests/class-share.test.cjs` 가 둘이 같은지 확인). 서버를 고치면 `VERSION` 을 올리고 `node tools/build-apps-script-release.cjs` → 선생님은 교사 화면의 🔄 업데이트.

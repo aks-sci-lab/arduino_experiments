@@ -179,3 +179,35 @@ test('배포 번호: 웹 앱 주소가 /dev 면 배포 목록에서 찾음', () 
     const app = loadCodeGs({ fetch, serviceUrl: 'https://script.google.com/macros/s/AKfyc/dev' });
     assert.equal(app.ctx.deploymentId(), 'D2');
 });
+
+test('8판: 업데이트 오류는 원래 문구를 그대로 보여 주고, 권한 문제면 다시 배포·허용 안내', () => {
+    // UrlFetchApp 권한이 아직 허용되지 않은 경우 (실제 Apps Script 의 예외 문구 모양)
+    const perm = loadCodeGs({ fetch: () => { throw new Error('You do not have permission to call UrlFetchApp.fetch. Required permissions: https://www.googleapis.com/auth/script.external_request'); } });
+    const k = perm.post({ action: 'claimAdmin' }).key;
+    const e = perm.post({ action: 'update', key: k }).error;
+    assert.match(e, /사이트에서 release\.json 을 받는 중 오류: You do not have permission to call UrlFetchApp\.fetch/);
+    assert.match(e, /script\.external_request/);
+    assert.match(e, /배포 관리 → ✏️ → 버전 "새 버전" → 배포 → 권한 확인 창에서 허용/);
+    // 한국어 권한 문구도
+    const ko = loadCodeGs({ fetch: () => { throw new Error('UrlFetchApp.fetch을(를) 호출할 권한이 없습니다.'); } });
+    const k2 = ko.post({ action: 'claimAdmin' }).key;
+    assert.match(ko.post({ action: 'update', key: k2 }).error, /호출할 권한이 없습니다.*권한 확인 창에서 허용/);
+    // 권한과 상관없는 오류는 원래 문구만 (안내를 붙이지 않음)
+    const dns = loadCodeGs({ fetch: () => { throw new Error('Address unavailable: https://aks-sci-lab.web.app/apps-script/release.json'); } });
+    const k3 = dns.post({ action: 'claimAdmin' }).key;
+    const e3 = dns.post({ action: 'update', key: k3 }).error;
+    assert.match(e3, /받는 중 오류: Address unavailable/); assert.doesNotMatch(e3, /권한 확인 창/);
+    // 200 인데 JSON 이 아닌 글 (로그인 화면 등): 받은 글 앞부분까지
+    const html = loadCodeGs({ fetch: () => ({ code: 200, body: '<!DOCTYPE html><html>로그인' }) });
+    const k4 = html.post({ action: 'claimAdmin' }).key;
+    assert.match(html.post({ action: 'update', key: k4 }).error, /release\.json 을 읽지 못했습니다: .+받은 글 앞부분: <!DOCTYPE html>/);
+});
+
+test('8판: 되돌리기 중 예상 밖 예외도 원래 문구로', () => {
+    const app = loadCodeGs({ fetch: () => { throw new Error('Authorization is required to perform that action.'); } });
+    const k = app.post({ action: 'claimAdmin' }).key;
+    app.props.set('PREV_DEPLOY_VERSION', '3');
+    const e = app.post({ action: 'rollback', key: k }).error;
+    assert.match(e, /Authorization is required to perform that action\./);
+    assert.match(e, /권한 확인 창에서 허용/);
+});

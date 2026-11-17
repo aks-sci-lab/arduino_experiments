@@ -28,7 +28,11 @@
             if (fit) { summary['cos2 R2'] = num(fit.r2, 4); summary.theta0 = num(fit.theta0, 1); }
             summary['결측'] = pts.length - valid.length;
             if (fit) summary.A = num(fit.A, 5);
-            return { id: 'run' + run, title: run + '회차', n: pts.length, summary, data: { v: 1, run, ch: ch || '', gamma: gamma || '', points: pts } };
+            // at: 그 회차의 마지막 측정 시각 (폰 회차 목록에 보임, 예전 점에는 시각이 없음)
+            const ts = ps.map(p => Number(p.t)).filter(Number.isFinite);
+            const item = { id: 'run' + run, title: run + '회차', n: pts.length, summary, data: { v: 1, run, ch: ch || '', gamma: gamma || '', points: pts } };
+            if (ts.length) item.at = new Date(Math.max(...ts)).toISOString();
+            return item;
         });
     }
 

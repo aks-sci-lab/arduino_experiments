@@ -77,10 +77,12 @@ const CASES = [
         seed: { 'phone-accel:last': JSON.stringify({ samples: [0, 20, 40, 60].map((rel, i) => ({ t: 5000 + rel, rel, ax: 0, ay: i * 0.1, az: 1 })), original: null }) },
         points: 4, step: '기록',
         incoming: async p => { await p.waitForSelector('#in-list li', { state: 'attached' }); return p.textContent('#in-list li'); },
-        expectIn: /📥 노트북 .* · 스마트폰 기록.*샘플 4개, 0\.06 s/
+        // 예전 판의 마지막 기록(phone-accel:last)이 '1회' 회차로 옮겨져 보내짐, 새로 받은 것은 🆕
+        expectIn: /🆕 노트북 .* · 1회.*샘플 4개, 0\.06 s/
     },
     {
         exp: 'freefall', page: 'projects/free-fall.html#step-5',
+        // 예전 판의 결과(free-fall:mine)가 '1회 자유낙하' 회차로 옮겨짐
         seed: { 'free-fall:mine': JSON.stringify({ 'free-fall': { mode: 'free-fall', rows: [{ t: 0, x: 10, y: 0 }, { t: 0.1, x: 10, y: 49 }, { t: 0.2, x: 10, y: 196 }, { t: 0.3, x: 10, y: 441 }], mmPerPx: 1.2, fit: { g: 9.8, r2: 0.9999, errPct: 0 } } }) },
         points: 4, step: '5 데이터',
         incoming: async p => { await p.waitForFunction(() => /📥/.test(document.getElementById('group-table-body').textContent)); return p.textContent('#group-table-body'); },

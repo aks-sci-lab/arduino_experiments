@@ -25,12 +25,35 @@
     var ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
     var DATA_MAX = 45000 * 6;
 
-    function newDeviceId(random) {
-        var R = typeof random === 'function' ? random : Math.random, s = 'n';
+    // 노트북은 'n…', 폰(📱 폰 연결로 연 화면)은 'p…' 로 시작한다 (교사 화면·다른 노트북이 폰을 알아보게)
+    function newDeviceId(random, prefix) {
+        var R = typeof random === 'function' ? random : Math.random, s = prefix === 'p' ? 'p' : 'n';
         for (var i = 0; i < 6; i++) s += 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(R() * 32)];
         return s;
     }
-    function deviceLabel(device) { return '노트북 ' + String(device || '').slice(-4).toUpperCase(); }
+    function isPhoneDevice(device) { return /^p/.test(String(device || '')); }
+    function deviceLabel(device) { return (isPhoneDevice(device) ? '📱 폰 ' : '노트북 ') + String(device || '').slice(-4).toUpperCase(); }
+    /* 📱 폰 연결: 폰 주소의 값 읽기 (?role=phone&group=조코드[&c=수업&jo=조&num=번호]) → { group, jo, num } 또는 null */
+    function readPhoneParams(search) {
+        var q = String(search || '');
+        if (!/[?&]role=phone(?:&|#|$)/.test(q)) return null;
+        var get = function (k) { var m = new RegExp('[?&]' + k + '=([^&#]*)').exec(q); return m ? decodeURIComponent(m[1]) : ''; };
+        var g = get('group').replace(/\s+/g, '');
+        if (!/^\d{1,2}-\d{1,2}-\d{4}$/.test(g)) return null;
+        var jo = Number(get('jo')), num = Number(get('num'));
+        return { group: g, jo: jo >= 1 && jo <= 99 && jo % 1 === 0 ? jo : 0, num: num >= 1 && num <= 10 && num % 1 === 0 ? num : 0 };
+    }
+    /* 폰 주소 만들기: base(폰 페이지 주소) 의 다른 값은 그대로 두고 role·group·s·c·jo·num 을 새로 붙인다 */
+    function phoneUrl(base, o) {
+        var u = new URL(base);
+        ['role', 'group', 's', 'c', 'jo', 'num'].forEach(function (k) { u.searchParams.delete(k); });
+        u.searchParams.set('role', 'phone');
+        u.searchParams.set('group', o.group);
+        if (o.scriptId) u.searchParams.set('s', o.scriptId);
+        if (o.classCode) { u.searchParams.set('c', o.classCode); if (o.jo && o.num) { u.searchParams.set('jo', String(o.jo)); u.searchParams.set('num', String(o.num)); } }
+        u.hash = '';
+        return u.href;
+    }
     // 시트 한 줄의 id: 노트북 번호 + 실험이 정한 id (서버 규칙 ^[A-Za-z0-9_-]{6,40}$)
     function rowId(device, itemId) {
         var x = String(itemId == null ? '' : itemId).replace(/[^A-Za-z0-9_-]/g, '');
@@ -51,10 +74,12 @@
         if (!o.isGroupCode(o.group)) return { error: '조 코드를 먼저 정하세요 (예: 2-3-4821).' };
         if (!DEVICE_RE.test(String(o.device || ''))) return { error: '노트북 번호가 없습니다. 페이지를 새로고침하세요.' };
         var now = o.now || new Date().toISOString(), seen = {}, list = [];
+        var only = Array.isArray(o.only) ? o.only.map(String) : null;   // 폰 회차 고르기: 고른 id 만 보냄 (안 고른 것은 시트에 그대로 둠)
         (o.items || []).forEach(function (it) {
             var id = rowId(o.device, it.id);
             if (!id || seen[id]) return;
             seen[id] = true;
+            if (only && only.indexOf(String(it.id)) < 0) return;
             var data = it.data === undefined ? '' : (typeof it.data === 'string' ? it.data : JSON.stringify(it.data));
             if (data.length > DATA_MAX) data = '';   // 너무 크면 자료는 빼고 요약만 (화면에서 CSV 안내)
             list.push({ action: 'save', exp: o.exp, id: id, group: o.group, device: o.device, title: String(it.title || '측정').slice(0, 60),
@@ -89,16 +114,27 @@
         var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
         var LS = null; try { LS = window.localStorage; } catch (e) { LS = null; }
         var KEY = 'class-share:' + exp;
-        var store = opts.store || {
+        // 📱 폰으로 연 화면이면(?role=phone) 조 코드·수업 자리를 주소에서 받고, 노트북 화면의 저장과 섞이지 않게 따로 저장한다
+        var PHONE = readPhoneParams(location.search);
+        var role = PHONE ? 'phone' : 'laptop';
+        if (PHONE) KEY += ':phone';
+        var store = (!PHONE && opts.store) || {
             load: function () { try { return JSON.parse((LS && LS.getItem(KEY)) || 'null'); } catch (e) { return null; } },
             save: function (o) { try { LS.setItem(KEY, JSON.stringify(o)); } catch (e) { /* 저장 불가 */ } }
         };
         var st = fixState(store.load());
+        if (!st.runs || typeof st.runs !== 'object') st.runs = {};   // 폰 회차 목록: { 실험 id: { sel, memo, at, sig } }
+        var PICK = !!PHONE && !opts.autoSendOnSave && !opts.phoneAutoSend;   // phoneAutoSend: 폰만 바로 보내기                  // 폰은 기본으로 '회차를 골라 보내기'
+        if (PHONE) {
+            if (!isPhoneDevice(st.device)) st.device = newDeviceId(null, 'p');
+            if (st.group !== PHONE.group) { st.group = PHONE.group; st.sent = []; }
+            st.auto = false;   // 폰은 측정해서 보내기만 (불러오기는 노트북이)
+        }
         function saveSt() { store.save(st); }
         saveSt();
         var SERVER = PCF.resolveServer(location.search, CFG.appsScriptUrl || '', LS, true);
         var pollSec = function () { return Math.max(3, Number(CFG.pollSeconds) || 5) * (run.fails >= 3 ? 3 : 1); };
-        var run = { busy: false, pulling: false, lastOk: null, fails: 0, timer: null };
+        var run = { busy: false, pulling: false, lastOk: null, fails: 0, timer: null, seen: null };
         var timeText = function (d) { return d ? d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''; };
         var groupOk = function () { return PCF.isGroupCode(st.group); };
         var els = {};
@@ -119,13 +155,15 @@
                 '<label class="cs-check"><input type="checkbox" id="cs-auto"> 몇 초마다 자동으로 불러오기</label></div>' +
                 '<div id="cs-status" class="cs-note" role="status" aria-live="polite"></div>' +
                 '<div class="cs-row" id="cs-extra">' +
+                (opts.phone && !PHONE ? '<button type="button" id="cs-phone" class="cs-btn">📱 폰으로 측정하기</button>' : '') +
                 (opts.csvImport ? '<label class="cs-btn secondary cs-file">📂 CSV 불러오기<input type="file" id="cs-csv" accept=".csv,text/csv" multiple hidden></label>' : '') +
                 (opts.clearIncoming ? '<button type="button" id="cs-clear" class="cs-btn danger">불러온 값 지우기</button>' : '') + '</div>' +
                 '<p class="cs-note">이 노트북에서 직접 잰 값만 보내므로, 값을 잰 노트북마다 한 번씩 보내세요. 다시 보내면 같은 줄을 고쳐 씁니다.<br>' +
                 '학교 인터넷에서 보내기가 안 되면: ' + esc(opts.csvHint || '이 페이지의 CSV 저장') + ' 파일을 다른 노트북으로 옮기고, 선생님께는 CSV 파일로 내세요.</p>' +
                 '<p class="cs-note" id="cs-server"></p></details>';
-            ['share', 'sum', 'ban', 'jo', 'make', 'group', 'send', 'pull', 'auto', 'status', 'csv', 'clear', 'server'].forEach(function (k) { els[k] = document.getElementById('cs-' + k); });
-            if (!groupOk()) els.share.open = true;
+            ['share', 'sum', 'ban', 'jo', 'make', 'group', 'send', 'pull', 'auto', 'status', 'csv', 'clear', 'server', 'phone'].forEach(function (k) { els[k] = document.getElementById('cs-' + k); });
+            if (!groupOk() && !PHONE) els.share.open = true;
+            if (PHONE) els.share.open = false;   // 폰 화면은 측정에 집중 (조 공유 칸은 접어 둠)
         }
         function setStatus(html, err) { if (!els.status) return; els.status.innerHTML = html; els.status.classList.toggle('cs-err', !!err); }
         function incoming() { return typeof opts.incomingCount === 'function' ? opts.incomingCount() : 0; }
@@ -148,6 +186,8 @@
         }
         function setGroup(code, quiet) {
             var g = PCF.normalizeGroup(code);
+            // 같은 코드로 다시 정해지면(칸에서 다른 곳을 누를 때 등) 아무것도 바꾸지 않음 — 안내 글이 지워져 화면이 움직이면 누르려던 단추를 놓친다
+            if (g === st.group && !quiet) { render(); return; }
             if (g !== st.group) { st.group = g; st.sent = []; }
             if (PCF.isGroupCode(g)) { var p = PCF.groupParts(g); st.ban = String(p.ban); st.jo = String(p.jo); }
             saveSt();
@@ -189,37 +229,51 @@
 
         // ----- 보내기 -----
         function defaultSend(ctx) {
-            var b = buildPayloads({ exp: exp, group: ctx.group, device: ctx.device, items: opts.getItems ? opts.getItems() : [], sent: ctx.sent, isGroupCode: PCF.isGroupCode });
+            var b = buildPayloads({ exp: exp, group: ctx.group, device: ctx.device, items: myItems(), sent: ctx.sent, only: ctx.only, isGroupCode: PCF.isGroupCode });
             if (b.error) return Promise.resolve({ ok: false, error: b.error });
-            var done = 0, ids = [], big = b.payloads.filter(function (p) { return p.tooBig; }).length;
+            var done = 0, ids = [], cleared = [], big = b.payloads.filter(function (p) { return p.tooBig; }).length;
             return b.payloads.reduce(function (pr, pl) {
                 return pr.then(function (prev) {
                     if (prev && !prev.ok) return prev;
                     ctx.progress(done + 1, b.payloads.length);
                     var body = Object.assign({}, pl); delete body.tooBig;
-                    return PCF.save(ctx.url, body).then(function (r) { if (r.ok) { done++; if (pl.n > 0) ids.push(pl.id); } return r; });
+                    return PCF.save(ctx.url, body).then(function (r) { if (r.ok) { done++; if (pl.n > 0) ids.push(pl.id); else cleared.push(pl.id); } return r; });
                 });
             }, Promise.resolve(null)).then(function (last) {
-                return last && !last.ok ? { ok: false, error: last.error, done: done, ids: ids } : { ok: true, done: done, ids: ids, note: big ? '자료가 너무 커서 ' + big + '개는 요약만 보냈습니다 (CSV 로 내세요).' : '' };
+                return last && !last.ok ? { ok: false, error: last.error, done: done, ids: ids, cleared: cleared } : { ok: true, done: done, ids: ids, cleared: cleared, note: big ? '자료가 너무 커서 ' + big + '개는 요약만 보냈습니다 (CSV 로 내세요).' : '' };
             });
         }
-        async function send(statusEl) {
-            var show = function (html, err) { setStatus(html, err); if (statusEl) $q(statusEl).innerHTML = html; };
+        // 이 기기가 잰 것 (폰 회차 메모는 제목 뒤에 붙여 보냄)
+        function myItems() {
+            var items = opts.getItems ? (opts.getItems() || []) : [];
+            return items.map(function (it) {
+                var m = it && st.runs[String(it.id)] && st.runs[String(it.id)].memo;
+                return m ? Object.assign({}, it, { title: String(it.title || '측정') + ' · ' + m }) : it;
+            });
+        }
+        async function send(statusEl, only) {
+            var show = function (html, err) {
+                setStatus(html, err); if (statusEl) $q(statusEl).innerHTML = html;
+                if (els.pmsg) { els.pmsg.innerHTML = html; els.pmsg.classList.toggle('cs-err', !!err); els.presend.hidden = !err || PICK; }
+            };
             if (!groupOk()) { show('⚠ 먼저 조 코드를 정하세요' + (mount ? ' (👥 조 공유).' : '.'), true); return { ok: false }; }
             if (run.busy) { show('📤 이미 보내는 중이에요. 끝나면 결과가 여기에 나와요.'); return { ok: false, busy: true }; }
             run.busy = true; render();
             // 불러오기가 도는 중이면 (조 코드를 넣은 직후 등) 끝날 때까지 기다렸다가 이어서 보낸다
             if (run.pulling && run.pullDone) { show('📥 불러오는 중이라, 끝나면 바로 보낼게요…'); await run.pullDone; }
-            var ctx = { url: SERVER.url, group: st.group, device: st.device, sent: st.sent.slice(), exp: exp,
+            var ctx = { url: SERVER.url, group: st.group, device: st.device, sent: st.sent.slice(), exp: exp, only: only || null,
                 progress: function (i, n) { show('📤 보내는 중… (' + i + '/' + n + ')'); } };
             var r = await (opts.send || defaultSend)(ctx);
             run.busy = false; run.sentAt = Date.now();
             (r.ids || []).forEach(function (id) { if (st.sent.indexOf(id) < 0) st.sent.push(id); });
+            (r.cleared || []).forEach(function (id) { var k = st.sent.indexOf(id); if (k >= 0) st.sent.splice(k, 1); });   // 지운 줄은 한 번 비우면 끝
+            if (PHONE) markSent(r.ids || []);
             if (r.ok && r.done === 0 && !(r.ids || []).length) { /* 아무것도 안 보냄 */ }
             saveSt();
             if (!r.ok) show('⚠ ' + (r.done ? '일부만 보냈습니다 (' + r.done + '개). ' : '보내지 못했습니다: ') + esc(r.error) + '<br>다시 눌러 보고, 계속 안 되면 ' + esc(opts.csvHint || 'CSV 저장') + ' 파일을 선생님께 내세요.', true);
-            else { show('✅ 선생님 시트로 보냈습니다: ' + esc(r.label || ('측정 ' + (r.ids || []).length + '개')) + ' (' + timeText(new Date()) + '). 같은 조의 다른 노트북에서 📥 불러오기를 누르면 합쳐집니다.' + (r.note ? '<br>' + esc(r.note) : '')); beat(true); }
-            render();
+            else { show('✅ ' + (PHONE ? '노트북으로 보냈어요' : '선생님 시트로 보냈습니다') + ': ' + esc(r.label || ('측정 ' + (r.ids || []).length + '개')) + ' (' + timeText(new Date()) + '). ' +
+                (PHONE ? '노트북 화면에 몇 초 안에 나타나요.' : '같은 조의 다른 노트북에서 📥 불러오기를 누르면 합쳐집니다.') + (r.note ? '<br>' + esc(r.note) : '')); beat(true); }
+            render(); if (PICK) renderRuns();
             return r;
         }
 
@@ -230,7 +284,11 @@
                 var items = incomingFrom(r.items, ctx.device);
                 var changed = opts.onIncoming ? !!opts.onIncoming(items) : false;
                 var others = {}; items.forEach(function (x) { others[x.device] = 1; });
-                return { ok: true, changed: changed, others: Object.keys(others).length, points: items.reduce(function (n, x) { return n + x.n; }, 0) };
+                // 폰에서 새로 들어온 측정 세기 (처음 불러올 때는 세지 않음)
+                var keys = items.map(function (x) { return x.rowId; }), phoneNew = 0;   // 새 측정만 (다시 보낸 측정은 세지 않음)
+                if (run.seen) items.forEach(function (x, i) { if (isPhoneDevice(x.device) && !run.seen[keys[i]]) phoneNew++; });
+                run.seen = {}; keys.forEach(function (k) { run.seen[k] = 1; });
+                return { ok: true, changed: changed, others: Object.keys(others).length, points: items.reduce(function (n, x) { return n + x.n; }, 0), phoneNew: phoneNew };
             });
         }
         async function pull(quiet) {
@@ -255,7 +313,8 @@
                 return;
             }
             run.fails = 0; run.lastOk = new Date();
-            if (!keepMsg || r.changed) setStatus((r.changed ? '🆕 다른 노트북의 값을 합쳤습니다' : '🟢 연결됨') + ' · 같은 조의 다른 노트북 ' + (r.others || 0) + '대, 불러온 값 ' + (r.points || 0) + '개' +
+            if (r.phoneNew) { notifyPhone(r.phoneNew); }
+            if (!keepMsg || r.changed) setStatus((r.phoneNew ? '🆕 폰에서 새 측정 ' + r.phoneNew + '개가 들어왔어요' : r.changed ? '🆕 다른 노트북의 값을 합쳤습니다' : '🟢 연결됨') + ' · 같은 조의 다른 노트북 ' + (r.others || 0) + '대, 불러온 값 ' + (r.points || 0) + '개' +
                 (r.newItems ? ', 새 항목 ' + r.newItems + '개' : '') + ' <span class="cs-note">(마지막 확인 ' + timeText(run.lastOk) + (st.auto ? ', ' + pollSec() + '초마다 확인' : '') + ')</span>');
             render();
         }
@@ -288,7 +347,9 @@
             clearTimeout(cls.pending); cls.pending = null;
             cls.lastBeat = now;
             var submitted = typeof opts.getSubmitted === 'function' ? !!opts.getSubmitted() : st.sent.length > 0;
-            CC.heartbeat(SERVER.url, { classCode: CLASS, jo: cls.me.jo, num: cls.me.num, step: opts.getStep ? opts.getStep() : '',
+            var stepNow = opts.getStep ? String(opts.getStep() || '') : '';
+            if (PHONE) stepNow = ('phone-' + (stepNow || 'live')).slice(0, 20);   // 교사 화면에 📱 로 보임
+            CC.heartbeat(SERVER.url, { classCode: CLASS, jo: cls.me.jo, num: cls.me.num, step: stepNow,
                 points: opts.getPoints ? opts.getPoints() : '', submitted: submitted, device: st.device })
                 .then(function (r) { els.cmsg.innerHTML = r.ok ? '' : '⚠ 선생님께 진행 상황을 보내지 못했습니다: ' + esc(r.error); });
         }
@@ -308,7 +369,9 @@
             els.cpick.hidden = !!me; els.cjoined.hidden = !me;
             if (me) {
                 var g = CC.groupFor(i, me.jo);
-                els.cme.innerHTML = '나: <b>' + esc(me.jo) + '조 ' + esc(me.num) + '번</b> <span class="cs-note">· 조 코드 ' + esc(g ? g.code : '') + ' · 측정값은 조원·선생님과 자동으로 나눠요</span>';
+                els.cme.innerHTML = '나: <b>' + esc(me.jo) + '조 ' + esc(me.num) + '번</b>' + (PHONE ? ' 📱' : '') + ' <span class="cs-note">· 조 코드 ' + esc(g ? g.code : '') + ' · 측정값은 조원·선생님과 자동으로 나눠요</span>';
+                if (els.cphone) els.cphone.hidden = !opts.phone || !!PHONE;
+                if (els.cchange) els.cchange.hidden = !!PHONE;
                 return;
             }
             els.cjo.innerHTML = '<option value="">조 고르기</option>' + i.groups.map(function (g) { return '<option value="' + g.jo + '">' + g.jo + '조 (' + g.size + '명)</option>'; }).join('');
@@ -322,12 +385,13 @@
         function applyMe() {
             var g = CC.groupFor(cls.info, cls.me.jo);
             if (!g) return;
-            st.auto = true;
+            if (!PHONE) st.auto = true;
             if (st.group !== g.code) setGroup(g.code, true);
             else { saveSt(); if (typeof opts.onGroup === 'function') opts.onGroup(g.code); render(); if (mount) pull(true); }
             beat(true);
             clearInterval(cls.timer);
-            cls.timer = setInterval(function () { if (!document.hidden) beat(true); }, 60000);
+            // 폰은 측정·보내기 때만 신호 (노트북의 1분 신호와 번갈아 덮어쓰지 않게)
+            if (!PHONE) cls.timer = setInterval(function () { if (!document.hidden) beat(true); }, 60000);
         }
         async function startClass() {
             var r = await CC.joinInfo(SERVER.url, CLASS);
@@ -338,6 +402,8 @@
             }
             cls.info = r;
             cls.me = r.exp === exp ? loadMe() : null;
+            // 폰 주소에 조·번호가 있으면 그대로 (묻지 않음)
+            if (PHONE && PHONE.jo && PHONE.num && r.exp === exp && CC.groupFor(r, PHONE.jo) && CC.groupFor(r, PHONE.jo).code === PHONE.group) { cls.me = { c: CLASS, jo: PHONE.jo, num: PHONE.num }; saveMe(); }
             if (cls.me && !CC.groupFor(r, cls.me.jo)) cls.me = null;
             renderBar();
             if (cls.me) applyMe();
@@ -348,12 +414,14 @@
             bar.innerHTML = '<div id="cs-cinfo"><b>🏫 수업 참여</b> <span class="cs-note">불러오는 중…</span></div>' +
                 '<div class="cs-row" id="cs-cpick" hidden><label>조 <select id="cs-cjo" class="cs-in"></select></label><label>번호 <select id="cs-cnum" class="cs-in"></select></label>' +
                 '<button type="button" id="cs-cjoin" class="cs-btn good">참여하기</button></div>' +
-                '<div class="cs-row" id="cs-cjoined" hidden><span id="cs-cme"></span><button type="button" id="cs-cchange" class="cs-btn secondary">조·번호 바꾸기</button></div>' +
+                '<div class="cs-row" id="cs-cjoined" hidden><span id="cs-cme"></span><button type="button" id="cs-cchange" class="cs-btn secondary">조·번호 바꾸기</button>' +
+                (opts.phone && !PHONE ? '<button type="button" id="cs-cphone" class="cs-btn" hidden>📱 폰으로 측정하기</button>' : '') + '</div>' +
                 '<div id="cs-cmsg" class="cs-note" role="status" aria-live="polite"></div>';
             var where = opts.barMount ? $q(opts.barMount) : null;
             if (where) where.appendChild(bar);
             else { var h1 = document.querySelector('h1'); if (h1) h1.insertAdjacentElement('afterend', bar); else document.body.insertBefore(bar, document.body.firstChild); }
-            ['cinfo', 'cpick', 'cjo', 'cnum', 'cjoin', 'cjoined', 'cme', 'cchange', 'cmsg'].forEach(function (k) { els[k] = document.getElementById('cs-' + k); });
+            ['cinfo', 'cpick', 'cjo', 'cnum', 'cjoin', 'cjoined', 'cme', 'cchange', 'cmsg', 'cphone'].forEach(function (k) { els[k] = document.getElementById('cs-' + k); });
+            if (els.cphone) els.cphone.addEventListener('click', function () { openPhone(); });
             els.cjo.addEventListener('change', fillNums);
             els.cjoin.addEventListener('click', function () {
                 var jo = Number(els.cjo.value), num = Number(els.cnum.value);
@@ -370,11 +438,162 @@
             else startClass();
         }
 
+        // ----- 📱 폰 연결 -----
+        // 폰 쪽: 맨 위에 '노트북과 연결됨' 띠. 실험이 측정을 저장할 때 share.saved() 를 부르면 바로 보낸다
+        if (PHONE) {
+            var strip = document.createElement('div');
+            strip.className = 'cs-card cs-phone';
+            strip.innerHTML = '<div>📱 <b>노트북과 연결됨</b> · 조 <b>' + esc(PHONE.group) + '</b>' + (PHONE.jo && PHONE.num ? ' · ' + PHONE.jo + '조 ' + PHONE.num + '번' : '') +
+                '<br><span class="cs-note">' + (PICK ? '여러 번 측정해 저장한 뒤, 보낼 회차를 골라 <b>📤 고른 회차 보내기</b>를 누르세요.' : '측정을 저장하면 저절로 노트북(과 선생님 시트)으로 보내요.') + '</span></div>' +
+                (PICK ? '<div id="cs-runs" class="cs-runs"></div>' +
+                    '<div class="cs-row"><button type="button" id="cs-rall" class="cs-btn">☑ 전체 선택</button><button type="button" id="cs-rnone" class="cs-btn">☐ 전체 해제</button>' +
+                    '<button type="button" id="cs-rsend" class="cs-btn good">📤 고른 회차 보내기</button></div>' : '') +
+                '<div id="cs-pmsg" class="cs-note" role="status" aria-live="polite"></div>' +
+                '<div class="cs-row"><button type="button" id="cs-presend" class="cs-btn good" hidden>📤 다시 보내기</button></div>';
+            var pw = opts.barMount ? $q(opts.barMount) : null;
+            if (pw) pw.insertBefore(strip, pw.firstChild);
+            else { var h1p = document.querySelector('h1'); if (h1p) h1p.insertAdjacentElement('afterend', strip); else document.body.insertBefore(strip, document.body.firstChild); }
+            els.pmsg = document.getElementById('cs-pmsg'); els.presend = document.getElementById('cs-presend');
+            els.presend.addEventListener('click', function () { send(); });
+            if (PICK) {
+                els.runs = document.getElementById('cs-runs'); els.rsend = document.getElementById('cs-rsend');
+                document.getElementById('cs-rall').addEventListener('click', function () { setAll(true); });
+                document.getElementById('cs-rnone').addEventListener('click', function () { setAll(false); });
+                els.rsend.addEventListener('click', function () { sendPicked(); });
+                els.runs.addEventListener('change', function (e) {
+                    var id = e.target.getAttribute('data-id'); if (id == null || !st.runs[id]) return;
+                    if (e.target.type === 'checkbox') st.runs[id].sel = e.target.checked;
+                    else st.runs[id].memo = String(e.target.value || '').replace(/[|\u0000-\u001f]/g, ' ').trim().slice(0, 30);
+                    saveSt(); renderRuns();
+                });
+                els.runs.addEventListener('click', function (e) {
+                    var b = e.target.closest('[data-del]'); if (!b) return;
+                    var id = b.getAttribute('data-del'), r = st.runs[id];
+                    if (!window.confirm('이 회차를 지울까요?' + (r && r.sig ? ' (노트북·선생님 시트에서도 빠져요)' : ''))) return;
+                    var wasSent = !!(r && r.sig);
+                    try { opts.deleteItem(id); } catch (err) { /* 실험 쪽 오류 */ }
+                    delete st.runs[id]; saveSt(); renderRuns();
+                    if (wasSent && groupOk()) send(null, []);   // 보낸 회차였으면 시트의 그 줄도 비움
+                });
+                renderRuns();
+            }
+            if (!SERVER.url) { els.pmsg.innerHTML = '⚠ 선생님 시트 주소가 없어요. 측정한 뒤 ' + esc(opts.csvHint || 'CSV 저장') + ' 파일을 노트북으로 옮기세요.'; els.pmsg.classList.add('cs-err'); }
+        }
+        // ----- 📱 폰 회차 목록 (여러 번 재고 골라 보내기) -----
+        function itemSig(it) {   // 내용이 바뀌었는지 알아보는 짧은 지문
+            var s = JSON.stringify([it.title, it.n, it.summary || {}, it.data === undefined ? '' : it.data]), h = 0;
+            for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+            return s.length + ':' + h;
+        }
+        function syncRuns() {   // 실험의 회차와 목록 맞추기: 새 회차는 골라 둔 상태로
+            var items = opts.getItems ? (opts.getItems() || []) : [], seen = {};
+            items.forEach(function (it) {
+                var id = String(it.id); seen[id] = 1;
+                if (!st.runs[id]) st.runs[id] = { sel: true, memo: '', at: it.at || new Date().toISOString(), sig: '' };
+            });
+            Object.keys(st.runs).forEach(function (id) { if (!seen[id]) delete st.runs[id]; });
+            return items;
+        }
+        function markSent(rowIds) {
+            (opts.getItems ? (opts.getItems() || []) : []).forEach(function (it) {
+                var r = st.runs[String(it.id)];
+                if (r && rowIds.indexOf(rowId(st.device, it.id)) >= 0) { r.sig = itemSig(it); r.sel = false; }   // 보낸 것은 고르기 풀기 → 남은 것 = 못 보낸 것
+            });
+            saveSt();
+        }
+        function fmtNum(v) { var x = Number(v); return isFinite(x) && typeof v !== 'string' ? (Math.abs(x) >= 100 ? x.toFixed(0) : Math.abs(x) >= 1 ? x.toFixed(2) : x.toPrecision(3)) : String(v); }
+        function renderRuns() {
+            if (!els.runs) return;
+            var items = syncRuns(); saveSt();
+            var picked = items.filter(function (it) { return st.runs[String(it.id)].sel; }).length;
+            els.rsend.textContent = '📤 고른 회차 보내기 (' + picked + '개)';
+            els.rsend.disabled = !picked || run.busy;
+            if (!items.length) { els.runs.innerHTML = '<p class="cs-note">아직 저장한 회차가 없어요. 측정하고 저장하면 여기에 1회, 2회… 로 쌓여요 (새로고침해도 남아요).</p>'; return; }
+            els.runs.innerHTML = items.map(function (it, k) {
+                var id = String(it.id), r = st.runs[id];
+                var at = new Date(r.at), when = isNaN(at) ? '' : at.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+                var sum = Object.keys(it.summary || {}).slice(0, 3).map(function (k2) { return esc(k2) + ' ' + esc(fmtNum(it.summary[k2])); }).join(' · ');
+                var state = !r.sig ? '<span class="cs-rst">보내기 전</span>' : r.sig === itemSig(it) ? '<span class="cs-rst ok">✅ 보냄</span>' : '<span class="cs-rst warn">✏️ 바뀜 · 다시 보내기</span>';
+                return '<div class="cs-run' + (r.sel ? ' on' : '') + '"><label class="cs-rchk"><input type="checkbox" data-id="' + esc(id) + '"' + (r.sel ? ' checked' : '') + '> <b>' + esc(it.title || ((k + 1) + '회')) + '</b></label> ' + state +
+                    '<div class="cs-note">' + esc(when) + (it.n != null ? ' · ' + esc(it.n) + '점' : '') + (sum ? ' · ' + sum : '') + '</div>' +
+                    '<div class="cs-row"><input type="text" class="cs-memo" data-id="' + esc(id) + '" maxlength="30" placeholder="메모 (선택, 예: 손에 들고)" value="' + esc(r.memo || '') + '" aria-label="' + esc(it.title || '') + ' 메모">' +
+                    (typeof opts.deleteItem === 'function' ? '<button type="button" class="cs-btn" data-del="' + esc(id) + '" aria-label="' + esc(it.title || '') + ' 지우기">🗑</button>' : '') + '</div></div>';
+            }).join('');
+        }
+        function setAll(on) { syncRuns(); Object.keys(st.runs).forEach(function (id) { st.runs[id].sel = on; }); saveSt(); renderRuns(); }
+        function sendPicked() {
+            syncRuns();
+            var ids = Object.keys(st.runs).filter(function (id) { return st.runs[id].sel; });
+            if (!ids.length) { els.pmsg.innerHTML = '⚠ 보낼 회차에 체크하세요.'; els.pmsg.classList.add('cs-err'); return Promise.resolve({ ok: false }); }
+            return send(null, ids);
+        }
+        if (typeof opts.onRole === 'function') opts.onRole(role);
+        // 노트북 쪽: QR 창
+        var dlg = null;
+        function siteRoot() { var h = location.href.split('#')[0].split('?')[0]; var i = h.indexOf('/projects/'); return i >= 0 ? h.slice(0, i + 1) : h.replace(/[^/]*$/, ''); }
+        function phoneLink() {
+            var base = opts.phone && typeof opts.phone === 'object' && opts.phone.page ? siteRoot() + String(opts.phone.page).replace(/^\/+/, '') : location.href.split('#')[0];
+            return phoneUrl(base, { group: st.group, scriptId: SERVER.id || '', classCode: CLASS && cls.me ? CLASS : '', jo: cls.me && cls.me.jo, num: cls.me && cls.me.num });
+        }
+        function ensureQr() {
+            if (typeof window.qrcode === 'function') return Promise.resolve(true);
+            return new Promise(function (res) {
+                var sc = document.createElement('script');
+                sc.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js';
+                sc.onload = function () { res(typeof window.qrcode === 'function'); }; sc.onerror = function () { res(false); };
+                document.head.appendChild(sc);
+            });
+        }
+        async function openPhone() {
+            if (!groupOk()) { setStatus('먼저 조 코드를 정하세요. 그다음 📱 폰으로 측정하기를 누르면 폰용 QR 이 나와요.', true); if (els.share) els.share.open = true; return; }
+            var link = phoneLink();
+            if (!dlg) {
+                dlg = document.createElement('div');
+                dlg.className = 'cs-dlg'; dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-label', '폰으로 측정하기 QR');
+                dlg.innerHTML = '<div class="cs-dlg-in"><h2>📱 폰으로 측정하기</h2><p class="cs-note">폰 카메라로 QR 을 찍으면 측정 화면이 이 조(<b id="cs-dgroup"></b>)로 열려요. 폰에서 측정을 저장하면 몇 초 안에 이 노트북에 들어와요.</p>' +
+                    '<div id="cs-qr" class="cs-qr"></div><p class="cs-link"><a id="cs-plink" target="_blank" rel="noopener"></a></p>' +
+                    '<div class="cs-row"><button type="button" id="cs-pcopy" class="cs-btn secondary">🔗 주소 복사</button><button type="button" id="cs-pclose" class="cs-btn">닫기</button></div></div>';
+                document.body.appendChild(dlg);
+                document.getElementById('cs-pclose').addEventListener('click', function () { dlg.hidden = true; });
+                document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && dlg) dlg.hidden = true; });
+                document.getElementById('cs-pcopy').addEventListener('click', async function () {
+                    var b = document.getElementById('cs-pcopy');
+                    try { await navigator.clipboard.writeText(document.getElementById('cs-plink').href); b.textContent = '✅ 복사함'; } catch (e) { prompt('아래 주소를 복사하세요.', document.getElementById('cs-plink').href); }
+                    setTimeout(function () { b.textContent = '🔗 주소 복사'; }, 1500);
+                });
+            }
+            document.getElementById('cs-dgroup').textContent = st.group;
+            var a = document.getElementById('cs-plink'); a.href = link; a.textContent = link;
+            dlg.hidden = false;
+            document.getElementById('cs-pclose').focus();
+            var ok = await ensureQr(), box = document.getElementById('cs-qr');
+            if (ok) { var qr = window.qrcode(0, 'M'); qr.addData(link); qr.make(); box.innerHTML = qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true }); }
+            else box.innerHTML = '<p class="cs-note">QR 을 만드는 도구를 불러오지 못했어요(인터넷 확인). 아래 주소를 폰에서 열어도 돼요.</p>';
+            // 폰에서 오는 측정을 받도록 자동 불러오기를 켬
+            if (!st.auto) { st.auto = true; saveSt(); }
+            render(); pull(true);
+        }
+        if (els.phone) els.phone.addEventListener('click', function () { openPhone(); });
+        function notifyPhone(n) {
+            if (typeof opts.onPhoneData === 'function') { try { opts.onPhoneData(n); } catch (e) { /* 무시 */ } }
+            if (dlg && !dlg.hidden) { var p = dlg.querySelector('.cs-note'); if (p) p.innerHTML = '🆕 <b>폰에서 새 측정 ' + n + '개</b>가 들어왔어요! 창을 닫고 표를 보세요.'; }
+        }
+
         render();
         if (groupOk() && st.auto && !CLASS && mount) pull(true);
         if (groupOk() && typeof opts.onGroup === 'function' && !CLASS) opts.onGroup(st.group);
         return {
             send: send, pull: pull, render: render, beat: beat,
+            role: function () { return role; }, isPhone: function () { return !!PHONE; },
+            openPhone: openPhone, phoneLink: phoneLink,
+            // 실험이 측정 하나를 저장했을 때 부른다: 폰 화면(또는 autoSendOnSave)이면 바로 보내기
+            // 폰은 기본으로 회차 목록에 쌓기만 하고(고른 회차 보내기), autoSendOnSave: true 면 바로 보낸다
+            saved: function () {
+                if (PICK) { renderRuns(); els.pmsg.classList.remove('cs-err'); els.pmsg.innerHTML = '💾 저장했어요. 보낼 회차에 체크하고 <b>📤 고른 회차 보내기</b>를 누르세요.'; return Promise.resolve({ ok: true, skipped: true, listed: true }); }
+                return (PHONE || opts.autoSendOnSave) && groupOk() ? send() : Promise.resolve({ ok: true, skipped: true });
+            },
+            sendPicked: function () { return PICK ? sendPicked() : send(); },
+            runs: function () { return st.runs; },
             stepChanged: function () { beat(false); },
             setGroup: setGroup,
             group: function () { return st.group; }, device: function () { return st.device; },
@@ -383,5 +602,6 @@
         };
     }
 
-    return { init: init, buildPayloads: buildPayloads, incomingFrom: incomingFrom, rowId: rowId, newDeviceId: newDeviceId, deviceLabel: deviceLabel, fixState: fixState };
+    return { init: init, buildPayloads: buildPayloads, incomingFrom: incomingFrom, rowId: rowId, newDeviceId: newDeviceId, deviceLabel: deviceLabel, fixState: fixState,
+        isPhoneDevice: isPhoneDevice, readPhoneParams: readPhoneParams, phoneUrl: phoneUrl };
 });

@@ -95,8 +95,12 @@
         return Math.floor(s / 3600) + '시간 전';
     }
     function stepName(exp, step) {
+        // 폰 연결(📱)로 연 화면은 단계 앞에 'phone-' 을 붙여 보낸다
+        var ph = /^phone-/.test(String(step || ''));
+        if (ph) step = String(step).slice(6);
         var e = expInfo(exp);
-        return (e && e.steps[step]) || (step ? step : '–');
+        var name = (e && e.steps[step]) || (step ? step : '–');
+        return ph ? '📱 ' + (name === 'live' ? '폰으로 측정 중' : name) : name;
     }
     /* 선생님이 만든 실험이 학생에게 공개되었는지 (로그인 없이 Firestore 를 읽어 봄. 규칙: published == true 일 때만 누구나 읽기)
        돌려주는 값: { state: 'public', title } | { state: 'hidden' }(비공개이거나 없는 번호) | { state: 'unknown', error }(인터넷 등) */

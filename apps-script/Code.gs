@@ -43,7 +43,7 @@
  * 4단계(보고서·AI)용 시트 reports·ai_logs·quiz 는 만들어 두기만 한다.
  */
 
-var VERSION = 7;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠  6: 모든 실험 공용 저장(submissions 시트)·수업에 모든 실험  7: 요약 이름에 °·%·한글 등 허용('|'·제어 문자만 막음)
+var VERSION = 8;   // 2: 조 코드·글자를 시트에 '글자'로 저장 (2-3-5376 이 날짜로 바뀌던 문제)  3: LED 플랑크 상수(planck 시트) 추가  4: 수업 연결(classes·progress 시트)  5: 스스로 업데이트·관리 열쇠  6: 모든 실험 공용 저장(submissions 시트)·수업에 모든 실험  7: 요약 이름에 °·%·한글 등 허용('|'·제어 문자만 막음)  8: 업데이트·되돌리기 오류에 원래 문구와 권한 안내
 // 스스로 업데이트: 코드는 이 고정 주소에서만 받는다 (요청 값으로 바꿀 수 없음)
 var SITE = 'https://aks-sci-lab.web.app/apps-script/';
 var SCRIPT_API = 'https://script.googleapis.com/v1/projects/';
@@ -557,9 +557,21 @@ function requireAdmin(b) {
 }
 function hexOf(bytes) { return bytes.map(function (b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join(''); }
 // 고정된 사이트 주소에서 파일 받기 (이름은 정해 둔 것만)
+// 오류를 가리지 않는다: 원래 문구를 그대로 붙이고, 권한 문제로 보이면 무엇을 하면 되는지 덧붙인다
+var PERM_RE = /permission|권한|authoriz|Required permissions|script\.external_request|not allowed to call/i;
+var PERM_HINT = ' → 이 스크립트에 새 권한 허용이 필요해요: Apps Script 편집기의 appsscript.json 이 사이트 것과 같은지 확인하고, 배포 → 배포 관리 → ✏️ → 버전 "새 버전" → 배포 → 권한 확인 창에서 허용하세요 (또는 편집기에서 함수 setupSheets 를 한 번 실행해 허용).';
+function errText(err) { return String(err && err.message || err); }
+function withHint(prefix, err) {
+  var m = errText(err);
+  var text = prefix ? prefix + ': ' + m : m;
+  if (PERM_RE.test(m) && m.indexOf('배포 관리') < 0 && m.indexOf('손으로') < 0) text += PERM_HINT;
+  return new Error(text);
+}
 function siteFile(name, max) {
   if (['release.json', 'Code.gs', 'appsscript.json'].indexOf(name) < 0) throw new Error('받을 수 없는 파일입니다.');
-  var res = UrlFetchApp.fetch(SITE + name + '?_=' + Date.now(), { muteHttpExceptions: true, followRedirects: true });
+  var res;
+  try { res = UrlFetchApp.fetch(SITE + name + '?_=' + Date.now(), { muteHttpExceptions: true, followRedirects: true }); }
+  catch (err) { throw withHint('사이트에서 ' + name + ' 을 받는 중 오류', err); }
   if (res.getResponseCode() !== 200) throw new Error('사이트에서 ' + name + ' 을 받지 못했습니다 (' + res.getResponseCode() + ').');
   var bytes = res.getContent();
   if (bytes.length > max) throw new Error(name + ' 이 너무 큽니다.');
@@ -595,8 +607,13 @@ function scopesOf(manifestText) {
 }
 function selfUpdate(b) {
   requireAdmin(b);
+  try { return selfUpdateInner(b); } catch (err) { throw withHint('', err); }
+}
+function selfUpdateInner(b) {
   var rel;
-  try { rel = JSON.parse(siteFile('release.json', 5000).text); } catch (err) { throw new Error(String(err.message || err).indexOf('받지 못했') >= 0 ? err.message : '사이트의 release.json 을 읽지 못했습니다.'); }
+  var relText;
+  relText = siteFile('release.json', 5000).text;   // 받기 오류는 siteFile 이 원래 문구와 함께 알림
+  try { rel = JSON.parse(relText); } catch (err) { throw new Error('사이트의 release.json 을 읽지 못했습니다: ' + errText(err) + ' (받은 글 앞부분: ' + String(relText).slice(0, 60) + ')'); }
   var to = Number(rel.version);
   if (!(to % 1 === 0 && to > VERSION)) throw new Error('이미 최신입니다 (지금 ' + VERSION + '판, 사이트 ' + rel.version + '판).');
   var code = siteFile('Code.gs', UPDATE_MAX_CODE), man = siteFile('appsscript.json', UPDATE_MAX_MANIFEST);
@@ -642,6 +659,9 @@ function selfUpdate(b) {
 }
 function rollback(b) {
   requireAdmin(b);
+  try { return rollbackInner(b); } catch (err) { throw withHint('', err); }
+}
+function rollbackInner(b) {
   var prev = Number(props().getProperty(PROP_PREV));
   if (!(prev > 0)) throw new Error('되돌릴 이전 버전이 없습니다.');
   var lock = LockService.getScriptLock();
