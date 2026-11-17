@@ -76,3 +76,8 @@ canvas.chart.small { height: 140px; margin-top: 6px; }
 .br-run .row { justify-content: center; }
 button.big { font-size: 1.15rem; padding: 14px 20px; min-height: 56px; }
 body.mode-breath #start, body.mode-breath #dur, body.mode-breath #runs-box, body.mode-breath #detail-box, body.mode-breath details.sim { display: none !important; }
+
+/* ---------- 📱 폰 화면 (?role=phone): 측정만, 계산·결과는 노트북 ---------- */
+body.hr-phone #runs-box, body.hr-phone #detail-box, body.hr-phone details.sim,
+body.hr-phone #br-result, body.hr-phone #br-profile-box, body.hr-phone #br-runs-box, body.hr-phone #br-phone-note { display: none !important; }
+#br-phone-note { margin: 0 0 var(--sp-3); }

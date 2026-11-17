@@ -6,12 +6,14 @@
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
     <title>데이터 가공 실험실 — 심박수 원본에서 결과까지</title>
+    <link rel="stylesheet" href="../css/class-share.css">
     <link rel="stylesheet" href="../css/data-lab.css">
 </head>
 <body>
 <main class="dl">
     <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
     <h1>🧪 데이터 가공 실험실</h1>
+    <div id="class-bar-mount"></div>
     <p class="lead">스마트폰 카메라 심박수의 <b>원본 자료</b>가 어떤 단계를 거쳐 '심박수 한 개'가 되는지 직접 골라 가며 봅니다. 단계마다 설정을 바꾸면 그 아래 단계와 <b>최종 심박수</b>가 바로 다시 계산돼요. 코딩·수식 없이, 그래프의 <b>전 → 후</b>를 비교하세요.</p>
 
     <!-- 자료 고르기 -->
@@ -21,6 +23,12 @@
         <input type="file" id="file" accept=".csv,text/csv,text/plain" hidden>
     </div>
     <p id="src-note" class="note"></p>
+    <p id="phone-new" class="ok" role="status" aria-live="polite" hidden></p>
+    <details class="dl-more dl-phone" id="phone-box">
+        <summary>📱 폰으로 재고 여기서 분석하기 (👥 조 공유)</summary>
+        <p class="note">측정은 스마트폰, 분석은 이 노트북에서 해요. 조 코드를 정하고 <b>📱 폰으로 측정하기</b> QR 을 폰으로 찍으세요. 폰에서 잰 회차를 골라 보내면 위 '자료' 목록에 <b>📱 폰 …</b> 으로 들어와요. 폰이 보낸 원본(밝기 숫자, 영상 아님)은 <b>선생님 구글 시트를 거쳐</b> 같은 조 기기만 불러와요.</p>
+        <div id="share-mount"></div>
+    </details>
 
     <!-- 늘 보이는 최종 결과 + 단계 탭 -->
     <div class="dl-top">
@@ -181,14 +189,19 @@
     <details class="dl-more">
         <summary>ℹ️ 이 페이지에 대해</summary>
         <ul class="note">
-            <li>개인정보: 이름·학번을 받지 않습니다. 영상은 없고 색 평균 숫자만 다룹니다. 불러온 CSV 는 이 브라우저 안에서만 계산하고 어디에도 보내지 않습니다.</li>
+            <li>개인정보: 이름·학번을 받지 않습니다. 영상은 없고 색 평균 숫자만 다룹니다. 불러온 CSV 는 이 브라우저 안에서만 계산하고 어디에도 보내지 않습니다. 📱 폰에서 받은 원본은 선생님 시트를 거쳐 오고, 계산은 이 노트북에서 합니다.</li>
             <li>내 측정 CSV: <a href="heart-rate.html">스마트폰 카메라 심박수</a> 페이지의 '원본 CSV' 또는 phyphox 의 CSV.</li>
             <li>예시 자료 '선생님 실측'은 실제 폰(갤럭시 Z 플립6)으로 잰 원본, '가짜 자료'는 컴퓨터가 정해 둔 심박수로 만든 시뮬레이션입니다.</li>
             <li>수업용 — 의료 진단에 쓰지 마세요.</li>
         </ul>
     </details>
 </main>
+<script src="../js/pendulum-config.js"></script>
+<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/class-cloud.js"></script>
+<script src="../js/class-share.js"></script>
 <script src="../js/heart-rate-math.js"></script>
+<script src="../js/heart-rate-raw.js"></script>
 <script src="../js/data-lab-math.js"></script>
 <script src="../js/data-lab.js"></script>
 </body>

@@ -53,6 +53,7 @@
 
     <!-- ===== 숨 참기 탐구 (설계: docs/data-processing-class-design.md 2부) ===== -->
     <section id="breath" class="breath" hidden>
+        <div id="br-phone-note" class="ok" hidden></div>
         <div class="br-card" id="br-setup">
             <h2>🫁 숨 참기와 심박수</h2>
             <p class="note">안정 <b>60초</b> → 숨 참기 <b>30초 또는 60초</b> → 회복 <b>60초</b> 를 끊지 않고 이어서 잽니다. 힘들면 언제든 <b>■ 숨 참기 멈춤</b> — 멈춘 것도 정상 자료예요(실패가 아님).</p>
@@ -108,6 +109,7 @@
             <p id="br-send-st" class="note" role="status"></p>
             <div id="br-share-mount"></div>
             <p class="note">📤 보내기는 '수업 분석 동의'를 체크한 회차만 보내요. 이름·학번·성별은 보내지 않아요.</p>
+            <p class="note">📱 <b>폰으로 재고 노트북에서 분석</b>: 아래 '👥 조 공유'의 '📱 폰으로 측정하기' QR 을 폰으로 찍으세요. 폰이 보낸 원본(밝기 숫자, 영상 아님)은 선생님 시트를 거쳐 같은 조 기기만 불러와요. 동의하지 않은 회차의 결과는 이 노트북에만 남아요.</p>
         </details>
     </section>
 
@@ -185,6 +187,7 @@
 <script src="../js/dev-collect.js"></script>
 <script src="../js/heart-rate-math.js"></script>
 <script src="../js/heart-rate.js"></script>
+<script src="../js/heart-rate-raw.js"></script>
 <script src="../js/heart-rate-breath.js"></script>
 <script src="../js/heart-rate-breath-ui.js"></script>
 </body>

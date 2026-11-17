@@ -79,8 +79,10 @@
         sel.append(g1, g2);
         if (custom.length) {
             const g3 = document.createElement('optgroup'); g3.label = '내 측정 (불러온 CSV)';
-            custom.forEach((c, i) => g3.appendChild(new Option(c.title, 'csv:' + i)));
-            sel.appendChild(g3);
+            const g4 = document.createElement('optgroup'); g4.label = '📱 폰에서 받은 측정';
+            custom.forEach((c, i) => (c.srcKey ? g4 : g3).appendChild(new Option(c.title, 'csv:' + i)));
+            if (g3.children.length) sel.appendChild(g3);
+            if (g4.children.length) sel.appendChild(g4);
         }
     }
     async function loadSource(id) {
@@ -116,6 +118,51 @@
         fillSources();
         loadSource('csv:' + (custom.length - 1));
     });
+    // ---------- 📱 폰에서 받은 원본 (조 공유, exp heartrate · kind 'raw') ----------
+    const R = window.HeartRateRaw;
+    const seenRaw = {};
+    function takeRaw(items) {
+        if (!R) return 0;
+        let added = 0;
+        R.rawIncoming(items).forEach(it => {
+            const sig = it.key + '|' + it.sentAt;
+            if (seenRaw[sig]) return;
+            seenRaw[sig] = true;
+            const u = R.rawUnpack(it.raw);
+            if (!u || !u.frames.length) return;
+            const who = (/^p/.test(it.device) ? '📱 폰 ' : '💻 ') + it.device.replace(/^p/, '').slice(0, 4).toUpperCase();
+            const old = custom.findIndex(c => c.srcKey === it.key);
+            const n = old >= 0 ? custom[old].no : custom.filter(c => c.srcKey).length + 1;
+            const kind = u.mode === 'breath' ? '🫁 숨 참기' : '❤️ 한 번 재기';
+            const t = R.timeText(u.at);
+            const entry = {
+                srcKey: it.key, no: n, title: who + ' · ' + n + '회차' + (t ? ' (' + t + ')' : ''),
+                note: kind + ' · ' + u.frames.length + '장' + (u.decimate > 1 ? ` (원래 ${u.frames0}장을 ${u.decimate}장마다 1장으로 솎음)` : '') + ' · 폰에서 잰 원본을 선생님 시트로 받아 이 노트북에서 계산',
+                frames: u.frames, lock: u.lock === 'locked' ? 'csv-locked' : (u.lock || 'unlocked')
+            };
+            if (old >= 0) custom[old] = entry; else { custom.push(entry); added++; }
+        });
+        if (added) fillSources();
+        if ($('src').value !== (store.src || '')) $('src').value = store.src || $('src').value;
+        return added;
+    }
+    function phoneNew(n) {
+        const el = $('phone-new');
+        if (!el || !n) return;
+        el.hidden = false;
+        el.innerHTML = '🆕 <b>폰에서 새 측정 ' + n + '개</b>가 들어왔어요. 위 <b>자료</b> 목록의 \'📱 폰에서 받은 측정\'에서 고르세요.';
+    }
+    let share = null;
+    if (window.ClassShare) {
+        share = ClassShare.init({
+            exp: 'heartrate', barMount: '#class-bar-mount', shareMount: '#share-mount',
+            getItems: () => [],
+            onIncoming: items => { const n = takeRaw(items); if (n) phoneNew(n); },
+            getStep: () => 'datalab',
+            phone: { page: 'projects/heart-rate.html' }
+        });
+    }
+
     function showMsg(t) { $('msg').hidden = !t; $('msg').textContent = t; }
 
     // ---------- 설정 칸 ↔ settings ----------

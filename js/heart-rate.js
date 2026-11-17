@@ -8,7 +8,9 @@
     const H = window.HeartRateMath;
     const $ = id => document.getElementById(id);
     const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    const KEY = 'heart-rate:v1';
+    // 📱 노트북 QR 로 연 폰 화면(?role=phone&group=…)은 기록을 노트북 화면과 따로 저장 (js/heart-rate-breath-ui.js 가 조 공유·폰 연결을 맡음)
+    const PHONE = /[?&]role=phone(?:&|#|$)/.test(location.search);
+    const KEY = 'heart-rate:v1' + (PHONE ? ':phone' : '');
     const MAX_RUNS = 30;
     const LEVEL = { good: '🟢', fair: '🟡', bad: '🔴' };
 
@@ -374,11 +376,12 @@
         });
     }
     function newId() { let k = 1; const ids = new Set(state.runs.map(r => r.id)); while (ids.has('r' + k)) k++; return 'r' + k; }
+    const hooks = {};   // 숨 참기·폰 연결(js/heart-rate-breath-ui.js)이 채움: onRunSaved(run), onRunDeleted(id)
     function addRun(o) {
         const raw = H.pack(o.frames);
         const scene = o.scene ? { y: o.scene.y, exposureTime: o.scene.exposureTime, iso: o.scene.iso } : null;
         const a = analyzeFrames(o.lock, H.unpack(raw), scene);
-        const run = { id: newId(), at: o.at || new Date().toISOString(), lock: o.lock, why: o.why || '', torch: !!o.torch, sim: !!o.sim, palp: null, scene, lockLog: o.lockLog || null, raw, res: summarize(a) };
+        const run = { id: newId(), at: o.at || new Date().toISOString(), lock: o.lock, why: o.why || '', torch: !!o.torch, sim: !!o.sim, palp: null, scene, lockLog: o.lockLog || null, raw, res: summarize(a), from: o.from || '', srcKey: o.srcKey || '' };
         state.runs.push(run);
         while (state.runs.length > MAX_RUNS) state.runs.shift();
         state.pick = run.id;
@@ -394,6 +397,7 @@
                 (res.doubled ? '<br>🔁 처음 찾은 값의 두 배가 더 그럴듯해 바꿨어요 (어두우면 절반으로 잡히기 쉬워요).' : '') +
                 `<br>${esc(signalNote(res))}` + (res.level === 'bad' ? '<br>신뢰도가 낮아요. 손가락을 다시 덮고 가만히 재 보세요.' : ''), res.level === 'bad' || (res.exposure && res.exposure.warn) || (res.light && res.light.level !== 'ok') ? 'warn' : '');
         } else msg('저장했지만 심박수를 찾지 못했어요: ' + esc((res.reasons || []).join(', ')) + '. 손가락을 다시 덮고 재 보세요.', 'warn');
+        if (typeof hooks.onRunSaved === 'function' && !o.fromPhone) { try { hooks.onRunSaved(run); } catch (e) { /* 무시 */ } }
         return run;
     }
     function summarize(a) {
@@ -419,7 +423,7 @@
     // ---------- 회차 목록 ----------
     const runTime = at => { const d = new Date(at); return isNaN(d) ? '' : d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
     const MODE_SHORT = { locked: '🔒 노출 고정', corrected: '⚠ 노출 보정', raw: '⚠ 보정 전 밝기', nocorrect: '⚠ 보정 불가' };
-    function runName(r, i) { return (i + 1) + '회' + (r.sim ? ' 🧪' : r.lock.startsWith('csv') ? ' 📂' : ''); }
+    function runName(r, i) { return (i + 1) + '회' + (r.sim ? ' 🧪' : r.from ? ' · ' + r.from : r.lock.startsWith('csv') ? ' 📂' : ''); }
     function renderRuns() {
         const ul = $('runs');
         $('runs-empty').hidden = !!state.runs.length;
@@ -445,7 +449,7 @@
     $('runs').addEventListener('click', e => {
         const b = e.target.closest('button');
         if (!b) return;
-        if (b.dataset.del) { if (!confirm('이 회차를 지울까요?')) return; state.runs = state.runs.filter(r => r.id !== b.dataset.del); save(); renderRuns(); renderDetail(); }
+        if (b.dataset.del) { if (!confirm('이 회차를 지울까요?')) return; deleteRun(b.dataset.del); }
         else if (b.dataset.csv) downloadRunCsv(b.dataset.csv);
         else if (b.dataset.view) { state.pick = b.dataset.view; save(); renderPick(); $('detail-box').open = true; renderDetail(); $('detail-box').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     });
@@ -580,5 +584,6 @@
     // 시험용
     window.__heartRate = { state: () => state, addRun, phase: () => phase };
     // 숨 참기 탐구(js/heart-rate-breath-ui.js)가 같은 카메라·노출 잠금·기록을 쓰도록
-    window.__hrCore = { start, finish, phase: () => phase, rec: () => rec, live: () => live, plot, msg, download, esc, LEVEL, hasCamera: () => !!stream, lastScene: () => lastScene };
+    function deleteRun(id) { state.runs = state.runs.filter(r => r.id !== id); save(); renderRuns(); renderDetail(); if (typeof hooks.onRunDeleted === 'function') hooks.onRunDeleted(id); }
+    window.__hrCore = { hooks, runs: () => state.runs, deleteRun, addRun, isPhone: PHONE, start, finish, phase: () => phase, rec: () => rec, live: () => live, plot, msg, download, esc, LEVEL, hasCamera: () => !!stream, lastScene: () => lastScene };
 })();
