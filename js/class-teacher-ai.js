@@ -63,7 +63,7 @@
         if (r.models.length) $('aiModelList').innerHTML = r.models.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('');
         var model = $('aiModel').value.trim(), has = !r.models.length || r.models.indexOf(model) >= 0;
         var c = await RA.callAI({ provider: p, model: model, key: keyNow(), system: '한 단어로만 답한다.', user: '준비됐으면 "준비"라고만 답해.', timeoutMs: 30000 });
-        if (!c.ok) { m.className = 'note err'; m.textContent = '⚠️ 키는 맞지만 ' + model + ' 로 답을 받지 못했어요: ' + c.error + (has ? '' : ' (이 키로 쓸 수 있는 모델 목록에 없어요 — 모델 칸에서 다시 고르세요)'); return; }
+        if (!c.ok) { m.className = 'note err'; m.textContent = '⚠️ 키는 맞지만 ' + model + ' 로 답을 받지 못했어요: ' + c.error + ' — 모델 이름을 확인하세요' + (has ? '.' : ' (이 키로 쓸 수 있는 모델 목록에 없어요. 모델 칸에 직접 쓰거나 목록에서 고르세요).'); return; }
         m.className = 'note'; m.textContent = '✅ 키가 맞아요 — ' + model + ' 가 답했어요 ("' + c.text.slice(0, 20) + '"). 쓸 수 있는 모델 ' + r.models.length + '개를 모델 칸 목록에 넣었어요.';
     });
 
@@ -122,12 +122,25 @@
             if (queue.length) { renderDesk(); if (state.view) renderView(); }
         } finally { state.busy = false; }
     }
+    // 선생님 요금 지키기: 규칙은 조 코드 '모양'만 보므로, 부르기 전에 여기서 세 번 막는다
+    //   ① 이 수업에 없는 조 코드(가짜 조 코드를 바꿔 가며 한도를 늘리기) ② 수업 전체 상한 = 조 한도 × 조 수 ③ 한 기기(uid)가 여러 조를 오가며 쓰기
+    function guard(x) {
+        var q = x.q, limit = x.r.limit, groups = x.r.groups || [], asks = x.r.asks;
+        var g = groups.filter(function (k) { return k.code === q.group; })[0];
+        if (!g || (q.jo && Number(g.jo) !== Number(q.jo))) return { status: 'error', used: 0, error: '이 수업에 없는 조예요. 선생님이 준 QR 로 들어와 🏫 수업 참여에서 조·번호를 다시 고르세요.' };
+        var done = function (f) { return asks.filter(function (a) { return a.status === 'done' && a.id !== q.id && f(a); }).length; };
+        var used = done(function (a) { return a.group === q.group; });
+        if (used >= limit) return { status: 'limit', used: used, error: '이 조는 이 수업에서 AI 질문을 ' + limit + '번까지 쓸 수 있는데 다 썼어요. 이제는 스스로 검토하거나 선생님께 물어보세요.' };
+        var all = done(function () { return true; });
+        if (all >= limit * groups.length) return { status: 'limit', used: used, error: '이 수업 전체의 AI 질문 한도(' + limit * groups.length + '번)를 다 썼어요.' };
+        if (q.uid && done(function (a) { return a.uid === q.uid; }) >= limit) return { status: 'limit', used: used, error: '이 기기에서 쓸 수 있는 AI 질문(' + limit + '번)을 다 썼어요.' };
+        return { ok: true, used: used };
+    }
     async function answer(x) {
-        var c = x.c, q = x.q, limit = x.r.limit, used = usedOf(x.r.asks, q.group, q.id);
-        if (used >= limit) {
-            await call(c.space, { action: 'aiAnswer', id: q.id, status: 'limit', used: used, limit: limit,
-                error: '이 조는 이 수업에서 AI 질문을 ' + limit + '번까지 쓸 수 있는데 다 썼어요. 이제는 스스로 검토하거나 선생님께 물어보세요.' });
-            q.status = 'limit';
+        var c = x.c, q = x.q, limit = x.r.limit, gd = guard(x), used = gd.used;
+        if (!gd.ok) {
+            await call(c.space, { action: 'aiAnswer', id: q.id, status: gd.status, used: used, limit: limit, error: gd.error });
+            q.status = gd.status;
             return;
         }
         var cl = await call(c.space, { action: 'aiClaim', id: q.id });

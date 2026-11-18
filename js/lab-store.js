@@ -444,7 +444,7 @@
                 answer: String(d.answer || ''), error: String(d.error || ''), provider: String(d.provider || ''), model: String(d.model || ''),
                 used: d.used == null ? null : Number(d.used), limit: d.limit == null ? null : Number(d.limit), verify: String(d.verify || ''),
                 createdAt: iso(d.createdAt), answeredAt: iso(d.answeredAt || ''), busyAt: iso(d.busyAt || ''), device: String(d.device || '') };
-            if (full) { o.draft = String(d.draft || ''); o.calc = String(d.calc || ''); }
+            if (full) { o.draft = String(d.draft || ''); o.calc = String(d.calc || ''); o.uid = String(d.uid || ''); }   // uid: 교사 화면이 기기별 상한을 셈
             return o;
         }
         function byTime(a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)) || String(a.id).localeCompare(String(b.id)); }

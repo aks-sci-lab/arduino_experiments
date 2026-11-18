@@ -203,3 +203,86 @@ test('보고서 AI: 수업 밖에서 열면 AI 는 꺼지고 글쓰기·저장�
         assert.deepEqual(errors, []);
     } finally { await browser.close(); stat.close(); }
 });
+
+// 선생님 요금 지키기: 규칙은 조 코드 모양만 보므로 교사 화면이 부르기 전에 막는다 (통합 관리 세션 검토 의견)
+// 학생 기기가 core 검사를 건너뛰고 Firestore 에 직접 쓴 질문을 흉내 내 메모리 DB 에 바로 넣는다
+test('보고서 AI: 가짜 조 코드·수업 전체 상한·한 기기가 조를 오가기 → AI 를 부르지 않음', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
+    const app = loadLabStore();
+    const api = labServer(app);
+    const stat = http.createServer((req, res) => {
+        const p = path.join(REPO, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+        fs.readFile(p, (e, d) => { if (e) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }[path.extname(p)] || 'text/plain') + '; charset=utf-8' }); res.end(d); });
+    });
+    await new Promise(r => api.listen(0, r)); await new Promise(r => stat.listen(0, r));
+    const API = 'http://127.0.0.1:' + api.address().port + '/exec', ROOT = 'http://127.0.0.1:' + stat.address().port + '/';
+    const browser = await chromium.launch(), errors = [];
+    let calls = 0;
+    try {
+        const c = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API) }));
+        await c.route(/cdn\.jsdelivr|cdnjs/, r => r.fulfill({ contentType: 'text/javascript', body: /qrcode/.test(r.request().url()) ? QR : CHART_STUB }));
+        await c.route(/gstatic|accounts\.google/, r => r.abort());
+        await c.route(/api\.anthropic\.com/, async route => {
+            const req = route.request(), CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' };
+            if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+            if (req.method() === 'POST') calls++;
+            const body = req.method() === 'GET' ? { data: [{ id: 'claude-sonnet-5-5' }] } : { content: [{ type: 'text', text: '답' }] };
+            return route.fulfill({ status: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(body) });
+        });
+        const T = await c.newPage(); T.on('pageerror', e => errors.push(e.message)); T.on('dialog', d => d.accept());
+        await T.goto(ROOT + 'projects/class-teacher.html');
+        await T.click('#btnLogin'); await T.waitForSelector('#btnLogout:not([hidden])');
+        // 수업 하나: 조 2개, 조마다 한도 1 → 수업 전체 상한 2
+        await T.fill('#inBan', '3'); await T.fill('#inN', '4'); await T.fill('#inSize', '2'); await T.fill('#inAiLimit', '1');
+        await T.selectOption('#inExp', 'malus'); await T.click('#btnCreate'); await T.waitForSelector('#classOut:not([hidden])');
+        const cls = Object.entries(app.db.dump('labClasses/')).find(([p]) => p.split('/').length === 2)[1];
+        const sp = Object.keys(app.db.dump('labClasses/')).find(p => p.split('/').length === 2).split('/')[1];
+        const [g1, g2] = cls.groups.map(g => g.code), four = g1.split('-')[2];
+        let t0 = Date.now() - 60000, n = 0;
+        const put = async (o) => {   // 학생이 Firestore 에 바로 쓴 질문 (core 의 조 검사를 건너뜀)
+            const id = 'a' + String(++n).padStart(19, '0');
+            await app.db.set('labClasses/' + sp + '/aiAsk/' + id, Object.assign({ jo: 1, exp: 'malus', section: 'theory', sectionName: '이론', prompt: '질문 ' + n, attach: [], draft: '', calc: '', device: '', status: 'wait', createdAt: new Date(t0 + n * 1000), expireAt: new Date(Date.now() + 86400000) }, o));
+            return id;
+        };
+        const st = id => app.db.docs.get('labClasses/' + sp + '/aiAsk/' + id);
+        const fakeA = await put({ uid: 'evil', group: '3-9-' + four, jo: 9 });       // 수업에 없는 조
+        const fakeB = await put({ uid: 'evil', group: '3-1-0001', jo: 1 });           // 조 번호는 있지만 코드가 다름
+        const u1 = await put({ uid: 'u1', group: g1, jo: 1 });                         // 정상 → 답
+        const hop = await put({ uid: 'u1', group: g2, jo: 2 });                        // 같은 기기가 다른 조로 → 기기 상한
+        const u2 = await put({ uid: 'u2', group: g2, jo: 2 });                         // 정상 → 답 (수업 전체 2 다 참)
+        // 키 넣고 켜기
+        await T.click('#ctTabs button[data-tab="ai"]');
+        await T.selectOption('#aiProvider', 'claude'); await T.fill('#aiKey', 'sk-ant-x');
+        const wait = async (id, s) => { for (let i = 0; i < 100; i++) { if (st(id).status === s) return; await new Promise(r => setTimeout(r, 100)); } assert.fail(id + ' 가 ' + s + ' 이 아님: ' + st(id).status); };
+        await wait(u2, 'done');
+        await wait(fakeA, 'error'); await wait(fakeB, 'error');
+        assert.match(st(fakeA).error, /이 수업에 없는 조/);
+        assert.equal(st(u1).status, 'done');
+        await wait(hop, 'limit'); assert.match(st(hop).error, /이 기기/);
+        assert.equal(calls, 2, 'AI 는 정상 질문 2개만 부름');
+        // 수업 전체 상한: 한도 계산을 틀리게 만들 만한 '이미 답한' 가짜 조 기록이 있어도 전체 2 를 넘지 않음
+        const extra = await put({ uid: 'u3', group: g1, jo: 1 });
+        await wait(extra, 'limit');
+        assert.equal(calls, 2);
+        // 전체 상한만 걸리는 경우: 조 2 는 아직 0 이지만 다른 기록이 이미 2개 답함
+        await app.db.set('labClasses/' + sp + '/aiAsk/' + u2, Object.assign({}, st(u2), { group: '3-8-' + four }));   // 답한 것을 엉뚱한 조로 옮겨 조 2 를 비움
+        const capped = await put({ uid: 'u4', group: g2, jo: 2 });
+        await wait(capped, 'limit'); assert.match(st(capped).error, /수업 전체/);
+        assert.equal(calls, 2);
+        // 키 시험 실패 때 모델 이름 안내
+        await c.unroute(/api\.anthropic\.com/);
+        await c.route(/api\.anthropic\.com/, async route => {
+            const req = route.request(), CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' };
+            if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+            if (req.method() === 'GET') return route.fulfill({ status: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify({ data: [{ id: 'claude-haiku-5-5' }] }) });
+            return route.fulfill({ status: 404, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify({ error: { type: 'not_found_error', message: 'model: claude-sonnet-5-5' } }) });
+        });
+        assert.equal(await T.getAttribute('#aiModel', 'type'), 'text', '모델은 직접 쓸 수 있는 글칸');
+        await T.click('#aiTest');
+        await T.waitForFunction(() => /⚠️/.test(document.getElementById('aiTestMsg').textContent));
+        assert.match(await T.textContent('#aiTestMsg'), /모델 이름을 확인하세요/);
+        await T.fill('#aiModel', 'claude-haiku-5-5');
+        assert.equal(await T.inputValue('#aiModel'), 'claude-haiku-5-5');
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); api.close(); stat.close(); }
+});
