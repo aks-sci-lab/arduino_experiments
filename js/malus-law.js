@@ -185,33 +185,66 @@
         }
     }
 
+    // 고정: 노출·화이트밸런스·초점을 따로따로 건다 — 한 가지가 안 되어도(예: 화이트밸런스 색온도가
+    // 기기 범위 밖 "colorTemperature setting out of range") 나머지는 고정되도록. 값은 기기 범위 안으로 맞춤.
+    function fitCap(v, cap) {
+        if (v == null || !Number.isFinite(Number(v))) return undefined;
+        v = Number(v);
+        if (cap && typeof cap === 'object' && Number.isFinite(cap.min) && Number.isFinite(cap.max)) {
+            if (cap.max < cap.min) return undefined;
+            v = Math.min(cap.max, Math.max(cap.min, v));
+            if (cap.step > 0) v = Math.min(cap.max, cap.min + Math.round((v - cap.min) / cap.step) * cap.step);
+        }
+        return v;
+    }
+    async function tryLock(withValue, modeOnly) {
+        // 값까지 넣어 보고, 안 되면 모드만(manual) 걸어 봄 — 모드만 걸면 기기가 지금 값을 그대로 씀
+        const tries = withValue ? [withValue, modeOnly] : [modeOnly];
+        let err = null;
+        for (const c of tries) {
+            if (!c || !Object.keys(c).length) continue;
+            try { await state.track.applyConstraints({ advanced: [c] }); return { ok: true }; }
+            catch (e) { err = e; }
+        }
+        return { ok: false, err };
+    }
     async function lockExposure() {
-        const c = state.caps, s = state.track.getSettings();
-        const adv = {};
-        if (c.exposureMode && c.exposureMode.includes('manual')) {
-            adv.exposureMode = 'manual';
-            if (s.exposureTime != null) adv.exposureTime = s.exposureTime;
+        const c = state.caps || {}, s = state.track.getSettings ? state.track.getSettings() : {};
+        const has = (k, v) => Array.isArray(c[k]) && c[k].includes(v);
+        const parts = [];
+        if (has('exposureMode', 'manual') || c.exposureTime || c.iso) {
+            const full = {}, mode = {};
+            if (has('exposureMode', 'manual')) { full.exposureMode = 'manual'; mode.exposureMode = 'manual'; }
+            const et = fitCap(s.exposureTime, c.exposureTime), iso = fitCap(s.iso, c.iso);
+            if (c.exposureTime && et !== undefined) full.exposureTime = et;
+            if (c.iso && iso !== undefined) full.iso = iso;
+            parts.push({ name: '노출', full, mode });
         }
-        if (c.iso && s.iso != null) adv.iso = s.iso;
-        if (c.whiteBalanceMode && c.whiteBalanceMode.includes('manual')) {
-            adv.whiteBalanceMode = 'manual';
-            if (s.colorTemperature != null) adv.colorTemperature = s.colorTemperature;
+        if (has('whiteBalanceMode', 'manual')) {
+            const full = { whiteBalanceMode: 'manual' }, ct = fitCap(s.colorTemperature, c.colorTemperature);
+            if (c.colorTemperature && ct !== undefined) full.colorTemperature = ct;
+            parts.push({ name: '화이트밸런스', full, mode: { whiteBalanceMode: 'manual' } });
         }
-        if (c.focusMode && c.focusMode.includes('manual')) {
-            adv.focusMode = 'manual';
-            if (s.focusDistance != null) adv.focusDistance = s.focusDistance;
+        if (has('focusMode', 'manual')) {
+            const full = { focusMode: 'manual' }, fd = fitCap(s.focusDistance, c.focusDistance);
+            if (c.focusDistance && fd !== undefined) full.focusDistance = fd;
+            parts.push({ name: '초점', full, mode: { focusMode: 'manual' } });
         }
-        try {
-            await state.track.applyConstraints({ advanced: [adv] });
-            const n = state.track.getSettings();
-            const bits = [];
-            if (n.exposureMode) bits.push('노출: ' + n.exposureMode);
-            if (n.whiteBalanceMode) bits.push('화이트밸런스: ' + n.whiteBalanceMode);
-            if (n.focusMode) bits.push('초점: ' + n.focusMode);
-            showMsg('고정 적용됨 — ' + (bits.join(', ') || '설정 완료') + '. 값이 "manual"이 아니면 기기가 일부 고정을 지원하지 않는 것입니다.', true);
-        } catch (e) {
-            showMsg('노출 고정 실패: ' + e.message);
+        if (!parts.length) { showMsg('이 기기/브라우저는 웹에서 노출 고정을 지원하지 않습니다. 기본 카메라 앱에서 노출을 고정해 사진을 찍은 뒤 "사진 불러오기"로 측정하세요.'); return; }
+        const done = [], failed = [];
+        for (const p of parts) {
+            const r = await tryLock(p.full, p.mode);
+            if (r.ok) done.push(p.name); else failed.push(p.name + (r.err && r.err.message ? ' (' + r.err.message + ')' : ''));
         }
+        const n = state.track.getSettings ? state.track.getSettings() : {};
+        const bits = [];
+        if (n.exposureMode) bits.push('노출: ' + n.exposureMode);
+        if (n.whiteBalanceMode) bits.push('화이트밸런스: ' + n.whiteBalanceMode);
+        if (n.focusMode) bits.push('초점: ' + n.focusMode);
+        const exposureOk = done.includes('노출');
+        if (!failed.length) showMsg('고정 적용됨 — ' + (bits.join(', ') || '설정 완료') + '. 값이 "manual"이 아니면 기기가 일부 고정을 지원하지 않는 것입니다.', true);
+        else if (exposureOk) showMsg('노출은 고정했어요 (' + bits.join(', ') + '). 이 기기에서 안 된 것: ' + failed.join(', ') + ' — 밝기 측정에는 노출 고정이 가장 중요해서 그대로 측정해도 돼요.', true);
+        else showMsg('노출 고정 실패: ' + failed.join(', ') + ' — 기본 카메라 앱에서 노출을 고정(AE 잠금·프로 모드)해 사진을 찍은 뒤 "사진 불러오기"로 측정하세요.');
     }
 
     function loadPhoto(file) {
