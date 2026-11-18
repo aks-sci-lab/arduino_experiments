@@ -3,18 +3,17 @@
 //  CSV 머리말, 30초·60초 두 회차 비교, 375px 가로 스크롤 없음·44px
 const http = require('http'), path = require('path'), fs = require('fs');
 const REPO = path.join(__dirname, '..');
-const { loadCodeGs } = require(REPO + '/tests/fake-apps-script.cjs');
+const { loadLabStore } = require(REPO + '/tests/fake-lab-store.cjs');
 let chromium = null, devices = null;
 try { ({ chromium, devices } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const app = loadCodeGs();
+const app = loadLabStore();
 const api = http.createServer((req, res) => {
     const send = o => { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(o)); };
     const u = new URL(req.url, 'http://x');
-    if (req.method === 'GET') return send(app.get(Object.fromEntries(u.searchParams)));
-    let b = ''; req.on('data', c => b += c); req.on('end', () => send(app.post(b)));
+        let b = ''; req.on('data', c => b += c); req.on('end', () => app.post(b).then(send));
 });
 const stat = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x'), p = path.join(REPO, decodeURIComponent(u.pathname));
@@ -55,7 +54,7 @@ test('숨 참기 탐구: 안전 확인 · 멈춤 · 지표 · 동의해야 보�
     try {
         const c = await browser.newContext(Object.assign({ acceptDownloads: true }, devices['Pixel 7']));
         c.setDefaultTimeout(15000);
-        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.PENDULUM_CONFIG={appsScriptUrl:${JSON.stringify(API)},pollSeconds:3};` }));
+        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.LAB_STORE_FAKE_URL=${JSON.stringify(API)};window.PENDULUM_CONFIG={pollSeconds:3};` }));
         await c.route(/gstatic|jsdelivr/, r => r.abort());
         await c.addInitScript(CAM);
         const P = await c.newPage();
@@ -108,14 +107,14 @@ test('숨 참기 탐구: 안전 확인 · 멈춤 · 지표 · 동의해야 보�
         await P.evaluate(() => document.getElementById('cs-share').open = true);
         await P.click('#cs-send');
         await P.waitForTimeout(1500);
-        assert.equal(app.get({ action: 'list', exp: 'heartrate', group: '3-2-4821' }).items.length, 0, '동의 안 한 회차는 시트에 안 감');
+        assert.equal((await app.get({ action: 'list', exp: 'heartrate', group: '3-2-4821' })).items.length, 0, '동의 안 한 회차는 시트에 안 감');
         // ---- 동의 → 보냄 ----
         await P.check('[data-consent="b1"]');
         await P.waitForFunction(() => !document.getElementById('br-send').disabled);
         assert.match(await P.textContent('#br-send'), /1개/);
         await P.click('#br-send');
         await P.waitForFunction(() => /보냈|못했/.test(document.getElementById('br-send-st').textContent), null, { timeout: 15000 });
-        const rows = app.get({ action: 'list', exp: 'heartrate', group: '3-2-4821' }).items;
+        const rows = (await app.get({ action: 'list', exp: 'heartrate', group: '3-2-4821' })).items;
         console.log('시트:', rows.map(r => r.title + ' ' + JSON.stringify(r.summary)));
         assert.equal(rows.length, 1);
         assert.deepEqual(Object.keys(rows[0].summary), ['변화율(%)', '참은 초', '안정 평균', '회복 시간(초)']);

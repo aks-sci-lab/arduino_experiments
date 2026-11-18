@@ -3,18 +3,17 @@
 //  → 데이터 가공 실험실 자료 목록에 '📱 폰 …' + 🆕, 최종 심박수 / 심박수 노트북 숨 참기 탐구에 곡선·지표(노트북에서 계산), 폰은 계산 결과 숨김, 375px·44px
 const http = require('http'), path = require('path'), fs = require('fs');
 const REPO = path.join(__dirname, '..');
-const { loadCodeGs } = require(REPO + '/tests/fake-apps-script.cjs');
+const { loadLabStore } = require(REPO + '/tests/fake-lab-store.cjs');
 let chromium = null, devices = null;
 try { ({ chromium, devices } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const app = loadCodeGs();
+const app = loadLabStore();
 const api = http.createServer((req, res) => {
     const send = o => { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(o)); };
     const u = new URL(req.url, 'http://x');
-    if (req.method === 'GET') return send(app.get(Object.fromEntries(u.searchParams)));
-    let b = ''; req.on('data', c => b += c); req.on('end', () => send(app.post(b)));
+        let b = ''; req.on('data', c => b += c); req.on('end', () => app.post(b).then(send));
 });
 const stat = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x'), p = path.join(REPO, decodeURIComponent(u.pathname));
@@ -57,7 +56,7 @@ test('📱 폰 측정 → 노트북 분석: 데이터 가공 실험실 · 숨 �
     async function ctx(opt, name) {
         const c = await browser.newContext(opt);
         c.setDefaultTimeout(15000);
-        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.PENDULUM_CONFIG={appsScriptUrl:${JSON.stringify(API)},pollSeconds:2};` }));
+        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.LAB_STORE_FAKE_URL=${JSON.stringify(API)};window.PENDULUM_CONFIG={pollSeconds:2};` }));
         await c.route(/gstatic|jsdelivr/, r => r.abort());
         await c.route(/qrcode-generator/, r => r.fulfill({ contentType: 'text/javascript', body: QR }));
         await c.addInitScript(CAM);
@@ -133,7 +132,7 @@ test('📱 폰 측정 → 노트북 분석: 데이터 가공 실험실 · 숨 �
         await P.click('#cs-rsend');
         await P.waitForFunction(() => /보냈|못했/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 20000 });
         assert.match(await P.textContent('#cs-pmsg'), /보냈/);
-        const rows = app.get({ action: 'list', exp: 'heartrate', group: G }).items;
+        const rows = (await app.get({ action: 'list', exp: 'heartrate', group: G })).items;
         console.log('시트:', rows.map(r => r.title + ' ' + JSON.stringify(r.summary) + ' ' + String(typeof r.data === 'string' ? r.data.length : JSON.stringify(r.data).length) + '자'));
         assert.equal(rows.length, 1);
         assert.ok('참은 초' in rows[0].summary);

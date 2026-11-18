@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 let chromium = null;
 try { ({ chromium } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
 
@@ -39,9 +39,10 @@ async function open(browser, app, url, ctxOpts) {
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
+    await page.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
     await page.route('https://script.google.com/macros/s/**', async route => {
         const req = route.request();
-        const out = req.method() === 'POST' ? app.post(req.postData() || '') : app.get(Object.fromEntries(new URL(req.url()).searchParams));
+        const out = req.method() === 'POST' ? (await app.post(req.postData() || '')) : (await app.get(Object.fromEntries(new URL(req.url()).searchParams)));
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify(out), headers: { 'Access-Control-Allow-Origin': '*' } });
     });
     await page.route(/^https:\/\/(cdn\.jsdelivr\.net|www\.gstatic\.com)\//, r => r.abort());
@@ -50,7 +51,7 @@ async function open(browser, app, url, ctxOpts) {
 }
 
 test('📱 폰 카드: 조 코드 없이도 QR 주소 → 폰이 보내면 노트북 카드에 🆕', { skip: !chromium && 'playwright 없음', timeout: 90000 }, async () => {
-    const app = loadCodeGs();
+    const app = loadLabStore();
     const server = serve().listen(0);
     const base = 'http://localhost:' + server.address().port + '/t.html';
     const browser = await chromium.launch();
@@ -64,7 +65,7 @@ test('📱 폰 카드: 조 코드 없이도 QR 주소 → 폰이 보내면 노�
         const u = new URL(link);
         assert.equal(u.searchParams.get('role'), 'phone');
         assert.equal(u.searchParams.get('group'), group);
-        assert.equal(u.searchParams.get('s'), SCRIPT_ID);
+        assert.match(u.searchParams.get('s'), /^p[a-z0-9]{23}$/, '이 노트북·폰 짝 공간');
         assert.match(await lp.textContent('#pc'), /기다리는 중/);
         assert.match(await lp.textContent('#pc'), /QR 도구를 불러오지 못했어요/, 'QR 도구가 막히면 주소 안내');
         assert.equal(await lp.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);

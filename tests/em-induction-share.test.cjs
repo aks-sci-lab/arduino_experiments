@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const ES = require('../js/em-induction-share.js');
 const CS = require('../js/class-share.js');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 function wave(n) {
     const rec = [];
@@ -15,7 +15,7 @@ function wave(n) {
     return rec;
 }
 
-test('파형 줄이기: 600점 안, 처음·끝 점과 봉우리를 남긴다', () => {
+test('파형 줄이기: 600점 안, 처음·끝 점과 봉우리를 남긴다', async () => {
     const rec = wave(2500);
     const w = ES.downsample(rec);
     assert.ok(w.t.length <= 600 && w.t.length > 500);
@@ -30,7 +30,7 @@ test('파형 줄이기: 600점 안, 처음·끝 점과 봉우리를 남긴다', 
     assert.equal(ES.wavePoints(w).length, w.t.length);
 });
 
-test('예전 측정에 id 붙이기, 겹치는 id 고치기', () => {
+test('예전 측정에 id 붙이기, 겹치는 id 고치기', async () => {
     const tr = [{ name: 'a' }, { id: 'tabcd1234', name: 'b' }, { id: 'tabcd1234', name: 'c' }];
     assert.equal(ES.fixTrials(tr), true);
     assert.equal(new Set(tr.map(t => t.id)).size, 3);
@@ -41,7 +41,7 @@ test('예전 측정에 id 붙이기, 겹치는 id 고치기', () => {
 const sample = () => ({ id: 'tq2w3e4r5', name: '자석 빠르게', N: 200, maxV: 29.8, minV: -39.5, tMax: 0.98, tMin: 1.2, order: '+ 먼저, − 나중',
     maxAbsI: 1.58, integral: 0.0012, dPhi: -0.006, samples: 2500, wave: ES.downsample(wave(2500)) });
 
-test('보낼 것: 요약(봉우리·∫ε dt·ΔΦ)과 자료', () => {
+test('보낼 것: 요약(봉우리·∫ε dt·ΔΦ)과 자료', async () => {
     const items = ES.itemsFrom([sample()]);
     assert.equal(items.length, 1);
     const it = items[0];
@@ -57,7 +57,7 @@ test('보낼 것: 요약(봉우리·∫ε dt·ΔΦ)과 자료', () => {
     assert.equal(b.payloads[0].tooBig, false);
 });
 
-test('받은 것: 출처별로 ext 에, 다시 받아도 같으면 바뀌지 않음, 지운 측정은 빠짐, CSV 파일 값은 그대로', () => {
+test('받은 것: 출처별로 ext 에, 다시 받아도 같으면 바뀌지 않음, 지운 측정은 빠짐, CSV 파일 값은 그대로', async () => {
     const ext = { 'f:old.csv': { name: 'old', maxV: 1, minV: -1, integral: 0 } };
     const it = ES.itemsFrom([sample()])[0];
     const incoming = [{ id: it.id, device: 'nzzzzzz', from: '노트북 ZZZZ', title: it.title, n: it.n, summary: it.summary, data: JSON.parse(JSON.stringify(it.data)), sentAt: 'x' }];
@@ -74,20 +74,20 @@ test('받은 것: 출처별로 ext 에, 다시 받아도 같으면 바뀌지 않
     assert.deepEqual(Object.keys(ext), ['f:old.csv']);
 });
 
-test('CSV 읽기: 이 페이지가 내려받은 모양만', () => {
+test('CSV 읽기: 이 페이지가 내려받은 모양만', async () => {
     const csv = '﻿time_s,voltage_mV,current_mA\n0.0000,0.1,0.01\n0.0100,0.2,0.02\n0.0200,0.3,0.03\n0.0300,0.4,0.04\n';
     assert.equal(ES.parseCsv(csv).rec.length, 4);
     assert.match(ES.parseCsv('a,b\n1,2').error, /CSV/);
     assert.match(ES.parseCsv('time_s,voltage_mV,current_mA\n1,2,3').error, /적습니다/);
 });
 
-test('가짜 Apps Script: 노트북 A 가 보내면 같은 조 노트북 B 가 받는다 (조 코드가 날짜로 바뀌지 않음)', () => {
-    const app = loadCodeGs();
+test('가짜 Apps Script: 노트북 A 가 보내면 같은 조 노트북 B 가 받는다 (조 코드가 날짜로 바뀌지 않음)', async () => {
+    const app = loadLabStore();
     const group = '2-3-5376';
     const items = ES.itemsFrom([sample()]);
     const b = CS.buildPayloads({ exp: 'eminduction', group, device: 'naaaaaa', items, sent: [], isGroupCode: () => true });
-    for (const pl of b.payloads) { const body = Object.assign({}, pl); delete body.tooBig; assert.equal(app.post(body).ok, true); }
-    const list = app.get({ action: 'list', exp: 'eminduction', group });
+    for (const pl of b.payloads) { const body = Object.assign({}, pl); delete body.tooBig; assert.equal((await app.post(body)).ok, true); }
+    const list = (await app.get({ action: 'list', exp: 'eminduction', group }));
     assert.equal(list.ok, true);
     const inc = CS.incomingFrom(list.items, 'nbbbbbb');
     assert.equal(inc.length, 1);

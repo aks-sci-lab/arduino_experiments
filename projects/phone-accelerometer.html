@@ -117,7 +117,7 @@
                 <ul id="run-list" class="in-list"></ul>
             </details>
 
-            <!-- 👥 조 공유 (구글 로그인 없이 조 코드로 선생님 시트에 보내기·같은 조 기기에서 불러오기): js/class-share.js 가 채움 -->
+            <!-- 👥 조 공유 (구글 로그인 없이 조 코드로 사이트 저장소에 보내기·같은 조 기기에서 불러오기): js/class-share.js 가 채움 -->
             <div id="share-mount"></div>
             <details id="in-box" class="panel" hidden>
                 <summary>📥 같은 조에서 불러온 기록 <span id="in-sum" class="note"></span></summary>
@@ -139,9 +139,9 @@
 
     <script src="../js/phone-accel.js" defer></script>
 
-    <!-- 조 공유: 선생님 구글 시트의 Apps Script (주소 js/pendulum-config.js, 링크의 ?s= 가 있으면 그것). 구글 로그인 없음 -->
+    <!-- 조 공유: 사이트 저장소(Firestore, js/lab-store.js, 링크의 ?s= 가 있으면 그 공간). 구글 로그인 없음 -->
     <script src="../js/pendulum-config.js" defer></script>
-    <script src="../js/pendulum-cloud.js" defer></script>
+    <script src="../js/pendulum-cloud.js" defer></script><script src="../js/lab-store.js"></script>
     <script src="../js/class-cloud.js" defer></script>
     <script src="../js/class-share.js" defer></script>
     <script src="../js/accelerometer-share.js" defer></script>

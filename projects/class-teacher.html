@@ -14,98 +14,32 @@
 <main class="ct-wrap">
     <a class="back" href="../index.html">← 메인 페이지</a>
     <h1>👩‍🏫 수업 연결 (교사)</h1>
-    <p class="note">구글 로그인 없이 씁니다. 선생님 구글 시트(Apps Script)에 수업을 만들면 조가 나뉘고, 학생은 QR 로 들어와 조·번호(이름 없음)를 고릅니다. 측정값은 조원과 선생님께 자동으로 공유되고, 여기서 진행 상황을 봅니다.</p>
+    <p class="note">선생님은 <b>구글 로그인 한 번</b>으로 씁니다. 수업을 만들면 조가 나뉘고, 학생은 QR 로 들어와 조·번호(이름 없음)를 고릅니다 — 학생은 로그인하지 않아요. 측정값은 조원과 선생님께 실시간으로 공유되고, 여기서 진행 상황을 보고 자료를 내려받습니다. 학생 자료는 <b>학기 끝(만든 날부터 6개월)</b>에 저절로 지워져요.</p>
 
-    <!-- 서버(Apps Script) 판 확인: 사이트의 apps-script/release.json 과 비교 → 업데이트·되돌리기 -->
-    <section class="ct-card ct-update" id="updBox" hidden>
-        <h2 id="updTitle"></h2>
-        <p id="updText" class="note"></p>
-        <div class="ct-row" id="updKeyRow" hidden>
-            <label class="ct-field ct-inline">관리 열쇠 <input type="text" id="updKey" autocomplete="off" spellcheck="false" placeholder="처음 연결한 컴퓨터에서 확인"></label>
-        </div>
+    <!-- 구글 로그인 (사이트 Firebase, 수업 주인 = 이 계정) -->
+    <section class="ct-card ct-login" id="loginCard">
+        <p id="loginNow" class="ct-status">⏳ 로그인 상태를 확인하는 중…</p>
         <div class="ct-row">
-            <button id="btnUpdate" class="good" hidden>🔄 업데이트</button>
-            <button id="btnRollback" class="secondary" hidden>↩ 이전 판으로 되돌리기</button>
+            <button id="btnLogin" class="good" hidden>🔐 구글 계정으로 로그인</button>
+            <button id="btnLogout" class="secondary" hidden>로그아웃</button>
         </div>
-        <p id="updMsg" class="note" role="status" aria-live="polite"></p>
-        <details class="ct-manual" id="updManual">
-            <summary>손으로 업데이트하는 법 (처음 5판으로 바꿀 때 · 단추가 안 될 때)</summary>
-            <ol class="ct-steps">
-                <li><a href="https://script.google.com/home/usersettings" target="_blank" rel="noopener">Apps Script 설정</a>에서 <b>Google Apps Script API</b> 를 <b>사용</b>으로 켜요 (다음부터 단추로 업데이트하려면 필요, 한 번만).</li>
-                <li>선생님 시트 → <kbd>확장 프로그램</kbd> → <kbd>Apps Script</kbd> → <kbd>Code.gs</kbd> 내용을 모두 지우고 새 코드를 붙여 넣어요.
-                    <div class="ct-row"><button id="btnCopyCode" class="secondary">📋 Code.gs 복사</button></div></li>
-                <li>왼쪽 ⚙ <kbd>프로젝트 설정</kbd> → <b>"appsscript.json" 매니페스트 파일을 편집기에 표시</b> 켜기 → 편집기에 생긴 <kbd>appsscript.json</kbd> 내용을 모두 지우고 붙여 넣어요.
-                    <div class="ct-row"><button id="btnCopyManifest" class="secondary">📋 appsscript.json 복사</button></div></li>
-                <li>저장(<kbd>Ctrl</kbd>+<kbd>S</kbd>) → <kbd>배포</kbd> → <kbd>배포 관리</kbd> → ✏️ → 버전 <b>새 버전</b> → <kbd>배포</kbd> → 권한 확인 창이 나오면 <b>고급 → (안전하지 않음)으로 이동 → 허용</b> (새 권한: 스스로 업데이트용).</li>
-                <li>여기서 <b>지금 시트 연결 시험</b>을 누르면 새 판이 보여요. 주소는 그대로예요.</li>
-            </ol>
-            <p id="copyCodeMsg" class="note"></p>
+        <p id="loginMsg" class="note" role="status" aria-live="polite"></p>
+        <details class="ct-key" id="devBox" hidden>
+            <summary>🧪 개발 데이터 수집 (선생님 폰)</summary>
+            <p class="note">심박수를 잴 <b>선생님 폰</b>으로 아래 QR 을 찍어 이 교사 화면을 열고, 같은 구글 계정으로 로그인하면 그 폰에서 잰 측정이 개발 데이터로 모여요(맨 위에 🧪 띠). 사이트 관리 교사 계정만 됩니다. <a href="../docs/dev-data.md">설명</a></p>
+            <div id="devQr" class="ct-qr"></div>
         </details>
     </section>
 
     <nav class="subtabs sticky" id="ctTabs" aria-label="수업 연결">
-        <button data-tab="sheet">① 시트 연결</button>
-        <button data-tab="make">② 수업 만들기</button>
-        <button data-tab="watch">③ 진행 보기</button>
+        <button data-tab="make">① 수업 만들기</button>
+        <button data-tab="watch">② 진행 보기·내려받기</button>
     </nav>
 
-    <!-- ① 시트 연결 -->
-    <div class="tab-panel" data-tab="sheet">
-        <!-- 🛠 내 서버 만들기: 구글 로그인(토큰 방식) 한 번으로 시트 + Apps Script 만들고 배포 (js/server-maker.js) -->
-        <section class="ct-card ct-maker" id="makerCard">
-            <h2>🛠 내 서버 만들기 <span class="note">(처음 한 번, 1~2분)</span></h2>
-            <p class="note">선생님 구글 계정으로 로그인하면 내 구글 드라이브에 <b>'센서 실험실 서버'</b> 시트와 Apps Script 가 만들어지고 웹 앱으로 배포돼요. 수업 중에는 지금처럼 로그인 없이 써요. 학생은 구글 계정이 필요 없어요.</p>
-            <p class="note">미리 한 번: <a href="https://script.google.com/home/usersettings" target="_blank" rel="noopener">Apps Script 설정</a>에서 <b>Google Apps Script API</b> 를 <b>사용</b>으로 켜 주세요.</p>
-            <p id="mkNoClient" class="ct-status warn" hidden>사이트 관리자가 구글 클라우드 등록(클라이언트 ID)을 마치면 이 단추가 생겨요. 지금은 아래 <b>손으로 만들기</b>를 쓰세요.</p>
-            <div class="ct-row">
-                <button id="btnMake" class="good">🛠 구글 계정으로 내 서버 만들기</button>
-                <button id="btnMakeReset" class="secondary" hidden>처음부터 다시</button>
-            </div>
-            <ol id="mkSteps" class="ct-mk-steps" hidden></ol>
-            <div class="ct-row" id="mkAllowRow" hidden><button id="btnAllow">🔓 권한 허용 창 열기</button></div>
-            <p id="mkMsg" class="note" role="status" aria-live="polite"></p>
-            <details class="ct-key">
-                <summary>'확인되지 않은 앱' 경고가 나오면</summary>
-                <p class="note">선생님 계정으로 선생님이 만든 스크립트라서 나오는 구글의 안내예요. <b>고급</b> → <b>센서 실험실 서버(으)로 이동(안전하지 않음)</b> → 권한 확인 → <b>허용</b>. 이 스크립트는 붙어 있는 시트 하나와 그 자신의 코드(스스로 업데이트)만 다뤄요.</p>
-            </details>
-            <details class="ct-key">
-                <summary>손으로 만들기 (코드 복사·붙여 넣기)</summary>
-                <p class="note"><a href="pendulum-setup.html">시트 만들기 자세한 안내</a>대로 시트를 만들고, 위 띠의 <b>📋 Code.gs 복사</b>·<b>📋 appsscript.json 복사</b>로 붙여 넣은 뒤 배포하세요. 나온 웹 앱 주소를 아래에 넣고 연결 시험을 누르면 돼요.</p>
-            </details>
-        </section>
-
-        <section class="ct-card">
-            <h2>① 선생님 시트 연결</h2>
-            <p id="sheetNow" class="ct-status"></p>
-            <ol class="ct-steps">
-                <li>구글 시트에 <b>Apps Script</b>(진자·플랑크와 같은 코드)를 붙여 웹 앱으로 배포합니다. 처음이면 <a href="pendulum-setup.html">시트 만들기 자세한 안내</a>를 따라 하세요.</li>
-                <li>서버 코드가 새로 나오면 이 화면 맨 위에 안내가 떠요. <b>5판부터는 🔄 업데이트 단추</b>로 끝나고, 4판 이하는 처음 한 번만 손으로 바꿔요(수업 연결은 <b>4판</b>, 스스로 업데이트는 <b>5판</b> 이상).</li>
-                <li>웹 앱 주소(<code>https://script.google.com/macros/s/…/exec</code>)를 아래에 붙여 넣고 연결 시험을 누르세요. 이 브라우저가 기억합니다.</li>
-            </ol>
-            <label class="ct-field">웹 앱 주소
-                <input type="url" id="sheetUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
-            </label>
-            <div class="ct-row">
-                <button id="btnConnect">🔌 연결 시험하고 기억하기</button>
-                <button id="btnTestNow" class="secondary">지금 시트 연결 시험</button>
-            </div>
-            <p id="sheetMsg" class="note" role="status" aria-live="polite"></p>
-            <details class="ct-key" id="adminBox" hidden>
-                <summary>🔑 관리 열쇠 (서버 업데이트용)</summary>
-                <p>이 시트의 관리 열쇠 <b class="ct-mono" id="adminKey"></b> — 이 브라우저에 저장되어 있어요. 다른 컴퓨터에서 업데이트하려면 그 컴퓨터의 업데이트 칸에 넣으세요. <b>학생에게 보여 주지 마세요.</b>
-                잃어버리면 Apps Script 편집기 ⚙ 프로젝트 설정 → 스크립트 속성에서 <code>ADMIN_KEY_HASH</code> 를 지우고 다시 연결하면 새로 만들어져요.</p>
-                <div id="devKeyBox" hidden>
-                    <p>🧪 <b>개발 데이터 수집</b>: 심박수를 잴 <b>선생님 폰</b>으로 아래 QR 을 찍으면, 그 폰에 열쇠가 들어가고 심박수 페이지가 열려요(맨 위에 🧪 띠). 학생에게 보여 주지 마세요. <a href="../docs/dev-data.md">설명</a></p>
-                    <div id="devKeyQr" class="ct-qr"></div>
-                </div>
-            </details>
-        </section>
-    </div>
-
-    <!-- ② 수업 만들기 -->
+    <!-- ① 수업 만들기 -->
     <div class="tab-panel" data-tab="make">
         <section class="ct-card">
-            <h2>② 수업 만들기</h2>
+            <h2>① 수업 만들기</h2>
             <div class="ct-grid3">
                 <label class="ct-field">반 <input type="number" id="inBan" min="1" max="99" inputmode="numeric" value="1"></label>
                 <label class="ct-field">학생 수 <input type="number" id="inN" min="1" max="60" inputmode="numeric" value="24"></label>
@@ -135,33 +69,22 @@
                     <div class="ct-row">
                         <button id="btnCopy" class="secondary">📋 주소 복사</button>
                         <button id="btnBig" class="secondary">🔍 QR 크게</button>
-                        <button class="good" data-tab-go="watch">③ 진행 보기 →</button>
+                        <button class="good" data-tab-go="watch">② 진행 보기 →</button>
                     </div>
                     <p id="copyMsg" class="note"></p>
                 </div>
             </div>
-            <details class="ct-key">
-                <summary>🔑 교사 열쇠 (다른 기기에서 이 수업을 볼 때)</summary>
-                <p>열쇠 <b class="ct-mono" id="outKey"></b> — 이 브라우저에는 저장되어 있어요. 다른 컴퓨터에서 보려면 그 컴퓨터의 이 화면에서 '수업 불러오기'에 수업 코드와 열쇠를 넣으세요. <b>학생에게 보여 주지 마세요.</b></p>
-            </details>
+            <p class="ct-status warn" id="outExpire"></p>
         </section>
 
         <section class="ct-card">
-            <h2>만든 수업</h2>
+            <h2>내 수업 <span class="note">(이 구글 계정으로 만든 수업 — 어느 컴퓨터에서나 보여요)</span></h2>
             <div id="classList" class="ct-list"></div>
-            <details>
-                <summary>📥 다른 기기에서 만든 수업 불러오기</summary>
-                <div class="ct-grid3">
-                    <label class="ct-field">수업 코드 <input type="text" id="impCode" placeholder="예: 2-4821" inputmode="numeric" autocomplete="off"></label>
-                    <label class="ct-field">교사 열쇠 <input type="text" id="impKey" autocomplete="off" spellcheck="false"></label>
-                </div>
-                <div class="ct-row"><button id="btnImport" class="secondary">불러오기 (지금 연결한 시트에서)</button></div>
-                <p id="impMsg" class="note"></p>
-            </details>
+            <p id="listMsg" class="note" role="status" aria-live="polite"></p>
         </section>
     </div>
 
-    <!-- ③ 진행 보기 -->
+    <!-- ② 진행 보기·내려받기 -->
     <div class="tab-panel" data-tab="watch">
         <section class="ct-card">
             <div class="ct-row">
@@ -169,7 +92,18 @@
                 <button id="btnRefresh" class="secondary">🔄 지금 새로 보기</button>
             </div>
             <p id="watchMsg" class="note" role="status" aria-live="polite"></p>
+            <p id="watchExpire" class="note"></p>
             <div id="watchSum" class="ct-sum"></div>
+        </section>
+        <section class="ct-card" id="dlCard">
+            <h2>📥 자료 내려받기</h2>
+            <p class="note">한 줄 = 한 회차(측정). 엑셀에서 바로 열려요(한글 안 깨짐). 열 이름에 단위가 들어 있고, 실험마다 정한 요약 값은 <b>요약: …</b> 열로 나와요. 이름·학번은 없어요.</p>
+            <div class="ct-row">
+                <label class="ct-field ct-inline">조 <select id="dlGroup"><option value="">전체 조</option></select></label>
+                <button id="btnCsv" class="good">📥 CSV 내려받기</button>
+                <button id="btnJson" class="secondary">전체 자료(JSON)</button>
+            </div>
+            <p id="dlMsg" class="note" role="status" aria-live="polite"></p>
         </section>
         <div id="groups" class="ct-groups"></div>
         <section class="ct-card" id="detail" hidden>
@@ -188,9 +122,8 @@
 </div>
 
 <script src="../js/pendulum-config.js"></script>
-<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/class-cloud.js"></script>
-<script src="../js/server-maker.js"></script>
 <script src="../js/class-teacher.js"></script>
 </body>
 </html>

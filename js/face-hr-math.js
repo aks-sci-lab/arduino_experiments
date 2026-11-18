@@ -369,7 +369,7 @@
 
     // ---------- 정답 경로 고르기 ----------
     // 순서: ① 같은 폰 후면 동시 ② 두 번째 폰 ③ 블루투스 심박계 ④ 손목 15초×4
-    // cap: { dual: 'ok'|'fail'|'untried', dualError, server(true: 선생님 시트 있음), bluetooth(true: Web Bluetooth 있음) }
+    // cap: { dual: 'ok'|'fail'|'untried', dualError, server(true: 사이트 저장소 있음), bluetooth(true: Web Bluetooth 있음) }
     const PATHS = ['dual', 'phone2', 'ble', 'wrist'];
     const PATH_NAMES = { dual: '① 같은 폰 후면 카메라 (손가락)', phone2: '② 두 번째 폰 후면 카메라 (손가락)', ble: '③ 블루투스 심박계', wrist: '④ 손목 맥박 15초 × 4번' };
     function choosePath(cap) {
@@ -378,8 +378,8 @@
         if (cap.dual === 'ok') return { path: 'dual', why: ['같은 폰에서 앞·뒤 카메라를 함께 열 수 있어요'] };
         if (cap.dual === 'fail') why.push('같은 폰 동시 열기 실패: ' + (cap.dualError || '이유 모름'));
         else why.push('같은 폰 동시 열기는 아직 시험하지 않았어요');
-        if (cap.server) return { path: 'phone2', why: why.concat(['선생님 시트가 있어 두 번째 폰으로 손가락을 잴 수 있어요']) };
-        why.push('선생님 시트가 없어 두 번째 폰을 이을 수 없어요');
+        if (cap.server) return { path: 'phone2', why: why.concat(['사이트 저장소가 있어 두 번째 폰으로 손가락을 잴 수 있어요']) };
+        why.push('사이트 저장소가 없어 두 번째 폰을 이을 수 없어요');
         if (cap.bluetooth) return { path: 'ble', why: why.concat(['이 브라우저는 블루투스 심박계를 쓸 수 있어요']) };
         why.push('이 브라우저는 블루투스(Web Bluetooth)를 쓸 수 없어요');
         return { path: 'wrist', why: why.concat(['손목 맥박을 15초씩 4번 세어 넣어요']) };

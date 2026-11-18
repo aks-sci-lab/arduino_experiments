@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /* 개발 데이터 가져오기 (GitHub Actions dev-data-collect.yml 이 매시간 실행, 손으로도 됨)
-   선생님 시트의 Apps Script(10판) devExport 를 관리 열쇠로 불러, 지난번 뒤에 쌓인 측정을 파일로 저장한다.
+   Firestore devlog(선생님 기기에서 잰 측정, js/lab-store.js devSave)를 서비스 계정으로 읽어, 지난번 뒤에 쌓인 측정을 파일로 저장한다.
      <폴더>/YYYY-MM-DD/<id>.csv   원본(밝기 등) — 페이지의 'CSV 내려받기' 와 같은 모양
      <폴더>/YYYY-MM-DD/<id>.json  결과·기기 정보 등 나머지
      <폴더>/index.json            측정 목록(요약)
      state.json                   마지막으로 받은 시각(since)
-   환경 변수: DEV_SHEET_URL(웹 앱 주소), DEV_ADMIN_KEY(관리 열쇠), DEV_OUT(저장할 폴더, 기본 현재 폴더)
-   열쇠는 화면·기록에 찍지 않는다. 사용법: docs/dev-data.md */
+   환경 변수: FIREBASE_SERVICE_ACCOUNT(사이트 배포와 같은 서비스 계정 JSON), DEV_OUT(저장할 폴더, 기본 현재 폴더)
+   (2026-11-18 Apps Script devExport·DEV_SHEET_URL·DEV_ADMIN_KEY 대신). 키는 화면·기록에 찍지 않는다. 사용법: docs/dev-data.md */
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
@@ -50,21 +50,33 @@ function saveItem(out, it) {
         csv: csv ? base.split(path.sep).join('/') + '.csv' : null, json: base.split(path.sep).join('/') + '.json' } };
 }
 
-async function postJson(fetchFn, url, body) {
-    const r = await fetchFn(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' });
-    const text = await r.text();
-    try { return JSON.parse(text); } catch (e) { throw new Error('서버 응답이 JSON 이 아닙니다 (HTTP ' + r.status + '): ' + text.slice(0, 120)); }
+// Firestore 에서 since 뒤의 devlog 를 시각 순으로 한 쪽(40개)씩: { items, more } — 시험에서는 o.exportPage 로 바꿔 끼움
+function firestoreExporter(serviceAccountJson) {
+    const admin = require('firebase-admin');
+    const app = admin.initializeApp({ credential: admin.credential.cert(JSON.parse(serviceAccountJson)) }, 'dev-data-pull');
+    const db = app.firestore();
+    return async function exportPage(since) {
+        let q = db.collection('devlog').orderBy('timestamp');
+        if (since) q = q.where('timestamp', '>', admin.firestore.Timestamp.fromDate(new Date(since)));
+        const snap = await q.limit(41).get();
+        const docs = snap.docs.slice(0, 40);
+        return { more: snap.docs.length > 40, items: docs.map(d => {
+            const x = d.data(), t = x.timestamp && x.timestamp.toDate ? x.timestamp.toDate().toISOString() : String(x.timestamp || '');
+            return { timestamp: t, exp: x.exp, id: x.id, measuredAt: x.measuredAt, device: x.device, summary: x.summary || {}, data: String(x.data || '') };
+        }) };
+    };
 }
 
 async function pull(o) {
-    const out = o.out || '.', fetchFn = o.fetch || fetch;
-    if (!o.url || !o.key) return { skipped: true, reason: 'DEV_SHEET_URL 또는 DEV_ADMIN_KEY 가 없음' };
+    const out = o.out || '.';
+    const exportPage = o.exportPage || (o.serviceAccount ? firestoreExporter(o.serviceAccount) : null);
+    if (!exportPage) return { skipped: true, reason: 'FIREBASE_SERVICE_ACCOUNT 가 없음' };
     const stateFile = path.join(out, 'state.json');
     const state = readJson(stateFile, { since: '' });
     const indexes = {};
     let since = state.since || '', got = 0;
     for (let round = 0; round < 50; round++) {
-        const r = await postJson(fetchFn, o.url, { action: 'devExport', key: o.key, since });
+        const r = await exportPage(since);
         if (!r || !r.ok) throw new Error('devExport 실패: ' + ((r && r.error) || '알 수 없음'));
         for (const it of r.items || []) {
             const { folder, entry } = saveItem(out, it);
@@ -91,13 +103,11 @@ async function pull(o) {
 module.exports = { pull, saveItem, rawToCsv, kstDate };
 
 if (require.main === module) {
-    pull({ url: process.env.DEV_SHEET_URL, key: process.env.DEV_ADMIN_KEY, out: process.env.DEV_OUT || '.' }).then(r => {
+    pull({ serviceAccount: process.env.FIREBASE_SERVICE_ACCOUNT, out: process.env.DEV_OUT || '.' }).then(r => {
         if (r.skipped) console.log('건너뜀: ' + r.reason);
         else console.log('새 측정 ' + r.got + '개 (마지막 ' + (r.since || '없음') + ')');
         if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, 'got=' + (r.got || 0) + '\n');
     }).catch(e => {
-        // 열쇠가 문구에 섞이지 않게
-        const msg = String(e && e.message || e).split(String(process.env.DEV_ADMIN_KEY || '\u0000')).join('***');
-        console.error('실패: ' + msg); process.exit(1);
+        console.error('실패: ' + String(e && e.message || e).slice(0, 300)); process.exit(1);
     });
 }

@@ -241,7 +241,7 @@
         if (typeof DevCollect === 'undefined' || !DevCollect.active()) return;
         const m = run.metrics;
         DevCollect.send('heartrate', {
-            id: 'hrb-' + DevCollect.init().device().slice(-6) + '-' + Math.floor(Date.parse(run.at) / 1000).toString(36) + '-' + run.id,
+            id: 'hrb-' + DevCollect.device().slice(-6) + '-' + Math.floor(Date.parse(run.at) / 1000).toString(36) + '-' + run.id,
             measuredAt: run.at,
             summary: { '종류': '숨 참기', '변화율': m.changePct == null ? '' : m.changePct, '참은 초': m.heldSec, '안정 평균': m.restMean == null ? '' : m.restMean, '회복': m.recoverySec == null ? '' : m.recoverySec },
             data: { kind: 'breath', csv: B.breathCsv(run), raw: run.raw ? H.toCsv(H.unpack(run.raw), { locked: /고정됨/.test(run.lock) }) : '', ph: run.ph, metrics: m, lock: run.lock,

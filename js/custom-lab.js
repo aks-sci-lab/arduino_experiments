@@ -3,7 +3,7 @@
 //                   ?c=수업코드&s=스크립트ID 가 붙으면 수업 참여 띠(조·번호) → 조 공유 (js/class-share.js, exp 'custom:<문서id>')
 //   ?edit=new|문서id 선생님 화면: 실험 만들기·고치기 (선생님 구글 로그인)
 //   ?record=문서id  예전 제출 내용 보기 (2026-11-16 전 구글 로그인 제출, 본인 또는 선생님)
-// 실험 설정은 Firestore `customExperiments` 에(공개한 실험은 로그인 없이 읽힘), 학생 값은 조 공유로 선생님 구글 시트(공용 submissions)에.
+// 실험 설정은 Firestore `customExperiments` 에(공개한 실험은 로그인 없이 읽힘), 학생 값은 조 공유로 사이트 저장소(공용 submissions)에.
 // 실험 설정에서 센서 기능을 고르면 Pico 환경 센서 보드를 연결해 시간 그래프를 그린다 (custom-lab-sensor.js).
 (function () {
     'use strict';
@@ -263,7 +263,7 @@
         if (useSteps) arrangeSteps();
     }
 
-    // ---------- 조 공유 (구글 로그인 없이: 같은 조 다른 기기와 선생님 구글 시트로) ----------
+    // ---------- 조 공유 (구글 로그인 없이: 같은 조 다른 기기와 사이트 저장소로) ----------
     function myPoints() { return M.filledRowCount(view.rows) + sensor.series.t.length; }
     function initShare() {
         if (!window.ClassShare || !window.PendulumCloud || !window.ClassCloud) {
@@ -762,7 +762,7 @@
         window.addEventListener('beforeunload', () => { if (loaded && mode === 'view') { clearTimeout(saveTimer); saveNow(); } });
     }
 
-    // 선생님께 보내기: 조 공유와 같은 길 (구글 로그인 없이 선생님 구글 시트로)
+    // 선생님께 보내기: 조 공유와 같은 길 (구글 로그인 없이 사이트 저장소로)
     async function submit() {
         const status = $('submitStatus');
         status.className = '';

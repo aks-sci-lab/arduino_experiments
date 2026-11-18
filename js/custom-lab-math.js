@@ -265,7 +265,7 @@
         return '﻿' + lines.join('\r\n') + '\r\n';
     }
 
-    // ---------- 조 공유 (js/class-share.js, 구글 로그인 없이 선생님 시트로) ----------
+    // ---------- 조 공유 (js/class-share.js, 구글 로그인 없이 사이트 저장소로) ----------
     const SHARE_SERIES = MAX_SUBMIT_SERIES;   // 보낼 때 센서 기록 점 수 한도 (넘으면 고르게 솎아 냄)
     // 서버 요약 이름 규칙 (apps-script/Code.gs cleanSummary): 영어·숫자·한글·공백·.()- 30자
     function summaryKey(s, fallback) {

@@ -1,10 +1,10 @@
 // 폰 측정 · 노트북 분석 이원화 시험 (2026-11-17 선생님 결정): 스마트폰 가속도·자유낙하
 //  💻 노트북(1280, 터치 없음): 측정 단추가 보이지 않고 '📱 폰으로 측정해 보내기' QR 카드만 → 📱 폰(iPhone 13)으로 그 주소를 열어 2회 측정
 //  → 1회만 골라 보내기 → 노트북에 🆕 로 들어와 그래프(·표·결과)가 저절로 그 기록으로. 📟 태블릿(Galaxy Tab S4)은 측정·분석 둘 다.
-//  가짜 Apps Script·CDN 대역은 tests/accelerometer-ui-helpers.cjs. Playwright 가 없으면 건너뜀.
+//  가짜 저장소·CDN 대역은 tests/accelerometer-ui-helpers.cjs. Playwright 가 없으면 건너뜀.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadCodeGs, chromium, devices, servers, open, overflow, smallButtons, fakeFrames, tapFall, shake } = require('./accelerometer-ui-helpers.cjs');
+const { loadLabStore, chromium, devices, servers, open, overflow, smallButtons, fakeFrames, tapFall, shake } = require('./accelerometer-ui-helpers.cjs');
 
 const LAPTOP = { viewport: { width: 1280, height: 800 } };
 const visible = (page, sel) => page.isVisible(sel);
@@ -14,7 +14,7 @@ async function cardLink(L) {
 }
 
 test('스마트폰 가속도: 노트북은 분석만(QR 카드), 폰은 측정·골라 보내기, 태블릿은 둘 다', { skip: !chromium && 'playwright 없음', timeout: 150000 }, async () => {
-    const app = loadCodeGs(), S = await servers(app), browser = await chromium.launch(), errors = [];
+    const app = loadLabStore(), S = await servers(app), browser = await chromium.launch(), errors = [];
     try {
         const { page: L } = await open(browser, S, LAPTOP, 'L', errors);
         await L.goto(S.BASE + '/projects/phone-accelerometer.html');
@@ -79,7 +79,7 @@ test('스마트폰 가속도: 노트북은 분석만(QR 카드), 폰은 측정·
 });
 
 test('자유낙하: 노트북은 영상·점 찍기 없이 QR 카드, 폰에서 점 찍어 1회 골라 보내기 → 노트북 표·결과, 태블릿은 둘 다', { skip: !chromium && 'playwright 없음', timeout: 150000 }, async () => {
-    const app = loadCodeGs(), S = await servers(app), browser = await chromium.launch(), errors = [];
+    const app = loadLabStore(), S = await servers(app), browser = await chromium.launch(), errors = [];
     try {
         const { page: L } = await open(browser, S, LAPTOP, 'L', errors);
         await L.goto(S.BASE + '/projects/free-fall.html#step-5');

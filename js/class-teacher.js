@@ -1,288 +1,52 @@
-/* 수업 연결 (교사) — projects/class-teacher.html
-   ① 시트 연결: 웹 앱 주소 → 연결 시험(ping, 4판 이상) → 이 브라우저에 기억 (진자·플랑크 노트북 화면과 같은 기억 칸)
-   ② 수업 만들기: 반·학생 수·조별 인원 → 조 나누기 미리보기 → 서버에 수업 만들기 → 수업 코드·QR·교사 열쇠
-   ③ 진행 보기: 10초마다 classStatus → 조별 카드(조원의 단계·마지막 활동·측정 점 수·제출) → 학생 하나 누르면 자세히
-   교사 열쇠는 이 브라우저(localStorage)에만 두고 POST 본문으로만 보낸다. 로그인 없음. */
+/* 수업 연결 (교사) — projects/class-teacher.html (2026-11-18 Firestore 로 바꿈)
+   구글 로그인(사이트 Firebase, js/lab-store.js) → 수업 주인 = 이 계정. 다른 컴퓨터에서 로그인해도 '내 수업'이 그대로 보인다.
+   ① 수업 만들기: 반·학생 수·조별 인원 → 조 나누기 미리보기 → 수업 코드·QR(…?c=수업코드&s=수업 공간) → 내 수업 목록
+   ② 진행 보기: 조별 카드(조원의 단계·마지막 활동·측정 점 수·제출) — 학생 신호가 오면 바로 바뀜 + 5초마다 다시 그림(읽기 비용 없음)
+      📥 자료 내려받기: 수업 전체·조별 CSV(UTF-8 BOM, 한 줄 = 한 회차), 전체 자료 JSON
+   학생 자료는 만든 날부터 183일 뒤 저절로 지워진다(expireAt). 이름·학번은 받지 않는다. */
 (function () {
     'use strict';
-    var PC = window.PendulumCloud, CC = window.ClassCloud, CONFIG = window.PENDULUM_CONFIG || {};
+    var CC = window.ClassCloud, LS = window.LabStore, CONFIG = window.PENDULUM_CONFIG || {};
     var $ = function (id) { return document.getElementById(id); };
     var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
-    var STORE = null; try { STORE = window.localStorage; } catch (e) { STORE = null; }
-    var LIST_KEY = 'class-teacher:v1';
-    var POLL_MS = 10000;
-    var server = PC.resolveServer(location.search, CONFIG.appsScriptUrl || '', STORE, true);
-    var state = { classes: loadList(), watching: null, timer: null, last: null, detail: null, busy: false };
-
-    function loadList() {
-        try { var a = JSON.parse((STORE && STORE.getItem(LIST_KEY)) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
-    }
-    function saveList() { try { STORE.setItem(LIST_KEY, JSON.stringify(state.classes)); } catch (e) { /* 저장 불가 */ } }
-    function urlOf(c) { return (c && c.scriptId && PC.urlFromScriptId(c.scriptId)) || (c && c.url) || ''; }
+    var POLL_MS = 5000;
+    var state = { user: null, classes: [], watching: null, timer: null, last: null, detail: null, busy: false, liveOff: null, liveSpace: '' };
     function siteRoot() { return new URL('../', location.href).href; }
-
     var tabs = LabUI.initTabs('#ctTabs', { key: 'class-teacher', onShow: function (t) { if (t === 'watch') startWatch(); else stopWatch(); } });
 
-    // ---------- ① 시트 연결 ----------
-    function renderSheet() {
-        var el = $('sheetNow');
-        if (!server.url) { el.className = 'ct-status warn'; el.textContent = '⚠️ 아직 연결한 시트가 없어요. 아래에 웹 앱 주소를 넣어 주세요.'; return; }
-        el.className = 'ct-status';
-        el.innerHTML = '📒 지금 시트: ' + (server.from === 'default' ? '사이트 기본 시트' : '선생님 시트') +
-            (server.id ? ' <span class="ct-mono">…' + esc(server.id.slice(-8)) + '</span>' : '') +
-            (server.from === 'saved' ? ' (이 브라우저에 기억됨)' : server.from === 'link' ? ' (링크로 받음, 기억함)' : '');
+    // ---------- 구글 로그인 ----------
+    function renderLogin() {
+        var u = state.user, el = $('loginNow');
+        var ok = !!(u && u.google);
+        el.className = 'ct-status' + (ok ? ' ok' : ' warn');
+        el.innerHTML = ok ? '✅ 로그인됨: <b>' + esc(u.name || u.email || '선생님') + '</b>' + (u.email ? ' <span class="note">(' + esc(u.email) + ')</span>' : '')
+            : '🔐 수업을 만들고 보려면 선생님 구글 계정으로 로그인하세요. (학생은 로그인하지 않아요)';
+        $('btnLogin').hidden = ok; $('btnLogout').hidden = !ok;
+        $('btnCreate').title = ok ? '' : '먼저 구글 로그인';
+        renderPreview();
+        renderDev();
     }
-    async function testSheet(url, id, remember) {
-        var msg = $('sheetMsg');
-        msg.className = 'note'; msg.textContent = '⏳ 연결 시험 중…';
-        var r = await CC.ping(url);
-        if (!r.ok) { msg.className = 'note err'; msg.textContent = '⚠️ ' + r.error; return false; }
-        var v = Number(r.version) || 0;
-        if (v < CC.MIN_VERSION) {
-            msg.className = 'note err';
-            msg.innerHTML = '⚠️ 연결은 되지만 이 시트의 코드가 <b>' + v + '판</b>이에요. 수업 연결은 ' + CC.MIN_VERSION + '판이 필요해요: 위 <b>손으로 업데이트하는 법</b>대로 새 코드를 붙여 넣고 새 버전으로 배포하세요.';
-            checkVersion(r);
-            return false;
+    $('btnLogin').addEventListener('click', async function () {
+        $('loginMsg').className = 'note'; $('loginMsg').textContent = '⏳ 구글 로그인 창에서 계정을 고르세요…';
+        try { state.user = await LS.signInGoogle(); $('loginMsg').textContent = ''; }
+        catch (e) {
+            $('loginMsg').className = 'note err';
+            $('loginMsg').textContent = '⚠️ 로그인하지 못했어요: ' + (/popup-blocked/.test(String(e && e.code)) ? '팝업이 막혔어요. 주소창 오른쪽의 팝업 허용을 눌러 주세요.' : /popup-closed|cancelled/.test(String(e && e.code)) ? '창을 닫았어요.' : String(e && e.message || e));
         }
-        if (remember && id) {
-            try { STORE.setItem(PC.SERVER_KEY, id); } catch (e) { /* 저장 불가 */ }
-            server = { url: url, id: id, from: 'saved' };
-        }
-        msg.className = 'note'; msg.textContent = '✅ 연결됨 (' + v + '판)' + (remember ? ' · 이 브라우저가 기억해요. 진자·플랑크 노트북 화면도 이 시트를 써요.' : '');
-        renderSheet();
-        checkVersion(r);
-        return true;
-    }
-    $('btnConnect').addEventListener('click', function () {
-        var id = PC.scriptIdFromUrl($('sheetUrl').value);
-        if (!id) { $('sheetMsg').className = 'note err'; $('sheetMsg').textContent = '⚠️ 웹 앱 주소 모양이 아니에요. https://script.google.com/macros/s/…/exec 를 통째로 붙여 넣으세요.'; return; }
-        testSheet(PC.urlFromScriptId(id), id, true);
+        renderLogin(); loadClasses();
     });
-    $('btnTestNow').addEventListener('click', function () { testSheet(server.url, server.id, false); });
-
-    // ---------- 서버 판 확인 · 스스로 업데이트 (5판부터) ----------
-    // 사이트의 apps-script/release.json(공식 판) 과 시트의 판(ping)을 비교한다. 관리 열쇠는 이 브라우저에 시트마다 저장
-    var ADMIN_KEY = 'class-teacher:admin:v1';
-    function adminMap() { try { var o = JSON.parse((STORE && STORE.getItem(ADMIN_KEY)) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
-    function adminKeyOf(url) { return adminMap()[url] || ''; }
-    function setAdminKey(url, key) { var m = adminMap(); m[url] = key; try { STORE.setItem(ADMIN_KEY, JSON.stringify(m)); } catch (e) { /* 저장 불가 */ } }
-    var siteRelease = null;
-    async function loadRelease() {
-        if (siteRelease) return siteRelease;
-        try { var res = await fetch('../apps-script/release.json?_=' + Date.now(), { cache: 'no-store' }); if (res.ok) siteRelease = await res.json(); } catch (e) { siteRelease = null; }
-        return siteRelease;
-    }
-    function renderAdmin() {
-        var k = server.url && adminKeyOf(server.url);
-        $('adminBox').hidden = !k; $('adminKey').textContent = k || '';
-        // 개발 데이터 수집(js/dev-collect.js): 선생님 폰에 열쇠를 넣는 QR. 열쇠는 # 뒤(서버로 안 감)에 두고, 폰이 확인한 뒤 주소에서 지운다
-        var dev = (window.PENDULUM_CONFIG || {}).devCollect === true && k && server.id;
-        $('devKeyBox').hidden = !dev;
-        if (dev) {
-            var link = new URL('heart-rate.html?s=' + encodeURIComponent(server.id) + '#devkey=' + encodeURIComponent(k), location.href).href;
-            $('devKeyQr').innerHTML = qrSvg(link) || '<p class="note">QR 도구를 불러오지 못했어요.</p>';
-        }
-    }
-    async function checkVersion(ping) {
-        var url = server.url;
-        if (!url) return;
-        // 5판인데 관리 열쇠가 아직 없으면 지금 만든다 (처음 연결한 선생님 화면이 갖는다)
-        if (Number(ping.version) >= CC.UPDATE_VERSION && !ping.admin && !adminKeyOf(url)) {
-            var c = await CC.claimAdmin(url);
-            if (c.ok) { setAdminKey(url, c.key); ping.admin = true; }
-        }
-        renderAdmin();
-        var rel = await loadRelease();
-        var plan = CC.updatePlan(ping, rel), box = $('updBox');
-        box.hidden = !plan.show;
-        if (!plan.show) return;
-        box.classList.toggle('warn', plan.kind === 'manual');
-        $('updMsg').textContent = '';
-        var needKey = plan.kind === 'update' || plan.canRollback;
-        $('updKeyRow').hidden = !needKey || !!adminKeyOf(url);
-        $('btnUpdate').hidden = plan.kind !== 'update';
-        $('btnRollback').hidden = !plan.canRollback;
-        if (ping.prevServer) $('btnRollback').textContent = '↩ ' + ping.prevServer + '판으로 되돌리기';
-        $('updManual').open = plan.kind === 'manual';
-        if (plan.kind === 'update') {
-            $('updTitle').textContent = '🆕 새 서버 버전이 있어요 (' + plan.from + '판 → ' + plan.to + '판)';
-            $('updText').textContent = '단추를 누르면 선생님 시트의 스크립트가 사이트의 공식 코드를 받아 스스로 바뀌어요. 웹 앱 주소·학생 링크·시트의 기록은 그대로예요. (30초쯤 걸려요)';
-        } else if (plan.kind === 'manual') {
-            $('updTitle').textContent = '🛠 서버를 ' + plan.to + '판으로 바꿔 주세요 (지금 ' + plan.from + '판)';
-            $('updText').textContent = CC.UPDATE_VERSION + '판부터는 단추 하나로 스스로 업데이트돼요. 그 전에 한 번만 아래 순서대로 손으로 바꿔 주세요.';
-        } else {
-            $('updTitle').textContent = '✅ 서버가 최신이에요 (' + plan.from + '판)';
-            $('updText').textContent = '업데이트 뒤 문제가 있으면 이전 판으로 되돌릴 수 있어요.';
-        }
-    }
-    function currentAdminKey() {
-        var k = adminKeyOf(server.url) || $('updKey').value.trim();
-        if (k && !adminKeyOf(server.url)) setAdminKey(server.url, k);
-        return k;
-    }
-    async function afterChange(expect) {
-        // 배포가 바뀐 뒤 몇 번 다시 확인 (구글 쪽 반영에 몇 초 걸릴 수 있음)
-        for (var i = 0; i < 4; i++) {
-            await new Promise(function (r) { setTimeout(r, i ? 3000 : 1500); });
-            var p = await CC.ping(server.url);
-            if (p.ok && (expect == null || Number(p.version) === expect)) return p;
-        }
-        return CC.ping(server.url);
-    }
-    async function runServerChange(kind) {
-        var key = currentAdminKey(), msg = $('updMsg');
-        if (!key) { msg.className = 'note err'; msg.textContent = '관리 열쇠를 넣어 주세요 (처음 시트를 연결한 컴퓨터의 ① 시트 연결 → 🔑 관리 열쇠).'; $('updKeyRow').hidden = false; return; }
-        if (kind === 'rollback' && !confirm('서버를 이전 판으로 되돌릴까요? 시트의 기록은 그대로예요.')) return;
-        $('btnUpdate').disabled = $('btnRollback').disabled = true;
-        msg.className = 'note'; msg.textContent = kind === 'update' ? '⏳ 업데이트 중… 새 코드 받기 → 확인 → 바꾸기 → 새 버전으로 배포 (창을 닫지 마세요)' : '⏳ 되돌리는 중…';
-        var r = kind === 'update' ? await CC.update(server.url, key) : await CC.rollback(server.url, key);
-        if (!r.ok) {
-            $('btnUpdate').disabled = $('btnRollback').disabled = false;
-            msg.className = 'note err';
-            // 서버(8판부터)가 준 원래 오류 문구를 그대로 보여 준다. 권한 안내가 들어 있으면 손으로 하는 법도 펼쳐 둔다
-            var permHint = /권한 확인 창/.test(r.error);
-            msg.textContent = '⚠️ ' + r.error + (/관리 열쇠가 맞지/.test(r.error) || permHint ? '' : ' — 안 되면 아래 "손으로 업데이트하는 법"을 따라 하세요.');
-            if (permHint || !/관리 열쇠가 맞지/.test(r.error)) $('updManual').open = true;
-            if (/관리 열쇠가 맞지/.test(r.error)) { var m = adminMap(); delete m[server.url]; try { STORE.setItem(ADMIN_KEY, JSON.stringify(m)); } catch (e) { /* 무시 */ } $('updKeyRow').hidden = false; renderAdmin(); }
-            return;
-        }
-        msg.textContent = '⏳ 바뀐 판을 확인하는 중…';
-        var p = await afterChange(kind === 'update' ? r.to : null);
-        $('btnUpdate').disabled = $('btnRollback').disabled = false;
-        if (p.ok) {
-            await checkVersion(p);
-            $('updBox').hidden = false;
-            msg.className = 'note';
-            msg.textContent = '✅ ' + (kind === 'update' ? r.to + '판으로 바뀌었어요.' : '이전 판(' + p.version + '판)으로 되돌렸어요.') + ' 학생 화면은 새로고침하면 바뀐 판을 써요.';
-        } else { msg.className = 'note err'; msg.textContent = '⚠️ 바꾼 뒤 연결 확인이 안 돼요: ' + p.error; }
-    }
-    $('btnUpdate').addEventListener('click', function () { runServerChange('update'); });
-    $('btnRollback').addEventListener('click', function () { runServerChange('rollback'); });
-    function copyFile(btn, path, label) {
-        btn.addEventListener('click', async function () {
-            try {
-                var res = await fetch(path + '?_=' + Date.now(), { cache: 'no-store' });
-                if (!res.ok) throw new Error(res.status);
-                await navigator.clipboard.writeText(await res.text());
-                $('copyCodeMsg').textContent = '✅ ' + label + ' 을 복사했어요. Apps Script 편집기에 붙여 넣으세요.';
-            } catch (e) { $('copyCodeMsg').innerHTML = '복사하지 못했어요. <a href="' + path + '" target="_blank" rel="noopener">' + label + ' 열기</a>에서 모두 선택(Ctrl+A)해 복사하세요.'; }
-        });
-    }
-    copyFile($('btnCopyCode'), '../apps-script/Code.gs', 'Code.gs');
-    copyFile($('btnCopyManifest'), '../apps-script/appsscript.json', 'appsscript.json');
-
-    // ---------- 🛠 내 서버 만들기 (구글 로그인 한 번 → 시트 + Apps Script 만들고 배포, js/server-maker.js) ----------
-    // 토큰 방식(accounts.google.com/gsi/client)이라 사이트 비밀번호가 필요 없다. 클라이언트 ID 는 js/pendulum-config.js 의 googleClientId
-    var SM = window.ServerMaker, CLIENT_ID = String(CONFIG.googleClientId || '');
-    var MAKER_KEY = 'class-teacher:maker:v1';
-    var maker = { resume: null, busy: false, poll: null };
-    try { maker.resume = JSON.parse((STORE && STORE.getItem(MAKER_KEY)) || 'null'); } catch (e) { maker.resume = null; }
-    function saveMaker() { try { if (maker.resume) STORE.setItem(MAKER_KEY, JSON.stringify(maker.resume)); else STORE.removeItem(MAKER_KEY); } catch (e) { /* 저장 불가 */ } }
-    function mkStep(key, st, text) {
-        var li = document.querySelector('#mkSteps li[data-k="' + key + '"]');
-        if (!li) return;
-        li.className = st;
-        li.querySelector('small').textContent = text ? ' — ' + text : '';
-    }
-    function mkMsg(html, err) { $('mkMsg').className = 'note' + (err ? ' err' : ''); $('mkMsg').innerHTML = html; }
-    function renderMaker() {
-        if (!SM) return;
-        $('mkSteps').innerHTML = SM.STEPS.map(function (s) { return '<li data-k="' + s[0] + '">' + esc(s[1]) + '<small></small></li>'; }).join('');
-        $('mkNoClient').hidden = !!CLIENT_ID;
-        $('btnMake').disabled = !CLIENT_ID;
-        var r = maker.resume;
-        $('btnMakeReset').hidden = !r;
-        if (r && r.connected) {
-            $('btnMake').textContent = '🛠 서버 하나 더 만들기';
-            mkMsg('✅ 이 브라우저에서 만든 서버가 연결되어 있어요' + (r.sheetUrl ? ' · <a href="' + esc(r.sheetUrl) + '" target="_blank" rel="noopener">시트 열기</a>' : '') + '.');
-        } else if (r) {
-            $('btnMake').textContent = '🛠 이어서 만들기';
-            $('mkSteps').hidden = false;
-            ['sheet', 'project', 'code', 'version', 'deploy'].forEach(function (k) {
-                var done = { sheet: r.spreadsheetId, project: r.scriptId, code: r.codeVersion, version: r.versionNumber, deploy: r.url }[k];
-                if (done) mkStep(k, 'done');
-            });
-            if (r.url) { $('mkAllowRow').hidden = false; mkStep('allow', 'run'); mkMsg('배포까지 끝났어요. <b>🔓 권한 허용 창 열기</b>를 눌러 허용하면 자동으로 연결돼요.'); waitAllow(); }
-            else mkMsg('지난번에 중간에서 멈췄어요. 단추를 누르면 이미 만든 것을 다시 써서 이어서 해요.');
-        }
-    }
-    // 배포 뒤: 선생님이 새 탭에서 권한을 허용할 때까지 몇 초마다 연결 시험
-    function waitAllow() {
-        clearTimeout(maker.poll);
-        var url = maker.resume && maker.resume.url, started = Date.now();
-        if (!url) return;
-        (async function tick() {
-            var p = await CC.ping(url);
-            if (p.ok && Number(p.version) > 0) { finishMaker(url, p); return; }
-            if (Date.now() - started > 15 * 60 * 1000) { mkMsg('⚠️ 아직 권한 허용이 확인되지 않아요. <b>🔓 권한 허용 창 열기</b>를 다시 눌러 주세요.', true); return; }
-            maker.poll = setTimeout(tick, 3000);
-        })();
-    }
-    async function finishMaker(url, ping) {
-        mkStep('allow', 'done'); mkStep('connect', 'run');
-        $('mkAllowRow').hidden = true;
-        var id = PC.scriptIdFromUrl(url);
-        try { STORE.setItem(PC.SERVER_KEY, id); } catch (e) { /* 저장 불가 */ }
-        server = { url: url, id: id, from: 'saved' };
-        if (!ping.admin && !adminKeyOf(url)) {
-            var c = await CC.claimAdmin(url);
-            if (c.ok) { setAdminKey(url, c.key); ping.admin = true; }
-        }
-        mkStep('connect', 'done', ping.version + '판');
-        maker.resume.connected = true; saveMaker();
-        renderSheet(); renderAdmin(); checkVersion(ping);
-        mkMsg('✅ 내 서버가 준비됐어요 (' + ping.version + '판). 이 브라우저가 기억해요.' + (maker.resume.sheetUrl ? ' <a href="' + esc(maker.resume.sheetUrl) + '" target="_blank" rel="noopener">시트 열기</a>' : '') + ' 이제 ② 수업 만들기로 가세요.');
-        $('btnMake').textContent = '🛠 서버 하나 더 만들기';
-    }
-    function loadGis() {
-        if (!CLIENT_ID || (window.google && google.accounts && google.accounts.oauth2) || document.getElementById('gisScript')) return;
-        var sc = document.createElement('script');
-        sc.id = 'gisScript'; sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.defer = true;
-        sc.onerror = function () { mkMsg('⚠️ 구글 로그인 도구를 불러오지 못했어요(인터넷·학교 망 확인). 아래 손으로 만들기를 쓰세요.', true); };
-        document.head.appendChild(sc);
-    }
-    if (SM) {
-        loadGis();
-        renderMaker();
-        $('btnMake').addEventListener('click', async function () {
-            if (maker.busy || !CLIENT_ID) return;
-            if (maker.resume && maker.resume.connected) maker.resume = null;   // 하나 더 만들기
-            maker.busy = true; $('btnMake').disabled = true;
-            $('mkSteps').hidden = false;
-            mkMsg('🔐 구글 로그인 창에서 선생님 계정을 고르고 권한 3가지를 허용해 주세요.');
-            var t = await SM.requestToken(CLIENT_ID);   // 팝업은 단추를 누른 바로 그때 열린다
-            if (!t.ok) { maker.busy = false; $('btnMake').disabled = false; mkMsg('⚠️ ' + esc(t.error), true); return; }
-            mkMsg('⏳ 만드는 중… (창을 닫지 마세요)');
-            var r = await SM.run({ token: t.token, siteBase: '../apps-script/', resume: maker.resume || {}, onStep: mkStep });
-            maker.resume = r.resume; saveMaker();
-            maker.busy = false; $('btnMake').disabled = false; $('btnMakeReset').hidden = false;
-            if (!r.ok) {
-                $('btnMake').textContent = '🛠 이어서 만들기';
-                mkMsg('⚠️ ' + esc(r.error) + (r.resume.spreadsheetId ? '<br>지금까지 만든 것은 남아 있어요. 고친 뒤 <b>🛠 이어서 만들기</b>를 누르면 그다음부터 해요.' : ''), true);
-                return;
-            }
-            mkStep('allow', 'run');
-            $('mkAllowRow').hidden = false;
-            mkMsg('거의 다 됐어요! <b>🔓 권한 허용 창 열기</b>를 눌러 새 탭에서 선생님 계정으로 <b>허용</b>해 주세요. 허용하면 이 화면이 저절로 연결돼요.');
-            waitAllow();
-        });
-        $('btnAllow').addEventListener('click', function () {
-            var url = maker.resume && maker.resume.url;
-            if (!url) return;
-            var w = window.open(url + '?action=ping', '_blank');
-            if (!w) mkMsg('⚠️ 새 탭이 막혔어요. 이 주소를 새 탭에 붙여 넣어 여세요: <code>' + esc(url) + '?action=ping</code>', true);
-            else mkMsg('새 탭에서 <b>권한 검토 → 계정 고르기 → (경고가 나오면) 고급 → 이동 → 허용</b>을 마치면 이 화면이 저절로 연결돼요. 새 탭에 <code>{"ok":true…}</code> 가 보이면 끝이에요.');
-            waitAllow();
-        });
-        $('btnMakeReset').addEventListener('click', function () {
-            if (!confirm('만들던 기록을 지우고 처음부터 다시 할까요? (구글 드라이브에 이미 만든 시트는 지워지지 않아요. 필요 없으면 드라이브에서 지우세요)')) return;
-            clearTimeout(maker.poll); maker.resume = null; saveMaker();
-            $('mkAllowRow').hidden = true; $('mkSteps').hidden = true; $('btnMake').textContent = '🛠 구글 계정으로 내 서버 만들기';
-            renderMaker(); mkMsg('');
-        });
+    $('btnLogout').addEventListener('click', async function () {
+        if (!confirm('로그아웃할까요? (만든 수업과 학생 자료는 그대로예요)')) return;
+        await LS.signOut(); state.user = null; state.classes = []; renderLogin(); renderList(); renderWatchSel();
+    });
+    // 개발 데이터 수집: 선생님 폰으로 이 화면을 열어 같은 계정으로 로그인 (js/dev-collect.js)
+    function renderDev() {
+        var on = CONFIG.devCollect === true && state.user && state.user.google;
+        $('devBox').hidden = !on;
+        if (on) $('devQr').innerHTML = qrSvg(location.href.split('#')[0].split('?')[0]) || '';
     }
 
-    // ---------- ② 수업 만들기 ----------
+    // ---------- ① 수업 만들기 ----------
     // 실험 고르기: js/class-cloud.js 의 EXPS 전체 + 선생님이 만든 실험(번호 넣기)
     $('inExp').innerHTML = Object.keys(CC.EXPS).map(function (k) {
         var e = CC.EXPS[k];
@@ -331,37 +95,32 @@
     $('btnCreate').addEventListener('click', async function () {
         if (state.busy) return;
         var o = inputs(), msg = $('createMsg');
-        if (!server.url) { msg.className = 'note err'; msg.textContent = '⚠️ 먼저 ① 시트 연결을 해 주세요.'; return; }
-        if (/^custom:/.test(o.exp) && customState.state === 'hidden' && !confirm('이 실험은 아직 학생에게 공개되지 않았어요. 공개하기 전에는 학생이 열 수 없어요.\n그래도 수업을 만들까요? (나중에 공개로 바꾸면 그때부터 열려요)')) return;
+        if (!state.user || !state.user.google) { msg.className = 'note err'; msg.textContent = '⚠️ 먼저 맨 위에서 구글 로그인을 해 주세요.'; return; }
+        if (/^custom:/.test(o.exp) && customState.state === 'hidden' && !confirm('이 실험은 아직 학생에게 공개되지 않았어요. 공개하기 전에는 학생이 열 수 없어요.\n그래도 수업을 만들까요? (나중에 공개로 바꾸면 돼요)')) return;
         state.busy = true; $('btnCreate').disabled = true;
         msg.className = 'note'; msg.textContent = '⏳ 수업을 만드는 중…';
-        var r = await CC.createClass(server.url, o);
+        var r = await CC.createClass('lab:', o);
         state.busy = false; renderPreview();
-        if (!r.ok) {
-            msg.className = 'note err';
-            msg.textContent = '⚠️ ' + r.error + (/알 수 없는 요청|올바르지 않습니다/.test(r.error) ? ' (시트의 코드가 4판인지 ① 에서 연결 시험을 해 보세요)' : '');
-            return;
-        }
-        var c = { classCode: r.classCode, key: r.key, scriptId: server.id || '', url: server.id ? '' : server.url, exp: r.exp, ban: r.ban,
-            nStudents: r.nStudents, groupSize: r.groupSize, groups: r.groups, created: new Date().toISOString() };
-        state.classes.unshift(c); saveList();
+        if (!r.ok) { msg.className = 'note err'; msg.textContent = '⚠️ ' + r.error; return; }
         msg.className = 'note'; msg.textContent = '✅ 수업 ' + r.classCode + ' 을 만들었어요.';
-        showClass(c); renderList(); renderWatchSel();
+        state.classes = [r].concat(state.classes.filter(function (c) { return c.space !== r.space; }));
+        state.watching = r.space;
+        showClass(r); renderList(); renderWatchSel();
     });
-
-    function studentLink(c) { return CC.studentUrl(siteRoot(), c.exp, c.classCode, c.scriptId); }
+    function studentLink(c) { return CC.studentUrl(siteRoot(), c.exp, c.classCode, c.space); }
     function qrSvg(text) {
         if (typeof window.qrcode !== 'function') return null;
         var qr = window.qrcode(0, 'M'); qr.addData(text); qr.make();
         return qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true });
     }
+    function expireNote(c) { var t = CC.expireText(c.expireAt); return t ? '🗓 이 수업의 학생 자료는 ' + t + '에 저절로 지워져요. 그 전에 ② 에서 내려받아 두세요.' : ''; }
     function showClass(c) {
         var link = studentLink(c), e = CC.expInfo(c.exp);
         $('classOut').hidden = false;
         $('outTitle').textContent = '— ' + c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + c.nStudents + '명, ' + c.groups.length + '개 조';
         $('outCode').textContent = c.classCode;
         $('outLink').href = link; $('outLink').textContent = link;
-        $('outKey').textContent = c.key;
+        $('outExpire').textContent = expireNote(c);
         $('qr').innerHTML = qrSvg(link) || '<p class="note">QR 을 만드는 도구를 불러오지 못했어요(인터넷 확인). 학생은 메인 페이지 → 학생으로 시작에서 수업 코드를 넣어도 돼요.</p>';
         state.shown = c;
     }
@@ -378,69 +137,128 @@
     $('btnBigClose').addEventListener('click', function () { $('bigQr').hidden = true; });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('bigQr').hidden = true; });
 
+    // 내 수업 목록 (Firestore: 주인 = 이 계정)
+    async function loadClasses() {
+        if (!state.user || !state.user.google) { renderList(); renderWatchSel(); return; }
+        $('listMsg').className = 'note'; $('listMsg').textContent = '⏳ 내 수업을 불러오는 중…';
+        var r = await CC.myClasses();
+        if (!r.ok) { $('listMsg').className = 'note err'; $('listMsg').textContent = '⚠️ ' + r.error; return; }
+        $('listMsg').textContent = '';
+        state.classes = r.classes;
+        if (!state.watching || !byId(state.watching)) state.watching = state.classes[0] ? state.classes[0].space : null;
+        renderList(); renderWatchSel();
+        if (!state.shown && state.classes[0]) showClass(state.classes[0]);
+        if (tabs.current() === 'watch') refresh();
+    }
+    function byId(space) { return state.classes.filter(function (c) { return c.space === space; })[0] || null; }
     function renderList() {
         var el = $('classList');
+        if (!state.user || !state.user.google) { el.innerHTML = '<p class="note">구글 로그인하면 이 계정으로 만든 수업이 여기에 보여요.</p>'; return; }
         if (!state.classes.length) { el.innerHTML = '<p class="note">아직 만든 수업이 없어요.</p>'; return; }
-        el.innerHTML = state.classes.map(function (c, i) {
+        el.innerHTML = state.classes.map(function (c) {
             var e = CC.expInfo(c.exp);
             return '<div class="ct-item"><span><b>' + esc(c.classCode) + '</b> ' + esc(c.ban) + '반 · ' + esc(e ? e.name : c.exp) + ' · ' + esc(c.nStudents) + '명/' + esc(c.groups.length) + '조' +
-                '<br><span class="note">' + esc(new Date(c.created).toLocaleString('ko-KR')) + '</span></span>' +
-                '<span class="ct-row" style="margin:0"><button class="secondary" data-show="' + i + '">QR 보기</button><button data-watch="' + i + '">진행 보기</button>' +
-                '<button class="danger" data-del="' + i + '">목록에서 빼기</button></span></div>';
+                '<br><span class="note">' + esc(new Date(c.created).toLocaleString('ko-KR')) + ' 만듦 · ' + esc(CC.expireText(c.expireAt)) + ' 지워짐</span></span>' +
+                '<span class="ct-row" style="margin:0"><button class="secondary" data-show="' + esc(c.space) + '">QR 보기</button><button data-watch="' + esc(c.space) + '">진행·내려받기</button>' +
+                '<button class="danger" data-del="' + esc(c.space) + '">🗑 지우기</button></span></div>';
         }).join('');
     }
-    $('classList').addEventListener('click', function (e) {
+    $('classList').addEventListener('click', async function (e) {
         var b = e.target.closest('button'); if (!b) return;
-        var c = state.classes[+(b.dataset.show || b.dataset.watch || b.dataset.del)];
+        var c = byId(b.dataset.show || b.dataset.watch || b.dataset.del);
         if (!c) return;
-        if (b.dataset.show != null) { showClass(c); $('classOut').scrollIntoView({ behavior: 'smooth' }); }
-        else if (b.dataset.watch != null) { state.watching = c.classCode; renderWatchSel(); tabs.show('watch', true); }
-        else if (confirm('수업 ' + c.classCode + ' 을 이 브라우저 목록에서 뺄까요? (시트의 기록은 그대로예요. 열쇠를 적어 두지 않았다면 다시 볼 수 없어요)')) {
-            state.classes.splice(state.classes.indexOf(c), 1); saveList(); renderList(); renderWatchSel();
+        if (b.dataset.show) { showClass(c); $('classOut').scrollIntoView({ behavior: 'smooth' }); }
+        else if (b.dataset.watch) { state.watching = c.space; state.last = null; renderWatchSel(); tabs.show('watch', true); }
+        else if (confirm('수업 ' + c.classCode + ' 과 학생들이 보낸 자료를 지금 모두 지울까요? 되돌릴 수 없어요. 필요하면 먼저 ② 에서 내려받으세요.')) {
+            $('listMsg').className = 'note'; $('listMsg').textContent = '⏳ 지우는 중…';
+            var r = await CC.deleteClass(c.space);
+            if (!r.ok) { $('listMsg').className = 'note err'; $('listMsg').textContent = '⚠️ ' + r.error; return; }
+            $('listMsg').textContent = '🗑 수업 ' + c.classCode + ' 을 지웠어요.';
+            state.classes = state.classes.filter(function (x) { return x !== c; });
+            if (state.shown === c) { state.shown = null; $('classOut').hidden = true; }
+            if (state.watching === c.space) state.watching = state.classes[0] ? state.classes[0].space : null;
+            renderList(); renderWatchSel();
         }
     });
-    $('btnImport').addEventListener('click', async function () {
-        var code = CC.normalizeClass($('impCode').value), key = $('impKey').value.trim(), msg = $('impMsg');
-        if (!CC.isClassCode(code) || !key) { msg.className = 'note err'; msg.textContent = '수업 코드(예: 2-4821)와 열쇠를 넣어 주세요.'; return; }
-        msg.className = 'note'; msg.textContent = '⏳ 확인 중…';
-        var r = await CC.classStatus(server.url, code, key);
-        if (!r.ok) { msg.className = 'note err'; msg.textContent = '⚠️ ' + r.error; return; }
-        state.classes = state.classes.filter(function (c) { return c.classCode !== code || urlOf(c) !== server.url; });
-        state.classes.unshift({ classCode: code, key: key, scriptId: server.id || '', url: server.id ? '' : server.url, exp: r.exp, ban: r.ban,
-            nStudents: r.nStudents, groupSize: r.groupSize, groups: r.groups, created: r.created || new Date().toISOString() });
-        saveList(); renderList(); renderWatchSel();
-        msg.textContent = '✅ 불러왔어요.';
-    });
 
-    // ---------- ③ 진행 보기 ----------
+    // ---------- ② 진행 보기 ----------
     function renderWatchSel() {
         var sel = $('watchSel');
-        if (!state.watching && state.classes[0]) state.watching = state.classes[0].classCode;
         sel.innerHTML = state.classes.length ? state.classes.map(function (c) {
-            return '<option value="' + esc(c.classCode) + '"' + (c.classCode === state.watching ? ' selected' : '') + '>' + esc(c.classCode) + ' (' + esc(c.ban) + '반)</option>';
+            return '<option value="' + esc(c.space) + '"' + (c.space === state.watching ? ' selected' : '') + '>' + esc(c.classCode) + ' (' + esc(c.ban) + '반)</option>';
         }).join('') : '<option value="">만든 수업 없음</option>';
+        var c = watched();
+        $('dlGroup').innerHTML = '<option value="">전체 조</option>' + (c ? c.groups.map(function (g) { return '<option value="' + esc(g.code) + '">' + g.jo + '조 (' + esc(g.code) + ')</option>'; }).join('') : '');
+        $('watchExpire').textContent = c ? expireNote(c) : '';
+        $('dlCard').hidden = !c;
     }
-    $('watchSel').addEventListener('change', function (e) { state.watching = e.target.value; state.last = null; state.detail = null; $('detail').hidden = true; refresh(); });
+    $('watchSel').addEventListener('change', function (e) { state.watching = e.target.value; state.last = null; state.detail = null; $('detail').hidden = true; renderWatchSel(); refresh(); });
     $('btnRefresh').addEventListener('click', function () { refresh(); });
-    function watched() { return state.classes.filter(function (c) { return c.classCode === state.watching; })[0] || null; }
-
+    function watched() { return byId(state.watching); }
     function startWatch() { stopWatch(); refresh(); }
     function stopWatch() { clearTimeout(state.timer); state.timer = null; }
+    // 학생 신호가 오면 바로 다시 그림 (Firestore 실시간)
+    function liveFor(c) {
+        if (!c || state.liveSpace === c.space) return;
+        if (state.liveOff) { try { state.liveOff(); } catch (e) { /* 무시 */ } state.liveOff = null; }
+        state.liveSpace = c.space;
+        LS.watchClass('lab:' + c.space, c.classCode, function () { if (tabs.current() === 'watch' && !document.hidden) refresh(); })
+            .then(function (off) { if (state.liveSpace === c.space) state.liveOff = off; else if (off) off(); });
+    }
     async function refresh() {
         clearTimeout(state.timer);
         var c = watched(), msg = $('watchMsg');
-        if (!c) { msg.textContent = '② 수업 만들기에서 수업을 먼저 만들어 주세요.'; $('groups').innerHTML = ''; $('watchSum').innerHTML = ''; return; }
+        if (!state.user || !state.user.google) { msg.textContent = '맨 위에서 구글 로그인을 해 주세요.'; $('groups').innerHTML = ''; $('watchSum').innerHTML = ''; return; }
+        if (!c) { msg.textContent = '① 수업 만들기에서 수업을 먼저 만들어 주세요.'; $('groups').innerHTML = ''; $('watchSum').innerHTML = ''; return; }
         if (document.hidden) { state.timer = setTimeout(refresh, POLL_MS); return; }
-        var r = await CC.classStatus(urlOf(c), c.classCode, c.key);
+        if (state.refreshing) { state.again = true; return; }
+        state.refreshing = true;
+        var r = await CC.classStatus('lab:' + c.space, c.classCode);
+        state.refreshing = false;
         if (c !== watched()) return;
         if (!r.ok) msg.innerHTML = '<span class="err">⚠️ ' + esc(r.error) + '</span>' + (state.last ? ' (마지막으로 받은 내용을 보여 줘요)' : '');
         else {
             state.last = r;
-            msg.textContent = '🟢 ' + new Date().toLocaleTimeString('ko-KR') + ' 에 받음 · ' + (POLL_MS / 1000) + '초마다 새로 봐요';
+            msg.textContent = '🟢 ' + new Date().toLocaleTimeString('ko-KR') + ' · 학생이 움직이면 바로 바뀌어요';
             render(r);
+            liveFor(c);
         }
+        if (state.again) { state.again = false; return refresh(); }
         if (tabs.current() === 'watch') state.timer = setTimeout(refresh, POLL_MS);
     }
+    // ---------- 📥 자료 내려받기 ----------
+    function download(name, text, type) {
+        var blob = new Blob([text], { type: type }), a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    }
+    async function exportRows() {
+        var c = watched(), msg = $('dlMsg');
+        if (!c) return null;
+        msg.className = 'note'; msg.textContent = '⏳ 자료를 모으는 중…';
+        var r = await CC.classExport(c.space);
+        if (!r.ok) { msg.className = 'note err'; msg.textContent = '⚠️ ' + r.error; return null; }
+        var g = $('dlGroup').value;
+        r.items = r.items.filter(function (d) { return !g || d.group === g; });
+        return { c: c, r: r, g: g };
+    }
+    function fileBase(x) {
+        var e = CC.expInfo(x.c.exp), d = new Date(), pad = function (n) { return String(n).padStart(2, '0'); };
+        return '수업' + x.c.classCode + '_' + (e ? e.name.replace(/[\\/:*?"<>|()·]/g, '').replace(/\s+/g, '') : x.c.exp.replace(/[^A-Za-z0-9_-]/g, '')) + (x.g ? '_' + x.g + '조' : '') + '_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+    }
+    $('btnCsv').addEventListener('click', async function () {
+        var x = await exportRows(); if (!x) return;
+        var out = LS.toCsv(x.c.exp, x.r.items, x.c.groups);
+        download(fileBase(x) + '.csv', out.csv, 'text/csv;charset=utf-8');
+        $('dlMsg').textContent = '✅ ' + out.rows + '줄을 내려받았어요' + (out.rows ? '.' : ' (아직 보낸 자료가 없어요).');
+    });
+    $('btnJson').addEventListener('click', async function () {
+        var x = await exportRows(); if (!x) return;
+        var o = { classCode: x.c.classCode, exp: x.c.exp, ban: x.c.ban, groups: x.c.groups, exportedAt: new Date().toISOString(), items: x.r.items };
+        download(fileBase(x) + '.json', JSON.stringify(o, null, 1), 'application/json');
+        $('dlMsg').textContent = '✅ ' + x.r.items.length + '개 회차를 JSON 으로 내려받았어요 (자료 원본 포함).';
+    });
     function render(st) {
         var s = CC.summarize(st);
         $('watchSum').innerHTML =
@@ -486,9 +304,6 @@
     });
     $('btnCloseDetail').addEventListener('click', function () { state.detail = null; $('detail').hidden = true; });
     document.addEventListener('visibilitychange', function () { if (!document.hidden && tabs.current() === 'watch') refresh(); });
-
-    renderSheet(); renderPreview(); renderList(); renderWatchSel(); renderAdmin();
-    // 열 때 한 번: 시트의 판을 조용히 확인해 업데이트가 있으면 띠를 보여 준다
-    if (server.url) CC.ping(server.url).then(function (p) { if (p.ok) checkVersion(p); });
-    if (state.classes[0]) showClass(state.classes[0]);
+    renderPreview(); renderList(); renderWatchSel();
+    LS.onUser(function (u) { state.user = u && u.google ? u : null; renderLogin(); loadClasses(); });
 })();
