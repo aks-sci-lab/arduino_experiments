@@ -80,6 +80,9 @@ const noSideScroll = page => page.evaluate(() => document.documentElement.scroll
 const smallControls = (page, sel) => page.$$eval(sel, els => els.filter(e => e.offsetParent && e.getBoundingClientRect().height < 43.5).map(e => e.id || e.textContent.trim()));
 
 async function setup(app) {
+    // 저장이 Firestore 로 옮겨 가는 중이라 Code.gs 에는 qdot 이 없음 → 가짜 서버에만 넣어 둔다.
+    // 페이지는 ClassShare 공개 함수(init·saved·phoneCard)로만 보내므로, 나중에 가짜 Firestore 로 바꾸면 이 줄만 바뀜
+    app.ctx.GENERIC_EXPS.qdot = 1; app.ctx.CLASS_EXPS.qdot = 1;
     const srv = await staticServer();
     const base = 'http://127.0.0.1:' + srv.address().port;
     const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });

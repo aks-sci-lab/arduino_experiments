@@ -135,7 +135,7 @@ saveRun(run); share.saved();
 | `accel` | 가속도계 | `projects/accelerometer-lab.html` | 공용 (붙임 완료) |
 | `nano` | Nano 33 BLE Sense | `projects/arduino-nano-lab.html` | 공용 |
 | `phoneaccel` | 스마트폰 가속도 | `projects/phone-accelerometer.html` | 공용 (붙임 완료, 📱 폰 연결: 시작→중지 한 번 = 회차, `js/phone-accel-share.js`, 이원화: 노트북은 QR 카드·분석만) |
-| `qdot` | 탄소 양자점 형광 | `projects/quantum-dot.html` | 공용 (서버 11판, 📱 폰 연결: 시료 하나 = 한 줄, 숫자만, 이원화) |
+| `qdot` | 탄소 양자점 형광 | `projects/quantum-dot.html` | Firestore 전환 예정 (Code.gs 에는 없음, 📱 폰 연결: 시료 하나 = 한 줄, 숫자만, 이원화) |
 | `custom:<실험 id>` | 선생님이 만든 실험 | `projects/custom-lab.html?id=…` | 공용 |
 
 새 실험 이름을 더하려면 **서버(`apps-script/Code.gs` 의 `GENERIC_EXPS`)와 `js/class-cloud.js` 의 `EXPS` 를 같이** 고칩니다(시험 `tests/class-share.test.cjs` 가 둘이 같은지 확인). 서버를 고치면 `VERSION` 을 올리고 `node tools/build-apps-script-release.cjs` → 선생님은 교사 화면의 🔄 업데이트.

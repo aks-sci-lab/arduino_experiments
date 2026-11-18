@@ -37,8 +37,8 @@
         phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: true },
         // 서버 9판부터 공용 저장에 heartrate. 숨 참기 탐구 회차는 kind 'breath' 자료 (js/heart-rate-breath.js)
         heartrate: { name: '스마트폰 카메라 심박수 (숨 참기 탐구)', icon: '❤️', page: 'projects/heart-rate.html', steps: { live: '심박수 재기', breath: '숨 참기 탐구' }, ready: true },
-        // 서버 11판부터 공용 저장에 qdot (탄소 양자점 형광, 시료 하나 = 한 줄)
-        qdot: { name: '탄소 양자점 형광 실험', icon: '🌈', page: 'projects/quantum-dot.html', steps: STEPS7, ready: true, needServer: 11 }
+        // 탄소 양자점 형광 (시료 하나 = 한 줄). 저장은 Firestore 로 옮기는 중이라 Apps Script(Code.gs) 에는 넣지 않음 (2026-11-18 결정)
+        qdot: { name: '탄소 양자점 형광 실험', icon: '🌈', page: 'projects/quantum-dot.html', steps: STEPS7, ready: true }
     };
     var CUSTOM_RE = /^custom:([A-Za-z0-9_-]{1,40})$/;
     var CUSTOM_STEPS = Object.assign({ live: '한 화면' }, STEPS7);
