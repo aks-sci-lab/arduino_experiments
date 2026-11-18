@@ -1,0 +1,40 @@
+name: Firestore cleanup
+
+# 학기 끝 자동 삭제 (2026-11-18, 선생님 결정 "학생 자료는 6개월 뒤 자동 삭제"):
+# 수업·조 공유·진행·개발 자료 문서의 expireAt(만든 날 + 183일)이 지나면 지운다.
+# Firestore TTL 정책(docs/DEPLOY.md)이 켜져 있으면 Firestore 가 먼저 지우고, 이 작업은 남은 것을 한 번 더 정리한다.
+# 사이트 배포와 같은 키(저장소 Secret FIREBASE_SERVICE_ACCOUNT)를 쓴다. 키가 없으면 건너뛴다.
+
+on:
+  schedule:
+    - cron: '43 18 * * *'   # 매일 한국 시각 새벽 3시 43분
+  workflow_dispatch:
+
+concurrency:
+  group: firestore-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check deploy key
+        id: key
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then echo "::notice::FIREBASE_SERVICE_ACCOUNT 가 없어 건너뜁니다"; echo "ready=false" >> "$GITHUB_OUTPUT"; else echo "ready=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.key.outputs.ready == 'true'
+        with:
+          node-version: '20'
+      - name: Install firebase-admin
+        if: steps.key.outputs.ready == 'true'
+        run: npm install --no-save --no-audit --no-fund firebase-admin@12.7.0
+      - name: Delete expired documents
+        if: steps.key.outputs.ready == 'true'
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node tools/firestore-cleanup.cjs

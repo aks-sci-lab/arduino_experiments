@@ -4,7 +4,7 @@
    - 모바일 터치 확대 선택
    - 픽셀-실제 길이 보정 (자 양 끝을 눌러 mm/px 재기)
    - 측정값 표, 2차 함수·직선 맞춤으로 g·수평 속도 계산
-   - 👥 조 공유(js/class-share.js): 내 결과를 선생님 시트·같은 조 노트북으로, 받은 결과는 6. 결과의 '조 결과 모아 보기'
+   - 👥 조 공유(js/class-share.js): 내 결과를 사이트 저장소·같은 조 노트북으로, 받은 결과는 6. 결과의 '조 결과 모아 보기'
    ======================================== */
 
 const fileInput = document.getElementById('video-upload');
@@ -1041,7 +1041,7 @@ document.getElementById('group-table-body').addEventListener('click', e => {
     const list = document.getElementById('group-results')._list || [];
     const v = e.target.closest('[data-view]'), d = e.target.closest('[data-del]');
     if (v) { const r = list[Number(v.dataset.view)]; if (r) showRun({ key: r.key, who: r.who, title: r.title, mode: r.mode, rows: r.rows, mmPerPx: r.mmPerPx }); }
-    if (d) { const r = list[Number(d.dataset.del)]; if (r && r.mine && confirm(`'${r.title}' 회차를 지울까요? (보낸 회차면 다시 📤 보낼 때 선생님 시트에서도 빠집니다)`)) deleteRun(r.mine); }
+    if (d) { const r = list[Number(d.dataset.del)]; if (r && r.mine && confirm(`'${r.title}' 회차를 지울까요? (보낸 회차면 다시 📤 보낼 때 사이트 저장소에서도 빠집니다)`)) deleteRun(r.mine); }
 });
 document.getElementById('btn-view-mine').addEventListener('click', () => {
     setViewRun(null);

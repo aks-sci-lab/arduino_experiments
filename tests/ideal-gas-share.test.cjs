@@ -5,12 +5,12 @@ const G = require('../js/ideal-gas-math.js');
 const S = require('../js/ideal-gas-share.js');
 const CS = require('../js/class-share.js');
 const PCF = require('../js/pendulum-cloud.js');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 const boyle = [101.3, 85, 70, 60].map((p, i) => ({ v: +(2026 / p).toFixed(2), p, t: 20 + i * 0.1, dir: i === 3 ? 'up' : 'down', src: 'sensor' }));
 const gay = [20, 25, 30, 35].map((t, i) => ({ at: 1000000 + i * 5000, t, p: +(70 * (t + 273.15) / 293.15).toFixed(3), src: 'sensor' }));
 
-test('보낼 것: 실험 1·2 한 줄씩, 요약 이름은 서버 규칙에 맞고 점 자료가 그대로', () => {
+test('보낼 것: 실험 1·2 한 줄씩, 요약 이름은 서버 규칙에 맞고 점 자료가 그대로', async () => {
     const ba = G.boyleAnalysis(boyle), ga = G.gayLussacAnalysis(S.gayPoints(gay));
     const items = S.buildItems({ boyle, gay, dead: 0.5, ba, ga });
     assert.deepEqual(items.map(x => x.id), ['boyle1', 'gay1']);
@@ -26,7 +26,7 @@ test('보낼 것: 실험 1·2 한 줄씩, 요약 이름은 서버 규칙에 맞�
     assert.deepEqual(S.buildItems({ boyle: [], gay: [], ba: null, ga: null }), []);
 });
 
-test('받은 것: 노트북별로 따로 두고, 바뀔 때만 true, 목록에서 빠진 노트북은 지움, 엉뚱한 값은 버림', () => {
+test('받은 것: 노트북별로 따로 두고, 바뀔 때만 true, 목록에서 빠진 노트북은 지움, 엉뚱한 값은 버림', async () => {
     const ext = { 'f:a.csv': { from: '파일 a.csv', sentAt: '', boyle: [{ v: 1, p: 50, t: 20, dir: 'down' }], gay: [] } };
     const items = [
         { id: 'boyle1', device: 'nabc123', from: '노트북 C123', sentAt: '2026-11-16T01:00:00Z', data: { points: [{ v: 20, p: 101, t: 20, dir: 'down' }, { v: 'x', p: 1, t: 1 }, { v: 25, p: 500, t: 20 }] } },
@@ -48,7 +48,7 @@ test('받은 것: 노트북별로 따로 두고, 바뀔 때만 true, 목록에�
     assert.deepEqual(Object.keys(ext), ['f:a.csv']);
 });
 
-test('CSV: 이 페이지 CSV 를 읽고, 그 노트북도 불러온 값(from:)은 빼서 겹치지 않게', () => {
+test('CSV: 이 페이지 CSV 를 읽고, 그 노트북도 불러온 값(from:)은 빼서 겹치지 않게', async () => {
     const csv = '﻿experiment,no,process,time_s,scale_volume_mL,air_volume_mL,pressure_kPa,temp_C,PV_kPa_mL,P_over_T_kPa_per_K,source\n' +
         'boyle,1,down,,20,20.5,101.3,20.1,2076.65,,sensor\n' +
         'boyle,2,up,,30,30.5,67,20.2,2043.5,,hand\n' +
@@ -62,14 +62,14 @@ test('CSV: 이 페이지 CSV 를 읽고, 그 노트북도 불러온 값(from:)�
     assert.match(S.parseCsv('').error, /빈 파일/);
 });
 
-test('가짜 서버(진짜 시트처럼 조 코드가 날짜로 바뀌는 시트)로: 노트북 A 보내기 → 노트북 B 목록에서 받아 합침', () => {
-    const app = loadCodeGs();
+test('가짜 서버(진짜 시트처럼 조 코드가 날짜로 바뀌는 시트)로: 노트북 A 보내기 → 노트북 B 목록에서 받아 합침', async () => {
+    const app = loadLabStore();
     const group = '2-3-5376';
     const ba = G.boyleAnalysis(boyle), ga = G.gayLussacAnalysis(S.gayPoints(gay));
     const b = CS.buildPayloads({ exp: 'idealgas', group, device: 'nAAAA11', items: S.buildItems({ boyle, gay, ba, ga }), sent: [], isGroupCode: PCF.isGroupCode });
     assert.ok(!b.error, b.error);
-    for (const pl of b.payloads) { const body = Object.assign({}, pl); delete body.tooBig; const r = app.post(body); assert.ok(r.ok, JSON.stringify(r)); }
-    const list = app.get({ action: 'list', exp: 'idealgas', group });
+    for (const pl of b.payloads) { const body = Object.assign({}, pl); delete body.tooBig; const r = (await app.post(body)); assert.ok(r.ok, JSON.stringify(r)); }
+    const list = (await app.get({ action: 'list', exp: 'idealgas', group }));
     assert.ok(list.ok, JSON.stringify(list));
     assert.equal(list.items.length, 2);
     const ext = {};

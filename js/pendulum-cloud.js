@@ -1,9 +1,9 @@
-/* 스마트폰 진자 — 조 코드와 구글 시트(Apps Script) 주고받기 (브라우저·Node 공용)
+/* 스마트폰 진자 — 조 코드와 사이트 저장소(Firestore, js/lab-store.js) 주고받기 (브라우저·Node 공용)
    - 조 코드: 반-조-4자리 숫자 (예: 2-3-4821). 학생 이름 없이 조만 구분
    - 원본 데이터 줄이기: 정수로 바꾼 뒤 '앞 값과의 차이'를 36진수로 적어 글자 수를 줄이고,
      셀 한 칸(45,000자) × 6칸 안에 들어가게 나눔. 그래도 크면 점을 2개 중 1개만 남김
    - 서버 요청은 '단순 요청'(GET, 또는 Content-Type: text/plain 인 POST)이라 미리보기 요청이 생기지 않음
-   서버 코드: apps-script/Code.gs, 주소: js/pendulum-config.js, 시험: tests/pendulum-cloud.test.cjs */
+   'lab:' 주소 요청은 js/lab-store.js 로 (예전 Apps Script 주소 요청 길은 정리 PR 에서 지움), 시험: tests/pendulum-cloud.test.cjs */
 (function (root, factory) {
     if (typeof module === 'object' && module.exports) module.exports = factory();
     else root.PendulumCloud = factory();
@@ -50,28 +50,23 @@
         return m ? m[1] : null;
     }
     function urlFromScriptId(id) { return isScriptId(id) ? 'https://script.google.com/macros/s/' + id + '/exec' : ''; }
-    /* 이 화면이 쓸 서버 주소 정하기
-       - 주소의 ?s=ID 가 있으면 그것 (remember 면 이 브라우저에 기억)
-       - 없으면 remember 일 때만 기억해 둔 것, 그것도 없으면 사이트 기본(js/pendulum-config.js)
-       돌려주는 값: { url, id, from: 'link'|'saved'|'default'|'none' } */
+    /* 이 화면이 쓸 저장 공간 정하기 (2026-11-18 Firestore 로 바꿈, js/lab-store.js)
+       - 주소의 ?s=공간 이 있으면 그것 (수업 QR·폰 QR 이 담아 줌, 남이 맞히기 어려운 24자)
+       - 없으면 조 코드로 정해지는 공간 ('lab:' — 같은 조 코드를 넣은 기기끼리 만남)
+       - 예전 Apps Script 링크(?s=AKfy…)는 'legacy' 로 알려 주고 조 코드 공간을 쓴다
+       공간은 이 브라우저에 기억하지 않는다 (기억한 수업 공간과 조 코드 공간이 섞이지 않게)
+       돌려주는 값: { url: 'lab:…', id: 공간 또는 null, from: 'link'|'default'|'legacy' } */
     var SERVER_KEY = 'pendulum:server';
-    function resolveServer(search, defaultUrl, store, remember) {
+    var SPACE_RE = /^[cp][a-z0-9]{23}$/;
+    function resolveServer(search) {
         var m = /[?&]s=([^&#]*)/.exec(search || ''), id = m ? decodeURIComponent(m[1]) : '';
-        if (isScriptId(id)) {
-            if (remember && store) { try { store.setItem(SERVER_KEY, id); } catch (e) { /* 저장 불가 */ } }
-            return { url: urlFromScriptId(id), id: id, from: 'link' };
-        }
-        if (remember && store) {
-            var saved = null;
-            try { saved = store.getItem(SERVER_KEY); } catch (e) { saved = null; }
-            if (isScriptId(saved)) return { url: urlFromScriptId(saved), id: saved, from: 'saved' };
-        }
-        if (defaultUrl) return { url: defaultUrl, id: scriptIdFromUrl(defaultUrl), from: 'default' };
-        return { url: '', id: null, from: 'none' };
+        if (SPACE_RE.test(id)) return { url: 'lab:' + id, id: id, from: 'link' };
+        if (id && isScriptId(id)) return { url: 'lab:', id: null, from: 'legacy' };
+        return { url: 'lab:', id: null, from: 'default' };
     }
     function forgetServer(store) { try { store.removeItem(SERVER_KEY); } catch (e) { /* 저장 불가 */ } }
 
-    /* 폰 측정 · 노트북 분석 이원화: 측정 화면 ↔ 분석 화면으로 갈 때 선생님 시트(s)·수업 코드(c)를 그대로 넘긴다
+    /* 폰 측정 · 노트북 분석 이원화: 측정 화면 ↔ 분석 화면으로 갈 때 사이트 저장소(s)·수업 코드(c)를 그대로 넘긴다
        otherPage('pendulum-report.html', '?s=AK…&c=ABC&group=…&device=phone') → 'pendulum-report.html?s=AK…&c=ABC' */
     function otherPage(page, search, keys) {
         keys = keys || ['s', 'c'];
@@ -194,7 +189,30 @@
             promise.then(function (v) { clearTimeout(t); resolve(v); }, function (e) { clearTimeout(t); reject(e); });
         });
     }
+    // Firestore 저장소(js/lab-store.js)를 아직 안 불렀으면 이 파일 옆에서 불러온다
+    var labLoading = null;
+    function labStore() {
+        var g = typeof self !== 'undefined' ? self : null;
+        if (g && g.LabStore) return Promise.resolve(g.LabStore);
+        if (typeof module === 'object' && module.exports) { try { return Promise.resolve(require('./lab-store.js')); } catch (e) { /* 아래 */ } }
+        if (labLoading) return labLoading;
+        labLoading = new Promise(function (res, rej) {
+            var me = Array.prototype.slice.call(document.scripts).filter(function (sc) { return /pendulum-cloud\.js/.test(sc.src); })[0];
+            var sc = document.createElement('script');
+            sc.src = me ? me.src.replace(/pendulum-cloud\.js.*$/, 'lab-store.js') : '/js/lab-store.js';
+            sc.onload = function () { res(g.LabStore); }; sc.onerror = function () { labLoading = null; rej(new Error('저장소 도구를 불러오지 못했습니다.')); };
+            document.head.appendChild(sc);
+        });
+        return labLoading;
+    }
+    function isLab(url) { return /^lab:/.test(String(url || '')); }
+    function labRequest(url, init, ms) {
+        var body = null;
+        try { body = init && init.body ? JSON.parse(init.body) : null; } catch (e) { body = null; }
+        return labStore().then(function (L) { return L.call(url, body, ms); }, function (e) { return { ok: false, error: String(e && e.message || e), network: true }; });
+    }
     function request(url, init, fetchImpl, ms) {
+        if (isLab(url)) return labRequest(url, init, ms);
         var f = fetchImpl || (typeof fetch === 'function' ? fetch : null);
         if (!url) return Promise.resolve({ ok: false, error: '선생님 설정이 아직 안 되었습니다 (Apps Script 주소 없음).', noConfig: true });
         if (!f) return Promise.resolve({ ok: false, error: '이 브라우저는 서버에 연결할 수 없습니다.' });
@@ -219,7 +237,7 @@
     return {
         GROUP_RE: GROUP_RE, CELL_MAX: CELL_MAX, RAW_CELLS: RAW_CELLS,
         isScriptId: isScriptId, scriptIdFromUrl: scriptIdFromUrl, urlFromScriptId: urlFromScriptId,
-        resolveServer: resolveServer, otherPage: otherPage, forgetServer: forgetServer, SERVER_KEY: SERVER_KEY,
+        resolveServer: resolveServer, isLab: isLab, labStore: labStore, labRequest: labRequest, SPACE_RE: SPACE_RE, otherPage: otherPage, forgetServer: forgetServer, SERVER_KEY: SERVER_KEY,
         normalizeGroup: normalizeGroup, isGroupCode: isGroupCode, makeGroupCode: makeGroupCode, groupParts: groupParts, newId: newId,
         packSamples: packSamples, unpackSamples: unpackSamples, buildSavePayload: buildSavePayload,
         parseResponse: parseResponse, itemFromServer: itemFromServer, mergeItems: mergeItems,

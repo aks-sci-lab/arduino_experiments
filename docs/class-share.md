@@ -1,18 +1,18 @@
 # 수업 참여 · 조 공유 공통 부품 사용법 (`js/class-share.js`)
 
-교사·학생 모두 **구글 로그인 없이**, 조 코드로 측정값을 같은 조 노트북과 선생님 시트에 나누는 부품입니다(2026-11-16, 서버 `apps-script/Code.gs` 6판).
+학생은 **로그인 없이**(화면에 안 보이는 익명 로그인), 조 코드로 측정값을 같은 조 노트북·폰과 선생님 화면에 나누는 부품입니다. 저장소는 사이트 Firebase(Firestore, `js/lab-store.js`, 2026-11-18 Apps Script 대신)이고, 같은 조의 새 측정은 실시간으로 들어옵니다.
 실험 페이지마다 이 문서만 보고 붙이면 됩니다. 기준 예: 플랑크 상수(`js/planck-led.js` 의 `initShare`), 진자(`js/pendulum-report.js`·`js/pendulum-measure.js`, 띠만).
 
 ## 하는 일
 
 | 부분 | 나오는 때 | 내용 |
 |---|---|---|
-| 🏫 수업 참여 띠 | 주소에 `?c=수업코드` 가 있을 때만 | 선생님 시트에서 수업을 찾아 **조·번호**(이름 없음)를 고름 → 그 조의 조 코드를 정함. 다른 실험 수업이면 그 실험 페이지로 가는 링크 |
-| 👥 조 공유 칸 | `shareMount` 를 줄 때 | 반·조 → 조 코드, 📤 선생님께 보내기, 📥 불러오기(몇 초마다 자동), (있으면) 📂 CSV 불러오기·불러온 값 지우기, 실패 때 CSV 안내 |
-| 하트비트 | 수업에 참여했을 때 | 단계를 바꿀 때·보낼 때·1분마다 '보고 있는 단계·잰 점 수·보냄 여부'를 선생님 시트(`progress`)에 → 교사 화면 ③ 진행 보기 |
+| 🏫 수업 참여 띠 | 주소에 `?c=수업코드` 가 있을 때만 | 저장소에서 수업을 찾아 **조·번호**(이름 없음)를 고름 → 그 조의 조 코드를 정함. 다른 실험 수업이면 그 실험 페이지로 가는 링크 |
+| 👥 조 공유 칸 | `shareMount` 를 줄 때 | 반·조 → 조 코드, 📤 선생님께 보내기, 📥 불러오기(새 측정 자동), (있으면) 📂 CSV 불러오기·불러온 값 지우기, 실패 때 CSV 안내 |
+| 하트비트 | 수업에 참여했을 때 | 단계를 바꿀 때·보낼 때·3분마다 '보고 있는 단계·잰 점 수·보냄 여부'를 `labClasses/{수업}/progress` 에 → 교사 화면 ② 진행 보기 |
 
-어느 시트로 보낼지는 진자·플랑크와 같습니다: 링크의 `?s=스크립트ID` > 이 브라우저가 기억한 시트 > `js/pendulum-config.js` 기본.
-학생 이름·학번·이메일은 받지 않습니다. 글자 값은 서버가 앞에 `'` 를 붙여 저장합니다(조 코드가 날짜로 바뀌지 않게).
+어느 **공간**에 저장할지: 링크의 `?s=공간`(수업 QR·폰 QR 이 담음, 24자) > 수업 코드로 찾은 수업 공간 > 이 노트북이 '📱 폰' QR 을 만들며 정한 짝 공간 > 조 코드 공간(같은 조 코드를 넣은 기기끼리, 남이 맞히기 쉬움).
+학생 이름·학번·이메일은 받지 않습니다. 모든 자료는 183일 뒤 저절로 지워집니다. 이 부품을 쓰는 페이지는 `js/pendulum-cloud.js` 다음에 `js/lab-store.js` 를 불러옵니다(없으면 저절로 불러옴).
 
 ## 붙이는 법 (4단계)
 
@@ -125,8 +125,8 @@ saveRun(run); share.saved();
 
 | exp | 실험 | 페이지 | 서버 저장 |
 |---|---|---|---|
-| `planck` | LED 플랑크 상수 | `projects/planck-led.html` | 전용 `planck` 시트 (붙임 완료) |
-| `pendulum` | 스마트폰 진자 | `pendulum-report.html`(노트북)·`pendulum-measure.html`(폰) | 전용 `measurements` 시트 (띠 붙임 완료) |
+| `planck` | LED 플랑크 상수 | `projects/planck-led.html` | 전용 모양(LED 하나 = 한 문서) (붙임 완료) |
+| `pendulum` | 스마트폰 진자 | `pendulum-report.html`(노트북)·`pendulum-measure.html`(폰) | 전용 모양(원본은 `raw` 에 따로) (띠 붙임 완료) |
 | `idealgas` | 이상기체 | `projects/ideal-gas.html` | 공용 `submissions` (붙임 완료: 실험 1·2 한 줄씩, `js/ideal-gas-share.js`) |
 | `eminduction` | 전자기 유도 | `projects/em-induction.html` | 공용 (붙임 완료: 저장한 측정 하나 = 한 줄, 요약 봉우리·∫ε dt·ΔΦ + 줄인 파형) |
 | `malus` | 말루스 법칙 | `projects/malus-law.html` | 공용 (붙임 완료, `js/malus-share.js`) |
@@ -135,13 +135,14 @@ saveRun(run); share.saved();
 | `accel` | 가속도계 | `projects/accelerometer-lab.html` | 공용 (붙임 완료) |
 | `nano` | Nano 33 BLE Sense | `projects/arduino-nano-lab.html` | 공용 |
 | `phoneaccel` | 스마트폰 가속도 | `projects/phone-accelerometer.html` | 공용 (붙임 완료, 📱 폰 연결: 시작→중지 한 번 = 회차, `js/phone-accel-share.js`, 이원화: 노트북은 QR 카드·분석만) |
-| `qdot` | 탄소 양자점 형광 | `projects/quantum-dot.html` | Firestore 전환 예정 (Code.gs 에는 없음, 📱 폰 연결: 시료 하나 = 한 줄, 숫자만, 이원화) |
+| `qdot` | 탄소 양자점 형광 | `projects/quantum-dot.html` | 공용 (📱 폰 연결: 시료 하나 = 한 줄, 숫자만, 이원화) |
 | `custom:<실험 id>` | 선생님이 만든 실험 | `projects/custom-lab.html?id=…` | 공용 |
 
-새 실험 이름을 더하려면 **서버(`apps-script/Code.gs` 의 `GENERIC_EXPS`)와 `js/class-cloud.js` 의 `EXPS` 를 같이** 고칩니다(시험 `tests/class-share.test.cjs` 가 둘이 같은지 확인). 서버를 고치면 `VERSION` 을 올리고 `node tools/build-apps-script-release.cjs` → 선생님은 교사 화면의 🔄 업데이트.
+새 실험 이름을 더하려면 **`js/lab-store.js` 의 `GENERIC_EXPS` 와 `js/class-cloud.js` 의 `EXPS` 를 같이** 고칩니다(시험 `tests/class-share.test.cjs` 가 둘이 같은지 확인). 서버 업데이트는 없습니다(사이트 배포로 끝).
 
-## 서버 요청 (참고)
+## 저장소 요청 (참고, `LabStore.call('lab:공간', body)`)
 
-- 저장: `POST { action: 'save', exp, id, group, device, title, n, summary, data, sentAt }` (Content-Type `text/plain`, 미리보기 요청 없음) → `submissions` 시트 한 줄, 같은 `exp`·조·`id` 면 고쳐 씀, 조당 200줄
-- 목록: `GET ?action=list&exp=…&group=…` → `{ items: [{ id, device, title, n, summary, data, sentAt, timestamp }] }`
+- 저장: `{ action: 'save', exp, id, group, device, title, n, summary, data, sentAt }` → `labSpaces/{공간}/items/{exp~조~id}` 문서 하나, 같으면 고쳐 씀. 자료 27만 자까지(규칙이 확인)
+- 목록: `{ action: 'list', exp, group }` → `{ items: [{ id, device, title, n, summary, data, sentAt, timestamp }] }` (Firestore 실시간 듣기로 받아 둔 것을 돌려줌)
+- 시험: 페이지에 `window.LAB_STORE_FAKE_URL` 을 넣으면 `tests/fake-lab-store.cjs`(같은 core, 메모리 DB)로 보냄
 - 하트비트·진행 보기는 수업 연결(`docs/class-teacher-guide.md`)과 같음. 교사 화면은 실험마다 '제출: N개 (제목들) · summary 앞 4개' 로 보여 줌

@@ -1,8 +1,8 @@
 name: Dev data collect
 
-# 개발 데이터 자동 수집 (2026-11-17, 선생님 요청): 선생님 시트(Apps Script 10판)의 devlog 를 매시간 가져와
+# 개발 데이터 자동 수집 (2026-11-17, 선생님 요청): Firestore devlog(선생님 기기에서 잰 측정)를 매시간 가져와
 # dev-data 브랜치에 파일로 쌓는다. main 이 아니므로 사이트 배포와 상관없음.
-# 켜는 조건: js/pendulum-config.js 의 devCollect: true + 저장소 Secrets DEV_SHEET_URL·DEV_ADMIN_KEY
+# 켜는 조건: js/pendulum-config.js 의 devCollect: true + 저장소 Secret FIREBASE_SERVICE_ACCOUNT(사이트 배포와 같은 키, 2026-11-18 부터)
 # 멈추기: docs/dev-data.md (devCollect: false 로 바꾸면 이 작업은 아무것도 하지 않음)
 
 on:
@@ -24,10 +24,9 @@ jobs:
       - name: Check secrets
         id: sec
         env:
-          URL: ${{ secrets.DEV_SHEET_URL }}
-          KEY: ${{ secrets.DEV_ADMIN_KEY }}
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          if [ -n "$URL" ] && [ -n "$KEY" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "ok=false" >> "$GITHUB_OUTPUT"; echo "::notice::DEV_SHEET_URL·DEV_ADMIN_KEY Secret 이 없어 건너뜁니다"; fi
+          if [ -n "$SA" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "ok=false" >> "$GITHUB_OUTPUT"; echo "::notice::FIREBASE_SERVICE_ACCOUNT Secret 이 없어 건너뜁니다"; fi
 
       - name: Checkout main (tool, config)
         if: steps.sec.outputs.ok == 'true'
@@ -60,12 +59,15 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Pull from sheet
+      - name: Install firebase-admin
+        if: steps.sw.outputs.on == 'true'
+        run: cd site && npm install --no-save --no-audit --no-fund firebase-admin@12.7.0
+
+      - name: Pull from Firestore
         if: steps.sw.outputs.on == 'true'
         id: pull
         env:
-          DEV_SHEET_URL: ${{ secrets.DEV_SHEET_URL }}
-          DEV_ADMIN_KEY: ${{ secrets.DEV_ADMIN_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           DEV_OUT: ${{ github.workspace }}/data
         run: node site/tools/dev-data-pull.cjs
 

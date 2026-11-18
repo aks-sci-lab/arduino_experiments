@@ -663,7 +663,7 @@
             <span id="send2-status" class="note"></span>
         </div>
         <div class="row"><button id="btn-clear-all" class="danger">모든 측정값 지우기</button></div>
-        <p class="note">측정값은 이 브라우저에 자동 저장되어 페이지를 다시 열어도 남아 있습니다. 조 코드를 정하면 선생님 시트로 보내고 같은 조의 다른 노트북에서 불러올 수 있습니다 (<b>5. 데이터 수집</b> 맨 위 '👥 조 공유').</p>
+        <p class="note">측정값은 이 브라우저에 자동 저장되어 페이지를 다시 열어도 남아 있습니다. 조 코드를 정하면 사이트 저장소로 보내고 같은 조의 다른 노트북에서 불러올 수 있습니다 (<b>5. 데이터 수집</b> 맨 위 '👥 조 공유').</p>
         <div class="row next"><button class="good" data-go="conclusion">다음: 7. 결론 및 분석 →</button></div>
     </div>
     </section>
@@ -711,9 +711,9 @@
 <script src="../js/accelerometer-protocol.js"></script>
 <script src="../js/custom-lab-math.js"></script>
 <script src="../js/custom-lab-sensor.js"></script>
-<!-- 조 공유: 스마트폰 진자와 같은 선생님 Apps Script 를 쓴다 (주소 js/pendulum-config.js, 링크의 ?s= 가 있으면 그것) -->
+<!-- 조 공유: 사이트 저장소(Firestore, js/lab-store.js, 링크의 ?s= 가 있으면 그 공간). -->
 <script src="../js/pendulum-config.js"></script>
-<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/planck-cloud.js"></script>
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-share.js"></script>

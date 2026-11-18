@@ -1,5 +1,5 @@
 // 이상기체 상태 방정식 실험: 감압 용기 속 피코 환경 센서(BME280)의 압력·온도로 보일 법칙과 샤를·게이뤼삭 법칙을 확인한다.
-// 측정값은 조 공유(js/class-share.js, 구글 로그인 없음)로 같은 조 노트북·선생님 시트와 나누고, 보고서는 인쇄(PDF)로 낸다.
+// 측정값은 조 공유(js/class-share.js, 구글 로그인 없음)로 같은 조 노트북·사이트 저장소와 나누고, 보고서는 인쇄(PDF)로 낸다.
 // 예전에 구글 로그인으로 제출한 보고서는 메인 '사이트 관리'의 기록 목록에서 ?report=문서id 로 계속 볼 수 있다.
 (function () {
     'use strict';
@@ -681,7 +681,7 @@
     });
 
     // ---------- 조 공유 · 수업 참여: 공통 부품 js/class-share.js (docs/class-share.md) ----------
-    // 구글 로그인 없이 조 코드로: 이 노트북이 직접 잰 실험 1·2 를 선생님 시트(공용 submissions)로 보내고,
+    // 구글 로그인 없이 조 코드로: 이 노트북이 직접 잰 실험 1·2 를 사이트 저장소(공용 submissions)로 보내고,
     // 같은 조 다른 노트북이 보낸 것은 state.ext 에 따로 두어 표·그래프·결과에 합친다 (js/ideal-gas-share.js)
     let share = null;
     const myPoints = () => state.boyle.length + state.gay.length;

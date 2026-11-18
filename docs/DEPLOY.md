@@ -57,3 +57,27 @@ firebase init hosting:github
 ### 자동 게시가 안 될 때 (예비 방법)
 
 Firebase 콘솔 → 프로젝트 `web-experiment-f9b24` → Firestore Database → **규칙** 탭에 `firestore.rules` 내용을 통째로 붙여 넣고 **게시**를 누릅니다.
+
+## 수업 연결 저장소 (2026-11-18, Apps Script 대신 Firestore)
+
+수업 연결·조 공유·폰→노트북 전송은 `js/lab-store.js` 가 Firestore 에 저장합니다. 콘솔에서 **한 번만** 할 일:
+
+1. **익명 로그인 켜기**: Firebase 콘솔 → Authentication → 로그인 방법(Sign-in method) → **익명(Anonymous)** → 사용 설정 → 저장. (학생이 로그인 화면 없이 쓰는 데 필요. 꺼져 있으면 학생 화면에 '익명 로그인이 꺼져 있어요' 가 나옵니다)
+2. **구글 로그인**: 이미 켜져 있음(메인 화면 사이트 관리 로그인과 같음). 교사 화면도 같은 구글 로그인을 씁니다.
+3. **승인된 도메인**: Authentication → 설정 → 승인된 도메인에 `aks-sci-lab.web.app` 이 있는지 확인(보통 이미 있음).
+4. **규칙**: `firestore.rules` 가 머지되면 자동 게시(위 'Firestore 보안 규칙').
+
+### 학기 끝 자동 삭제 (TTL)
+
+모든 수업 자료 문서에 `expireAt`(만든 날 + 183일)이 붙습니다. 두 가지가 지웁니다.
+
+- **TTL 정책**(Firestore 가 스스로 지움, 하루쯤 늦을 수 있음): `firestore.indexes.json` 이 머지되면 "Deploy Firestore rules" 가 함께 게시합니다.
+  권한 오류(`datastore.indexes`)가 나면 서비스 계정에 **Cloud Datastore 색인 관리자(Cloud Datastore Index Admin)** 역할을 더하거나, 콘솔에서 직접:
+  Firestore Database → **TTL** 탭 → 정책 만들기 → 컬렉션 그룹 `items`, 타임스탬프 필드 `expireAt` → 만들기.
+  같은 방법으로 `raw`, `progress`, `labClasses`, `labClassCodes`, `devlog` 도 (모두 필드는 `expireAt`).
+- **정리 작업**(`.github/workflows/firestore-cleanup.yml`, 매일 새벽): TTL 을 못 켰어도 같은 키(`FIREBASE_SERVICE_ACCOUNT`)로 `expireAt` 가 지난 문서를 지웁니다. Actions 탭에서 손으로 돌릴 수도 있어요. 이 작업은 `expireAt` 색인(위 파일)이 있어야 동작합니다.
+
+### 비용
+
+Spark(무료) 한도: 하루 쓰기 2만·읽기 5만. 30명 한 반 50분 수업에 쓰기 약 1,000번·읽기 약 2,500번(자세히: `docs/class-teacher-guide.md`).
+학생 화면은 같은 조의 새 측정을 실시간 듣기로 받아, 몇 초마다 확인해도 읽기 횟수가 늘지 않습니다.

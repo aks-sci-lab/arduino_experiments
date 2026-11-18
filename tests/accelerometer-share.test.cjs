@@ -5,9 +5,9 @@ const AS = require('../js/accelerometer-share.js');
 const CS = require('../js/class-share.js');
 const PD = require('../js/pendulum-cloud.js');
 const CC = require('../js/class-cloud.js');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
-test('줄 줄이기: 반올림, 모양이 틀린 줄은 빼고, 너무 길면 고르게 솎음', () => {
+test('줄 줄이기: 반올림, 모양이 틀린 줄은 빼고, 너무 길면 고르게 솎음', async () => {
     const p = AS.pack([[0.123456, 1.234567, 2, 3, 99], [1, 'x', 0, 0], null, [2, 0, 0, 1]], ['t', 'x', 'y', 'z'], [3, 2, 2, 2]);
     assert.deepEqual(p, { cols: ['t', 'x', 'y', 'z'], step: 1, rows: [[0.123, 1.23, 2, 3], [2, 0, 0, 1]] });
     const long = Array.from({ length: 20000 }, (_, i) => [i * 0.005, Math.sin(i), Math.cos(i), 1 + i / 1e5]);
@@ -20,7 +20,7 @@ test('줄 줄이기: 반올림, 모양이 틀린 줄은 빼고, 너무 길면 �
     assert.deepEqual(AS.unpack('nope', ['t']), []);
 });
 
-test('가속도 요약: 점·시간·평균 |a|·최대 |a| (서버 요약 이름 규칙에 맞음)', () => {
+test('가속도 요약: 점·시간·평균 |a|·최대 |a| (서버 요약 이름 규칙에 맞음)', async () => {
     const rows = [[0, 0, 0, 1], [0.01, 0, 0, 2], [0.03, 3, 4, 0]];
     const s = AS.accelSummary(rows);
     assert.deepEqual(s, { '점': 3, '시간 (s)': 0.03, '평균 a (g)': 2.667, '최대 a (g)': 5 });
@@ -31,7 +31,7 @@ test('가속도 요약: 점·시간·평균 |a|·최대 |a| (서버 요약 이�
     assert.deepEqual(AS.accelSummary([]), { '점': 0 });
 });
 
-test('받은 것 보관: 노트북:id 로 따로, 같은 것은 바뀌지 않음, 빠진 것은 사라짐', () => {
+test('받은 것 보관: 노트북:id 로 따로, 같은 것은 바뀌지 않음, 빠진 것은 사라짐', async () => {
     const items = [{ id: 'a1', device: 'nzz9999', from: '노트북 9999', title: 'A', n: 2, summary: {}, sentAt: 's1', data: 1 },
         { id: 'b1', device: 'nqq1111', from: '노트북 1111', title: 'B', n: 1, summary: {}, sentAt: 's1', data: null }];
     const conv = it => (it.data ? { rows: [it.data] } : null);
@@ -43,7 +43,7 @@ test('받은 것 보관: 노트북:id 로 따로, 같은 것은 바뀌지 않음
     assert.deepEqual(AS.replaceIncoming(r.store, [], conv), { store: {}, changed: true });
 });
 
-test('자유낙하: 종류별 한 줄, 요약 g·오차·R²·vx, 받은 자료 되살리기', () => {
+test('자유낙하: 종류별 한 줄, 요약 g·오차·R²·vx, 받은 자료 되살리기', async () => {
     const rows = [{ t: 0, x: 0, y: 0 }, { t: 0.1, x: 50, y: 49.05 }, { t: 0.2, x: 100, y: 196.2 }];
     const ff = AS.freeFallItem({ mode: 'free-fall', rows, mmPerPx: 1.5, fit: { g: 9.8123, r2: 0.99991, errPct: 0.1255, vx: null } });
     assert.equal(ff.id, 'ff'); assert.equal(ff.n, 3); assert.equal(ff.title, '자유낙하 3점');
@@ -58,8 +58,8 @@ test('자유낙하: 종류별 한 줄, 요약 g·오차·R²·vx, 받은 자료 
     assert.equal(AS.freeFallFromData({ mode: 'other', cols: ['t', 'x', 'y'], rows: [[0, 0, 0]] }), null);
 });
 
-test('가짜 Apps Script: 세 실험 모두 공용 저장 → 같은 조 다른 노트북이 불러옴 (조 코드는 글자 그대로)', () => {
-    const app = loadCodeGs();
+test('가짜 Apps Script: 세 실험 모두 공용 저장 → 같은 조 다른 노트북이 불러옴 (조 코드는 글자 그대로)', async () => {
+    const app = loadLabStore();
     for (const exp of ['accel', 'phoneaccel', 'freefall']) assert.equal(CC.expInfo(exp).ready, true, exp);
     const items = {
         accel: [AS.accelItem('t1', '1회', [[0, 0, 0, 1], [0.01, 0, 0, 1.5]])],
@@ -69,8 +69,8 @@ test('가짜 Apps Script: 세 실험 모두 공용 저장 → 같은 조 다른 
     for (const exp of Object.keys(items)) {
         const b = CS.buildPayloads({ exp, group: '2-3-5376', device: 'nab12cd', items: items[exp], isGroupCode: PD.isGroupCode });
         assert.equal(b.error, undefined);
-        b.payloads.forEach(p => { const body = Object.assign({}, p); delete body.tooBig; const r = app.post(body); assert.equal(r.ok, true, r.error); });
-        const list = app.get({ action: 'list', exp, group: '2-3-5376' });
+        for (const p of b.payloads) { const body = Object.assign({}, p); delete body.tooBig; const r = (await app.post(body)); assert.equal(r.ok, true, r.error); }
+        const list = (await app.get({ action: 'list', exp, group: '2-3-5376' }));
         assert.equal(list.ok, true);
         const got = CS.incomingFrom(list.items, 'nother1');
         assert.equal(got.length, 1);
@@ -78,5 +78,5 @@ test('가짜 Apps Script: 세 실험 모두 공용 저장 → 같은 조 다른 
         if (exp === 'freefall') assert.equal(AS.freeFallFromData(got[0].data).rows[0].y, 2);
         else assert.deepEqual(AS.accelRows(got[0].data), items[exp][0].data.rows);
     }
-    assert.equal(app.ss.getSheetByName('submissions').rows[1][2], '2-3-5376');
+    assert.equal(app.items()[0].group, '2-3-5376');
 });

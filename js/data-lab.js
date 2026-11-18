@@ -137,7 +137,7 @@
             const t = R.timeText(u.at);
             const entry = {
                 srcKey: it.key, no: n, title: who + ' · ' + n + '회차' + (t ? ' (' + t + ')' : ''),
-                note: kind + ' · ' + u.frames.length + '장' + (u.decimate > 1 ? ` (원래 ${u.frames0}장을 ${u.decimate}장마다 1장으로 솎음)` : '') + ' · 폰에서 잰 원본을 선생님 시트로 받아 이 노트북에서 계산',
+                note: kind + ' · ' + u.frames.length + '장' + (u.decimate > 1 ? ` (원래 ${u.frames0}장을 ${u.decimate}장마다 1장으로 솎음)` : '') + ' · 폰에서 잰 원본을 사이트 저장소로 받아 이 노트북에서 계산',
                 frames: u.frames, lock: u.lock === 'locked' ? 'csv-locked' : (u.lock || 'unlocked')
             };
             if (old >= 0) custom[old] = entry; else { custom.push(entry); added++; }

@@ -17,8 +17,8 @@
     };
     var PC = window.PendulumCloud;
     var CONFIG = window.PENDULUM_CONFIG || {};
-    // 폰은 기억하지 않고 링크(QR)의 ?s= 만 따른다: 예전에 쓴 다른 선생님 시트로 잘못 보내지 않게
-    var SERVER = PC ? PC.resolveServer(location.search, CONFIG.appsScriptUrl, null, false) : { url: CONFIG.appsScriptUrl || '' };
+    // 저장 공간: 링크(QR)의 ?s= (수업 공간), 없으면 조 코드 공간 — 사이트 저장소(Firestore, js/lab-store.js)
+    var SERVER = PC ? PC.resolveServer(location.search) : { url: '' };
     var charts = { gyro: null, acc: null };
 
     // ---------- 저장(새로고침해도 조건·설정 유지) ----------
@@ -310,7 +310,7 @@
         updateSendState();
     }
 
-    // ---------- 노트북으로 보내기 (Apps Script → 선생님 구글 시트 → 노트북 분석 화면) ----------
+    // ---------- 노트북으로 보내기 (사이트 저장소 Firestore → 노트북 분석 화면, 실시간) ----------
     function newMeasurement() {
         state.measureId = PC ? PC.newId() : null;
         state.sentKey = null;

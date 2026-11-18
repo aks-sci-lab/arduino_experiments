@@ -214,7 +214,7 @@
         <h2>📱 폰으로 측정해 보내기</h2>
         <p class="note">이 노트북은 <b>분석용</b>입니다. 측정은 폰 카메라로 합니다. 아래 QR 을 폰으로 찍어 각도별 밝기를 재고, 보낼 회차를 골라 📤 보내면 <b>6. 결과</b> 표·그래프에 저절로 들어옵니다.</p>
         <div id="phone-card" class="show-on-laptop"></div>
-        <p class="note">선생님 시트가 없거나 인터넷이 안 되면: 폰에서 <b>6. 결과 → CSV 다운로드</b> 로 저장한 파일을 아래 '👥 조 공유' 칸의 <b>📂 CSV 불러오기</b>로 넣으세요. 이 기기가 노트북이 아니면 맨 위 '이 기기'를 바꾸세요.</p>
+        <p class="note">사이트 저장소가 없거나 인터넷이 안 되면: 폰에서 <b>6. 결과 → CSV 다운로드</b> 로 저장한 파일을 아래 '👥 조 공유' 칸의 <b>📂 CSV 불러오기</b>로 넣으세요. 이 기기가 노트북이 아니면 맨 위 '이 기기'를 바꾸세요.</p>
     </div>
     <p class="note show-on-phone phone-solo">📱 노트북이 있으면 노트북에서 이 페이지를 열고 '📱 폰으로 측정해 보내기' QR 을 찍으세요. 노트북이 없으면 이 폰에서 측정·분석을 모두 할 수 있습니다.</p>
     <div id="share-mount"></div>
@@ -385,7 +385,7 @@
 
         <div class="card">
             <h2>2. 선생님께 보내기 (조 공유)</h2>
-            <p class="note">내가 잰 회차들을 선생님 시트와 같은 조 노트북에 보냅니다. <b>구글 로그인은 필요 없습니다.</b> 조 코드는 <b>5. 데이터</b> 맨 위 '👥 조 공유'에서 정합니다. 결측 처리를 고쳤으면 다시 보내세요(같은 회차는 고쳐 씁니다).</p>
+            <p class="note">내가 잰 회차들을 사이트 저장소와 같은 조 노트북에 보냅니다. <b>구글 로그인은 필요 없습니다.</b> 조 코드는 <b>5. 데이터</b> 맨 위 '👥 조 공유'에서 정합니다. 결측 처리를 고쳤으면 다시 보내세요(같은 회차는 고쳐 씁니다).</p>
             <div class="row"><button id="btn-send2" class="good">📤 선생님께 보내기</button><span id="send2-status" class="note"></span></div>
         </div>
 
@@ -434,7 +434,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="../js/pendulum-config.js"></script>
-<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-share.js"></script>
 <script src="../js/malus-math.js"></script>

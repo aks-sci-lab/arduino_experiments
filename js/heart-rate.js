@@ -366,7 +366,7 @@
         if (!run || run.sim || String(run.lock).startsWith('csv') || typeof DevCollect === 'undefined' || !DevCollect.active()) return;
         const res = run.res || {};
         DevCollect.send('heartrate', {
-            id: 'hr-' + DevCollect.init().device().slice(-6) + '-' + Math.floor((Date.parse(run.at) || Date.now()) / 1000).toString(36) + '-' + run.id,
+            id: 'hr-' + DevCollect.device().slice(-6) + '-' + Math.floor((Date.parse(run.at) || Date.now()) / 1000).toString(36) + '-' + run.id,
             measuredAt: run.at,
             summary: { '심박수': res.bpm == null ? '' : Math.round(res.bpm * 10) / 10, '신뢰도': res.conf == null ? '' : Math.round(res.conf * 100) / 100, '노출': res.mode || '',
                 '손목': H.palpBpm(run.palp) || '', 'FFT': res.bpmFFT == null ? '' : Math.round(res.bpmFFT), '자기상관': res.bpmAC == null ? '' : Math.round(res.bpmAC), '봉우리': res.bpmPeaks == null ? '' : Math.round(res.bpmPeaks) },

@@ -108,6 +108,83 @@ service cloud.firestore {
                             request.resource.data.updatedAt == request.time;
     }
 
+    // ===== 수업 연결·조 공유·폰→노트북 (2026-11-18, Apps Script 대신, js/lab-store.js) =====
+    // 학생: 화면에 안 보이는 익명 로그인. 이름·학번 없음. 교사: 구글 로그인(수업 주인 = uid).
+    // 공간: c…24자(수업), p…24자(노트북↔폰 짝), g<조 코드>(조 코드만 넣어 쓸 때). 공간 id 를 아는 기기만 읽고 쓴다(목록 조회 불가).
+    // 모든 문서에 expireAt(만든 때 + 183일): TTL 정책·정리 작업이 지운다. 200일 넘게 늦출 수 없다.
+    function signedIn() { return request.auth != null; }
+    function isGoogle() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com'; }
+    function okSpace(s) { return s.matches('^([cp][a-z0-9]{23}|g[0-9]{1,2}-[0-9]{1,2}-[0-9]{4})$'); }
+    function okExpire(d) { return d.expireAt is timestamp && d.expireAt > request.time && d.expireAt < request.time + duration.value(200, 'd'); }
+    function shortStr(v, n) { return v is string && v.size() <= n; }
+    function okItem(d) {
+      return d.exp is string && d.exp.matches('^([a-z]{1,20}|custom:[A-Za-z0-9_-]{1,40})$') &&
+             d.group is string && d.group.matches('^[0-9]{1,2}-[0-9]{1,2}-[0-9]{4}$') &&
+             d.id is string && d.id.matches('^[A-Za-z0-9_-]{6,40}$') &&
+             (!('device' in d) || shortStr(d.device, 20)) &&
+             (!('data' in d) || shortStr(d.data, 270000)) &&
+             (!('title' in d) || shortStr(d.title, 60)) &&
+             (!('summary' in d) || (d.summary is map && d.summary.size() <= 20)) &&
+             (!('ivData' in d) || shortStr(d.ivData, 45000)) &&
+             (!('glowData' in d) || shortStr(d.glowData, 45000)) &&
+             d.keys().size() <= 40 && okExpire(d);
+    }
+    function classOwner(space) { return get(/databases/$(database)/documents/labClasses/$(space)).data.owner; }
+
+    match /labSpaces/{space}/items/{doc} {
+      allow get, list: if signedIn() && okSpace(space);
+      allow create, update: if signedIn() && okSpace(space) && okItem(request.resource.data) &&
+                            doc.size() <= 120;
+      allow delete: if signedIn() && space.matches('^c[a-z0-9]{23}$') && classOwner(space) == request.auth.uid;
+    }
+    match /labSpaces/{space}/raw/{doc} {
+      allow get: if signedIn() && okSpace(space);
+      allow list: if signedIn() && space.matches('^c[a-z0-9]{23}$') && classOwner(space) == request.auth.uid;
+      allow create, update: if signedIn() && okSpace(space) && request.resource.data.raw is list &&
+                            request.resource.data.raw.size() <= 6 && request.resource.data.keys().hasOnly(['group', 'id', 'raw', 'expireAt']) &&
+                            okExpire(request.resource.data);
+      allow delete: if signedIn() && space.matches('^c[a-z0-9]{23}$') && classOwner(space) == request.auth.uid;
+    }
+    // 수업: 공간 id 를 아는 사람(학생 QR)은 읽기, 목록은 주인 것만, 만들기·지우기는 구글 로그인한 주인
+    match /labClasses/{space} {
+      allow get: if signedIn() && space.matches('^c[a-z0-9]{23}$');
+      allow list: if signedIn() && resource.data.owner == request.auth.uid;
+      allow create: if isGoogle() && space.matches('^c[a-z0-9]{23}$') && request.resource.data.owner == request.auth.uid &&
+                    request.resource.data.keys().hasOnly(['owner', 'classCode', 'ban', 'nStudents', 'groupSize', 'exp', 'groups', 'createdAt', 'expireAt']) &&
+                    request.resource.data.classCode is string && request.resource.data.classCode.matches('^[0-9]{1,2}-[0-9]{4}$') &&
+                    request.resource.data.groups is list && request.resource.data.groups.size() <= 60 && okExpire(request.resource.data);
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.owner == request.auth.uid;
+    }
+    // 학생 진행(하트비트): 수업이 있을 때 누구나(익명 학생) 쓰기, 읽기는 수업 주인만
+    match /labClasses/{space}/progress/{pid} {
+      allow read: if signedIn() && classOwner(space) == request.auth.uid;
+      allow create, update: if signedIn() && pid.matches('^[0-9]{1,2}-[0-9]{1,2}$') &&
+                            exists(/databases/$(database)/documents/labClasses/$(space)) &&
+                            request.resource.data.keys().hasOnly(['jo', 'num', 'group', 'step', 'points', 'submitted', 'device', 'lastSeen', 'expireAt']) &&
+                            shortStr(request.resource.data.step, 20) && shortStr(request.resource.data.device, 20) &&
+                            request.resource.data.lastSeen == request.time && okExpire(request.resource.data);
+      allow delete: if signedIn() && classOwner(space) == request.auth.uid;
+    }
+    // 수업 코드 → 공간 (메인 화면 '학생으로 시작'에서 코드만 넣을 때). 하나씩 읽기만, 찾기 기간 안에만, 목록 불가
+    match /labClassCodes/{code} {
+      // 찾기 기간(joinUntil, 만든 뒤 2일 또는 주인이 다시 연 뒤 2일)이 지나면 못 읽음: 코드를 훑어 공간 id 를 알아내지 못하게
+      allow get: if signedIn() && code.matches('^[0-9]{1,2}-[0-9]{4}$') && resource.data.joinUntil > request.time;
+      allow create: if isGoogle() && code.matches('^[0-9]{1,2}-[0-9]{4}$') && request.resource.data.owner == request.auth.uid &&
+                    request.resource.data.keys().hasOnly(['space', 'owner', 'joinUntil', 'expireAt']) && okExpire(request.resource.data);
+      // 찾기 기간이 끝난 코드는 다른 선생님이 다시 쓸 수 있음
+      allow update: if isGoogle() && request.resource.data.owner == request.auth.uid &&
+                    (resource.data.owner == request.auth.uid || resource.data.joinUntil < request.time) &&
+                    request.resource.data.keys().hasOnly(['space', 'owner', 'joinUntil', 'expireAt']) && okExpire(request.resource.data);
+      allow delete: if signedIn() && resource.data.owner == request.auth.uid;
+    }
+    // 개발 데이터 (선생님 기기만, docs/dev-data.md). GitHub Actions 는 서비스 계정으로 읽음
+    match /devlog/{doc} {
+      allow read: if isGoogle() && isTeacher(request);
+      allow create, update: if isGoogle() && isTeacher(request) && request.resource.data.owner == request.auth.uid &&
+                            shortStr(request.resource.data.data, 270000) && okExpire(request.resource.data);
+    }
+
     // Roles collection (read-only for clients, managed by Admin SDK)
     match /roles/{uid} {
       allow read: if request.auth != null;

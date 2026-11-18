@@ -1,4 +1,4 @@
-// 탄소 양자점 형광 실험 화면 시험 (Playwright, 가짜 카메라·가짜 getSettings, 가짜 Apps Script)
+// 탄소 양자점 형광 실험 화면 시험 (Playwright, 가짜 카메라·가짜 getSettings, 가짜 저장소 tests/fake-lab-store.cjs)
 //  - 노트북 1280: 측정 숨김·📱 QR 카드
 //  - 폰(iPhone 13, QR 주소): 시료 2개 측정(형광 색 + 분광기 보정·스펙트럼) → 1개만 골라 보내기 → 노트북 🆕·표·그래프
 //  - 태블릿: 측정·분석 둘 다, 375px 가로 스크롤 없음·단추 44px
@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 let chromium = null, devices = null;
 try { ({ chromium, devices } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
@@ -80,19 +80,17 @@ const noSideScroll = page => page.evaluate(() => document.documentElement.scroll
 const smallControls = (page, sel) => page.$$eval(sel, els => els.filter(e => e.offsetParent && e.getBoundingClientRect().height < 43.5).map(e => e.id || e.textContent.trim()));
 
 async function setup(app) {
-    // 저장이 Firestore 로 옮겨 가는 중이라 Code.gs 에는 qdot 이 없음 → 가짜 서버에만 넣어 둔다.
-    // 페이지는 ClassShare 공개 함수(init·saved·phoneCard)로만 보내므로, 나중에 가짜 Firestore 로 바꾸면 이 줄만 바뀜
-    app.ctx.GENERIC_EXPS.qdot = 1; app.ctx.CLASS_EXPS.qdot = 1;
     const srv = await staticServer();
     const base = 'http://127.0.0.1:' + srv.address().port;
     const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
     const errors = [];
     async function open(opt, name, url) {
         const ctx = await browser.newContext(Object.assign({ permissions: ['camera'] }, opt));
+        await ctx.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
         await ctx.route('https://script.google.com/**', async route => {
             const req = route.request(), u = new URL(req.url());
             let out;
-            try { out = req.method() === 'POST' ? app.post(req.postData() || '{}') : app.get(Object.fromEntries(u.searchParams)); }
+            try { out = req.method() === 'POST' ? (await app.post(req.postData() || '{}')) : (await app.get(Object.fromEntries(u.searchParams))); }
             catch (e) { out = { ok: false, error: e.message }; }
             await route.fulfill({ contentType: 'application/json', body: JSON.stringify(out), headers: { 'Access-Control-Allow-Origin': '*' } });
         });
@@ -109,7 +107,7 @@ async function setup(app) {
 }
 
 test('📱 폰 측정 · 노트북 분석: 노트북 QR → 폰(iPhone 13)에서 시료 2개(형광 색·분광기) → 1개만 보내기 → 노트북 🆕·표·그래프', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
-    const app = loadCodeGs();
+    const app = loadLabStore();
     const S = await setup(app);
     try {
         const lamp = await spectrumPng(S.browser, LAMP);
@@ -191,7 +189,7 @@ test('📱 폰 측정 · 노트북 분석: 노트북 QR → 폰(iPhone 13)에서
         await P.locator('.cs-run input[type=checkbox][data-id=s1]').uncheck();
         await P.click('#cs-rsend');
         await P.waitForFunction(() => /보냈/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 15000 });
-        const rows = app.get({ action: 'list', exp: 'qdot', group: G }).items;
+        const rows = (await app.get({ action: 'list', exp: 'qdot', group: G })).items;
         assert.deepEqual(rows.map(r => r.title), ['시료 2 · 180초 · 1:2']);
         assert.ok(Math.abs(rows[0].summary['봉우리(nm)'] - 520) <= 5);
         assert.match(rows[0].device, /^p/);
@@ -226,7 +224,7 @@ test('📱 폰 측정 · 노트북 분석: 노트북 QR → 폰(iPhone 13)에서
 });
 
 test('태블릿은 측정·분석 둘 다, 노트북 375px 가로 스크롤 없음·단추 44px, 이론 단계 열림', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
-    const app = loadCodeGs();
+    const app = loadLabStore();
     const S = await setup(app);
     try {
         const T = await S.open(devices['Galaxy Tab S4'], 'T', S.base + '/projects/quantum-dot.html#step-5');
