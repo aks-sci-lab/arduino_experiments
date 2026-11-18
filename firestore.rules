@@ -150,7 +150,8 @@ service cloud.firestore {
       allow get: if signedIn() && space.matches('^c[a-z0-9]{23}$');
       allow list: if signedIn() && resource.data.owner == request.auth.uid;
       allow create: if isGoogle() && space.matches('^c[a-z0-9]{23}$') && request.resource.data.owner == request.auth.uid &&
-                    request.resource.data.keys().hasOnly(['owner', 'classCode', 'ban', 'nStudents', 'groupSize', 'exp', 'groups', 'createdAt', 'expireAt']) &&
+                    request.resource.data.keys().hasOnly(['owner', 'classCode', 'ban', 'nStudents', 'groupSize', 'exp', 'groups', 'aiLimit', 'createdAt', 'expireAt']) &&
+                    (!('aiLimit' in request.resource.data) || (request.resource.data.aiLimit is int && request.resource.data.aiLimit >= 0 && request.resource.data.aiLimit <= 200)) &&
                     request.resource.data.classCode is string && request.resource.data.classCode.matches('^[0-9]{1,2}-[0-9]{4}$') &&
                     request.resource.data.groups is list && request.resource.data.groups.size() <= 60 && okExpire(request.resource.data);
       allow update: if false;
@@ -165,6 +166,59 @@ service cloud.firestore {
                             shortStr(request.resource.data.step, 20) && shortStr(request.resource.data.device, 20) &&
                             request.resource.data.lastSeen == request.time && okExpire(request.resource.data);
       allow delete: if signedIn() && classOwner(space) == request.auth.uid;
+    }
+    // ----- 보고서 AI 피드백 (2026-11-19, js/report-ai.js) -----
+    // 학생(익명)이 질문을 만들면, 켜 둔 교사 화면이 선생님 키로 AI 를 불러 답을 씀. API 키는 교사 브라우저에만 있고 여기엔 오지 않음.
+    // 학생은 자기(이 기기 uid) 질문·보고서만 읽음 → 다른 조 것은 못 읽음. 수업 주인 교사만 모두 읽고 답을 씀. 한도는 교사 화면이 셈(규칙은 크기·필드만).
+    function isOwner(space) { return signedIn() && classOwner(space) == request.auth.uid; }
+    function okAsk(d) {
+      return d.keys().hasOnly(['uid', 'group', 'jo', 'exp', 'section', 'sectionName', 'prompt', 'attach', 'draft', 'calc', 'device', 'status', 'createdAt', 'expireAt']) &&
+             d.uid == request.auth.uid && d.status == 'wait' && d.createdAt == request.time &&
+             d.group is string && d.group.matches('^[0-9]{1,2}-[0-9]{1,2}-[0-9]{4}$') && d.jo is int &&
+             d.section is string && d.section.matches('^[a-z0-9_-]{1,20}$') && shortStr(d.sectionName, 40) && shortStr(d.exp, 60) &&
+             d.prompt is string && d.prompt.size() >= 1 && d.prompt.size() <= 1500 &&
+             d.attach is list && d.attach.size() <= 2 && shortStr(d.draft, 6000) && shortStr(d.calc, 4000) && shortStr(d.device, 20) && okExpire(d);
+    }
+    match /labClasses/{space}/aiAsk/{id} {
+      allow get, list: if signedIn() && (resource.data.uid == request.auth.uid || classOwner(space) == request.auth.uid);
+      allow create: if signedIn() && id.matches('^a[a-z0-9]{19}$') && exists(/databases/$(database)/documents/labClasses/$(space)) && okAsk(request.resource.data);
+      allow update: if signedIn() && (
+        // 학생: 검증·수정 메모만
+        (resource.data.uid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verify']) && shortStr(request.resource.data.verify, 2000)) ||
+        // 교사(수업 주인): 답 칸만. '답하는 중'으로 잡기는 기다리는 질문(또는 3분 넘게 멈춘 것)만 → 교사 화면 두 개가 같은 질문을 두 번 부르지 않음
+        (classOwner(space) == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'busyAt', 'answer', 'error', 'provider', 'model', 'answeredAt', 'used', 'limit']) &&
+         request.resource.data.status in ['wait', 'busy', 'done', 'error', 'limit'] &&
+         (request.resource.data.status != 'busy' || resource.data.status == 'wait' || resource.data.busyAt < request.time - duration.value(3, 'm')) &&
+         (!('answer' in request.resource.data) || shortStr(request.resource.data.answer, 8000)) &&
+         (!('error' in request.resource.data) || shortStr(request.resource.data.error, 300))));
+      allow delete: if isOwner(space);
+    }
+    function okReport(d, rid) {
+      return d.keys().hasOnly(['uid', 'group', 'jo', 'exp', 'device', 'sections', 'external', 'submitted', 'submittedAt', 'updatedAt', 'expireAt']) &&
+             d.uid == request.auth.uid && d.group is string && d.group.matches('^[0-9]{1,2}-[0-9]{1,2}-[0-9]{4}$') && rid == d.group + '~' + request.auth.uid &&
+             d.jo is int && shortStr(d.exp, 60) && shortStr(d.device, 20) &&
+             d.sections is map && d.sections.size() <= 12 && d.external is map && d.external.size() <= 3 &&
+             d.submitted is bool && d.updatedAt == request.time && okExpire(d);
+    }
+    match /labClasses/{space}/reports/{rid} {
+      allow get, list: if signedIn() && (resource.data.uid == request.auth.uid || classOwner(space) == request.auth.uid);
+      allow create: if signedIn() && exists(/databases/$(database)/documents/labClasses/$(space)) && okReport(request.resource.data, rid);
+      allow update: if signedIn() && (
+        // 학생: 최종 제출 전까지만
+        (resource.data.uid == request.auth.uid && resource.data.submitted != true && okReport(request.resource.data, rid)) ||
+        // 교사: 제출한 보고서 다시 열기만
+        (classOwner(space) == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submitted']) && request.resource.data.submitted == false));
+      allow delete: if isOwner(space);
+    }
+    // 교사 화면 AI 켜짐 신호: 공간을 아는 학생은 읽기, 쓰기는 수업 주인만
+    match /labClasses/{space}/aiDesk/{d} {
+      allow get: if signedIn();
+      allow list, delete: if isOwner(space);
+      allow create, update: if isOwner(space) && d == 'status' &&
+                            request.resource.data.keys().hasOnly(['on', 'provider', 'model', 'seenAt', 'expireAt']) && request.resource.data.on is bool &&
+                            shortStr(request.resource.data.provider, 20) && shortStr(request.resource.data.model, 60) &&
+                            request.resource.data.seenAt == request.time && okExpire(request.resource.data);
     }
     // 수업 코드 → 공간 (메인 화면 '학생으로 시작'에서 코드만 넣을 때). 하나씩 읽기만, 찾기 기간 안에만, 목록 불가
     match /labClassCodes/{code} {

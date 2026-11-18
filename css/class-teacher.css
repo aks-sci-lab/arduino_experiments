@@ -82,3 +82,13 @@ html.big-view .ct-bigqr { zoom: calc(1 / 1.35); }
 .ct-mk-steps li.done::before { content: "✅ "; }
 .ct-mk-steps li.error { color: var(--c-danger); font-weight: 600; }
 .ct-mk-steps li.error::before { content: "⚠️ "; }
+
+/* ③ 🤖 보고서 AI */
+.ct-check { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: var(--tap); font-size: var(--fs-sm); }
+.ct-check input { width: 20px; height: 20px; }
+.ct-ai-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.ct-ai-table th, .ct-ai-table td { border-bottom: 1px solid var(--c-line); padding: var(--sp-1) var(--sp-2); text-align: left; }
+.ct-ai-rep, .ct-ai-ask { border: 1px solid var(--c-line); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3); margin: var(--sp-2) 0; word-break: break-word; }
+.ct-ai-rep h3 { font-size: 1rem; margin: 0 0 var(--sp-2); }
+.ct-ai-ans { background: var(--c-primary-soft); border-radius: var(--r-ctl); padding: var(--sp-2); }
+.ct-ai-ask pre { white-space: pre-wrap; font-size: .8rem; }

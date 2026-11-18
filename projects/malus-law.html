@@ -428,6 +428,8 @@
                 <p class="note">브라우저 보안상 전송 성공 여부는 앱에서 확인할 수 없으니 시트에 행이 생겼는지 확인하세요. URL을 아는 사람은 누구나 시트에 쓸 수 있으므로 URL을 공유하지 마세요.</p>
             </details>
         </details>
+        <!-- 📝 보고서 쓰기 · AI 피드백 (js/report-ai.js) -->
+        <div id="report-ai"></div>
         <div class="step-next"><button class="secondary" data-go="result">← 이전: 6. 결과</button></div>
     </section>
 </div>
@@ -442,5 +444,8 @@
 <script src="../js/malus-tutorial.js"></script>
 <script src="../js/malus-law.js"></script>
 <script src="../js/malus-sheets.js"></script>
+<link rel="stylesheet" href="../css/report-ai.css">
+<script src="../js/report-ai.js"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'malus', mount: '#report-ai', contextFrom: '#crit-summary, #model-table-wrap, #norm-results' }); });</script>
 </body>
 </html>

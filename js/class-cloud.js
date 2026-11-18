@@ -205,7 +205,7 @@
     }
     function ping(url, fetchImpl) { return getQ(url, { action: 'ping', _: Date.now() }, fetchImpl); }
     function createClass(url, o, fetchImpl) {
-        return post(url, { action: 'createClass', ban: Number(o.ban), nStudents: Number(o.nStudents), groupSize: Number(o.groupSize), exp: o.exp }, fetchImpl);
+        return post(url, { action: 'createClass', ban: Number(o.ban), nStudents: Number(o.nStudents), groupSize: Number(o.groupSize), exp: o.exp, aiLimit: o.aiLimit == null || o.aiLimit === '' ? '' : Number(o.aiLimit) }, fetchImpl);
     }
     function joinInfo(url, classCode, fetchImpl) { return getQ(url, { action: 'joinInfo', 'class': classCode, _: Date.now() }, fetchImpl); }
     function heartbeat(url, o, fetchImpl) {

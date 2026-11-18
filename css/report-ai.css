@@ -1,0 +1,33 @@
+/* 보고서 쓰기 · AI 피드백 (js/report-ai.js). 색·간격은 lab-base.css 의 변수만 */
+.rai { display: block; margin: var(--sp-3) 0; font-family: var(--font); }
+.rai .rai-card, .rai .rai-sec { background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-3) var(--sp-4); box-shadow: var(--shadow); }
+.rai .rai-card { margin-bottom: var(--sp-2); }
+.rai h2 { font-size: var(--fs-h2); margin: 0 0 var(--sp-2); }
+.rai .rai-rules { margin: 0 0 var(--sp-2); padding-left: 20px; font-size: var(--fs-sm); line-height: 1.6; background: var(--c-warn-bg); color: var(--c-warn-text); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3) var(--sp-2) 28px; }
+.rai .rai-status { margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); font-size: var(--fs-sm); background: var(--c-fill); }
+.rai .rai-status.ok { background: var(--c-ok-bg); color: var(--c-ok-text); }
+.rai .rai-status.warn { background: var(--c-warn-bg); color: var(--c-warn-text); }
+.rai .rai-tabs { margin: var(--sp-2) 0; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+.rai .rai-tabs button { word-break: keep-all; }
+.rai .rai-label { display: block; margin: var(--sp-2) 0 var(--sp-1); font-size: var(--fs-sm); }
+.rai .rai-note { color: var(--c-muted); font-size: var(--fs-sm); font-weight: 400; }
+.rai textarea { width: 100%; max-width: 100%; box-sizing: border-box; font: inherit; font-size: 1rem; padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); resize: vertical; min-height: var(--tap); }
+.rai textarea[readonly] { background: var(--c-fill); }
+.rai .rai-ask { margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); background: var(--c-primary-soft); }
+.rai .rai-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin: var(--sp-2) 0; }
+.rai .rai-check { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: var(--tap); font-size: var(--fs-sm); }
+.rai .rai-check input { width: 20px; height: 20px; }
+.rai .rai-btn { min-height: var(--tap); padding: var(--sp-2) var(--sp-4); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font: inherit; font-size: .95rem; font-weight: 600; cursor: pointer; }
+.rai .rai-btn:hover { background: var(--c-primary-dark); }
+.rai .rai-btn.good { background: var(--c-success); }
+.rai .rai-btn.secondary { background: var(--c-secondary); }
+.rai .rai-btn:disabled { opacity: .5; cursor: not-allowed; }
+.rai .rai-calc { margin: var(--sp-1) 0; font-size: var(--fs-sm); }
+.rai .rai-calc summary { min-height: var(--tap); display: flex; align-items: center; cursor: pointer; }
+.rai .rai-calc pre { white-space: pre-wrap; word-break: break-word; background: var(--c-card); border-radius: var(--r-ctl); padding: var(--sp-2); margin: 0; font-family: var(--font-mono); font-size: .8rem; max-height: 240px; overflow: auto; }
+.rai .rai-item { border-top: 1px solid var(--c-line); padding: var(--sp-2) 0; }
+.rai .rai-q { margin: 0 0 var(--sp-1); font-weight: 600; word-break: break-word; }
+.rai .rai-a { background: var(--c-card); border-left: 4px solid var(--c-primary); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3); line-height: 1.6; word-break: break-word; }
+.rai .rai-wait { margin: var(--sp-1) 0; color: var(--c-warn-text); font-size: var(--fs-sm); }
+.rai .rai-err { color: var(--c-danger); }
+@media print { .rai { display: none; } }

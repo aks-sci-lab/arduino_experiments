@@ -34,6 +34,7 @@
     <nav class="subtabs sticky" id="ctTabs" aria-label="수업 연결">
         <button data-tab="make">① 수업 만들기</button>
         <button data-tab="watch">② 진행 보기·내려받기</button>
+        <button data-tab="ai">③ 🤖 보고서 AI</button>
     </nav>
 
     <!-- ① 수업 만들기 -->
@@ -47,6 +48,9 @@
             </div>
             <label class="ct-field">실험
                 <select id="inExp"></select>
+            </label>
+            <label class="ct-field">🤖 AI 질문 한도 (조마다, 이 수업에서 몇 번까지. 0 이면 끔)
+                <input type="number" id="inAiLimit" min="0" max="200" inputmode="numeric" value="20">
             </label>
             <label class="ct-field" id="customRow" hidden>선생님이 만든 실험의 번호 (주소 <code>custom-lab.html?id=</code> 뒤의 글자)
                 <input type="text" id="inCustom" autocomplete="off" spellcheck="false" placeholder="예: aB3xY9…">
@@ -112,6 +116,50 @@
             <div class="ct-row"><button id="btnCloseDetail" class="secondary">닫기</button></div>
         </section>
     </div>
+
+    <!-- ③ 🤖 보고서 AI (js/class-teacher-ai.js) -->
+    <div class="tab-panel" data-tab="ai">
+        <section class="ct-card">
+            <h2>🤖 보고서 AI — 선생님 키로 학생 질문에 답하기</h2>
+            <p class="note">학생이 7단계 보고서에서 <b>🤖 AI에게 묻기</b>를 누르면 질문이 여기로 오고, <b>이 화면이 선생님 키로 AI 를 불러</b> 답을 돌려줘요. 키는 <b>이 브라우저에만</b> 있고 학생·사이트 저장소로 가지 않아요. <b>이 화면(탭)이 열려 있어야</b> 답이 가요 — 수업 중에는 이 탭을 켜 두세요. AI 는 대신 써 주지 않고 피드백·질문만 주도록 정해져 있어요.</p>
+            <div class="ct-grid3">
+                <label class="ct-field">AI 회사 <select id="aiProvider"></select></label>
+                <label class="ct-field">모델 <input type="text" id="aiModel" list="aiModelList" autocomplete="off" spellcheck="false"><datalist id="aiModelList"></datalist></label>
+            </div>
+            <label class="ct-field">API 키 <span class="note">(<a id="aiKeyLink" target="_blank" rel="noopener"></a> · 쓴 만큼 요금이 나가요 — 회사 사이트에서 <b>사용 한도</b>를 걸어 두세요)</span>
+                <input type="password" id="aiKey" autocomplete="off" spellcheck="false">
+            </label>
+            <div class="ct-row">
+                <button id="aiKeyShow" class="secondary">👁 보기</button>
+                <label class="ct-check"><input type="checkbox" id="aiRemember"> 이 브라우저에 기억 <span class="note">(끄면 이 탭을 닫을 때 잊어요)</span></label>
+                <button id="aiTest" class="good">🔑 키 시험</button>
+            </div>
+            <p id="aiTestMsg" class="note" role="status" aria-live="polite"></p>
+            <div class="ct-row"><label class="ct-check"><input type="checkbox" id="aiOn"> 학생 질문에 AI 로 답하기 켜기</label></div>
+            <p id="aiDeskNow" class="ct-status" role="status" aria-live="polite"></p>
+        </section>
+        <section class="ct-card">
+            <h2>조별 보고서 · AI 기록</h2>
+            <div class="ct-row">
+                <label class="ct-field ct-inline">수업 <select id="aiView"></select></label>
+                <button id="aiViewRefresh" class="secondary">🔄 새로 보기</button>
+            </div>
+            <p id="aiViewMsg" class="note" role="status" aria-live="polite"></p>
+            <div id="aiGroups" class="ct-ai-groups"></div>
+            <div class="ct-row">
+                <button id="aiCsvRep" class="good">📥 보고서 CSV</button>
+                <button id="aiCsvLog" class="good">📥 AI 기록 CSV</button>
+                <button id="aiJson" class="secondary">전체(JSON)</button>
+            </div>
+            <p id="aiDlMsg" class="note" role="status" aria-live="polite"></p>
+            <p class="note">보고서 CSV: 한 줄 = 보고서 하나(학생 기기 하나). AI 기록 CSV: 한 줄 = 질문 하나(프롬프트·함께 보낸 자료·답·검증 메모) + 학생이 적은 외부 AI 기록. 아래에서 조를 고르면 그 조만 내려받아요. 수업과 함께 6개월 뒤 저절로 지워져요.</p>
+        </section>
+        <section class="ct-card" id="aiGroupDetail" hidden>
+            <h2 id="aiGroupTitle"></h2>
+            <div id="aiGroupBody"></div>
+            <div class="ct-row"><button id="aiCloseGroup" class="secondary">닫기 (전체 조로)</button></div>
+        </section>
+    </div>
 </main>
 
 <!-- QR 크게 보기 -->
@@ -125,5 +173,7 @@
 <script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-teacher.js"></script>
+<script src="../js/report-ai.js"></script>
+<script src="../js/class-teacher-ai.js"></script>
 </body>
 </html>

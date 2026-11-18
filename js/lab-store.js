@@ -13,6 +13,9 @@
      labClasses/{공간}/progress/{조-번호}   학생 진행 (하트비트)
      labClassCodes/{수업 코드}              학생이 메인 화면에서 수업 코드만 넣었을 때 공간 찾기
      devlog/{실험~id}                       개발 데이터 (선생님 기기)
+     labClasses/{공간}/aiAsk/{a…}           보고서 AI 질문 하나 (학생 익명 uid 가 만들고, 켜 둔 교사 화면이 답을 씀 — 키는 교사 브라우저에만, js/report-ai.js)
+     labClasses/{공간}/reports/{조코드~uid} 학생 보고서 글 (기기마다 하나, 최종 제출 뒤에는 학생이 못 고침)
+     labClasses/{공간}/aiDesk/status        교사 화면 AI 켜짐 신호 (학생 화면이 '선생님 화면 켜짐'을 보여 줌)
    모든 문서에 expireAt = 만든 때 + 183일 (학기 끝 자동 삭제: TTL 정책 + .github/workflows/firestore-cleanup.yml)
 
    쓰는 법(브라우저): LabStore.call('lab:<공간>', { action: 'save', … }) → Promise<응답>
@@ -41,6 +44,10 @@
     Object.keys(GENERIC_EXPS).forEach(function (k) { CLASS_EXPS[k] = 1; });
     var CUSTOM_EXP_RE = /^custom:[A-Za-z0-9_-]{1,40}$/;
     var DEV_EXPS = { heartrate: 1, facehr: 1 };
+    // 보고서 AI (js/report-ai.js). 한도는 교사 화면이 셈 (규칙은 크기·필드만)
+    var AI = { LIMIT_DEFAULT: 20, LIMIT_MAX: 200, PROMPT: 1500, DRAFT: 6000, CALC: 4000, ANSWER: 8000, VERIFY: 2000, TEXT: 8000, EXTERNAL: 3000, SECTIONS: 12, STALE_MS: 3 * 60000, DESK_MS: 150000 };
+    var SECTION_RE = /^[a-z0-9_-]{1,20}$/;
+    var ASK_ID_RE = /^a[a-z0-9]{19}$/;
     function isClassExp(e) { return !!CLASS_EXPS[e] || CUSTOM_EXP_RE.test(e); }
     function isGenericExp(e) { return !!GENERIC_EXPS[e] || CUSTOM_EXP_RE.test(e); }
 
@@ -83,6 +90,8 @@
         if (!isFinite(n) || n < lo || n > hi) fail(name + ' 값이 올바르지 않습니다.');
         return n;
     }
+    // 여러 줄 글 (줄바꿈·탭은 남김)
+    function block(v, max) { return String(v == null ? '' : v).replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ' ').slice(0, max); }
     function text(v, max) { return String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').slice(0, max); }
     function cleanSummary(v) {
         if (v == null || v === '') return {};
@@ -245,9 +254,10 @@
             if (!c || (code && c.classCode !== code)) return null;
             return Object.assign({ space: space }, c);
         }
+        function aiLimitOf(c) { var n = Number(c && c.aiLimit); return c && c.aiLimit != null && isFinite(n) ? n : AI.LIMIT_DEFAULT; }   // 예전 수업(칸 없음)은 기본 20
         function publicClass(c) {
             return { ok: true, classCode: c.classCode, space: c.space, ban: c.ban, nStudents: c.nStudents, groupSize: c.groupSize, exp: c.exp,
-                groups: c.groups || [], created: iso(c.createdAt), expireAt: iso(c.expireAt) };
+                groups: c.groups || [], aiLimit: aiLimitOf(c), created: iso(c.createdAt), expireAt: iso(c.expireAt) };
         }
         async function createClass(b, auth) {
             if (!auth || !auth.google) fail('선생님 구글 로그인이 필요합니다.');
@@ -255,6 +265,8 @@
             if (ban % 1 || n % 1 || size % 1) fail('반·학생 수·조별 인원은 정수로 넣어 주세요.');
             var exp = String(b.exp || '');
             if (!isClassExp(exp)) fail('이 실험은 아직 수업 연결을 쓸 수 없습니다.');
+            var aiLimit = b.aiLimit === '' || b.aiLimit == null ? AI.LIMIT_DEFAULT : numIn(b.aiLimit, 0, AI.LIMIT_MAX, 'AI 질문 한도');
+            if (aiLimit % 1) fail('AI 질문 한도는 정수로 넣어 주세요.');
             // 아직 쓰이는(찾기 기간이 남은) 코드와 겹치지 않는 4자리
             var code = '';
             for (var t = 0; t < 30 && !code; t++) {
@@ -266,10 +278,10 @@
             if (!code) fail('수업 코드를 만들지 못했습니다. 다시 눌러 주세요.');
             var four = code.split('-')[1], space = newSpace('c'), now = db.now(), exp2 = expireAt();
             var groups = splitGroups(n, size).map(function (k, i) { return { jo: i + 1, code: ban + '-' + (i + 1) + '-' + four, size: k }; });
-            var rec = { owner: auth.uid, classCode: code, ban: ban, nStudents: n, groupSize: size, exp: exp, groups: groups, createdAt: now, expireAt: exp2 };
+            var rec = { owner: auth.uid, classCode: code, ban: ban, nStudents: n, groupSize: size, exp: exp, groups: groups, aiLimit: aiLimit, createdAt: now, expireAt: exp2 };
             await db.set('labClasses/' + space, rec);
             await db.set('labClassCodes/' + code, { space: space, owner: auth.uid, joinUntil: new Date(now.getTime() + JOIN_DAYS * 86400000), expireAt: exp2 });
-            return { ok: true, classCode: code, space: space, ban: ban, nStudents: n, groupSize: size, exp: exp, groups: groups, created: now.toISOString(), expireAt: exp2.toISOString() };
+            return { ok: true, classCode: code, space: space, ban: ban, nStudents: n, groupSize: size, exp: exp, groups: groups, aiLimit: aiLimit, created: now.toISOString(), expireAt: exp2.toISOString() };
         }
         async function getOrNull(path) {
             try { return await db.get(path); }
@@ -375,6 +387,7 @@
             (await db.query('labClasses/' + c.space + '/progress', [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/progress/' + r.id); });
             (await db.query(itemsPath(c.space), [])).forEach(function (r) { paths.push(itemsPath(c.space) + '/' + r.id); });
             (await db.query('labSpaces/' + c.space + '/raw', [])).forEach(function (r) { paths.push('labSpaces/' + c.space + '/raw/' + r.id); });
+            for (var sub of ['aiAsk', 'reports', 'aiDesk']) (await db.query('labClasses/' + c.space + '/' + sub, [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/' + sub + '/' + r.id); });
             for (var i = 0; i < paths.length; i++) await db.del(paths[i]);
             var look = await db.get('labClassCodes/' + c.classCode);
             if (look && look.space === c.space) await db.del('labClassCodes/' + c.classCode);
@@ -411,6 +424,160 @@
             }) };
         }
 
+        // --- 보고서 AI · 보고서 글 (js/report-ai.js) ---
+        function classPath(c, sub) { return 'labClasses/' + c.space + '/' + sub; }
+        function needUid(auth) { if (!auth || !auth.uid) fail('로그인 정보가 없습니다. 페이지를 새로고침하세요.'); }
+        function classExpire(c) { return c.expireAt instanceof Date ? c.expireAt : expireAt(); }
+        async function joinedClass(b) {
+            var c = await findClass(b, true);
+            if (!c) fail('그 수업을 찾지 못했습니다. 선생님이 준 QR·링크로 다시 들어오세요.');
+            return c;
+        }
+        function groupIn(c, group) {
+            var g = (c.groups || []).filter(function (x) { return x.code === group; })[0];
+            if (!g) fail('이 수업에 없는 조 코드입니다. 위 🏫 수업 참여에서 조·번호를 다시 고르세요.');
+            return g;
+        }
+        function publicAsk(id, d, full) {
+            var o = { id: id, group: String(d.group || ''), jo: Number(d.jo) || 0, exp: String(d.exp || ''), section: String(d.section || ''), sectionName: String(d.sectionName || ''),
+                prompt: String(d.prompt || ''), attach: Array.isArray(d.attach) ? d.attach.map(String) : [], status: String(d.status || 'wait'),
+                answer: String(d.answer || ''), error: String(d.error || ''), provider: String(d.provider || ''), model: String(d.model || ''),
+                used: d.used == null ? null : Number(d.used), limit: d.limit == null ? null : Number(d.limit), verify: String(d.verify || ''),
+                createdAt: iso(d.createdAt), answeredAt: iso(d.answeredAt || ''), busyAt: iso(d.busyAt || ''), device: String(d.device || '') };
+            if (full) { o.draft = String(d.draft || ''); o.calc = String(d.calc || ''); }
+            return o;
+        }
+        function byTime(a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)) || String(a.id).localeCompare(String(b.id)); }
+        // 학생: 질문 하나 만들기 (답 칸은 비움 — 규칙도 막음)
+        async function aiAsk(b, auth) {
+            needUid(auth);
+            var c = await joinedClass(b), group = cleanGroup(b.group), g = groupIn(c, group);
+            if (!aiLimitOf(c)) fail('이 수업은 선생님이 AI 질문을 끄셨어요 (한도 0).');
+            var section = String(b.section || '');
+            if (!SECTION_RE.test(section)) fail('보고서 항목이 올바르지 않습니다.');
+            var prompt = block(b.prompt, AI.PROMPT + 1).trim();
+            if (!prompt) fail('AI 에게 물을 내용(프롬프트)을 먼저 쓰세요.');
+            if (prompt.length > AI.PROMPT) fail('프롬프트가 너무 깁니다 (' + AI.PROMPT + '자까지).');
+            var attach = (Array.isArray(b.attach) ? b.attach : []).map(String).filter(function (x, i, a) { return (x === 'draft' || x === 'calc') && a.indexOf(x) === i; });
+            var draft = attach.indexOf('draft') >= 0 ? block(b.draft, AI.DRAFT) : '', calc = attach.indexOf('calc') >= 0 ? block(b.calc, AI.CALC) : '';
+            var device = String(b.device || ''), id = 'a' + randomChars(19);
+            await db.set(classPath(c, 'aiAsk') + '/' + id, {
+                uid: auth.uid, group: group, jo: Number(g.jo), exp: text(c.exp, 60), section: section, sectionName: text(b.sectionName, 40),
+                prompt: prompt, attach: attach, draft: draft, calc: calc, device: DEVICE_RE.test(device) ? device : '', status: 'wait',
+                createdAt: db.stamp(), expireAt: classExpire(c)
+            });
+            return { ok: true, id: id };
+        }
+        // 학생: 내가(이 기기의 익명 uid) 만든 질문과 답 + 선생님 화면이 켜져 있는지
+        async function aiMine(b, auth) {
+            needUid(auth);
+            var c = await joinedClass(b);
+            var rows = await db.query(classPath(c, 'aiAsk'), [['uid', auth.uid]], { live: true });
+            var desk = await getOrNull(classPath(c, 'aiDesk') + '/status');
+            return { ok: true, limit: aiLimitOf(c), now: db.now().toISOString(), desk: deskInfo(desk),
+                asks: rows.map(function (r) { return publicAsk(r.id, r.data, false); }).sort(byTime) };
+        }
+        function deskInfo(d) {
+            if (!d) return { on: false, seenAt: '', fresh: false };
+            var seen = d.seenAt instanceof Date ? d.seenAt.getTime() : Date.parse(String(d.seenAt || ''));
+            return { on: !!d.on, seenAt: iso(d.seenAt), provider: String(d.provider || ''), model: String(d.model || ''), fresh: !!d.on && isFinite(seen) && db.now().getTime() - seen < AI.DESK_MS };
+        }
+        async function aiVerify(b, auth) {
+            needUid(auth);
+            var c = await joinedClass(b), id = String(b.id || '');
+            if (!ASK_ID_RE.test(id)) fail('질문 번호가 올바르지 않습니다.');
+            var path = classPath(c, 'aiAsk') + '/' + id, d = await getOrNull(path);
+            if (!d || d.uid !== auth.uid) fail('그 질문을 찾지 못했습니다.');
+            await db.update(path, { verify: block(b.verify, AI.VERIFY) });
+            return { ok: true };
+        }
+        // 교사: 이 수업의 모든 질문 (진행 보기·AI 답하기)
+        async function aiList(b, auth) {
+            var c = await ownedClass(b, auth);
+            var rows = await db.query(classPath(c, 'aiAsk'), [], { live: true });
+            return { ok: true, space: c.space, classCode: c.classCode, limit: aiLimitOf(c), groups: c.groups || [], asks: rows.map(function (r) { return publicAsk(r.id, r.data, true); }).sort(byTime) };
+        }
+        // 교사: 답하기 전에 '답하는 중'으로 잡기 (교사 화면 두 개가 같은 질문을 두 번 부르지 않게)
+        async function aiClaim(b, auth) {
+            var c = await ownedClass(b, auth), id = String(b.id || '');
+            if (!ASK_ID_RE.test(id)) fail('질문 번호가 올바르지 않습니다.');
+            var path = classPath(c, 'aiAsk') + '/' + id, d = await db.get(path);
+            if (!d) fail('그 질문을 찾지 못했습니다.');
+            var busyMs = d.busyAt instanceof Date ? d.busyAt.getTime() : Date.parse(String(d.busyAt || ''));
+            if (d.status !== 'wait' && !(d.status === 'busy' && isFinite(busyMs) && db.now().getTime() - busyMs > AI.STALE_MS)) return { ok: false, taken: true, error: '이미 다른 화면이 답하는 중이에요.' };
+            try { await db.update(path, { status: 'busy', busyAt: db.stamp() }); }
+            catch (e) { return { ok: false, taken: true, error: friendlyError(e) }; }
+            return { ok: true };
+        }
+        async function aiAnswer(b, auth) {
+            var c = await ownedClass(b, auth), id = String(b.id || '');
+            if (!ASK_ID_RE.test(id)) fail('질문 번호가 올바르지 않습니다.');
+            var status = String(b.status || '');
+            if (['done', 'error', 'limit', 'wait'].indexOf(status) < 0) fail('답 상태가 올바르지 않습니다.');
+            var path = classPath(c, 'aiAsk') + '/' + id;
+            if (!(await db.get(path))) fail('그 질문을 찾지 못했습니다.');
+            if (status === 'wait') { await db.update(path, { status: 'wait' }); return { ok: true }; }   // 키·한도 문제로 못 답함 → 다시 기다리게
+            var up = { status: status, answer: block(b.answer, AI.ANSWER), error: text(b.error, 300), provider: text(b.provider, 20), model: text(b.model, 60),
+                answeredAt: db.stamp(), used: numIn(b.used, 0, 100000, '사용 횟수', true) || 0, limit: numIn(b.limit, 0, AI.LIMIT_MAX, '한도', true) || 0 };
+            await db.update(path, up);
+            return { ok: true };
+        }
+        // 교사: AI 켜짐 신호 (1분마다). 학생 화면은 2분 30초 안에 신호가 있으면 '선생님 화면 켜짐'
+        async function aiDeskBeat(b, auth) {
+            var c = await ownedClass(b, auth);
+            await db.set(classPath(c, 'aiDesk') + '/status', { on: !!b.on, provider: text(b.provider, 20), model: text(b.model, 60), seenAt: db.stamp(), expireAt: classExpire(c) });
+            return { ok: true };
+        }
+        // 학생: 보고서 글 저장 (기기마다 하나: 조코드~uid). submit 이면 최종 제출 — 그 뒤로는 학생이 못 고침
+        function cleanSections(v) {
+            var out = {};
+            if (v == null) return out;
+            if (typeof v !== 'object' || Array.isArray(v)) fail('보고서 형식이 올바르지 않습니다.');
+            var keys = Object.keys(v);
+            if (keys.length > AI.SECTIONS) fail('보고서 항목이 너무 많습니다.');
+            keys.forEach(function (k) { if (!SECTION_RE.test(k)) fail('보고서 항목 이름이 올바르지 않습니다.'); out[k] = block(v[k], AI.TEXT); });
+            return out;
+        }
+        async function reportSave(b, auth) {
+            needUid(auth);
+            var c = await joinedClass(b), group = cleanGroup(b.group), g = groupIn(c, group);
+            var path = classPath(c, 'reports') + '/' + group + '~' + auth.uid, old = await getOrNull(path);
+            if (old && old.submitted) fail('이미 최종 제출했어요. 고치려면 선생님께 다시 열어 달라고 하세요.');
+            var ex = b.external && typeof b.external === 'object' ? b.external : {}, device = String(b.device || '');
+            var rec = { uid: auth.uid, group: group, jo: Number(g.jo), exp: text(c.exp, 60), device: DEVICE_RE.test(device) ? device : '', sections: cleanSections(b.sections),
+                external: { prompt: block(ex.prompt, AI.EXTERNAL), adopted: block(ex.adopted, AI.EXTERNAL), verify: block(ex.verify, AI.EXTERNAL) },
+                submitted: !!b.submit, updatedAt: db.stamp(), expireAt: classExpire(c) };
+            if (b.submit) rec.submittedAt = db.stamp();
+            await db.set(path, rec);
+            return { ok: true, submitted: rec.submitted, updated: !!old };
+        }
+        function publicReport(id, d) {
+            return { id: id, group: String(d.group || ''), jo: Number(d.jo) || 0, exp: String(d.exp || ''), device: String(d.device || ''),
+                sections: d.sections && typeof d.sections === 'object' ? d.sections : {}, external: d.external && typeof d.external === 'object' ? d.external : {},
+                submitted: !!d.submitted, submittedAt: iso(d.submittedAt || ''), updatedAt: iso(d.updatedAt) };
+        }
+        async function reportGet(b, auth) {
+            needUid(auth);
+            var c = await joinedClass(b), group = cleanGroup(b.group);
+            var path = classPath(c, 'reports') + '/' + group + '~' + auth.uid, d = await getOrNull(path);
+            if (!d || d.uid !== auth.uid) return { ok: true, report: null };
+            return { ok: true, report: publicReport(group + '~' + auth.uid, d) };
+        }
+        async function reportList(b, auth) {
+            var c = await ownedClass(b, auth);
+            var rows = await db.query(classPath(c, 'reports'), [], { live: true });
+            return { ok: true, reports: rows.map(function (r) { return publicReport(r.id, r.data); }).sort(function (a, x) { return a.jo - x.jo || a.updatedAt.localeCompare(x.updatedAt); }) };
+        }
+        // 교사: 최종 제출한 보고서를 학생이 다시 고칠 수 있게
+        async function reportReopen(b, auth) {
+            var c = await ownedClass(b, auth), id = String(b.id || '');
+            if (!/^\d{1,2}-\d{1,2}-\d{4}~[A-Za-z0-9_-]{1,128}$/.test(id)) fail('보고서 번호가 올바르지 않습니다.');
+            var path = classPath(c, 'reports') + '/' + id;
+            if (!(await db.get(path))) fail('그 보고서를 찾지 못했습니다.');
+            await db.update(path, { submitted: false });
+            return { ok: true };
+        }
+
         async function handle(body, auth) {
             body = body || {};
             try {
@@ -443,6 +610,17 @@
                 if (a === 'deleteClass') return await deleteClass(body, auth);
                 if (a === 'reopenCode') return await reopenCode(body, auth);
                 if (a === 'devSave') return await devSave(body, auth);
+                if (a === 'aiAsk') return await aiAsk(body, auth);
+                if (a === 'aiMine') return await aiMine(body, auth);
+                if (a === 'aiVerify') return await aiVerify(body, auth);
+                if (a === 'aiList') return await aiList(body, auth);
+                if (a === 'aiClaim') return await aiClaim(body, auth);
+                if (a === 'aiAnswer') return await aiAnswer(body, auth);
+                if (a === 'aiDeskBeat') return await aiDeskBeat(body, auth);
+                if (a === 'reportSave') return await reportSave(body, auth);
+                if (a === 'reportGet') return await reportGet(body, auth);
+                if (a === 'reportList') return await reportList(body, auth);
+                if (a === 'reportReopen') return await reportReopen(body, auth);
                 if (a === 'devExport') return await devExport(body, auth);
                 fail('알 수 없는 요청입니다.');
             } catch (err) {
@@ -473,6 +651,10 @@
             stamp: function () { return clock(); },
             get: function (path) { return Promise.resolve(docs.has(path) ? clone(docs.get(path)) : null); },
             set: function (path, data) { docs.set(path, clone(data)); return Promise.resolve(); },
+            update: function (path, data) {
+                if (!docs.has(path)) return Promise.reject(Object.assign(new Error('없는 문서: ' + path), { code: 'not-found' }));
+                docs.set(path, Object.assign(docs.get(path), clone(data))); return Promise.resolve();
+            },
             del: function (path) { docs.delete(path); return Promise.resolve(); },
             query: function (coll, filters) {
                 var pre = coll + '/', out = [];
@@ -573,7 +755,7 @@
 
     // Firestore 어댑터: live 질문은 실시간 듣기로 한 번 붙여 두고 그 뒤로는 받아 둔 것을 돌려준다 (몇 초마다 불러와도 읽기 횟수가 늘지 않음)
     function firestoreDb(fb) {
-        var fs = fb.firestore(), live = {}, cacheDocs = {}, LIVE_MAX = 8, order = [];
+        var fs = fb.firestore(), live = {}, cacheDocs = {}, LIVE_MAX = 30, order = [];   // 30: 교사 화면이 수업 여러 개의 AI 질문을 함께 들음
         function conv(v) {
             if (v && typeof v.toDate === 'function') return v.toDate();
             if (Array.isArray(v)) return v.map(conv);
@@ -607,6 +789,7 @@
                 return p;
             },
             set: function (path, data) { return fs.doc(path).set(data); },
+            update: function (path, data) { return fs.doc(path).update(data); },
             del: function (path) { return fs.doc(path).delete(); },
             query: function (coll, filters, opt) { return opt && opt.live ? liveQuery(coll, filters) : q(coll, filters).get().then(rows); },
             subscribe: function (coll, filters, cb) {
@@ -718,7 +901,43 @@
         return { csv: '﻿' + lines.join('\r\n') + '\r\n', rows: sorted.length };
     }
 
+    /* 보고서 AI 기록 CSV: 한 줄 = 질문 하나(웹앱 안) 또는 보고서 하나의 외부 AI 기록. 프롬프트·답·검증 메모 포함 */
+    var AI_STATUS = { wait: '기다리는 중', busy: '답하는 중', done: '답함', error: '오류', limit: '한도 넘음' };
+    function aiCsv(asks, reports, groups) {
+        var joOf = {}; (groups || []).forEach(function (g) { joOf[g.code] = g.jo; });
+        var head = ['조', '조 코드', '어디서', '보고서 항목', '시각', '프롬프트', '함께 보낸 참고 자료', '보낸 내 초안', '보낸 계산 결과', 'AI 답 (외부: 채택한 부분)', '검증·수정 메모', '상태', 'AI 회사', '모델', '조 사용 횟수', '한도'];
+        var rows = [];
+        (asks || []).forEach(function (q) {
+            rows.push([joOf[q.group] || q.jo || '', q.group, '웹앱 안', q.sectionName || q.section, q.createdAt, q.prompt,
+                (q.attach || []).map(function (x) { return x === 'draft' ? '내 초안' : x === 'calc' ? '계산 결과' : x; }).join('·') || '없음',
+                q.draft || '', q.calc || '', q.status === 'done' ? q.answer : q.error || q.answer, q.verify, AI_STATUS[q.status] || q.status, q.provider, q.model, q.used == null ? '' : q.used, q.limit == null ? '' : q.limit]);
+        });
+        (reports || []).forEach(function (r) {
+            var e = r.external || {};
+            if (!(e.prompt || e.adopted || e.verify)) return;
+            rows.push([joOf[r.group] || r.jo || '', r.group, '외부 AI (학생이 적음)', '', r.updatedAt, e.prompt || '', '', '', '', e.adopted || '', e.verify || '', '', '', '', '', '']);
+        });
+        rows.sort(function (a, b) { return (Number(a[0]) || 0) - (Number(b[0]) || 0) || String(a[4]).localeCompare(String(b[4])); });
+        return { csv: '\ufeff' + [head].concat(rows).map(function (r) { return r.map(csvCell).join(','); }).join('\r\n') + '\r\n', rows: rows.length };
+    }
+    /* 보고서 CSV: 한 줄 = 보고서 하나(기기 하나). sections: [{ key, name }] (없으면 들어온 항목 이름 그대로) */
+    function reportCsv(reports, groups, sections) {
+        var joOf = {}; (groups || []).forEach(function (g) { joOf[g.code] = g.jo; });
+        var secs = (sections || []).slice();
+        (reports || []).forEach(function (r) { Object.keys(r.sections || {}).forEach(function (k) { if (!secs.some(function (x) { return x.key === k; })) secs.push({ key: k, name: k }); }); });
+        var head = ['조', '조 코드', '기기', '최종 제출', '제출 시각', '마지막 저장'].concat(secs.map(function (x) { return x.name; }), ['외부 AI: 내가 쓴 프롬프트', '외부 AI: 채택한 부분', '외부 AI: 검증·고친 점']);
+        var sorted = (reports || []).slice().sort(function (a, b) { return (joOf[a.group] || a.jo || 0) - (joOf[b.group] || b.jo || 0); });
+        var lines = [head.map(csvCell).join(',')];
+        sorted.forEach(function (r) {
+            var e = r.external || {};
+            lines.push([joOf[r.group] || r.jo || '', r.group, r.device, r.submitted ? '제출' : '쓰는 중', r.submittedAt, r.updatedAt].concat(
+                secs.map(function (x) { return (r.sections || {})[x.key] || ''; }), [e.prompt || '', e.adopted || '', e.verify || '']).map(csvCell).join(','));
+        });
+        return { csv: '\ufeff' + lines.join('\r\n') + '\r\n', rows: sorted.length };
+    }
+
     return {
+        AI: AI, aiCsv: aiCsv, reportCsv: reportCsv,
         VERSION: VERSION, TTL_DAYS: TTL_DAYS, SPACE_RE: SPACE_RE, JOIN_DAYS: JOIN_DAYS,
         core: core, memoryDb: memoryDb, firestoreDb: firestoreDb, call: call, watch: watch, watchClass: watchClass,
         newSpace: newSpace, isSpace: isSpace, isLabUrl: isLabUrl, urlOf: urlOf, spaceOf: spaceOf, groupSpace: groupSpace, parseUrl: parseUrl, docKey: docKey,

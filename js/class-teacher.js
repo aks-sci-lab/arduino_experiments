@@ -12,7 +12,7 @@
     var POLL_MS = 5000;
     var state = { user: null, classes: [], watching: null, timer: null, last: null, detail: null, busy: false, liveOff: null, liveSpace: '' };
     function siteRoot() { return new URL('../', location.href).href; }
-    var tabs = LabUI.initTabs('#ctTabs', { key: 'class-teacher', onShow: function (t) { if (t === 'watch') startWatch(); else stopWatch(); } });
+    var tabs = LabUI.initTabs('#ctTabs', { key: 'class-teacher', onShow: function (t) { if (t === 'watch') startWatch(); else stopWatch(); window.dispatchEvent(new CustomEvent('lab-teacher-tab', { detail: t })); } });
 
     // ---------- 구글 로그인 ----------
     function renderLogin() {
@@ -58,10 +58,10 @@
         var id = $('inCustom').value.trim().replace(/^.*[?&]id=/, '').replace(/[&#].*$/, '');
         return /^[A-Za-z0-9_-]{1,40}$/.test(id) ? 'custom:' + id : '';
     }
-    function inputs() { return { ban: Number($('inBan').value), nStudents: Number($('inN').value), groupSize: Number($('inSize').value), exp: chosenExp() }; }
+    function inputs() { return { ban: Number($('inBan').value), nStudents: Number($('inN').value), groupSize: Number($('inSize').value), exp: chosenExp(), aiLimit: $('inAiLimit').value === '' ? 20 : Number($('inAiLimit').value) }; }
     function renderPreview() {
         var o = inputs(), g = CC.splitGroups(o.nStudents, o.groupSize);
-        var ok = g.length && o.ban >= 1 && o.ban <= 99 && o.ban % 1 === 0 && !!o.exp;
+        var ok = g.length && o.ban >= 1 && o.ban <= 99 && o.ban % 1 === 0 && !!o.exp && o.aiLimit >= 0 && o.aiLimit <= 200 && o.aiLimit % 1 === 0;
         $('btnCreate').disabled = !ok;
         $('customRow').hidden = $('inExp').value !== 'custom';
         var e = o.exp && CC.expInfo(o.exp);
@@ -69,9 +69,9 @@
             : e && !e.ready ? '⚠️ 이 실험 페이지는 아직 수업 참여 띠를 붙이는 중이에요. 수업은 만들 수 있지만, 학생 화면에 조·번호 고르기가 아직 안 나올 수 있어요.' : '';
         $('preview').innerHTML = ok
             ? '👥 ' + o.nStudents + '명 → <b>' + g.length + '개 조</b>: ' + g.map(function (k, i) { return (i + 1) + '조 ' + k + '명'; }).join(', ')
-            : '반(1~99), 학생 수(1~60), 조별 인원(1~10)을 정수로 넣어 주세요.';
+            + ' · 🤖 AI 질문 조마다 ' + o.aiLimit + '번' : '반(1~99), 학생 수(1~60), 조별 인원(1~10), AI 질문 한도(0~200)를 정수로 넣어 주세요.';
     }
-    ['inBan', 'inN', 'inSize', 'inExp', 'inCustom'].forEach(function (id) { $(id).addEventListener('input', renderPreview); });
+    ['inBan', 'inN', 'inSize', 'inExp', 'inCustom', 'inAiLimit'].forEach(function (id) { $(id).addEventListener('input', renderPreview); });
     $('inExp').addEventListener('change', renderPreview);
     // 선생님이 만든 실험은 '공개'여야 학생이 열 수 있다 → 번호를 넣으면 확인해 알려 줌
     var customState = { id: '', state: '', timer: null };
@@ -117,7 +117,7 @@
     function showClass(c) {
         var link = studentLink(c), e = CC.expInfo(c.exp);
         $('classOut').hidden = false;
-        $('outTitle').textContent = '— ' + c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + c.nStudents + '명, ' + c.groups.length + '개 조';
+        $('outTitle').textContent = '— ' + c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + c.nStudents + '명, ' + c.groups.length + '개 조 · AI 질문 조마다 ' + (c.aiLimit == null ? 20 : c.aiLimit) + '번';
         $('outCode').textContent = c.classCode;
         $('outLink').href = link; $('outLink').textContent = link;
         $('outExpire').textContent = expireNote(c);
@@ -152,6 +152,7 @@
     }
     function byId(space) { return state.classes.filter(function (c) { return c.space === space; })[0] || null; }
     function renderList() {
+        window.dispatchEvent(new CustomEvent('lab-classes', { detail: state.user && state.user.google ? state.classes : [] }));   // ③ 보고서 AI (js/class-teacher-ai.js)
         var el = $('classList');
         if (!state.user || !state.user.google) { el.innerHTML = '<p class="note">구글 로그인하면 이 계정으로 만든 수업이 여기에 보여요.</p>'; return; }
         if (!state.classes.length) { el.innerHTML = '<p class="note">아직 만든 수업이 없어요.</p>'; return; }

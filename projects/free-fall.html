@@ -487,6 +487,8 @@
                 <li>공기 저항이 큰 가벼운 공(풍선·종이공 등)을 쓰지는 않았는가?</li>
                 <li>삼각대가 흔들리거나 촬영 중 화면이 움직이지 않았는가?</li>
             </ul>
+            <!-- 📝 보고서 쓰기 · AI 피드백 (js/report-ai.js) -->
+            <div id="report-ai"></div>
             <div class="step-next"><button class="prev" data-go="result">← 6. 결과</button><button data-go="purpose">처음으로: 1. 목적</button></div>
         </section>
     </main>
@@ -498,5 +500,8 @@
     <script src="../js/class-share.js"></script>
     <script src="../js/accelerometer-share.js"></script>
     <script src="../js/free-fall-manual.js" defer></script>
+<link rel="stylesheet" href="../css/report-ai.css">
+<script src="../js/report-ai.js"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'freefall', mount: '#report-ai', contextFrom: '#fit-result, #group-results' }); });</script>
 </body>
 </html>
