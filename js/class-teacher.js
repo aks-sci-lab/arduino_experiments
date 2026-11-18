@@ -83,7 +83,10 @@
             $('devKeyQr').innerHTML = qrSvg(link) || '<p class="note">QR 도구를 불러오지 못했어요.</p>';
         }
     }
+    var serverVer = 0;   // 지금 시트의 서버 판 (실험별 needServer 와 비교)
     async function checkVersion(ping) {
+        serverVer = Number(ping && ping.version) || 0;
+        try { renderPreview(); } catch (e) { /* 아직 준비 전 */ }
         var url = server.url;
         if (!url) return;
         // 5판인데 관리 열쇠가 아직 없으면 지금 만든다 (처음 연결한 선생님 화면이 갖는다)
@@ -302,7 +305,8 @@
         $('customRow').hidden = $('inExp').value !== 'custom';
         var e = o.exp && CC.expInfo(o.exp);
         $('expNote').innerHTML = $('inExp').value === 'custom' && !o.exp ? '선생님이 만든 실험의 번호(또는 학생 화면 주소)를 넣어 주세요.'
-            : e && !e.ready ? '⚠️ 이 실험 페이지는 아직 수업 참여 띠를 붙이는 중이에요. 수업은 만들 수 있지만, 학생 화면에 조·번호 고르기가 아직 안 나올 수 있어요.' : '';
+            : e && !e.ready ? '⚠️ 이 실험 페이지는 아직 수업 참여 띠를 붙이는 중이에요. 수업은 만들 수 있지만, 학생 화면에 조·번호 고르기가 아직 안 나올 수 있어요.'
+            : e && e.needServer && serverVer && serverVer < e.needServer ? '⚠️ 이 실험은 <b>서버 ' + e.needServer + '판</b>이 필요해요 (지금 ' + serverVer + '판). 맨 위 띠의 🔄 업데이트를 먼저 눌러 주세요.' : '';
         $('preview').innerHTML = ok
             ? '👥 ' + o.nStudents + '명 → <b>' + g.length + '개 조</b>: ' + g.map(function (k, i) { return (i + 1) + '조 ' + k + '명'; }).join(', ')
             : '반(1~99), 학생 수(1~60), 조별 인원(1~10)을 정수로 넣어 주세요.';

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
+    <title>탄소 양자점 형광 실험 (스마트폰 카메라 · 간이 분광기)</title>
+    <link rel="stylesheet" href="../css/class-share.css">
+    <link rel="stylesheet" href="../css/quantum-dot.css">
+</head>
+<body>
+<div class="wrap">
+    <a class="back" href="../index.html">← 메인 페이지</a>
+    <h1>🌈 탄소 양자점 형광 실험</h1>
+    <div class="device-row" id="device-switch"></div>
+    <div id="class-bar-mount"></div>
+    <p class="note">구연산과 요소를 전자레인지로 가열해 <b>탄소 양자점</b> 용액을 만들고, 자외선을 비춰 나오는 형광의 색·밝기를 스마트폰 카메라와 간이 분광기로 잽니다. <b>가열 시간</b>과 <b>재료 비율</b>을 바꾸면 빛의 색(에너지)이 어떻게 달라지는지 알아봅니다. 카메라는 <b>https</b> 주소에서만 동작합니다.</p>
+
+    <nav class="steps" role="tablist" aria-label="실험 단계">
+        <button role="tab" data-step="purpose"><b>1</b><span>목적</span></button>
+        <button role="tab" data-step="theory"><b>2</b><span>이론</span></button>
+        <button role="tab" data-step="materials"><b>3</b><span>준비물</span></button>
+        <button role="tab" data-step="procedure"><b>4</b><span>과정</span></button>
+        <button role="tab" data-step="data"><b>5</b><span>데이터</span></button>
+        <button role="tab" data-step="result"><b>6</b><span>결과</span></button>
+        <button role="tab" data-step="conclusion"><b>7</b><span>결론</span></button>
+    </nav>
+
+    <!-- ===================== 1. 목적 ===================== -->
+    <section class="step-panel" data-step="purpose" hidden>
+        <div class="card">
+            <h2>1. 실험 목적</h2>
+            <ol class="text-list">
+                <li>구연산과 요소로 <b>탄소 양자점</b> 용액을 만들고, 자외선을 비추면 파랑·초록 <b>형광</b>이 나오는 것을 확인한다.</li>
+                <li><b>가열 시간</b>과 <b>재료 비율(구연산 : 요소)</b>을 바꾸며 형광의 <b>봉우리 파장</b>과 밝기가 어떻게 변하는지 스마트폰 카메라·간이 분광기로 측정한다.</li>
+                <li>빛의 파장을 <b>E = hc/λ</b> 로 광자 에너지로 바꾸고, 양자점의 <b>크기 ↔ 에너지 띠 틈 ↔ 빛의 색</b> 관계로 결과를 설명한다. 그 설명이 탄소 양자점에 어디까지 맞는지도 따져 본다.</li>
+            </ol>
+        </div>
+        <div class="card box">
+            <h2>이 실험에서 하는 일</h2>
+            <ol class="text-list">
+                <li><b>만들기</b> — 조마다 가열 시간 또는 재료 비율을 다르게 해서 시료를 만든다.</li>
+                <li><b>측정(폰)</b> — 어두운 상자에서 자외선을 비추고 ① 형광 색 사진 ② 간이 분광기 스펙트럼을 찍는다. 카메라 노출 시간·ISO 도 함께 기록된다.</li>
+                <li><b>분석(노트북)</b> — 폰이 보낸 시료를 모아 가열 시간·비율에 따른 파장·에너지·밝기 그래프를 그린다.</li>
+                <li><b>결론</b> — 주장·증거·추론으로 결론을 쓰고, 측정의 한계를 검토한다.</li>
+            </ol>
+        </div>
+        <div class="step-next"><button data-go="theory">다음: 2. 이론 →</button></div>
+    </section>
+
+    <!-- ===================== 2. 이론 ===================== -->
+    <section class="step-panel" data-step="theory" hidden data-subtabs="이론 나눠 보기">
+        <div class="card" data-subtab="양자점">
+            <h2>2-1. 양자점이란?</h2>
+            <p><b>양자점</b>(quantum dot)은 지름이 약 1~10 nm(나노미터, 10억 분의 1 m)인 아주 작은 반도체(또는 탄소) 알갱이입니다. 원자 수백~수천 개 정도의 크기라서, 안에 있는 전자가 마치 <b>좁은 상자에 갇힌 것처럼</b> 움직입니다.</p>
+            <p>상자에 갇힌 전자는 아무 에너지나 가질 수 없고 <b>띄엄띄엄한 에너지</b>만 가질 수 있습니다(양자화). 상자 크기가 L 이면 가장 낮은 에너지가 대략</p>
+            <p class="formula">E ∝ 1 / L²</p>
+            <p>처럼 변합니다. 상자가 <b>작을수록 에너지 간격이 커집니다</b>.</p>
+        </div>
+        <div class="card" data-subtab="띠 틈과 색">
+            <h2>2-2. 크기 ↔ 에너지 띠 틈 ↔ 빛의 색</h2>
+            <p>반도체에서 전자가 채워진 <b>원자가띠</b>와 비어 있는 <b>전도띠</b> 사이의 에너지 차이를 <b>띠 틈</b>(band gap, E<sub>g</sub>)이라고 합니다. 전자가 전도띠에서 원자가띠로 떨어질 때, 띠 틈만큼의 에너지를 가진 <b>빛(광자) 하나</b>를 냅니다.</p>
+            <p class="formula">E = hf = hc / λ</p>
+            <p>h = 6.63×10⁻³⁴ J·s(플랑크 상수), c = 3.00×10⁸ m/s 입니다. 에너지를 전자볼트(eV), 파장을 nm 로 쓰면 아주 간단해집니다.</p>
+            <p class="formula">E (eV) ≈ 1240 / λ (nm)</p>
+            <table class="mini">
+                <thead><tr><th>빛</th><th>파장 λ</th><th>광자 에너지 E</th></tr></thead>
+                <tbody>
+                    <tr><td>자외선 손전등</td><td>365 nm</td><td>3.40 eV</td></tr>
+                    <tr><td>파랑</td><td>450 nm</td><td>2.76 eV</td></tr>
+                    <tr><td>초록</td><td>530 nm</td><td>2.34 eV</td></tr>
+                    <tr><td>빨강</td><td>650 nm</td><td>1.91 eV</td></tr>
+                </tbody>
+            </table>
+            <p>양자점이 <b>작으면 띠 틈이 커져</b> 짧은 파장(파랑)의 빛을, <b>크면 띠 틈이 작아져</b> 긴 파장(빨강 쪽)의 빛을 냅니다. 같은 물질인데 크기만 바꿔 색을 고를 수 있어서, QLED 텔레비전·태양 전지·바이오 영상에 쓰입니다(2023년 노벨 화학상).</p>
+        </div>
+        <div class="card" data-subtab="형광">
+            <h2>2-3. 형광: 흡수 → 방출, 스토크스 이동</h2>
+            <ol class="text-list">
+                <li><b>흡수</b>: 에너지가 큰 자외선(365 nm, 3.4 eV)을 흡수해 전자가 높은 에너지 상태로 올라갑니다(들뜬 상태).</li>
+                <li><b>완화</b>: 들뜬 전자는 아주 짧은 시간 동안 분자 진동·주변 용매에 에너지 일부를 열로 넘겨 주며 들뜬 상태의 바닥으로 내려옵니다.</li>
+                <li><b>방출</b>: 바닥 상태로 떨어지며 빛을 냅니다. 잃은 에너지만큼 <b>흡수한 빛보다 파장이 긴</b> 빛(파랑·초록)이 나옵니다.</li>
+            </ol>
+            <p>흡수한 빛과 방출한 빛의 파장 차이를 <b>스토크스 이동</b>이라고 합니다. 그래서 눈에 거의 안 보이는 자외선을 비추면 용액이 파랗게 빛나는 것입니다. 자외선을 끄면 바로(10억 분의 몇 초 안에) 빛이 사라집니다.</p>
+        </div>
+        <div class="card" data-subtab="탄소 양자점">
+            <h2>2-4. 탄소 양자점과 가열 시간</h2>
+            <p>구연산(탄소 공급)과 요소(질소 공급)를 함께 가열하면 물이 빠지면서 분자들이 서로 이어지고(탈수·축합), 점점 <b>탄소 원자가 육각형 판 모양으로 이어진 작은 조각</b>(그래핀과 비슷한 sp² 탄소)이 생깁니다. 겉에는 –NH₂, –COOH 같은 작용기가 붙어 물에 잘 녹습니다.</p>
+            <ul class="text-list">
+                <li><b>가열이 짧으면</b>: 탄소 조각이 아직 작고 분자 상태가 많아 주로 <b>파란</b> 형광.</li>
+                <li><b>가열이 길어지면</b>: sp² 탄소 영역이 자라고 질소가 더 들어가 띠 틈이 작아지는 쪽 → 형광이 <b>초록 쪽으로 이동</b>하거나 넓어지는 경향이 있습니다.</li>
+                <li><b>너무 오래 가열하면</b>: 큰 탄소 덩어리(검게 탄 것)가 되어 형광이 약해집니다.</li>
+                <li><b>요소 비율</b>: 요소가 많을수록 질소가 더 들어가 밝기·색이 달라집니다(어떻게 달라지는지가 이번 탐구 질문).</li>
+            </ul>
+        </div>
+        <div class="card warn-card" data-subtab="한계">
+            <h2>2-5. 솔직하게: 이 설명의 한계</h2>
+            <ul class="text-list">
+                <li>CdSe 같은 <b>반도체 양자점</b>은 크기와 색이 거의 정확히 맞습니다. 하지만 <b>탄소 양자점은 크기–색 관계가 딱 맞지 않습니다</b>. 색이 크기보다 <b>표면의 작용기·질소의 결합 상태</b>, 함께 생긴 <b>형광 분자</b>(구연산–요소 반응에서 생기는 파란 형광 분자)에 더 크게 좌우될 때가 많습니다.</li>
+                <li>탄소 양자점은 <b>비추는 빛의 파장에 따라 방출 색이 바뀌기도</b> 합니다(들뜸 의존성). 그래서 365 nm 와 395 nm 로 비춘 결과를 섞어 비교하면 안 됩니다.</li>
+                <li>우리는 알갱이 크기를 <b>직접 재지 않습니다</b>(전자 현미경 필요). '가열이 길수록 크다'는 것은 가정입니다.</li>
+                <li>스마트폰 카메라는 빨강·초록·파랑 세 가지 센서만 있어 <b>색상으로 구한 파장은 대략적인 추정</b>입니다. 간이 분광기도 맞춤 정확도가 ±5~10 nm 정도입니다.</li>
+            </ul>
+            <p>결론을 쓸 때 "크기가 커져서 색이 바뀌었다"고 단정하기보다, <b>측정한 사실</b>과 <b>그것을 설명하는 가설</b>을 나눠 써 보세요.</p>
+        </div>
+        <div class="card" data-subtab="카메라로 재기">
+            <h2>2-6. 카메라로 빛 재기: 노출·ISO·조도</h2>
+            <p>카메라 사진의 밝기는 빛의 세기뿐 아니라 <b>노출 시간 t</b>(셔터가 열린 시간), <b>ISO</b>(감도), <b>조리개 N</b> 에 따라 달라집니다. 폰은 보통 자동으로 이 값을 바꾸므로, 그냥 찍으면 어두운 시료도 밝게 나옵니다.</p>
+            <ul class="text-list">
+                <li><b>🔒 노출 고정</b>: 시료를 바꿔도 노출·ISO 가 그대로이면 사진 밝기를 그대로 비교할 수 있습니다.</li>
+                <li><b>보정 밝기</b>: 고정이 안 되면 기록된 노출 시간·ISO 로 나눠 비교합니다. 보정 밝기 = 선형 밝기 ÷ (t × ISO/100)</li>
+                <li><b>노출값(EV)·조도</b>: EV₁₀₀ = log₂(N²/t) − log₂(ISO/100), 조도 ≈ 2.5 × 2<sup>EV</sup> lux (폰 조리개 N ≈ 1.8). 카메라가 '이 정도면 알맞다'고 정한 밝기라서 대략적인 값입니다.</li>
+                <li><b>색온도</b>: 화이트밸런스 값(K). 자동이면 색이 바뀌어 색상(파장 추정)이 달라질 수 있어 함께 기록합니다.</li>
+            </ul>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="purpose">← 이전: 1. 목적</button><button data-go="materials">다음: 3. 준비물 →</button></div>
+    </section>
+
+    <!-- ===================== 3. 준비물 ===================== -->
+    <section class="step-panel" data-step="materials" hidden>
+        <div class="card warn-card">
+            <h2>⚠️ 안전 먼저</h2>
+            <ul class="text-list">
+                <li><b>보안경·장갑</b>을 끼고, 가열한 용기는 <b>집게·내열 장갑</b>으로만 잡습니다. 종이컵·플라스틱 컵은 쓰지 않습니다.</li>
+                <li>전자레인지는 <b>30초씩 끊어서</b> 가열하고 끓어 넘치는지 지켜봅니다. 용기는 용액보다 넉넉히 큰 <b>내열 비커</b>를 씁니다.</li>
+                <li>가열 중 <b>암모니아 냄새</b>가 납니다. 창문을 열거나 환기 장치 아래에서 하고, 냄새를 직접 맡지 않습니다.</li>
+                <li><b>자외선 손전등을 눈이나 다른 사람 쪽으로 비추지 않습니다.</b> 자외선 차단 보안경을 쓰면 더 안전합니다.</li>
+                <li>시료는 먹거나 맛보지 않습니다. 실험에 쓴 전자레인지·비커는 음식에 쓰지 않습니다. 남은 용액은 선생님 안내대로 버립니다.</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h2>3-1. 시료 만들기</h2>
+            <ul class="text-list">
+                <li>구연산(무수 또는 일수화물), 요소 — 전자저울로 g 단위</li>
+                <li>증류수(또는 정수), 눈금 실린더(10 mL), 유리 막대</li>
+                <li>내열 비커(100 mL 이상) 조마다 1~2개, 전자레인지(약 700 W), 집게·내열 장갑</li>
+                <li>희석용 투명 유리병(또는 투명 큐벳·시험관), 스포이트</li>
+            </ul>
+            <h3>재료 비율 표 (물 10 mL 기준)</h3>
+            <div class="tbl-wrap"><table class="mini">
+                <thead><tr><th>시료</th><th>구연산</th><th>요소</th><th>구연산 : 요소</th></tr></thead>
+                <tbody>
+                    <tr><td>A</td><td>1 g</td><td>0.5 g</td><td>1 : 0.5</td></tr>
+                    <tr><td>B (기본)</td><td>1 g</td><td>1 g</td><td>1 : 1</td></tr>
+                    <tr><td>C</td><td>1 g</td><td>2 g</td><td>1 : 2</td></tr>
+                    <tr><td>D</td><td>1 g</td><td>3 g</td><td>1 : 3</td></tr>
+                </tbody>
+            </table></div>
+            <h3>가열 시간 단계 (재료 1 : 1, 700 W)</h3>
+            <div class="tbl-wrap"><table class="mini">
+                <thead><tr><th>가열</th><th>예상 모습</th></tr></thead>
+                <tbody>
+                    <tr><td>60 초</td><td>물이 끓고 거의 투명 ~ 연노랑</td></tr>
+                    <tr><td>120 초</td><td>물이 줄고 노란 끈적한 액체</td></tr>
+                    <tr><td>180 초</td><td>부풀며 주황 ~ 갈색 고체</td></tr>
+                    <tr><td>240 초</td><td>진한 갈색 거품 고체</td></tr>
+                    <tr><td>300 초</td><td>검은 갈색 (더 오래 하면 탐)</td></tr>
+                </tbody>
+            </table></div>
+            <p class="note">전자레인지마다 세기가 달라 시간은 예시입니다. 조끼리 같은 전자레인지를 쓰면 비교가 공정해집니다.</p>
+        </div>
+        <div class="card">
+            <h2>3-2. 측정 도구</h2>
+            <ul class="text-list">
+                <li>자외선 손전등: <b>365 nm</b>(형광이 잘 보임, 권장) 또는 395 nm(보라빛이 함께 보임). 한 실험 안에서는 같은 손전등을 씁니다.</li>
+                <li>어두운 상자(검은 종이 상자) 또는 불 끈 교실, 스마트폰 거치대</li>
+                <li><b>간이 분광기</b>: 종이 상자(시리얼 상자 크기), 검정 테이프·면도날 두 장(슬릿), <b>회절 격자 필름</b>(1000선/mm) 또는 <b>DVD 조각</b>(반사 막을 테이프로 벗겨 낸 투명 부분), 가위·칼</li>
+                <li>보정용 빛: 천장 <b>형광등</b>(수은선 436·546·611 nm) 또는 <b>레이저 포인터</b>(빨강 650 / 초록 532 nm)</li>
+                <li>측정용 스마트폰(카메라), 분석용 노트북</li>
+            </ul>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="theory">← 이전: 2. 이론</button><button data-go="procedure">다음: 4. 과정 →</button></div>
+    </section>
+
+    <!-- ===================== 4. 과정 ===================== -->
+    <section class="step-panel" data-step="procedure" hidden data-subtabs="과정 나눠 보기">
+        <div class="card" data-subtab="① 시료 만들기">
+            <h2>4-1. 탄소 양자점 만들기</h2>
+            <ol class="text-list">
+                <li>비커에 구연산·요소를 표대로 달아 넣고 물 10 mL 를 부어 다 녹을 때까지 젓습니다.</li>
+                <li>전자레인지에 넣고 <b>30초씩</b> 정한 시간만큼 가열합니다. 매번 꺼내지 말고 창으로 넘치는지 봅니다. (안전: 보안경·장갑, 환기)</li>
+                <li>꺼내서 <b>5분 이상 식힙니다</b>. 갈색 고체가 되었으면 물 10 mL 를 넣어 녹입니다(진한 원액).</li>
+                <li><b>희석</b>: 원액 1 mL + 물 9 mL(1 : 10). 너무 진해서 빛이 안 들어가면 1 : 100 까지 더 묽힙니다. 같은 실험 안에서는 희석 비율을 같게 합니다.</li>
+                <li>투명 유리병에 담고 이름표(가열 시간·비율)를 붙입니다.</li>
+            </ol>
+            <p class="note">💡 너무 진하면 빛이 시료 앞부분에서 다 흡수되고 형광이 오히려 어두워집니다(자기 흡수). 희석하면 더 밝아질 수 있어요.</p>
+        </div>
+        <div class="card" data-subtab="② 분광기 만들기">
+            <h2>4-2. 간이 분광기 만들기</h2>
+            <ol class="text-list">
+                <li>상자 한쪽 끝에 <b>좁은 틈(슬릿)</b>을 냅니다: 2 cm × 3 cm 구멍을 뚫고 면도날 두 장(또는 검정 테이프 두 장)을 0.5 mm 정도 띄워 붙입니다.</li>
+                <li>반대쪽 끝에 2 cm × 2 cm 구멍을 내고 <b>회절 격자 필름</b>(또는 DVD 조각)을 붙입니다. 격자의 홈 방향은 슬릿과 나란하게.</li>
+                <li>격자 구멍에 폰 카메라를 대고 슬릿을 형광등에 향하면, 화면 옆쪽에 <b>무지개 띠</b>가 보입니다. 띠가 화면 안에 다 들어오게 폰을 테이프로 고정합니다.</li>
+                <li>상자 틈은 검정 테이프로 막아 바깥 빛을 줄입니다.</li>
+            </ol>
+        </div>
+        <div class="card" data-subtab="③ 보정">
+            <h2>4-3. 분광기 보정 (화소 → 파장)</h2>
+            <ol class="text-list">
+                <li>5. 데이터 → ③ 분광기에서 카메라를 켜고, 화면의 무지개 띠 <b>시작(파랑 쪽)과 끝(빨강 쪽)을 차례로 눌러</b> 선을 정합니다.</li>
+                <li>슬릿을 형광등에 향하고 <b>📸 보정용 스펙트럼 찍기</b> → 밝은 선(봉우리)이 찾아집니다.</li>
+                <li><b>🪄 형광등 자동 짝짓기</b>를 누르거나, 봉우리마다 알려진 파장(436·546·611 nm, 레이저 532·650 nm)을 직접 고릅니다. 2개 이상이면 됩니다.</li>
+                <li><b>✅ 보정 저장</b> → 이 폰이 기억해 다음 시료에 그대로 씁니다. 폰·분광기를 움직이면 다시 보정합니다.</li>
+            </ol>
+        </div>
+        <div class="card" data-subtab="④ 측정">
+            <h2>4-4. 시료 측정 (폰)</h2>
+            <ol class="text-list">
+                <li>노트북의 5. 데이터에 있는 <b>📱 폰으로 측정해 보내기</b> QR 을 폰으로 찍습니다.</li>
+                <li>① 시료: 가열 시간·구연산·요소·희석·비춘 빛을 넣습니다.</li>
+                <li>② 형광 색: 어두운 상자에서 자외선을 시료에 비추고, 카메라를 켜서 <b>🔒 노출 고정</b> → 빛나는 부분에 초록 네모를 맞춰 <b>📸 이 색 기록</b>.</li>
+                <li>③ 분광기: 시료를 슬릿 바로 앞에 두고 자외선을 비춰 <b>📸 시료 스펙트럼 기록</b>.</li>
+                <li>④ 저장: <b>💾 시료 저장</b>. 다음 시료로 반복하고, 위 띠의 회차 목록에서 보낼 시료를 골라 <b>📤 보내기</b>.</li>
+            </ol>
+            <p class="note">노출 고정이 안 되는 폰도 측정할 수 있어요. 노출 시간·ISO 가 함께 기록되면 노트북이 '보정 밝기'로 비교합니다. 노출 값을 주지 않는 폰이면 밝기 비교는 하지 말고 색(파장)만 비교하세요.</p>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="materials">← 이전: 3. 준비물</button><button data-go="data">다음: 5. 데이터 →</button></div>
+    </section>
+
+    <!-- ===================== 5. 데이터 ===================== -->
+    <section class="step-panel" data-step="data" hidden>
+        <div id="phone-card" class="show-on-laptop"></div>
+        <p class="note show-on-phone phone-solo">📱 노트북이 있으면 노트북에서 이 페이지를 열고 '📱 폰으로 측정해 보내기' QR 을 찍으세요. 노트북이 없으면 이 폰에서 측정·분석을 모두 할 수 있습니다.</p>
+        <div id="share-mount"></div>
+        <div id="phone-note" class="ok" role="status" hidden></div>
+
+        <div class="hide-on-laptop qd-measure">
+            <nav class="subtabs" id="qdTabs" aria-label="측정 나눠 보기">
+                <button data-tab="sample">① 시료<small>정보</small></button>
+                <button data-tab="color">② 형광 색<small>사진</small></button>
+                <button data-tab="spec">③ 분광기<small>스펙트럼</small></button>
+                <button data-tab="save">④ 저장<small id="save-tab-n">시료 목록</small></button>
+            </nav>
+
+            <div class="tab-panel" data-tab="sample">
+                <div class="card">
+                    <h2>① 시료 정보 <span class="note" id="draft-no"></span></h2>
+                    <div class="form-grid">
+                        <label>가열 시간 (초)<input type="number" id="in-heat" min="0" max="1200" step="10" inputmode="decimal"></label>
+                        <label>구연산 (g)<input type="number" id="in-citric" min="0" step="0.1" inputmode="decimal"></label>
+                        <label>요소 (g)<input type="number" id="in-urea" min="0" step="0.1" inputmode="decimal"></label>
+                        <label>물 (mL)<input type="number" id="in-water" min="0" step="1" inputmode="decimal"></label>
+                        <label>희석<select id="in-dilution">
+                            <option value="원액">원액</option><option value="1:10">1 : 10</option><option value="1:100">1 : 100</option><option value="기타">기타(메모에)</option>
+                        </select></label>
+                        <label>비춘 빛<select id="in-light">
+                            <option value="365 nm">자외선 365 nm</option><option value="395 nm">자외선 395 nm</option><option value="파란 LED">파란 LED</option><option value="기타">기타(메모에)</option>
+                        </select></label>
+                    </div>
+                    <label class="wide">메모 (30자)<input type="text" id="in-memo" maxlength="30" placeholder="예: 2조 C 시료, 갈색"></label>
+                    <p class="note">재료 비율: <b id="ratio-txt">–</b> (구연산 : 요소, 질량비)</p>
+                    <div class="row"><button type="button" data-tab-go="color">다음: ② 형광 색 →</button></div>
+                </div>
+            </div>
+            <div class="tab-panel" data-tab="color"></div>
+            <div class="tab-panel" data-tab="spec"></div>
+            <div class="tab-panel" data-tab="save">
+                <div class="card">
+                    <h2>④ 지금 시료 저장</h2>
+                    <div id="draft-sum" class="draft-sum"></div>
+                    <div class="row"><button id="btn-save" class="good big" type="button">💾 시료 저장</button><span id="save-msg" class="note"></span></div>
+                </div>
+                <div class="card">
+                    <h2>이 기기에서 잰 시료 <span id="mine-n" class="note"></span></h2>
+                    <div id="mine-list" class="mine-list"></div>
+                </div>
+            </div>
+
+            <!-- 카메라 (② 형광 색·③ 분광기에서만 보임) -->
+            <div class="card" id="cam-card" hidden>
+                <div class="row">
+                    <button id="btn-cam" type="button">📷 카메라 켜기</button>
+                    <button id="btn-lock" type="button" class="secondary" disabled>🔒 노출 고정</button>
+                    <button id="btn-photo" type="button" class="secondary">🖼️ 사진 불러오기</button>
+                    <input type="file" id="file-photo" accept="image/*" hidden>
+                </div>
+                <div id="cam-msg" class="warn" hidden></div>
+                <div class="stage"><canvas id="view" width="640" height="360"></canvas><video id="video" playsinline muted autoplay></video></div>
+                <p class="note" id="stage-hint"></p>
+                <div class="live" id="cam-live"></div>
+                <details class="tip">
+                    <summary>카메라 설정값 · 조리개</summary>
+                    <div class="row"><label>폰 조리개 N <input type="number" id="in-aperture" min="1" max="16" step="0.1" value="1.8" inputmode="decimal"></label></div>
+                    <p class="note">기종마다 다릅니다(대부분 f/1.5~2.2). 조도(lux) 추정에만 쓰고, 보정 밝기에는 쓰지 않습니다.</p>
+                </details>
+            </div>
+
+            <div id="color-box" hidden>
+                <div class="card">
+                    <h2>② 형광 색</h2>
+                    <div class="row"><label style="flex:1">영역 크기 <input type="range" id="roi-size" min="4" max="60" value="20"></label><span id="roi-size-txt" class="note"></span></div>
+                    <div class="swatch-row"><span id="live-swatch" class="swatch"></span><div id="live-color" class="note">카메라를 켜거나 사진을 불러오세요.</div></div>
+                    <div id="clip-warn" class="warn" hidden>⚠️ 영역에 255 로 꽉 찬(포화) 화소가 많습니다. 밝기·색이 잘립니다. 시료를 멀리 두거나 노출을 낮추세요.</div>
+                    <div class="row"><button id="btn-color" class="good big" type="button" disabled>📸 이 색 기록</button><span id="color-msg" class="note"></span></div>
+                    <div class="row"><button type="button" class="secondary" data-tab-go="spec">다음: ③ 분광기 →</button><button type="button" class="secondary" data-tab-go="save">건너뛰고 ④ 저장 →</button></div>
+                </div>
+            </div>
+
+            <div id="spec-box" hidden>
+                <div class="card">
+                    <h2>③ 간이 분광기</h2>
+                    <div class="row"><label style="flex:1">선 두께 <input type="range" id="line-thick" min="1" max="41" step="2" value="9"></label><span id="line-thick-txt" class="note"></span>
+                        <button id="btn-line-reset" class="secondary" type="button">↺ 선 다시</button></div>
+                    <canvas id="prof-chart" class="chart small" width="600" height="180"></canvas>
+                    <p class="note" id="prof-note"></p>
+                    <details class="tip" id="cal-box">
+                        <summary id="cal-sum">🎯 보정 (화소 → 파장)</summary>
+                        <p class="note">형광등이나 레이저를 슬릿에 비춘 채로 찍으세요. 알려진 선을 2개 이상 고르면 직선으로 맞춥니다.</p>
+                        <div class="row"><button id="btn-cal-shot" class="secondary" type="button" disabled>📸 보정용 스펙트럼 찍기</button>
+                            <button id="btn-cal-auto" class="secondary" type="button" disabled>🪄 형광등 자동 짝짓기</button></div>
+                        <div id="cal-peaks" class="cal-peaks"></div>
+                        <div class="row"><button id="btn-cal-save" class="good" type="button" disabled>✅ 보정 저장</button>
+                            <button id="btn-cal-clear" class="danger" type="button">보정 지우기</button></div>
+                        <p class="note" id="cal-msg"></p>
+                    </details>
+                    <div class="row"><button id="btn-spec" class="good big" type="button" disabled>📸 시료 스펙트럼 기록</button><span id="spec-msg" class="note"></span></div>
+                    <div class="row"><button type="button" class="secondary" data-tab-go="save">다음: ④ 저장 →</button></div>
+                </div>
+            </div>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="procedure">← 이전: 4. 과정</button><button data-go="result">다음: 6. 결과 →</button></div>
+    </section>
+
+    <!-- ===================== 6. 결과 ===================== -->
+    <section class="step-panel" data-step="result" hidden>
+        <div class="card">
+            <h2>6-1. 시료 표 <span id="cnt" class="note"></span></h2>
+            <p class="note">λ 는 분광기 봉우리가 있으면 그것, 없으면 색상으로 구한 <b>추정</b>(≈) 입니다. E = 1240/λ. 보정 밝기는 노출 시간·ISO 로 나눈 값이라 노출이 달라도 비교할 수 있습니다.</p>
+            <div class="tbl-wrap"><table id="tbl">
+                <thead><tr><th>출처</th><th>시료</th><th>가열(s)</th><th>구연산:요소</th><th>빛</th><th>색</th><th>λ (nm)</th><th>반치폭</th><th>E (eV)</th><th>보정 밝기</th><th>노출</th></tr></thead>
+                <tbody id="tbody"></tbody>
+            </table></div>
+            <div class="row">
+                <button id="btn-csv" class="secondary" type="button" disabled>⬇️ CSV 다운로드</button>
+                <button id="btn-csv-in" class="secondary" type="button">📂 CSV 불러오기</button>
+                <input type="file" id="file-csv" accept=".csv,text/csv" multiple hidden>
+                <button id="btn-file-clear" class="secondary" type="button" hidden>불러온 CSV 지우기</button>
+            </div>
+            <p class="note" id="csv-msg"></p>
+        </div>
+        <div class="card">
+            <h2>6-2. 조건에 따른 변화</h2>
+            <div class="row">
+                <label>가로축 <select id="sel-x"><option value="heat">가열 시간 (초)</option><option value="ratio">요소/구연산 (질량비)</option></select></label>
+                <label>세로축 <select id="sel-y"><option value="lambda">파장 λ (nm)</option><option value="energy">광자 에너지 E (eV)</option><option value="corr">보정 밝기</option><option value="fwhm">반치폭 (nm)</option></select></label>
+            </div>
+            <canvas id="xy-chart" class="chart" width="800" height="320"></canvas>
+            <p class="note" id="xy-fit"></p>
+        </div>
+        <div class="card">
+            <h2>6-3. 분광 곡선 겹쳐 보기</h2>
+            <canvas id="spec-chart" class="chart" width="800" height="320"></canvas>
+            <p class="note" id="spec-legend"></p>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="data">← 이전: 5. 데이터</button><button data-go="conclusion">다음: 7. 결론 →</button></div>
+    </section>
+
+    <!-- ===================== 7. 결론 ===================== -->
+    <section class="step-panel" data-step="conclusion" hidden>
+        <div class="card">
+            <h2>7-1. 분석 질문</h2>
+            <ol class="text-list qlist">
+                <li><label>가열 시간이 길어질수록 봉우리 파장(또는 E)은 어떻게 변했나요? 6-2 그래프의 기울기로 답하세요.<textarea data-q="q1" rows="3"></textarea></label></li>
+                <li><label>재료 비율(요소의 양)에 따라 파장·보정 밝기는 어떻게 달라졌나요?<textarea data-q="q2" rows="3"></textarea></label></li>
+                <li><label>비춘 자외선(365 nm, 3.40 eV)과 측정한 형광의 에너지 차이(스토크스 이동)를 계산하고, 차이가 생기는 까닭을 쓰세요.<textarea data-q="q3" rows="3"></textarea></label></li>
+                <li><label>"가열이 길수록 양자점이 커져서 띠 틈이 작아졌다"는 설명은 우리 결과로 어디까지 뒷받침되나요? 2-5 한계를 참고해 다른 설명도 들어 보세요.<textarea data-q="q4" rows="3"></textarea></label></li>
+                <li><label>색상으로 구한 파장(≈)과 분광기 봉우리 파장이 얼마나 달랐나요? 차이의 원인은?<textarea data-q="q5" rows="3"></textarea></label></li>
+                <li><label>노출이 고정되지 않았을 때 사진 밝기를 그대로 비교하면 어떤 문제가 생기나요? 보정 밝기로 해결되나요?<textarea data-q="q6" rows="3"></textarea></label></li>
+            </ol>
+            <p class="note">쓴 답은 이 브라우저에만 저장되고 서버로 보내지 않습니다. 보고서는 손으로 쓰거나 인쇄하세요.</p>
+        </div>
+        <div class="card">
+            <h2>7-2. 선생님께 보내기 · 인쇄</h2>
+            <div class="row">
+                <button id="btn-send2" type="button">📤 내 시료 선생님께 보내기</button>
+                <button id="btn-print" type="button" class="secondary">🖨️ 인쇄 (PDF)</button>
+            </div>
+            <p class="note" id="send2-status"></p>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="result">← 이전: 6. 결과</button></div>
+    </section>
+</div>
+
+<script src="../js/pendulum-config.js"></script>
+<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/class-cloud.js"></script>
+<script src="../js/class-share.js"></script>
+<script src="../js/quantum-dot-math.js"></script>
+<script src="../js/quantum-dot.js"></script>
+</body>
+</html>

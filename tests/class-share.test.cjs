@@ -137,6 +137,19 @@ test('9판: 스마트폰 카메라 심박수(heartrate) 저장·목록, 수업�
     const c = app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'heartrate' });
     assert.equal(c.ok, true, JSON.stringify(c));
 });
+test('11판: 탄소 양자점 형광(qdot) 저장·목록, 수업도 만들 수 있음, 교사 화면은 서버 11판 필요', () => {
+    const app = loadCodeGs();
+    assert.ok(app.get({ action: 'ping' }).version >= 11);
+    assert.equal(app.ctx.isGenericExp('qdot'), true);
+    assert.equal(app.ctx.isClassExp('qdot'), true);
+    const r = app.post({ action: 'save', exp: 'qdot', id: 'pabcd12-s1', group: '2-3-5376', device: 'pabcd12', title: '시료 1', n: 1,
+        summary: { '가열(s)': 120, '봉우리(nm)': 455.2 }, data: JSON.stringify({ v: 1 }), sentAt: new Date().toISOString() });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    assert.equal(app.get({ action: 'list', exp: 'qdot', group: '2-3-5376' }).items[0].summary['봉우리(nm)'], 455.2);
+    assert.equal(app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'qdot' }).ok, true);
+    assert.equal(CC.EXPS.qdot.needServer, 11);
+    assert.equal(CC.EXPS.qdot.ready, true);
+});
 test('실험 목록: 서버와 같은 이름, 학생 링크(이미 ?가 있는 주소 포함)', () => {
     const app = loadCodeGs();
     Object.keys(CC.EXPS).forEach(k => assert.equal(app.ctx.isClassExp(k), true, k));
