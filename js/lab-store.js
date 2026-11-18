@@ -36,7 +36,7 @@
     var CELL_MAX = 45000;
     var SUMMARY_KEYS = 20, PLANCK_POINTS = 500;
     var JOIN_DAYS = 14;              // 수업 코드만으로 찾을 수 있는 기간 (QR·링크는 수업이 지워질 때까지)
-    var GENERIC_EXPS = { idealgas: 1, accel: 1, env: 1, light: 1, uv: 1, phoneaccel: 1, malus: 1, eminduction: 1, freefall: 1, nano: 1, heartrate: 1 };
+    var GENERIC_EXPS = { idealgas: 1, accel: 1, env: 1, light: 1, uv: 1, phoneaccel: 1, malus: 1, eminduction: 1, freefall: 1, nano: 1, heartrate: 1, qdot: 1 };   // qdot: 퀀텀닷 용액(PR #120)
     var CLASS_EXPS = { planck: 1, pendulum: 1 };
     Object.keys(GENERIC_EXPS).forEach(function (k) { CLASS_EXPS[k] = 1; });
     var CUSTOM_EXP_RE = /^custom:[A-Za-z0-9_-]{1,40}$/;

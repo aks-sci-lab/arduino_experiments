@@ -5,6 +5,9 @@
 //   await app.get({ action: 'list', exp, group })   → 시험 쪽 확인용: space 가 없으면 모든 공간에서 그 조의 줄을 모아 줌
 //   app.post(브라우저가 보낸 글자)                 → 페이지 요청 처리 (http 서버·page.route 에서)
 //   app.items(exp)                                   → 저장된 측정 줄(문서) 전부
+// 예전 가짜 Apps Script 시험 옮기기: require('./fake-apps-script.cjs') → require('./fake-lab-store.cjs') 의 loadLabStore,
+//   app.post/get 앞에 await, script.google.com 을 가로채는 시험은 페이지에 window.LAB_STORE_FAKE_URL 을 그 주소로(addInitScript),
+//   pendulum-config.js 대역은 configJs(주소), app.ss 시트 확인은 app.items(exp)·app.progress(), 교사 화면은 #btnLogin(가짜 구글 로그인)
 'use strict';
 const LabStore = require('../js/lab-store.js');
 
@@ -23,6 +26,8 @@ function loadLabStore(opts) {
     }
     return {
         db, calls, TEACHER,
+        // 예전 가짜 Apps Script 시험에서 옮길 때 쓰던 자리 (허용 목록은 js/lab-store.js 의 GENERIC_EXPS 가 진짜)
+        ctx: { GENERIC_EXPS: LabStore.GENERIC_EXPS, CLASS_EXPS: {}, isGenericExp: LabStore.isGenericExp, isClassExp: LabStore.isClassExp },
         handle,
         // 페이지가 보낸 글자({ body, auth }) 또는 시험이 직접 넣은 요청 내용
         async post(raw, auth) {
