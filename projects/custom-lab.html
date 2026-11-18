@@ -122,14 +122,14 @@
 
         <div class="card" id="studentCard">
             <h2>👤 학번·이름 <span class="muted">(인쇄용, 선택)</span></h2>
-            <p class="muted no-print">인쇄·PDF 보고서에만 들어갑니다. 선생님 시트로는 보내지 않습니다.</p>
+            <p class="muted no-print">인쇄·PDF 보고서에만 들어갑니다. 사이트 저장소로는 보내지 않습니다.</p>
             <div class="row">
                 <input type="text" id="stId" placeholder="학번" style="width:8em" autocomplete="off">
                 <input type="text" id="stName" placeholder="이름" style="width:8em" autocomplete="off">
             </div>
         </div>
 
-        <!-- 👥 조 공유: js/class-share.js 가 채움 (구글 로그인 없이 같은 조·선생님 시트와 나누기) -->
+        <!-- 👥 조 공유: js/class-share.js 가 채움 (구글 로그인 없이 같은 조·사이트 저장소와 나누기) -->
         <div id="shareCard" class="no-print"><div id="share-mount"></div></div>
         <div class="card" id="sensorCard" hidden>
             <h2>🔌 센서 <span id="sensorName" class="muted"></span></h2>
@@ -193,7 +193,7 @@
 
         <div class="card no-print" id="submitCard">
             <h2>📤 선생님께 보내기</h2>
-            <p class="muted">표·센서 기록 요약·질문 답을 선생님 구글 시트로 보냅니다. 구글 로그인은 필요 없고, 이름·학번은 보내지 않습니다. 다시 보내면 같은 줄을 고쳐 씁니다. 먼저 <b>👥 조 공유</b>에서 조 코드를 정하세요.</p>
+            <p class="muted">표·센서 기록 요약·질문 답을 사이트 저장소로 보냅니다. 구글 로그인은 필요 없고, 이름·학번은 보내지 않습니다. 다시 보내면 같은 줄을 고쳐 씁니다. 먼저 <b>👥 조 공유</b>에서 조 코드를 정하세요.</p>
             <div class="row">
                 <button id="btnSubmit" class="primary">📤 선생님께 보내기</button>
                 <button id="btnPrint">🖨 인쇄 · PDF 저장</button>
@@ -298,9 +298,9 @@
 <script src="../js/sensor-definitions.js?v=voc-index-v3"></script>
 <script src="../js/accelerometer-protocol.js"></script>
 <script src="../js/voc-index.js?v=official-v1"></script>
-<!-- 조 공유: 진자·플랑크와 같은 선생님 Apps Script (주소 js/pendulum-config.js, 링크의 ?s= 가 있으면 그것) -->
+<!-- 조 공유: 사이트 저장소(Firestore, js/lab-store.js, 링크의 ?s= 가 있으면 그 공간). -->
 <script src="../js/pendulum-config.js"></script>
-<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-share.js"></script>
 <script src="../js/custom-lab-math.js?v=3"></script>

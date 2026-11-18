@@ -9,7 +9,7 @@ const path = require('node:path');
 const MS = require('../js/malus-share.js');
 const CS = require('../js/class-share.js');
 const CC = require('../js/class-cloud.js');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 let chromium = null;
 try { ({ chromium } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
@@ -22,7 +22,7 @@ function runPoints(run, A, theta0, B) {
     return out;
 }
 
-test('보낼 자료: 회차마다 한 줄, 배경 뺀 밝기·결측, 요약 이름은 서버 규칙에 맞음', () => {
+test('보낼 자료: 회차마다 한 줄, 배경 뺀 밝기·결측, 요약 이름은 서버 규칙에 맞음', async () => {
     const pts = runPoints(1, 0.6, 20, 0.05).concat(runPoints(2, 0.3, 25, 0.02));
     pts[3].excluded = true; pts[3].reason = '폰이 밀림';
     const items = MS.buildItems(pts, p => p.raw - 0.01, 'r', 'srgb');
@@ -44,7 +44,7 @@ test('보낼 자료: 회차마다 한 줄, 배경 뺀 밝기·결측, 요약 이
     assert.deepEqual(b.payloads.map(p => p.id), ['nab12cd-run1', 'nab12cd-run2']);
 });
 
-test('받은 자료: 노트북·회차별로 보관, 바뀐 것만 changed, 분석용 점은 101번부터', () => {
+test('받은 자료: 노트북·회차별로 보관, 바뀐 것만 changed, 분석용 점은 101번부터', async () => {
     const items = [
         { id: 'run1', device: 'nzz99', from: '노트북 ZZ99', title: '1회차', n: 2, data: { run: 1, points: [{ theta: 0, y: 0.5 }, { theta: 90, y: 0.01, excluded: true, reason: 'x' }] } },
         { id: 'run2', device: 'naa11', from: '노트북 AA11', title: '2회차', n: 1, data: { run: 2, points: [{ theta: 45, y: 0.3 }, { theta: 'x', y: 1 }] } },
@@ -62,7 +62,7 @@ test('받은 자료: 노트북·회차별로 보관, 바뀐 것만 changed, 분�
     assert.equal(MS.applyIncoming(r.ext, []).changed, true, '다 지워지면 바뀜');
 });
 
-test('실험 목록: 말루스는 연결 준비 끝', () => {
+test('실험 목록: 말루스는 연결 준비 끝', async () => {
     assert.equal(CC.EXPS.malus.ready, true);
     assert.equal(CC.EXPS.malus.page, 'projects/malus-law.html');
 });
@@ -91,10 +91,11 @@ async function openLaptop(browser, base, app, query, width, seed) {
     page.on('pageerror', e => errors.push(e.message));
     page.on('dialog', d => d.accept());
     // 가짜 Apps Script (GET ?action=… / POST 본문 JSON)
+    await page.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
     await page.route('https://script.google.com/**', async route => {
         const req = route.request(), u = new URL(req.url());
         let out;
-        try { out = req.method() === 'POST' ? app.post(req.postData() || '{}') : app.get(Object.fromEntries(u.searchParams)); }
+        try { out = req.method() === 'POST' ? (await app.post(req.postData() || '{}')) : (await app.get(Object.fromEntries(u.searchParams))); }
         catch (e) { out = { ok: false, error: e.message }; }
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify(out), headers: { 'Access-Control-Allow-Origin': '*' } });
     });
@@ -107,8 +108,8 @@ async function openLaptop(browser, base, app, query, width, seed) {
 const noSideScroll = page => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 
 test('노트북 두 대 같은 조: 보내기 → 다른 노트북 자동 불러오기, 교사 진행 보기, 375px', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
-    const app = loadCodeGs();
-    const cls = app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'malus' });
+    const app = loadLabStore();
+    const cls = (await app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'malus' }));
     assert.equal(cls.ok, true, cls.error);
     const g1 = cls.groups[0].code;
     const srv = await staticServer();
@@ -139,7 +140,7 @@ test('노트북 두 대 같은 조: 보내기 → 다른 노트북 자동 불러
         await A.page.waitForFunction(() => /연결됨/.test(document.getElementById('cs-status').textContent));
         await A.page.click('#cs-send');
         await A.page.waitForFunction(() => /보냈|✅/.test(document.getElementById('cs-status').textContent));
-        const listed = app.get({ action: 'list', exp: 'malus', group: g1 });
+        const listed = (await app.get({ action: 'list', exp: 'malus', group: g1 }));
         assert.equal(listed.ok, true, listed.error);
         assert.deepEqual(listed.items.map(x => x.title).sort(), ['1회차', '2회차']);
 
@@ -162,7 +163,7 @@ test('노트북 두 대 같은 조: 보내기 → 다른 노트북 자동 불러
 
         // 교사 진행 보기: 두 학생의 단계·점 수, 조 1 제출 요약
         await A.page.evaluate(() => new Promise(r => setTimeout(r, 300)));
-        const st = app.post({ action: 'classStatus', class: cls.classCode, key: cls.key });
+        const st = (await app.post({ action: 'classStatus', class: cls.classCode, key: cls.key }));
         assert.equal(st.ok, true, st.error);
         const sA = st.students.find(s => s.jo === 1 && s.num === 1), sB = st.students.find(s => s.jo === 1 && s.num === 2);
         assert.equal(sA.points, 26);
@@ -182,7 +183,7 @@ test('노트북 두 대 같은 조: 보내기 → 다른 노트북 자동 불러
 });
 
 test('?c= 없이 열면 예전처럼: 띠 없음, 조 공유 칸은 있음, 로그인 없이 동작', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
-    const app = loadCodeGs();
+    const app = loadLabStore();
     const srv = await staticServer();
     const base = 'http://127.0.0.1:' + srv.address().port;
     const browser = await chromium.launch();
@@ -198,7 +199,7 @@ test('?c= 없이 열면 예전처럼: 띠 없음, 조 공유 칸은 있음, 로�
         await L.page.waitForFunction(() => /보냈|✅/.test(document.getElementById('cs-status').textContent), null, { timeout: 5000 }).catch(async e => {
             throw new Error(e.message + ' / 상태: ' + await L.page.textContent('#cs-status') + ' / ' + await L.page.textContent('#cs-server'));
         });
-        const listed = app.get({ action: 'list', exp: 'malus', group: '2-3-5376' });
+        const listed = (await app.get({ action: 'list', exp: 'malus', group: '2-3-5376' }));
         assert.deepEqual(listed.items.map(x => x.title), ['1회차'], '조 코드가 날짜로 바뀌지 않음');
         // 6. 결과: 내 기록만 (불러온 값 없음)
         await L.page.click('nav.steps button[data-step="result"]');
@@ -213,7 +214,7 @@ test('?c= 없이 열면 예전처럼: 띠 없음, 조 공유 칸은 있음, 로�
 
 test('📱 폰 측정 · 노트북 분석: 노트북(1280) 폰 카드 QR → 폰(Pixel 7, 가짜 카메라)에서 2회차 측정 → 고른 회차만 보내기 → 노트북 결과 표에 📱 폰 회차', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
     const { devices } = require('playwright');
-    const app = loadCodeGs();
+    const app = loadLabStore();
     const srv = await staticServer();
     const base = 'http://127.0.0.1:' + srv.address().port;
     // 가짜 카메라: 크롬이 움직이는 시험 화면을 카메라처럼 보내 줌
@@ -222,10 +223,11 @@ test('📱 폰 측정 · 노트북 분석: 노트북(1280) 폰 카드 QR → 폰
     const errors = [];
     async function open(opt, name, url, init) {
         const ctx = await browser.newContext(Object.assign({ permissions: ['camera'] }, opt));
+        await ctx.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
         await ctx.route('https://script.google.com/**', async route => {
             const req = route.request(), u = new URL(req.url());
             let out;
-            try { out = req.method() === 'POST' ? app.post(req.postData() || '{}') : app.get(Object.fromEntries(u.searchParams)); }
+            try { out = req.method() === 'POST' ? (await app.post(req.postData() || '{}')) : (await app.get(Object.fromEntries(u.searchParams))); }
             catch (e) { out = { ok: false, error: e.message }; }
             await route.fulfill({ contentType: 'application/json', body: JSON.stringify(out), headers: { 'Access-Control-Allow-Origin': '*' } });
         });
@@ -280,7 +282,7 @@ test('📱 폰 측정 · 노트북 분석: 노트북(1280) 폰 카드 QR → 폰
         await P.click('#cs-rsend');
         await P.waitForFunction(() => /보냈/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 15000 });
         assert.deepEqual(await P.locator('.cs-rst').allTextContents(), ['보내기 전', '✅ 보냄']);
-        const rows = app.get({ action: 'list', exp: 'malus', group: G }).items;
+        const rows = (await app.get({ action: 'list', exp: 'malus', group: G })).items;
         assert.deepEqual(rows.map(r => r.title), ['2회차']);
         assert.match(rows[0].device, /^p/, '폰 기기 번호');
 
@@ -313,17 +315,18 @@ test('📱 폰 측정 · 노트북 분석: 노트북(1280) 폰 카드 QR → 폰
 
 test('태블릿은 측정·분석 둘 다, QR 없이 연 폰도 측정·분석, 노트북 375px·CSV 불러오기', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
     const { devices } = require('playwright');
-    const app = loadCodeGs();
+    const app = loadLabStore();
     const srv = await staticServer();
     const base = 'http://127.0.0.1:' + srv.address().port;
     const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
     const errors = [];
     async function open(opt, name, url) {
         const ctx = await browser.newContext(Object.assign({ permissions: ['camera'] }, opt));
+        await ctx.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
         await ctx.route('https://script.google.com/**', async route => {
             const req = route.request(), u = new URL(req.url());
             let out;
-            try { out = req.method() === 'POST' ? app.post(req.postData() || '{}') : app.get(Object.fromEntries(u.searchParams)); }
+            try { out = req.method() === 'POST' ? (await app.post(req.postData() || '{}')) : (await app.get(Object.fromEntries(u.searchParams))); }
             catch (e) { out = { ok: false, error: e.message }; }
             await route.fulfill({ contentType: 'application/json', body: JSON.stringify(out) });
         });

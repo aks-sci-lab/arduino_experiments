@@ -1,13 +1,12 @@
 /* 스마트폰 진자 — 노트북 분석 화면 (projects/pendulum-report.html, 7단계 탭)
-   조 코드 만들기 → QR(측정 화면 주소 ?group=조코드) → 구글 시트(Apps Script)에서 몇 초마다 새 측정 가져오기
+   조 코드 만들기 → QR(측정 화면 주소 ?group=조코드) → 사이트 저장소(Firestore, js/lab-store.js)에서 새 측정을 실시간으로 받기
    → 표(L, T, 표준편차, T²) → T²–L 최소제곱 직선 → g = 4π²/기울기, d = 절편/기울기, 오차율.
    서버가 없어도 CSV 불러오기·직접 넣기로 같은 계산을 한다. 계산은 모두 js/pendulum-math.js (AI 안 씀). */
 (function () {
     'use strict';
     var PM = window.PendulumMath, PC = window.PendulumCloud, CONFIG = window.PENDULUM_CONFIG || {};
-    // 어느 선생님 시트를 쓸지: 링크의 ?s=스크립트ID > 이 노트북에 기억한 것 > 사이트 기본 (js/pendulum-cloud.js)
-    var STORE = (function () { try { return window.localStorage; } catch (e) { return null; } })();
-    var SERVER = PC.resolveServer(location.search, CONFIG.appsScriptUrl, STORE, true);
+    // 저장 공간: 링크의 ?s=수업 공간 > 조 코드 공간 (js/pendulum-cloud.js resolveServer)
+    var SERVER = PC.resolveServer(location.search);
     var $ = function (id) { return document.getElementById(id); };
     var GROUP_KEY = 'pendulum-report:group', GREF_KEY = 'pendulum-report:gref';
 
@@ -55,20 +54,9 @@
     function showServer() {
         var el = $('serverInfo');
         if (!el) return;
-        if (SERVER.from === 'none') { el.hidden = true; return; }
-        var short = SERVER.id ? SERVER.id.slice(0, 6) + '…' + SERVER.id.slice(-4) : '';
         el.hidden = false;
-        el.innerHTML = '📒 저장할 곳: ' + (SERVER.from === 'default' ? '사이트 기본 선생님 시트' : '선생님 시트 <span class="num">' + esc(short) + '</span>' +
-            (SERVER.from === 'saved' ? ' (이 노트북에 기억됨)' : '')) +
-            (SERVER.from !== 'default' && CONFIG.appsScriptUrl ? ' <button id="btnForget" type="button">기본 시트로 되돌리기</button>' : '');
-        var b = $('btnForget');
-        if (b) b.addEventListener('click', function () {
-            if (!confirm('이 노트북이 기억한 선생님 시트를 지우고 사이트 기본 시트를 쓸까요?')) return;
-            PC.forgetServer(STORE);
-            // 주소의 ?s= 를 빼고 다시 열기 (같은 주소로 가면 # 뒤만 바뀌어 새로 읽지 않으므로 reload)
-            history.replaceState(null, '', location.pathname + location.hash);
-            location.reload();
-        });
+        el.innerHTML = '📒 저장할 곳: ' + (SERVER.from === 'link' ? '이 수업 공간' : '조 코드 공간 (같은 조 코드를 넣은 노트북·폰끼리)') + ' · 학기 끝(6개월 뒤)에 저절로 지워져요' +
+            (SERVER.from === 'legacy' ? '<br>⚠ 예전 선생님 시트(Apps Script) 링크예요. 이제 사이트 저장소를 써요. 선생님께 새 링크를 받으세요.' : '');
     }
     function qrSvg(text) {
         if (typeof window.qrcode !== 'function') return null;
@@ -90,11 +78,7 @@
         el.innerHTML = text;
     }
     function startPolling() {
-        if (!SERVER.url) {
-            setConn('⚙️ 선생님 설정이 필요해요(서버 주소 없음). 폰에서 <b>CSV 저장</b> → 아래 <b>CSV 불러오기</b>로 할 수 있어요.', 'warn');
-            return;
-        }
-        setConn('⏳ 서버에 연결하는 중…');
+        setConn('⏳ 저장소에 연결하는 중…');
         poll();
     }
     function stopPolling() { clearTimeout(state.pollTimer); state.pollTimer = null; }
@@ -114,6 +98,7 @@
         if (group !== state.group) return;   // 기다리는 동안 조 코드를 바꿈
         if (res.ok) {
             state.fails = 0; state.lastOk = new Date();
+            liveWatch(group);
             var m = PC.mergeItems(state.items, (res.items || []).map(PC.itemFromServer));
             state.items = m.items;
             if (m.added.length) {
@@ -123,14 +108,23 @@
                 persist(); render();
             }
             if (state.lastNew && Date.now() - state.lastNew.at < 15000) setConn(state.lastNew.text + ' <span class="note">(' + timeText() + ')</span>', 'new');
-            else setConn('🟢 연결됨 · 폰에서 보낸 측정을 기다리는 중 <span class="note">(마지막 확인 ' + timeText(state.lastOk) + ', ' + (Number(CONFIG.pollSeconds) || 5) + '초마다 확인)</span>', 'ok');
+            else setConn('🟢 연결됨 · 폰에서 보낸 측정을 기다리는 중 <span class="note">(마지막 확인 ' + timeText(state.lastOk) + ', 새 측정은 바로 들어와요)</span>', 'ok');
         } else {
             state.fails++;
-            setConn('🔴 서버에 연결 안 됨 (' + state.fails + '번째): ' + esc(res.error) + '<br><span class="note">저절로 다시 시도해요. 급하면 폰에서 CSV 저장 → 아래에서 불러오기.</span>', 'err');
+            setConn('🔴 저장소에 연결 안 됨 (' + state.fails + '번째): ' + esc(res.error) + '<br><span class="note">저절로 다시 시도해요. 급하면 폰에서 CSV 저장 → 아래에서 불러오기.</span>', 'err');
         }
         schedule();
     }
-    document.addEventListener('visibilitychange', function () { if (!document.hidden && state.group && SERVER.url) { stopPolling(); poll(); } });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && state.group) { stopPolling(); poll(); } });
+    // 실시간: 폰이 보내면 바로 가져오기 (Firestore 일 때, 몇 초마다 확인은 받아 둔 것을 읽어 비용 없음)
+    var live = { key: '', off: null };
+    function liveWatch(group) {
+        if (live.key === group) return;
+        if (live.off) { try { live.off(); } catch (e) { /* 무시 */ } live.off = null; }
+        live.key = group;
+        PC.labStore().then(function (L) { return L.watch(SERVER.url, 'pendulum', group, function () { if (group === state.group && !state.polling) { stopPolling(); poll(); } }); })
+            .then(function (off) { if (live.key === group) live.off = off; else if (off) off(); }, function () { /* 몇 초마다 확인으로 */ });
+    }
 
     // ---------- 표 ----------
     function included() {
@@ -335,7 +329,6 @@
 
     function init() {
         setupDevice();
-        if (!SERVER.url) $('cfgWarn').hidden = false;
         showServer();
         $('gRef').value = load(GREF_KEY, '9.80');
         $('gRef').addEventListener('input', function () { save(GREF_KEY, $('gRef').value); renderFit(); });

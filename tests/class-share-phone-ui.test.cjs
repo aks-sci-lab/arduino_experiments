@@ -1,17 +1,16 @@
 // 📱 폰 연결(js/class-share.js): 노트북·폰 두 브라우저, 가짜 Apps Script 서버, 수업 있음/없음
 const http = require('http'), path = require('path'), fs = require('fs');
 const REPO = path.join(__dirname, '..');
-const { loadCodeGs } = require(REPO + '/tests/fake-apps-script.cjs');
+const { loadLabStore } = require(REPO + '/tests/fake-lab-store.cjs');
 let chromium = null, devices = null;
 try { ({ chromium, devices } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const app = loadCodeGs();
+const app = loadLabStore();
 const api = http.createServer((req, res) => {
   const send = o => { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(o)); };
   const u = new URL(req.url, 'http://x');
-  if (req.method === 'GET') return send(app.get(Object.fromEntries(u.searchParams)));
-  let b = ''; req.on('data', c => b += c); req.on('end', () => send(app.post(b)));
+    let b = ''; req.on('data', c => b += c); req.on('end', () => app.post(b).then(send));
 });
 // 시험용 실험 페이지 (exp phoneaccel): 폰이면 '측정 저장' → share.saved()
 const HARNESS = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -43,7 +42,7 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   const browser = await chromium.launch(), errors = [];
   async function ctx(opt, name) {
     const c = await browser.newContext(opt);
-    await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.PENDULUM_CONFIG={appsScriptUrl:${JSON.stringify(API)},pollSeconds:3};` }));
+    await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.LAB_STORE_FAKE_URL=${JSON.stringify(API)};window.PENDULUM_CONFIG={pollSeconds:3};` }));
     await c.route(/qrcode-generator/, r => r.fulfill({ contentType: 'text/javascript', body: QR }));
     await c.route(/gstatic/, r => r.abort());
     const pg = await c.newPage(); pg.on('pageerror', e => errors.push(name + ': ' + e.message)); return pg;
@@ -85,7 +84,7 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   const g1 = JSON.parse(await L.textContent('#got'));
   assert.deepEqual(Object.keys(g1).map(k => k.split('/')[1]).sort(), ['run1', 'run3']);
   assert.ok(Object.keys(g1).every(k => /^📱 폰 /.test(k)));
-  const rows = app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' }).items;
+  const rows = (await app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' })).items;
   assert.equal(rows.length, 2); assert.ok(rows.some(r => /3회 · 손에 들고/.test(r.title)));
   console.log('L got 2 rows:', Object.keys(g1), '| titles', rows.map(r => r.title), '| dialog note:', await L.textContent('.cs-dlg .cs-note'));
   // 2회를 마저 보내면 '새 측정 1개' (이미 보낸 것은 세지 않음)
@@ -97,13 +96,13 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   // 전부 다시 보내도 줄 수 그대로 (같은 id 로 고쳐 씀)
   await P.click('#cs-rall'); await P.click('#cs-rsend');
   await P.waitForFunction(() => /측정 3개/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 15000 });
-  assert.equal(app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' }).items.length, 3);
+  assert.equal((await app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' })).items.length, 3);
   // 보낸 회차 지우기 → 시트에서도 빠짐
   P.once('dialog', d => d.accept());
   await P.click('[data-del=run1]');
   await P.waitForFunction(() => document.querySelectorAll('.cs-run').length === 2);
   await new Promise(r => setTimeout(r, 1500));
-  const after = app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' }).items.filter(r => Number(r.n) > 0);
+  const after = (await app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' })).items.filter(r => Number(r.n) > 0);
   assert.deepEqual(after.map(r => r.id.split('-').pop()).sort(), ['run2', 'run3']);
   console.log('after delete run1, sheet rows with data:', after.map(r => r.id));
   // 못 보낸 회차는 체크가 남아 그대로 다시 보내면 됨
@@ -119,7 +118,7 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   assert.equal(await P.locator('.cs-run input[type=checkbox][data-id=run4]').isChecked(), false);
   console.log('P retry ok:', await P.locator('.cs-rst').allTextContents());
   // ---- 2) 수업 있음 ----
-  const c = app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'phoneaccel' });
+  const c = (await app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'phoneaccel' }));
   const L2 = await ctx({ viewport: { width: 1280, height: 800 } }, 'L2');
   await L2.goto(ROOT + 'projects/_phone.html?auto=1&c=' + c.classCode);   // 이 실험은 '한 번에 하나' (autoSendOnSave)
   await L2.waitForFunction(() => !document.getElementById('cs-cpick').hidden);
@@ -133,7 +132,7 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   const P2 = await ctx(devices['Pixel 7'], 'P2');
   await P2.goto(link2);
   await P2.waitForFunction(() => !document.getElementById('cs-cjoined').hidden, null, { timeout: 10000 });
-  assert.match(link2, /auto=1/); assert.match(link2, /role=phone&group=2-2-\d{4}&c=2-\d{4}&jo=2&num=3/);
+  assert.match(link2, /auto=1/); assert.match(link2, /role=phone&group=2-2-\d{4}&s=c[a-z0-9]{23}&c=2-\d{4}&jo=2&num=3/);
   assert.equal(await P2.isHidden('#cs-cpick'), true);
   assert.equal(await P2.locator('#cs-rsend').count(), 0);   // 바로 보내기 방식이면 회차 고르기 없음
   console.log('P2 me:', (await P2.textContent('#cs-cme')).replace(/\s+/g, ' '), '| pick hidden', await P2.isHidden('#cs-cpick'), '| change hidden', await P2.isHidden('#cs-cchange'));
@@ -143,7 +142,7 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   console.log('L2 got phone data ✓');
   await check(P2, 'P2(Pixel7)');
   await new Promise(r => setTimeout(r, 800));
-  const st = app.post({ action: 'classStatus', class: c.classCode, key: c.key });
+  const st = (await app.post({ action: 'classStatus', class: c.classCode, key: c.key }));
   const s = st.students.find(x => x.jo === 2 && x.num === 3);
   assert.equal(s.step, 'phone-live');
   console.log('teacher sees:', s.step, '→', require(REPO + '/js/class-cloud.js').stepName('phoneaccel', s.step), '| submissions', JSON.stringify(st.submissions[1].labels));

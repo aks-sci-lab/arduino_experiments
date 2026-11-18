@@ -1,6 +1,8 @@
 name: Deploy Firestore rules
 
 # firestore.rules 가 바뀐 채로 main 에 반영되면 Firebase(web-experiment-f9b24)의 Firestore 보안 규칙을 자동으로 게시한다.
+# firestore.indexes.json(학기 끝 자동 삭제 TTL 정책·expireAt 색인)도 함께 게시한다. 이 단계가 권한 문제로 실패해도 규칙 게시는 그대로
+# (그때는 docs/DEPLOY.md 'TTL' 대로 콘솔에서 켜거나 서비스 계정에 'Cloud Datastore 색인 관리자' 역할 추가).
 # (예전에는 선생님이 콘솔 '규칙' 탭에 붙여 넣고 '게시'를 눌렀음)
 # 사이트 배포와 같은 키(저장소 Secret FIREBASE_SERVICE_ACCOUNT)를 쓴다. 키가 없으면 건너뛴다.
 # 권한이 없다는 오류가 나면: docs/DEPLOY.md 의 'Firestore 보안 규칙' (서비스 계정에 'Firebase Rules 관리자' 역할 추가)
@@ -9,7 +11,7 @@ name: Deploy Firestore rules
 on:
   push:
     branches: [main]
-    paths: [firestore.rules]
+    paths: [firestore.rules, firestore.indexes.json]
   workflow_dispatch:
 
 concurrency:
@@ -55,3 +57,17 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS="$KEY"
           npx --yes firebase-tools@13.29.1 deploy --only firestore:rules --project "$PROJECT" --non-interactive
           echo "::notice::Firestore 규칙을 게시했습니다 ($PROJECT). 콘솔 → Firestore → 규칙 탭의 기록에서 확인할 수 있어요."
+
+      - name: Publish TTL policies and indexes (firestore.indexes.json)
+        if: steps.key.outputs.ready == 'true'
+        continue-on-error: true
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT: ${{ vars.FIREBASE_PROJECT_ID || 'web-experiment-f9b24' }}
+        run: |
+          KEY="$RUNNER_TEMP/sa.json"
+          printf '%s' "$SA" > "$KEY"
+          trap 'rm -f "$KEY"' EXIT
+          export GOOGLE_APPLICATION_CREDENTIALS="$KEY"
+          npx --yes firebase-tools@13.29.1 deploy --only firestore:indexes --project "$PROJECT" --non-interactive
+          echo "::notice::TTL 정책·색인을 게시했습니다. 콘솔 → Firestore → TTL 탭에서 확인할 수 있어요."

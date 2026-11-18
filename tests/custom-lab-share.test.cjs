@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const M = require('../js/custom-lab-math.js');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 let chromium = null;
 try { ({ chromium } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
@@ -20,7 +20,7 @@ const DEF = M.normalizeDefinition({
     stepTexts: { theory: 'V = IR', materials: '', procedure: '' }, sensor: { mode: 'none' }
 });
 
-test('shareItems: 표·질문 답을 따로 한 줄씩, 빈 표는 n 0', () => {
+test('shareItems: 표·질문 답을 따로 한 줄씩, 빈 표는 n 0', async () => {
     const items = M.shareItems({ def: DEF, rows: [['1', '10', 'a'], ['', '', ''], ['2', '20', '']], answers: ['저항의 역수', ''], series: null, fields: [], sel: { x: 0, y: 1, fit: 'proportional' } });
     assert.deepEqual(items.map(i => i.id), ['table', 'answers']);
     assert.equal(items[0].n, 2);
@@ -33,7 +33,7 @@ test('shareItems: 표·질문 답을 따로 한 줄씩, 빈 표는 n 0', () => {
     assert.equal(empty[0].n, 0);
 });
 
-test('shareItems: 센서 기록 요약 이름은 서버 규칙에 맞게, 긴 기록은 솎아 냄', () => {
+test('shareItems: 센서 기록 요약 이름은 서버 규칙에 맞게, 긴 기록은 솎아 냄', async () => {
     const def = M.normalizeDefinition(Object.assign({}, DEF, { sensor: { mode: 'imu', fields: ['total', 'x'] } }));
     const fields = M.sensorFields(def.sensor);
     assert.ok(fields.length >= 1);
@@ -45,12 +45,12 @@ test('shareItems: 센서 기록 요약 이름은 서버 규칙에 맞게, 긴 �
     assert.equal(it.data.total, 2000);
     Object.keys(it.summary).forEach(k => assert.match(k, /^[A-Za-z0-9_가-힣 .()-]{1,30}$/, k));
     // 가짜 서버가 그대로 받아 준다 (요약 이름·자료 크기)
-    const app = loadCodeGs();
-    const r = app.post({ action: 'save', exp: 'custom:ohm01', id: 'nabcdef-sensor', group: '2-3-5376', device: 'nabcdef', title: it.title, n: it.n, summary: it.summary, data: JSON.stringify(it.data), sentAt: new Date().toISOString() });
+    const app = loadLabStore();
+    const r = (await app.post({ action: 'save', exp: 'custom:ohm01', id: 'nabcdef-sensor', group: '2-3-5376', device: 'nabcdef', title: it.title, n: it.n, summary: it.summary, data: JSON.stringify(it.data), sentAt: new Date().toISOString() }));
     assert.equal(r.ok, true, JSON.stringify(r));
 });
 
-test('mergeIncoming: 기기별로 따로, 열 이름으로 맞추고 CSV 로 불러온 것은 남김', () => {
+test('mergeIncoming: 기기별로 따로, 열 이름으로 맞추고 CSV 로 불러온 것은 남김', async () => {
     const items = [
         { id: 'table', device: 'nAAAA1', from: '노트북 AAA1', data: { cols: ['전류', '전압'], rows: [['10', '1'], ['20', '2']] } },
         { id: 'answers', device: 'nAAAA1', from: '노트북 AAA1', data: { questions: ['오차의 원인은?'], answers: ['접촉 저항'] } },
@@ -70,7 +70,7 @@ test('mergeIncoming: 기기별로 따로, 열 이름으로 맞추고 CSV 로 불
     assert.deepEqual(M.normalizeExt({ 'bad key!': {} }, DEF, []), {});
 });
 
-test('rowsFromCsv: 이 페이지의 CSV 저장 파일을 다시 읽는다', () => {
+test('rowsFromCsv: 이 페이지의 CSV 저장 파일을 다시 읽는다', async () => {
     const csv = M.toCsv(DEF.columns, [['1', '10', '쉼표, "따옴표"'], ['2', '20', '']]);
     assert.deepEqual(M.rowsFromCsv(csv, DEF.columns).rows, [['1', '10', '쉼표, "따옴표"'], ['2', '20', '']]);
     assert.match(M.rowsFromCsv('a,b\n1,2', DEF.columns).error, /열 이름/);
@@ -91,8 +91,8 @@ async function newPage(browser, app, width, def) {
         if (u.hostname === 'script.google.com') {
             const req = route.request();
             let body;
-            if (req.method() === 'POST') body = app.post(req.postData() || '{}');
-            else body = app.get(Object.fromEntries(u.searchParams));
+            if (req.method() === 'POST') body = (await app.post(req.postData() || '{}'));
+            else body = (await app.get(Object.fromEntries(u.searchParams)));
             return route.fulfill({ contentType: 'application/json', body: JSON.stringify(body), headers: { 'access-control-allow-origin': '*' } });
         }
         if (u.hostname === 'cdn.jsdelivr.net' && /chart\.js/.test(u.pathname)) return route.fulfill({ contentType: 'application/javascript', body: FAKE_CHART });
@@ -101,6 +101,7 @@ async function newPage(browser, app, width, def) {
         if (!file.startsWith(ROOT) || !fs.existsSync(file)) return route.fulfill({ status: 404, body: '' });
         return route.fulfill({ contentType: TYPES[path.extname(file)] || 'application/octet-stream', body: fs.readFileSync(file) });
     });
+    await ctx.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
     if (def) await ctx.addInitScript(d => { try { if (!localStorage.getItem('customLabDef:v1:ohm01')) localStorage.setItem('customLabDef:v1:ohm01', d); } catch (e) { /* */ } }, JSON.stringify(def));
     const page = await ctx.newPage();
     const errors = [];
@@ -116,12 +117,14 @@ async function smallButtons(page) {
 }
 
 test('화면: 교사 수업 만들기 → 학생 2명 같은 조 보내기·자동 불러오기 → 교사 진행 보기 (375px)', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
-    const app = loadCodeGs();
+    const app = loadLabStore();
     const browser = await chromium.launch();
     try {
         // ---------- 교사: 수업 만들기 ----------
         const t = await newPage(browser, app, 1200);
         await t.page.goto(ORIGIN + '/projects/class-teacher.html');
+        await t.page.click('#btnLogin');   // 가짜 구글 로그인 (js/lab-store.js, 시험)
+        await t.page.waitForSelector('#btnLogout:not([hidden])');
         await t.page.click('#ctTabs button[data-tab="make"]');
         await t.page.fill('#inBan', '2'); await t.page.fill('#inN', '4'); await t.page.fill('#inSize', '2');
         await t.page.selectOption('#inExp', 'custom');
@@ -154,13 +157,13 @@ test('화면: 교사 수업 만들기 → 학생 2명 같은 조 보내기·자�
         await a.page.fill('#questions textarea[data-q="0"]', '저항의 역수');
         a.page.on('dialog', d => d.accept());
         await a.page.click('#btnSubmit');
-        await a.page.waitForFunction(() => /선생님 시트로 보냈습니다/.test(document.getElementById('submitStatus').textContent));
+        await a.page.waitForFunction(() => /보냈습니다/.test(document.getElementById('submitStatus').textContent));
         assert.ok(await noSideScroll(a.page), '학생 A 가로 스크롤');
         // 시트에는 이름·학번이 없고 조 코드가 글자로 남는다
-        const sheet = app.ss.getSheetByName('submissions');
-        assert.ok(sheet.rows.length >= 3);
-        assert.ok(sheet.written.slice(1).every(r => String(r[2]) === "'" + groupCode), '조 코드는 글자로 저장');
-        assert.doesNotMatch(JSON.stringify(sheet.written), /학번|@gmail/);
+        const docs = app.items();
+        assert.ok(docs.length >= 2);
+        assert.ok(docs.every(d => d.group === groupCode), '조 코드 그대로');
+        assert.doesNotMatch(JSON.stringify(docs), /학번|@gmail/);
 
         // ---------- 학생 B: 같은 조 2번 → 자동 불러오기 ----------
         const b = await newPage(browser, app, 375, DEF);
@@ -189,7 +192,7 @@ test('화면: 교사 수업 만들기 → 학생 2명 같은 조 보내기·자�
         b.page.on('dialog', d => d.accept());
         await b.page.click('#stepNav button[data-step="conclusion"]');
         await b.page.click('#btnSubmit');
-        await b.page.waitForFunction(() => /선생님 시트로 보냈습니다/.test(document.getElementById('submitStatus').textContent));
+        await b.page.waitForFunction(() => /보냈습니다/.test(document.getElementById('submitStatus').textContent));
         // 새로고침해도 불러온 값이 남음
         await b.page.reload();
         await b.page.click('#stepNav button[data-step="data"]');
@@ -212,7 +215,7 @@ test('화면: 교사 수업 만들기 → 학생 2명 같은 조 보내기·자�
 });
 
 test('화면: 한 화면 방식 · ?c= 없이 열면 조 공유 칸만 (로그인 없이), 휴대폰 375px', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
-    const app = loadCodeGs();
+    const app = loadLabStore();
     const browser = await chromium.launch();
     try {
         const def = Object.assign({}, DEF, { layout: 'single' });

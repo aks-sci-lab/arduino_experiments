@@ -134,7 +134,7 @@
     async function probeClock(share) {
         if (!share || !window.PendulumCloud) return { ok: false, error: '조 공유가 준비되지 않았어요' };
         const srv = share.server(), st = share.state();
-        if (!srv || !srv.url) return { ok: false, error: '선생님 시트 주소가 없어요' };
+        if (!srv || !srv.url) return { ok: false, error: '사이트 저장소 주소가 없어요' };
         if (!PendulumCloud.isGroupCode(st.group)) return { ok: false, error: '조 코드를 먼저 정하세요' };
         const id = st.device + '-clock', sendMs = Date.now();
         const r = await PendulumCloud.save(srv.url, { action: 'save', exp: 'heartrate', id, group: st.group, device: st.device, title: '시계 맞추기', n: 0, summary: {}, data: '', sentAt: new Date(sendMs).toISOString() });
@@ -738,7 +738,7 @@
     }
     function devSend(s) {
         if (!s || !s.meta || s.meta.sim || s.meta.file || !s.frames || !s.frames.length || typeof DevCollect === 'undefined' || !DevCollect.active()) return;
-        if (!s.meta.id) { s.meta.id = 'fh-' + DevCollect.init().device().slice(-6) + '-' + Math.floor((s.meta.wall0 || Date.now()) / 1000).toString(36); saveSession(); }
+        if (!s.meta.id) { s.meta.id = 'fh-' + DevCollect.device().slice(-6) + '-' + Math.floor((s.meta.wall0 || Date.now()) / 1000).toString(36); saveSession(); }
         let p;
         try { p = devPayload(s); } catch (e) { console.error(e); return; }
         DevCollect.send('facehr', { id: s.meta.id, measuredAt: s.meta.at, summary: p.summary, data: p.data });

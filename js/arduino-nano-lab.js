@@ -152,7 +152,7 @@
 
     function deleteRun(run) {
         if (recording) return;
-        if (!window.confirm(N.runTitle(run.mode, run.no) + ' (' + run.samples.length.toLocaleString('ko-KR') + '점) 을 지울까요? 조 공유로 이미 보냈다면 다음에 보낼 때 선생님 시트에서도 지워집니다.')) return;
+        if (!window.confirm(N.runTitle(run.mode, run.no) + ' (' + run.samples.length.toLocaleString('ko-KR') + '점) 을 지울까요? 조 공유로 이미 보냈다면 다음에 보낼 때 사이트 저장소에서도 지워집니다.')) return;
         myRuns = myRuns.filter(r => r !== run);
         viewKey[mode] = null;
         saveRuns();

@@ -5,21 +5,18 @@
 //  얼굴 찾기(MediaPipe)는 시험 환경에서 내려받지 못하게 막아 '안내 타원'으로 돈다
 const http = require('http'), path = require('path'), fs = require('fs');
 const REPO = path.join(__dirname, '..');
-const { loadCodeGs } = require(REPO + '/tests/fake-apps-script.cjs');
+const { loadLabStore } = require(REPO + '/tests/fake-lab-store.cjs');
 let chromium = null;
 try { ({ chromium } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const F = require(REPO + '/js/face-hr-math.js');
 
-const app = loadCodeGs();
-// 서버 9판(heartrate 허용) 전까지 시험에서만 허용 목록에 더함
-app.ctx.GENERIC_EXPS.heartrate = 1; app.ctx.CLASS_EXPS.heartrate = 1;
+const app = loadLabStore();
 const api = http.createServer((req, res) => {
     const send = o => { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(o)); };
     const u = new URL(req.url, 'http://x');
-    if (req.method === 'GET') return send(app.get(Object.fromEntries(u.searchParams)));
-    let b = ''; req.on('data', c => b += c); req.on('end', () => send(app.post(b)));
+        let b = ''; req.on('data', c => b += c); req.on('end', () => app.post(b).then(send));
 });
 const stat = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
@@ -90,7 +87,7 @@ test('얼굴 심박 개발 페이지: 동시 카메라 → 측정·비교, 실�
     const browser = await chromium.launch(), errors = [];
     async function ctx(opt, name, cam) {
         const c = await browser.newContext(opt);
-        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.PENDULUM_CONFIG={appsScriptUrl:${JSON.stringify(API)},pollSeconds:3};` }));
+        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.LAB_STORE_FAKE_URL=${JSON.stringify(API)};window.PENDULUM_CONFIG={pollSeconds:3};` }));
         await c.route(/qrcode-generator/, r => r.fulfill({ contentType: 'text/javascript', body: QR }));
         await c.route(/gstatic|jsdelivr|storage\.googleapis/, r => r.abort());
         if (cam) await c.addInitScript(cam);
@@ -206,7 +203,7 @@ test('얼굴 심박 개발 페이지: 동시 카메라 → 측정·비교, 실�
     await B.waitForFunction(() => window.__faceHr.session() && window.__faceHr.session().meta.path === 'phone2', null, { timeout: 45000 });
     await P.click('#p-stop');
     await P.waitForFunction(() => /보냈|못했/.test(document.body.textContent) && !/보내는 중/.test(document.getElementById('cs-pmsg') ? document.getElementById('cs-pmsg').textContent : ''), null, { timeout: 20000 }).catch(() => {});
-    const rows = app.get({ action: 'list', exp: 'heartrate', group: '9-9-4821' }).items;
+    const rows = (await app.get({ action: 'list', exp: 'heartrate', group: '9-9-4821' })).items;
     console.log('시트:', rows.map(r => r.id + ' n=' + r.n + ' ' + JSON.stringify(r.summary)));
     assert.ok(rows.some(r => r.n > 300 && /손가락/.test(r.title)), '손가락 자료가 시트에');
     assert.equal(rows.filter(r => /-clock$/.test(r.id)).length, 2, '시계 맞추기 줄은 기기마다 하나 (n=0)');
@@ -229,14 +226,13 @@ test('얼굴 심박 개발 페이지: 동시 카메라 → 측정·비교, 실�
     await browser.close(); api.close(); stat.close();
 });
 
-// 개발 데이터 자동 수집 (docs/dev-data.md): 선생님 기기(관리 열쇠 있음)에서 카메라로 잰 측정만 'facehr' 로, 손목 수를 고치면 같은 id 로 고쳐 씀
+// 개발 데이터 자동 수집 (docs/dev-data.md): 선생님 기기(사이트 관리 교사 구글 로그인)에서 카메라로 잰 측정만 'facehr' 로, 손목 수를 고치면 같은 id 로 고쳐 씀
 test('얼굴 심박: 개발 데이터 자동 수집 (카메라 측정만, 같은 id 고쳐 쓰기)', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
-    const app2 = loadCodeGs(), key = app2.post({ action: 'claimAdmin' }).key;
+    const app2 = loadLabStore(), ADMIN = { admin: true };
     const api2 = http.createServer((req, res) => {
         const send = o => { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(o)); };
         const u = new URL(req.url, 'http://x');
-        if (req.method === 'GET') return send(app2.get(Object.fromEntries(u.searchParams)));
-        let b = ''; req.on('data', c => b += c); req.on('end', () => send(app2.post(b)));
+        let b = ''; req.on('data', c => b += c); req.on('end', () => app2.post(b).then(send));
     });
     await new Promise(r => api2.listen(0, r)); await new Promise(r => stat.listen(0, r));
     const API = 'http://127.0.0.1:' + api2.address().port + '/exec', ROOT = 'http://127.0.0.1:' + stat.address().port + '/';
@@ -248,10 +244,10 @@ test('얼굴 심박: 개발 데이터 자동 수집 (카메라 측정만, 같은
     };
     try {
         const c = await browser.newContext({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
-        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.PENDULUM_CONFIG={appsScriptUrl:${JSON.stringify(API)},pollSeconds:3,devCollect:true};` }));
+        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.LAB_STORE_FAKE_URL=${JSON.stringify(API)};window.PENDULUM_CONFIG={pollSeconds:3,devCollect:true};` }));
         await c.route(/qrcode-generator/, r => r.fulfill({ contentType: 'text/javascript', body: QR }));
         await c.route(/gstatic|jsdelivr|storage\.googleapis/, r => r.abort());
-        await c.addInitScript(`localStorage.setItem('class-teacher:admin:v1', JSON.stringify({ ${JSON.stringify(API)}: ${JSON.stringify(key)} }));`);
+        await c.addInitScript(`localStorage.setItem('lab-store:fake-user', JSON.stringify({ uid: 'teacher-1', google: true, teacher: true }));`);
         await c.addInitScript(fakeCams(72, 'fail'));
         const pg = await c.newPage(); pg.on('pageerror', e => errors.push(e.message));
         await pg.goto(ROOT + 'projects/face-hr-lab.html');
@@ -260,7 +256,7 @@ test('얼굴 심박: 개발 데이터 자동 수집 (카메라 측정만, 같은
         // 시뮬레이션은 보내지 않음
         await pg.click('#tabs [data-tab=io]'); await pg.click('#sim');
         await pg.waitForTimeout(500);
-        assert.equal(app2.post({ action: 'devExport', key }).items.length, 0, '시뮬레이션은 안 보냄');
+        assert.equal((await app2.post({ action: 'devExport' }, ADMIN)).items.length, 0, '시뮬레이션은 안 보냄');
         // 카메라 측정 (손목 경로, 시험이라 15초)
         await pg.click('#tabs [data-tab=prep]');
         await pg.check('#consent'); await pg.click('#cam');
@@ -274,7 +270,7 @@ test('얼굴 심박: 개발 데이터 자동 수집 (카메라 측정만, 같은
         await layout375(pg);
         await pg.waitForFunction(() => window.__faceHr.session() && window.__faceHr.session().meta.id, null, { timeout: 30000 });
         await pg.waitForFunction(() => /보냄 1/.test(document.querySelector('.dev-collect').textContent), null, { timeout: 10000 });
-        let items = app2.post({ action: 'devExport', key }).items;
+        let items = (await app2.post({ action: 'devExport' }, ADMIN)).items;
         assert.equal(items.length, 1);
         const it = items[0], d = typeof it.data === 'string' ? JSON.parse(it.data) : it.data;
         const sm = typeof it.summary === 'string' ? JSON.parse(it.summary) : it.summary;
@@ -291,7 +287,7 @@ test('얼굴 심박: 개발 데이터 자동 수집 (카메라 측정만, 같은
         await pg.click('#tabs [data-tab=prep]');
         await pg.fill('[data-wc="0"]', '18'); await pg.press('[data-wc="0"]', 'Tab');
         await pg.waitForFunction(() => /보냄 2/.test(document.querySelector('.dev-collect').textContent), null, { timeout: 10000 });
-        items = app2.post({ action: 'devExport', key }).items;
+        items = (await app2.post({ action: 'devExport' }, ADMIN)).items;
         assert.equal(items.length, 1, '같은 id 는 한 줄');
         const sm2 = typeof items[0].summary === 'string' ? JSON.parse(items[0].summary) : items[0].summary;
         assert.equal(Number(sm2['정답 평균']), 72);

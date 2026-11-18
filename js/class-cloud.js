@@ -1,6 +1,7 @@
 /* 수업 연결 — 교사·학생 모두 구글 로그인 없이 (브라우저·Node 공용)
    - 수업 코드: 반-4자리 (예: 2-4821). 조 코드는 반-조-같은 4자리 (예: 2-3-4821) → 기존 조 공유가 그대로 동작
-   - 서버는 선생님 시트의 Apps Script(apps-script/Code.gs 4판): createClass·joinInfo·heartbeat·classStatus
+   - 저장소는 사이트 Firebase(Firestore, js/lab-store.js — 2026-11-18 Apps Script 대신): createClass·joinInfo·heartbeat·classStatus·myClasses·classExport·deleteClass
+     교사는 구글 로그인(수업 주인 = 교사 uid), 학생은 화면에 안 보이는 익명 로그인. 주소는 'lab:<수업 공간>'
    - 교사 열쇠는 POST 본문으로만 보낸다 (주소에 남지 않게). 학생은 이름 없이 '3조 2번' 으로만
    - 요청은 미리보기 요청이 생기지 않는 단순 요청 (GET, 또는 Content-Type: text/plain 인 POST)
    화면: projects/class-teacher.html(js/class-teacher.js), 학생 쪽은 projects/planck-led.html, 메인 index.html
@@ -69,7 +70,7 @@
         return ((info && info.groups) || []).filter(function (g) { return Number(g.jo) === Number(jo); })[0] || null;
     }
 
-    // 학생 링크: 실험 페이지?c=수업코드&s=스크립트ID (s 가 없으면 학생 쪽은 사이트 기본 시트)
+    // 학생 링크: 실험 페이지?c=수업코드&s=수업 공간(24자, 남이 맞히기 어려움)
     function studentUrl(origin, exp, classCode, scriptId) {
         var e = expInfo(exp);
         if (!e || !isClassCode(classCode)) return '';
@@ -173,6 +174,12 @@
         return j;
     }
     function request(url, init, fetchImpl, ms) {
+        // Firestore 저장소 (js/lab-store.js, 'lab:공간' 주소) — js/pendulum-cloud.js 가 불러 줌
+        var PC = typeof self !== 'undefined' && self.PendulumCloud;
+        if (/^lab:/.test(String(url || ''))) {
+            if (PC && PC.labRequest) return PC.labRequest(url, init, ms);
+            try { return require('./pendulum-cloud.js').labRequest(url, init, ms); } catch (e) { return Promise.resolve({ ok: false, error: '저장소 도구가 없습니다.' }); }
+        }
         var f = fetchImpl || (typeof fetch === 'function' ? fetch : null);
         if (!url) return Promise.resolve({ ok: false, error: '선생님 시트가 아직 연결되지 않았습니다 (Apps Script 주소 없음).', noConfig: true });
         if (!f) return Promise.resolve({ ok: false, error: '이 브라우저는 서버에 연결할 수 없습니다.' });
@@ -206,6 +213,13 @@
         }, fetchImpl, 15000);
     }
     function classStatus(url, classCode, key, fetchImpl) { return post(url, { action: 'classStatus', 'class': classCode, key: key }, fetchImpl, 20000); }
+    // 교사(구글 로그인): 내 수업 목록·내려받기·지우기 (Firestore)
+    function myClasses(fetchImpl) { return post('lab:', { action: 'myClasses' }, fetchImpl, 20000); }
+    function classExport(space, fetchImpl) { return post('lab:' + space, { action: 'classExport' }, fetchImpl, 60000); }
+    function deleteClass(space, fetchImpl) { return post('lab:' + space, { action: 'deleteClass' }, fetchImpl, 60000); }
+    function reopenCode(space, fetchImpl) { return post('lab:' + space, { action: 'reopenCode' }, fetchImpl, 20000); }
+    // 지워지는 날 (만든 때 + 183일): '2027년 5월 20일'
+    function expireText(iso) { var d = new Date(iso); return isNaN(d) ? '' : d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일'; }
     // 스스로 업데이트 (5판): 관리 열쇠도 POST 본문으로만
     function claimAdmin(url, fetchImpl) { return post(url, { action: 'claimAdmin' }, fetchImpl); }
     function update(url, key, fetchImpl) { return post(url, { action: 'update', key: key }, fetchImpl, 120000); }
@@ -226,6 +240,7 @@
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
         studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
-        parseResponse: parseResponse, ping: ping, createClass: createClass, joinInfo: joinInfo, heartbeat: heartbeat, classStatus: classStatus
+        parseResponse: parseResponse, ping: ping, createClass: createClass, joinInfo: joinInfo, heartbeat: heartbeat, classStatus: classStatus,
+        myClasses: myClasses, classExport: classExport, deleteClass: deleteClass, reopenCode: reopenCode, expireText: expireText
     };
 });

@@ -101,7 +101,7 @@
                 </div>
                 <div class="path-panel" data-path="phone2" hidden>
                     <h3>② 두 번째 폰 뒤 카메라 (손가락)</h3>
-                    <p class="note">아래 조 공유 칸에서 조 코드를 정하고 <b>📱 폰으로 측정하기</b> QR 을 두 번째 폰으로 찍습니다. 두 폰의 시계 차이는 선생님 시트(서버)를 오가는 시간으로 재고(⏱ 시계 맞추기), 분석 때 두 곡선을 맞춰 한 번 더 고칩니다. <b>손가락 심박수 수업과 다른 조 코드</b>를 쓰세요(같은 시트의 heartrate 칸을 씀).</p>
+                    <p class="note">아래 조 공유 칸에서 조 코드를 정하고 <b>📱 폰으로 측정하기</b> QR 을 두 번째 폰으로 찍습니다. 두 폰의 시계 차이는 사이트 저장소(서버)를 오가는 시간으로 재고(⏱ 시계 맞추기), 분석 때 두 곡선을 맞춰 한 번 더 고칩니다. <b>손가락 심박수 수업과 다른 조 코드</b>를 쓰세요(같은 시트의 heartrate 칸을 씀).</p>
                     <div id="share-mount"></div>
                     <div class="row"><button id="clock" class="secondary">⏱ 시계 맞추기</button><span class="pill" id="clock-st">시계: 아직</span></div>
                     <p id="p2-st" class="note"></p>
@@ -200,7 +200,7 @@
                 <h3>정답 경로</h3>
                 <ol class="text-list">
                     <li>같은 폰 뒤 카메라: 같은 시계라 시각 맞추기가 필요 없음. 지원하는 폰이 적음.</li>
-                    <li>두 번째 폰: 선생님 시트를 거쳐 자료를 받음. 두 폰 시계 차이는 서버 왕복으로 재고, 분석에서 곡선 맞추기로 한 번 더 고침.</li>
+                    <li>두 번째 폰: 사이트 저장소를 거쳐 자료를 받음. 두 폰 시계 차이는 서버 왕복으로 재고, 분석에서 곡선 맞추기로 한 번 더 고침.</li>
                     <li>블루투스 심박계: 가장 정확한 편(가슴 띠). Web Bluetooth 가 되는 브라우저만.</li>
                     <li>손목 15초 × 4: 기계 없이. 점이 4개뿐이라 대략적인 비교만.</li>
                 </ol>
@@ -210,7 +210,7 @@
 </div>
 
 <script src="../js/pendulum-config.js"></script>
-<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/dev-collect.js"></script>
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-share.js"></script>

@@ -146,21 +146,15 @@ test('선생님 시트: 웹 앱 주소 ↔ 스크립트 ID', () => {
     assert.equal(C.isScriptId('<script>alert(1)</script>xxxxxxxxxxxx'), false);
 });
 
-test('선생님 시트 고르기: 링크의 ?s= > 기억한 것(노트북) > 사이트 기본', () => {
-    const mem = new Map(), store = { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v), removeItem: k => mem.delete(k) };
-    const A = 'A'.repeat(30), B = 'B'.repeat(30), def = 'https://script.google.com/macros/s/' + 'D'.repeat(30) + '/exec';
-    assert.equal(C.resolveServer('', def, store, true).from, 'default');
-    let r = C.resolveServer('?s=' + A, def, store, true);
-    assert.equal(r.from, 'link'); assert.equal(r.url, 'https://script.google.com/macros/s/' + A + '/exec');
-    r = C.resolveServer('?group=2-3-4821', def, store, true);
-    assert.equal(r.from, 'saved'); assert.equal(r.id, A, '노트북은 한 번 연 선생님 시트를 기억');
-    assert.equal(C.resolveServer('?s=' + B, def, store, true).id, B);
-    // 폰(remember=false)은 링크에 없으면 늘 기본: 예전 선생님 시트로 잘못 보내지 않게
-    assert.equal(C.resolveServer('?group=2-3-4821', def, store, false).from, 'default');
-    assert.equal(C.resolveServer('?s=bad!id', def, store, false).from, 'default');
-    C.forgetServer(store);
-    assert.equal(C.resolveServer('', def, store, true).from, 'default');
-    assert.equal(C.resolveServer('', '', null, true).from, 'none');
+test('저장 공간 고르기 (2026-11-18 Firestore): 링크의 ?s=공간 > 조 코드 공간, 예전 Apps Script 링크는 legacy, 기억하지 않음', () => {
+    const sp = 'c' + 'a1'.repeat(11) + 'b';
+    assert.deepEqual(C.resolveServer(''), { url: 'lab:', id: null, from: 'default' });
+    assert.deepEqual(C.resolveServer('?s=' + sp + '&group=2-3-4821'), { url: 'lab:' + sp, id: sp, from: 'link' });
+    assert.equal(C.resolveServer('?s=' + 'p' + 'z'.repeat(23)).from, 'link');
+    assert.equal(C.resolveServer('?s=AKfycb' + 'X'.repeat(40)).from, 'legacy');
+    assert.equal(C.resolveServer('?s=AKfycb' + 'X'.repeat(40)).url, 'lab:');
+    assert.equal(C.resolveServer('?s=bad!id').from, 'default');
+    assert.equal(C.isLab('lab:'), true); assert.equal(C.isLab('https://script.google.com/x'), false);
 });
 
 test('Apps Script: 조 코드·id 가 시트에서 날짜·숫자로 바뀌지 않아 목록·고쳐 쓰기·원본이 됨 (2026-11-14 실제 문제)', () => {

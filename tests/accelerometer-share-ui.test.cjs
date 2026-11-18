@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 let chromium = null;
 try { ({ chromium } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
@@ -43,11 +43,12 @@ async function openPage(browser, app, url, seed) {
     page.on('pageerror', e => errors.push(e.message));
     await page.route(/^https:\/\/(cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|www\.gstatic\.com)\//, route =>
         route.fulfill({ contentType: 'text/javascript', body: /chart\.umd/.test(route.request().url()) ? CHART_STUB : '' }));
+    await page.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
     await page.route('https://script.google.com/**', async route => {
         const req = route.request();
         let out;
-        if (req.method() === 'POST') out = app.post(req.postData() || '{}');
-        else out = app.get(Object.fromEntries(new URL(req.url()).searchParams));
+        if (req.method() === 'POST') out = (await app.post(req.postData() || '{}'));
+        else out = (await app.get(Object.fromEntries(new URL(req.url()).searchParams)));
         await route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(out) });
     });
     if (seed) await page.addInitScript(s => { if (!sessionStorage.getItem('seeded')) { Object.entries(s).forEach(([k, v]) => localStorage.setItem(k, v)); sessionStorage.setItem('seeded', '1'); } }, seed);
@@ -91,12 +92,12 @@ const CASES = [
 ];
 
 test('수업 참여 → 조 공유 보내기·자동 불러오기 → 교사 진행 보기 (가속도계·스마트폰 가속도·자유낙하, 375px)', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
-    const app = loadCodeGs();
+    const app = loadLabStore();
     const site = await startSite();
     const browser = await chromium.launch();
     try {
         for (const C of CASES) {
-            const cls = app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: C.exp });
+            const cls = (await app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: C.exp }));
             assert.equal(cls.ok, true, cls.error);
             const url = site.base + '/' + C.page.replace(/#|$/, m => '?c=' + cls.classCode + m);
 
@@ -112,7 +113,7 @@ test('수업 참여 → 조 공유 보내기·자동 불러오기 → 교사 진
             // 노트북 화면(터치 없는 창)의 스마트폰 가속도·자유낙하는 조 공유 칸이 접혀 있음 (폰 QR 카드가 먼저) → 펼쳐서 보냄
             await A.page.evaluate(() => { document.getElementById('cs-share').open = true; });
             await A.page.click('#cs-send');
-            await A.page.waitForFunction(() => /✅ 선생님 시트로 보냈습니다/.test(document.getElementById('cs-status').textContent), null, { timeout: 10000 })
+            await A.page.waitForFunction(() => /✅ 보냈습니다/.test(document.getElementById('cs-status').textContent), null, { timeout: 10000 })
                 .catch(async e => { throw new Error(C.exp + ': 보내기 — ' + await A.page.textContent('#cs-status') + ' / ' + A.errors.join(' | ')); });
 
             // 학생 B: 같은 1조 2번 → 참여하면 바로 불러옴
@@ -126,14 +127,13 @@ test('수업 참여 → 조 공유 보내기·자동 불러오기 → 교사 진
             await B.page.waitForFunction(() => /보낼 측정값이 없습니다/.test(document.getElementById('cs-status').textContent));
 
             // 시트: 조 코드가 날짜로 바뀌지 않고 글자 그대로, 한 줄
-            const list = app.get({ action: 'list', exp: C.exp, group: cls.groups[0].code });
+            const list = (await app.get({ action: 'list', exp: C.exp, group: cls.groups[0].code }));
             assert.equal(list.items.length, 1, C.exp);
             assert.equal(list.items[0].n, C.points);
 
             // 교사 진행 보기
             const T = await openPage(browser, app, site.base + '/projects/class-teacher.html', {
-                'class-teacher:v1': JSON.stringify([{ classCode: cls.classCode, key: cls.key, scriptId: '', url: 'https://script.google.com/macros/s/AKfycbxX-2giNNmH-2loNRX3UDzJqWKYXnFT2zjfWMXFgsXjfpU_JBlQ2DA6DSK1pQyJunjI/exec',
-                    exp: C.exp, ban: 2, nStudents: 8, groupSize: 4, groups: cls.groups, created: new Date().toISOString() }])
+                'lab-store:fake-user': JSON.stringify({ uid: 'teacher-1', google: true, teacher: true })   // 가짜 구글 로그인 (수업 주인)
             });
             await T.page.click('#ctTabs button[data-tab="watch"]');
             await T.page.waitForSelector('.ct-group');

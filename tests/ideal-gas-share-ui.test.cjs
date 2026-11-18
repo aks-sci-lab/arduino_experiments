@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 let chromium = null;
 try { ({ chromium } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
@@ -34,10 +34,11 @@ async function newPage(browser, app, base, width) {
     page.on('pageerror', e => errors.push(e.message));
     page.on('dialog', d => d.accept());
     // 사이트 기본 서버 대신 가짜 서버 (링크의 ?s= 로도 같은 주소)
-    await page.route(base + '/js/pendulum-config.js', route => route.fulfill({ contentType: 'text/javascript', body: 'window.PENDULUM_CONFIG = { appsScriptUrl: ' + JSON.stringify(GAS) + ', pollSeconds: 3 };' }));
-    await page.route('https://script.google.com/**', route => {
+    await page.route(base + '/js/pendulum-config.js', route => route.fulfill({ contentType: 'text/javascript', body: 'window.LAB_STORE_FAKE_URL=' + JSON.stringify(GAS) + ';window.PENDULUM_CONFIG = { pollSeconds: 3 };' }));
+    await page.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
+    await page.route('https://script.google.com/**', async route => {
         const req = route.request(), u = new URL(req.url());
-        const out = req.method() === 'POST' ? app.post(req.postData() || '{}') : app.get(Object.fromEntries(u.searchParams));
+        const out = req.method() === 'POST' ? (await app.post(req.postData() || '{}')) : (await app.get(Object.fromEntries(u.searchParams)));
         route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(out) });
     });
     await page.route(/gstatic\.com|jsdelivr\.net/, route => route.abort());
@@ -54,7 +55,7 @@ async function smallButtons(page) {
 }
 
 test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오기 → 교사 진행 보기 (375px)', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
-    const app = loadCodeGs({ scriptId: SCRIPT_ID });
+    const app = loadLabStore({ scriptId: SCRIPT_ID });
     const srv = await startStatic();
     const base = 'http://127.0.0.1:' + srv.address().port;
     const browser = await chromium.launch();
@@ -63,10 +64,8 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
         const t = await newPage(browser, app, base, 1280);
         const tp = t.page;
         await tp.goto(base + '/projects/class-teacher.html');
-        await tp.click('#ctTabs button[data-tab="sheet"]');
-        await tp.fill('#sheetUrl', GAS);
-        await tp.click('#btnConnect');
-        await tp.waitForFunction(() => /연결됨/.test(document.getElementById('sheetMsg').textContent));
+        await tp.click('#btnLogin');   // 가짜 구글 로그인 (js/lab-store.js, 시험)
+        await tp.waitForSelector('#btnLogout:not([hidden])');
         await tp.click('#ctTabs button[data-tab="make"]');
         await tp.fill('#inBan', '2'); await tp.fill('#inN', '8'); await tp.fill('#inSize', '4');
         assert.ok(await tp.$eval('#inExp', s => [...s.options].some(o => o.value === 'idealgas' && !/준비 중/.test(o.textContent))), '실험 고르기에 이상기체가 준비됨');
@@ -129,13 +128,13 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
         await bp.waitForFunction(() => /보낼 측정값이 없습니다/.test(document.getElementById('send2-status').textContent));
 
         /* ---------- 서버: A 의 실험 1 한 줄, 조 코드는 글자 그대로 ---------- */
-        const rows = app.ss.getSheetByName('submissions').rows;
-        assert.equal(rows.length, 2);
-        const head = rows[0];
-        assert.equal(rows[1][head.indexOf('exp')], 'idealgas');
-        assert.match(String(rows[1][head.indexOf('groupCode')]), /^2-1-\d{4}$/);
-        assert.equal(rows[1][head.indexOf('n')], 4);
-        assert.match(String(rows[1][head.indexOf('summary')]), /PV 평균/);
+        const rows = app.items();
+        assert.equal(rows.length, 1);
+        assert.equal(rows[0].exp, 'idealgas');
+        assert.match(String(rows[0].group), /^2-1-\d{4}$/);
+        assert.equal(rows[0].n, 4);
+        assert.match(JSON.stringify(rows[0].summary), /PV 평균/);
+        assert.match(rows[0]._space, /^c[a-z0-9]{23}$/, '수업 공간에 저장');
 
         /* ---------- 선생님 진행 보기: 단계·점 수·제출 ---------- */
         await tp.click('#ctTabs button[data-tab="watch"]');
@@ -155,7 +154,7 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
 });
 
 test('수업 링크 없이 열면 예전처럼 (띠 없음, 조 공유 칸은 있음), ?report= 는 학생 화면 대신 보고서 보기', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
-    const app = loadCodeGs({ scriptId: SCRIPT_ID });
+    const app = loadLabStore({ scriptId: SCRIPT_ID });
     const srv = await startStatic();
     const base = 'http://127.0.0.1:' + srv.address().port;
     const browser = await chromium.launch();

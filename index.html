@@ -268,9 +268,10 @@
     </div>
     <script>LabUI.initTabs('#homeTabs', { key: 'home' });</script>
 
-    <!-- 학생으로 시작: 수업 코드 → 선생님 시트에서 실험을 찾아 그 실험 페이지로 (?c=코드) -->
+    <!-- 학생으로 시작: 수업 코드 → 사이트 저장소에서 수업을 찾아 그 실험 페이지로 (?c=코드&s=수업 공간) -->
     <script src="js/pendulum-config.js"></script>
     <script src="js/pendulum-cloud.js"></script>
+    <script src="js/lab-store.js"></script>
     <script src="js/class-cloud.js"></script>
     <script>
     (function () {
@@ -284,18 +285,16 @@
             var CC = window.ClassCloud, PC = window.PendulumCloud;
             var code = CC.normalizeClass(document.getElementById('joinCode').value);
             if (!CC.isClassCode(code)) { msg.className = 'note join-err'; msg.textContent = '수업 코드는 "반-숫자 4개" 모양이에요 (예: 2-4821).'; return; }
-            var store = null; try { store = window.localStorage; } catch (err) { store = null; }
-            // 이 브라우저가 기억한 선생님 시트(QR 로 한 번 들어온 적이 있으면), 없으면 사이트 기본 시트
-            var server = PC.resolveServer(location.search, (window.PENDULUM_CONFIG || {}).appsScriptUrl || '', store, true);
+            // 사이트 저장소(Firestore)에서 수업 코드로 수업 공간을 찾는다 (코드로 찾기는 만든 뒤 2일까지 — 규칙이 막음, QR 은 학기 끝까지)
             msg.className = 'note'; msg.textContent = '⏳ 수업을 찾는 중…';
-            var r = await CC.joinInfo(server.url, code);
+            var r = await CC.joinInfo('lab:', code);
             var exp = r.ok && CC.expInfo(r.exp);
             if (!exp) {
                 msg.className = 'note join-err';
-                msg.textContent = '⚠️ ' + (r.ok ? '이 화면에서 열 수 없는 실험이에요.' : r.error) + ' 선생님 화면의 QR 을 찍어 들어오세요 (선생님마다 시트가 달라 코드만으로는 못 찾을 수 있어요).';
+                msg.textContent = '⚠️ ' + (r.ok ? '이 화면에서 열 수 없는 실험이에요.' : r.error) + ' 선생님 화면의 QR 을 찍어 들어오세요.';
                 return;
             }
-            location.href = exp.page + (exp.page.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(code) + (server.id && server.from !== 'default' ? '&s=' + encodeURIComponent(server.id) : '');
+            location.href = exp.page + (exp.page.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(code) + (r.space ? '&s=' + encodeURIComponent(r.space) : '');
         });
     })();
     </script>

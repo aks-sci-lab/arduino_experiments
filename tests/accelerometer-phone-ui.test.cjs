@@ -5,10 +5,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const H = require('./accelerometer-ui-helpers.cjs');
-const { loadCodeGs, chromium, devices, servers, open, overflow, smallButtons, phoneLink } = H;
+const { loadLabStore, chromium, devices, servers, open, overflow, smallButtons, phoneLink } = H;
 
 test('📱 스마트폰 가속도: 폰에서 3회 → 1·3회만 보내기 → 노트북에 📱 폰 기록, 📈 보기', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
-    const app = loadCodeGs(), S = await servers(app), browser = await chromium.launch(), errors = [];
+    const app = loadLabStore(), S = await servers(app), browser = await chromium.launch(), errors = [];
     try {
         const { page: L } = await open(browser, S, { viewport: { width: 1280, height: 800 } }, 'L', errors);
         await L.goto(S.BASE + '/projects/phone-accelerometer.html');
@@ -51,7 +51,7 @@ test('📱 스마트폰 가속도: 폰에서 3회 → 1·3회만 보내기 → �
         assert.match(await L.textContent('#record-status'), /📈 보는 중: 📱 폰 \w{4} · 3회 \(샘플 6개\)/);
         assert.equal(await L.evaluate(() => window.__charts[0].data.datasets[1].data.length), 6, '그래프에 Ay 6점');
         assert.equal(await overflow(L), 0);
-        assert.equal(app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' }).items.length, 2);
+        assert.equal((await app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' })).items.length, 2);
         // 폰에서 회차를 지우면 노트북에서도 빠짐
         P.once('dialog', d => d.accept());
         await P.click('[data-del]');
@@ -61,7 +61,7 @@ test('📱 스마트폰 가속도: 폰에서 3회 → 1·3회만 보내기 → �
 });
 
 test('📱 자유낙하: 폰에서 프레임에 손가락으로 점 찍기 → 회차 2개 → 하나 보내기 → 노트북 📈 보기로 g', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
-    const app = loadCodeGs(), S = await servers(app), browser = await chromium.launch(), errors = [];
+    const app = loadLabStore(), S = await servers(app), browser = await chromium.launch(), errors = [];
     try {
         const { page: L } = await open(browser, S, { viewport: { width: 1280, height: 800 } }, 'L', errors);
         await L.goto(S.BASE + '/projects/free-fall.html#step-5');
@@ -106,7 +106,7 @@ test('📱 자유낙하: 폰에서 프레임에 손가락으로 점 찍기 → �
         assert.equal(await overflow(P), 0, '폰 가로 스크롤 (회차 목록)');
         await P.click('#cs-rsend');
         await P.waitForFunction(() => /보냈/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 15000 });
-        const rows = app.get({ action: 'list', exp: 'freefall', group: '2-4-1111' }).items;
+        const rows = (await app.get({ action: 'list', exp: 'freefall', group: '2-4-1111' })).items;
         assert.equal(rows.length, 1);
         const data = JSON.parse(rows[0].data);
         assert.equal(data.fps, 30); assert.equal(data.mmPerPx, 2); assert.equal(data.rows.length, 6);

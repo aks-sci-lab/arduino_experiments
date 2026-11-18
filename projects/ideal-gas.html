@@ -455,7 +455,7 @@
             <button id="btn-print" class="secondary">🖨️ 보고서 미리보기·인쇄</button>
         </div>
         <div id="send2-status" class="note" role="status" aria-live="polite"></div>
-        <p class="note"><b>측정값</b>은 5. 데이터 탭 맨 위 <b>👥 조 공유</b>의 조 코드로 선생님 구글 시트에 보내집니다 (구글 로그인 없음, 이름·학번은 보내지 않음). 값을 잰 노트북마다 한 번씩 보내세요.<br>
+        <p class="note"><b>측정값</b>은 5. 데이터 탭 맨 위 <b>👥 조 공유</b>의 조 코드로 사이트 저장소에 보내집니다 (구글 로그인 없음, 이름·학번은 보내지 않음). 값을 잰 노트북마다 한 번씩 보내세요.<br>
             <b>보고서(쓴 글)</b>는 보내지 않습니다. 미리보기에서 인쇄하거나, 인쇄 창에서 'PDF 로 저장'을 골라 선생님이 정한 방법으로 내세요.</p>
         <details class="print-who">
             <summary>인쇄할 보고서에 넣을 학번·이름 (이 노트북에만 저장)</summary>
@@ -478,9 +478,9 @@
 <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
 <script src="../js/pico-ble.js?v=setup-v3"></script>
 <script src="../js/ideal-gas-math.js"></script>
-<!-- 조 공유: 스마트폰 진자·플랑크와 같은 선생님 Apps Script (주소 js/pendulum-config.js, 링크의 ?s= 가 있으면 그것) -->
+<!-- 조 공유: 사이트 저장소(Firestore, js/lab-store.js, 링크의 ?s= 가 있으면 그 공간). -->
 <script src="../js/pendulum-config.js"></script>
-<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-share.js"></script>
 <script src="../js/ideal-gas-share.js"></script>

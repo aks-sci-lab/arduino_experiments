@@ -8,14 +8,14 @@
 ## 흐름
 
 ```
-선생님 폰(관리 열쇠 있음) ─ 측정 끝 ─▶ 선생님 시트 devlog 탭 (Apps Script 10판 devSave)
-                                              │  매시간
-GitHub Actions dev-data-collect.yml ◀─ devExport ┘
+선생님 폰(구글 로그인) ─ 측정 끝 ─▶ Firestore devlog (js/lab-store.js devSave)
+                                              │  매시간 (서비스 계정)
+GitHub Actions dev-data-collect.yml ◀─────────┘
    └▶ dev-data 브랜치: heart-rate/YYYY-MM-DD/<id>.csv · <id>.json · heart-rate/index.json · state.json
 ```
 
-- **켜지는 기기**: `js/pendulum-config.js` 의 `devCollect: true` **그리고** 그 브라우저에 그 시트의 **관리 열쇠**가 있을 때만.
-  관리 열쇠는 교사 화면(`projects/class-teacher.html`)이 시트를 처음 연결할 때 그 브라우저에 저장합니다. 학생 기기에는 없어 아무것도 보내지 않습니다.
+- **켜지는 기기**: `js/pendulum-config.js` 의 `devCollect: true` **그리고** 그 브라우저가 **사이트 관리 교사 구글 계정**으로 로그인했을 때만(2026-11-18 부터, 예전 관리 열쇠 대신).
+  로그인은 교사 화면(`projects/class-teacher.html`)에서. 규칙(`firestore.rules` 의 `devlog`)이 교사 계정만 쓰고 읽게 막습니다. 학생 기기(익명)는 아무것도 보내지 않습니다.
 - 켜진 기기는 페이지 맨 위에 **'🧪 개발 데이터 자동 수집 중 (선생님 기기)'** 띠가 나옵니다. '이 기기 끄기'로 그 기기만 멈춤, 다시 켜려면 주소 끝에 `?devcollect=on`.
 - 못 보낸 측정은 그 기기에 쌓아 두었다가(30개까지) 다음 측정 때·1분마다 다시 보냅니다.
 - 같은 측정에 손목 맥박을 나중에 넣으면 같은 id 로 다시 보내 고쳐 씁니다.
@@ -25,20 +25,17 @@ GitHub Actions dev-data-collect.yml ◀─ devExport ┘
 
 ## 선생님이 한 번 할 일
 
-1. 교사 화면 맨 위 **🔄 업데이트**(9판 → 10판). 권한은 그대로라 새 허용 창이 뜨지 않아요.
-2. **심박수를 잴 폰에도 관리 열쇠 넣기**: 그 폰으로 교사 화면을 열어 시트를 연결하세요(관리 열쇠는 PC 교사 화면의 '관리 열쇠'에서 확인).
+1. **심박수를 잴 폰에서 로그인**: PC 교사 화면 맨 위 '🧪 개발 데이터 수집' QR 을 폰으로 찍어 교사 화면을 열고, 같은 구글 계정으로 로그인.
    폰으로 심박수 페이지를 열어 맨 위 🧪 띠가 보이면 준비 끝.
-3. GitHub → 저장소 → **Settings → Secrets and variables → Actions → New repository secret** 에 두 개
-   - `DEV_SHEET_URL`: 선생님 시트 웹 앱 주소(`https://script.google.com/macros/s/…/exec`)
-   - `DEV_ADMIN_KEY`: 관리 열쇠
-   **채팅에 붙여 넣지 마세요.** 이 두 값은 GitHub 설정 화면에만 넣습니다.
-4. Actions → **Dev data collect** → Run workflow 로 한 번 돌려 보면 `dev-data` 브랜치가 생깁니다. 그다음은 매시간 17분에 저절로.
+2. GitHub Secret 은 사이트 배포에 쓰는 `FIREBASE_SERVICE_ACCOUNT` 하나면 됩니다(이미 있음). 예전 `DEV_SHEET_URL`·`DEV_ADMIN_KEY` 는 더 쓰지 않아 지워도 됩니다.
+3. Actions → **Dev data collect** → Run workflow 로 한 번 돌려 보면 `dev-data` 브랜치가 생깁니다. 그다음은 매시간 17분에 저절로.
 
 ## 개발 세션이 쓰는 법
 
 ```html
 <script src="../js/pendulum-config.js"></script>
 <script src="../js/pendulum-cloud.js"></script>
+<script src="../js/lab-store.js"></script>
 <script src="../js/dev-collect.js"></script>
 ```
 
@@ -52,7 +49,7 @@ if (window.DevCollect && DevCollect.active()) DevCollect.send('facehr', {
 });
 ```
 
-- 받는 실험(`exp`)은 서버 `DEV_EXPS`: `heartrate`, `facehr`. 더하려면 `apps-script/Code.gs` 판을 올리고 `node tools/build-apps-script-release.cjs`
+- 받는 실험(`exp`)은 `js/lab-store.js` 의 `DEV_EXPS`: `heartrate`, `facehr`.
 - 폴더 이름은 `tools/dev-data-pull.cjs` 의 `FOLDERS`(heartrate → `heart-rate`, facehr → `face-hr`)
 - 자료(`data`)는 27만 자까지. `data.csv` 가 없고 `data.raw` 가 `{ 열이름: [숫자…] }` 이면 그걸로 CSV 를 만듭니다
 - 받은 자료 보기: `git fetch origin dev-data && git checkout dev-data` 또는 GitHub 에서 브랜치를 `dev-data` 로
@@ -64,6 +61,6 @@ if (window.DevCollect && DevCollect.active()) DevCollect.send('facehr', {
 1. `js/pendulum-config.js` 의 `devCollect: true` → **`false`** (모든 기기의 띠·전송이 멈춤)
 2. `.github/workflows/dev-data-collect.yml` 의 `schedule:` 두 줄을 지움(손 실행만 남김). devCollect 가 false 면 손으로 돌려도 아무것도 하지 않음
 3. 머지(선생님 "머지해") → 배포
-4. 선생님이 원하면: GitHub Secrets 의 `DEV_SHEET_URL`·`DEV_ADMIN_KEY` 삭제, 시트의 `devlog` 탭 삭제
+4. Firestore `devlog` 는 183일 뒤 저절로 지워집니다(학기 끝 자동 삭제)
 
 `dev-data` 브랜치와 쌓인 파일은 지우지 않습니다(지우려면 선생님이 GitHub Branches 화면에서).

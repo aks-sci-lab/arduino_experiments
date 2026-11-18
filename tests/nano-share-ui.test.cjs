@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 let chromium = null;
 try { ({ chromium } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
@@ -59,10 +59,11 @@ async function openPage(browser, app, url, width, withBoard) {
     page.on('pageerror', e => errors.push(e.message));
     page.on('dialog', d => d.accept());
     // 가짜 Apps Script: 진짜 웹 앱 주소로 가는 요청을 Code.gs(Node) 로 돌린다
+    await page.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
     await page.route('https://script.google.com/macros/s/**', async route => {
         const req = route.request();
         const params = Object.fromEntries(new URL(req.url()).searchParams);
-        const out = req.method() === 'POST' ? app.post(req.postData() || '') : app.get(params);
+        const out = req.method() === 'POST' ? (await app.post(req.postData() || '')) : (await app.get(params));
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify(out), headers: { 'Access-Control-Allow-Origin': '*' } });
     });
     // 바깥 CDN(Chart.js·QR 등)은 막는다 — 페이지는 그래프 없이도 동작해야 함
@@ -75,7 +76,7 @@ const noSideScroll = page => page.evaluate(() => document.documentElement.scroll
 const smallButtons = page => page.$$eval('button', bs => bs.filter(b => b.offsetParent && b.getBoundingClientRect().height < 43.5).map(b => b.id || b.textContent.trim()));
 
 test('Nano 페이지: 수업 참여 → 같은 조 보내기·자동 불러오기 → 교사 진행 보기 (375px)', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
-    const app = loadCodeGs();
+    const app = loadLabStore();
     const server = serveRepo().listen(0);
     const base = 'http://localhost:' + server.address().port;
     const browser = await chromium.launch();
@@ -83,10 +84,8 @@ test('Nano 페이지: 수업 참여 → 같은 조 보내기·자동 불러오�
         // ---------- 교사: 시트 연결 → 수업 만들기 (nano) ----------
         const t = await openPage(browser, app, base + '/projects/class-teacher.html', 1280, false);
         const tp = t.page;
-        await tp.click('#ctTabs button[data-tab="sheet"]');
-        await tp.fill('#sheetUrl', EXEC);
-        await tp.click('#btnConnect');
-        await tp.waitForFunction(() => /연결/.test(document.getElementById('sheetMsg').textContent));
+        await tp.click('#btnLogin');   // 가짜 구글 로그인 (js/lab-store.js, 시험)
+        await tp.waitForSelector('#btnLogout:not([hidden])');
         await tp.click('#ctTabs button[data-tab="make"]');
         await tp.fill('#inBan', '2'); await tp.fill('#inN', '8'); await tp.fill('#inSize', '4');
         await tp.selectOption('#inExp', 'nano');
@@ -126,8 +125,7 @@ test('Nano 페이지: 수업 참여 → 같은 조 보내기·자동 불러오�
         await ap.evaluate(() => { document.getElementById('cs-share').open = true; });
         await ap.click('#cs-send');
         await ap.waitForFunction(() => /보냈/.test(document.getElementById('cs-status').textContent), null, { timeout: 15000 });
-        const subs = app.ss.getSheetByName('submissions');
-        assert.ok(subs && subs.rows.length >= 2, '공용 submissions 시트에 저장');
+        assert.ok(app.items('nano').length >= 1, '저장소에 저장');
 
         // 학생 B: 자동 불러오기로 📥 회차가 생긴다
         const bp = b.page;

@@ -1,9 +1,9 @@
-// 가속도·자유낙하 화면 시험(Playwright)이 같이 쓰는 도우미 — 가짜 Apps Script 서버·사이트 서버, CDN 대역, 기기 흉내
+// 가속도·자유낙하 화면 시험(Playwright)이 같이 쓰는 도우미 — 가짜 저장소 서버(tests/fake-lab-store.cjs)·사이트 서버, CDN 대역, 기기 흉내
 // (이 파일은 시험이 아님: 이름이 .test.cjs 가 아니라 node --test tests/*.test.cjs 에 들어가지 않음)
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 let chromium = null, devices = null;
 try { ({ chromium, devices } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
@@ -22,8 +22,7 @@ function servers(app) {
     const api = http.createServer((req, res) => {
         const send = o => { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(o)); };
         const u = new URL(req.url, 'http://x');
-        if (req.method === 'GET') return send(app.get(Object.fromEntries(u.searchParams)));
-        let b = ''; req.on('data', c => { b += c; }); req.on('end', () => send(app.post(b)));
+                let b = ''; req.on('data', c => { b += c; }); req.on('end', () => app.post(b).then(send));
     });
     const site = http.createServer((req, res) => {
         const file = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -38,7 +37,7 @@ function servers(app) {
 
 async function open(browser, S, opt, name, errors) {
     const ctx = await browser.newContext(opt);
-    await ctx.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.PENDULUM_CONFIG={appsScriptUrl:${JSON.stringify(S.API)},pollSeconds:3};` }));
+    await ctx.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: `window.LAB_STORE_FAKE_URL=${JSON.stringify(S.API)};window.PENDULUM_CONFIG={pollSeconds:3};` }));
     await ctx.route(/^https:\/\/(cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|www\.gstatic\.com)\//, r => {
         const u = r.request().url();
         r.fulfill({ contentType: 'text/javascript', body: /chart\.umd/.test(u) ? CHART_STUB : /qrcode/.test(u) ? QR : '' });
@@ -100,4 +99,4 @@ async function shake(P, k) {
     await P.click('#btn-stop');
 }
 
-module.exports = { loadCodeGs, chromium, devices, servers, open, overflow, smallButtons, phoneLink, fakeFrames, tapFall, shake };
+module.exports = { loadLabStore, chromium, devices, servers, open, overflow, smallButtons, phoneLink, fakeFrames, tapFall, shake };
