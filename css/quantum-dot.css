@@ -1,0 +1,95 @@
+/* 탄소 양자점 형광 실험 페이지 (색·글꼴·간격은 css/lab-base.css 변수) */
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { display: block; font-family: var(--font); background: #f4f6f8; margin: 0; padding: 12px; color: #222; }
+.wrap { max-width: var(--w-step, 860px); margin: 0 auto; }
+h1 { font-size: 1.35em; margin: 4px 0 8px; }
+h2 { font-size: 1.05em; margin: 0 0 10px; }
+h3 { font-size: .98em; margin: 14px 0 6px; }
+.back { display: inline-block; margin-bottom: 6px; font-size: .9em; }
+.card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.card.box { background: var(--c-primary-soft); }
+.card.warn-card { border-left: 5px solid #e0a800; }
+.card p { line-height: 1.65; }
+.note { font-size: .88em; color: #555; line-height: 1.5; }
+.warn { background: #fff3cd; color: #7a5b00; padding: 8px 10px; border-radius: 6px; font-size: .88em; margin: 8px 0; }
+.ok { background: #e6f4ea; color: #1e6b34; padding: 8px 10px; border-radius: 6px; font-size: .88em; margin: 8px 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.row label { font-size: .9em; display: flex; align-items: center; gap: 6px; }
+button { padding: 10px 14px; border: none; border-radius: 6px; background: var(--c-primary); color: #fff; font-size: .95em; cursor: pointer; min-height: var(--tap, 44px); }
+button.secondary { background: var(--c-secondary); }
+button.good { background: var(--c-success); }
+button.danger { background: var(--c-danger); }
+button:disabled { opacity: .45; cursor: default; }
+button.big { font-size: 1.05em; padding: 12px 18px; }
+input[type=number], input[type=text], select, textarea { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 1em; font-family: inherit; min-height: var(--tap, 44px); }
+input[type=range] { flex: 1; min-width: 120px; min-height: var(--tap, 44px); }
+textarea { width: 100%; min-height: 70px; display: block; margin-top: 4px; }
+.text-list { padding-left: 22px; margin: 6px 0; line-height: 1.65; }
+.text-list li { margin: 3px 0; }
+.formula { text-align: center; font-size: 1.2em; font-weight: 600; margin: 10px 0; padding: 8px; background: var(--c-fill); border-radius: var(--r-ctl); }
+.step-next { overflow-wrap: anywhere; }
+.device-row { margin: -4px 0 10px; }
+#phone-note { margin: 0 0 12px; }
+
+/* 표 */
+.tbl-wrap { overflow-x: auto; max-height: 340px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .88em; }
+th, td { padding: 6px 4px; border-bottom: 1px solid #eee; text-align: right; white-space: nowrap; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+th { font-size: .85em; }
+table.mini { max-width: 520px; }
+table.mini td, table.mini th { text-align: left; }
+tr.ext td { background: var(--c-primary-soft); }
+.dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #999; vertical-align: middle; }
+
+/* 시료 정보 입력 */
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; }
+@media (min-width: 640px) { .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.form-grid label, label.wide { display: flex; flex-direction: column; gap: 4px; font-size: .9em; }
+.form-grid input, .form-grid select, label.wide input { width: 100%; }
+label.wide { margin-top: 8px; }
+
+/* 카메라 */
+.stage { position: relative; background: #000; border-radius: 8px; overflow: hidden; min-height: 120px; }
+#view { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+#video { position: absolute; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+.live { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.live div { background: #f1f3f5; border-radius: 6px; padding: 6px 8px; font-size: .85em; }
+.live b { font-variant-numeric: tabular-nums; }
+.swatch-row { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
+.swatch { flex: none; width: 44px; height: 44px; border-radius: 8px; border: 1px solid #999; background: #000; }
+details.tip { margin: 8px 0; }
+details.tip summary { cursor: pointer; font-weight: 600; min-height: var(--tap, 44px); display: flex; align-items: center; }
+canvas.chart { width: 100%; height: 300px; display: block; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; margin-top: 8px; }
+canvas.chart.small { height: 170px; }
+.cal-peaks { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.cal-peak { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .9em; }
+.cal-peak select { flex: 1; min-width: 150px; }
+.cal-peak input { width: 90px; }
+
+/* 저장 */
+.draft-sum { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.draft-sum div { background: #f1f3f5; border-radius: 6px; padding: 6px 8px; font-size: .88em; overflow-wrap: anywhere; }
+.draft-sum b { display: block; font-variant-numeric: tabular-nums; }
+.mine-list { display: flex; flex-direction: column; gap: 6px; }
+.mine-item { display: flex; gap: 8px; align-items: center; border: 1px solid #e3e6ea; border-radius: 8px; padding: 6px 8px; font-size: .9em; }
+.mine-item .txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.qlist li { margin-bottom: 10px; }
+.qlist label { display: block; }
+
+/* 📱 노트북 QR 로 연 폰 화면: 5. 데이터(측정)만 */
+body.qd-phone nav.steps,
+body.qd-phone .step-panel:not([data-step="data"]),
+body.qd-phone #share-mount,
+body.qd-phone #phone-note,
+body.qd-phone .step-next,
+body.qd-phone .phone-solo { display: none !important; }
+html body.qd-phone .hide-on-laptop { display: block !important; }
+body.qd-phone .show-on-laptop { display: none !important; }
+
+@media print {
+    nav.steps, .step-next, .row button, #share-mount, #phone-card, .qd-measure, .back, .device-row { display: none !important; }
+    .step-panel { display: block !important; }
+    .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+}
