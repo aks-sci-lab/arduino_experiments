@@ -130,6 +130,15 @@ test('수업: 구글 로그인 교사만 만들고, 모든 실험으로 만들 �
     assert.equal((await app.post({ action: 'heartbeat', class: u.classCode, jo: 1, num: 1, step: 'data' }, { uid: 'anon2' })).ok, true);
     assert.match((await app.post({ action: 'heartbeat', class: u.classCode, jo: 9, num: 1 }, { uid: 'anon2' })).error, /없는 조/);
     assert.equal(app.progress().length, 1); assert.equal(app.progress()[0].step, 'data');
+    // 수업 코드 찾기는 2일까지 (그 뒤엔 QR·공간으로), 주인이 다시 열 수 있음
+    const LS0 = require('../js/lab-store.js');
+    assert.equal(LS0.JOIN_DAYS, 2);
+    app.db.docs.get('labClassCodes/' + u.classCode).joinUntil = new Date(Date.now() - 1000);
+    assert.equal((await app.post({ action: 'joinInfo', class: u.classCode }, { uid: 'anon5' })).ok, false);
+    assert.equal((await app.post({ action: 'joinInfo', class: u.classCode, space: u.space }, { uid: 'anon5' })).ok, true);
+    assert.equal((await app.post({ action: 'reopenCode', space: u.space }, { uid: 'x', google: true })).ok, false);
+    assert.equal((await app.post({ action: 'reopenCode', space: u.space })).ok, true);
+    assert.equal((await app.post({ action: 'joinInfo', class: u.classCode }, { uid: 'anon5' })).ok, true);
     // 내 수업 목록·지우기
     assert.equal((await app.post({ action: 'myClasses' })).classes.length, 3);
     assert.equal((await app.post({ action: 'myClasses' }, { uid: 'x', google: true })).classes.length, 0);

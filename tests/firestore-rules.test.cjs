@@ -15,7 +15,13 @@ const skip = (!HOST && 'FIRESTORE_EMULATOR_HOST 없음') || (!RUT && '@firebase/
 test('규칙: 수업·조 공유·진행·개발 자료 (에뮬레이터)', { skip, timeout: 120000 }, async () => {
     const [host, port] = HOST.split(':');
     const env = await RUT.initializeTestEnvironment({ projectId: 'demo-lab-' + Date.now(), firestore: { host, port: Number(port), rules: fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf8') } });
-    const ctx = (uid, provider, email) => env.authenticatedContext(uid, { email: email || '', firebase: { sign_in_provider: provider } });
+    const ctxs = {};   // 같은 사용자의 Firestore 는 한 번만 만든다 (두 번 만들면 설정 오류)
+    const ctx = (uid, provider, email) => {
+        if (ctxs[uid]) return ctxs[uid];
+        const c = env.authenticatedContext(uid, { email: email || '', firebase: { sign_in_provider: provider } });
+        let fsx = null;
+        return (ctxs[uid] = { firestore: () => fsx || (fsx = c.firestore()) });
+    };
     const store = c => { const fsx = c.firestore(); return LabStore.firestoreDb({ firestore: () => fsx, raw: firebase.default || firebase }); };
     const as = (c, auth) => { const core = LabStore.core(store(c)); return body => core.handle(body, auth); };
     const T1 = as(ctx('t1', 'google.com'), { uid: 't1', google: true });
@@ -23,6 +29,8 @@ test('규칙: 수업·조 공유·진행·개발 자료 (에뮬레이터)', { sk
     const S1 = as(ctx('s1', 'anonymous'), { uid: 's1' });
     const S2 = as(ctx('s2', 'anonymous'), { uid: 's2' });
     try {
+        // 개발 자료 시험용 교사 역할 (이 함수는 시험 하나에 한 번만 — 두 번 부르면 Firestore 설정 오류)
+        await env.withSecurityRulesDisabled(async c2 => { await c2.firestore().doc('roles/t1').set({ isTeacher: true }); });
         // 익명 학생은 수업을 못 만듦 (core 가 막지 않게 google 이라고 속여도 규칙이 막음)
         const fakeT = as(ctx('s9', 'anonymous'), { uid: 's9', google: true });
         assert.equal((await fakeT({ action: 'createClass', ban: 1, nStudents: 4, groupSize: 2, exp: 'idealgas' })).ok, false);
@@ -75,11 +83,32 @@ test('규칙: 수업·조 공유·진행·개발 자료 (에뮬레이터)', { sk
         // 이상한 공간 이름은 막음
         await RUT.assertFails(ctx('s1', 'anonymous').firestore().collection('labSpaces/abc/items').get());
         // 개발 자료: 교사(roles) 만
-        await env.withSecurityRulesDisabled(async c2 => { await c2.firestore().doc('roles/t1').set({ isTeacher: true }); });
         assert.equal((await T1({ action: 'devSave', exp: 'heartrate', id: 'hr-abc-r1', device: 'dvabc123', summary: { bpm: 70 }, data: '{}' })).ok, true);
         assert.equal((await T2({ action: 'devSave', exp: 'heartrate', id: 'hr-abc-r2', device: 'dvabc123', data: '{}' })).ok, false);
         await RUT.assertFails(ctx('t2', 'google.com').firestore().collection('devlog').limit(1).get());
         await RUT.assertSucceeds(ctx('t1', 'google.com').firestore().collection('devlog').limit(1).get());
+        // 수업 코드 찾기 기간(joinUntil): 지나면 코드로 공간을 알아낼 수 없음 (코드 99만 개를 훑는 것을 막음)
+        await RUT.assertSucceeds(ctx('s3', 'anonymous').firestore().doc('labClassCodes/' + c.classCode).get());   // 아직 유효
+        const past = new Date(Date.now() - 3600000);
+        // 찾기 기간을 지난 것으로 (주인은 자기 코드 문서를 고칠 수 있음)
+        const t1fs = ctx('t1', 'google.com').firestore(), exp1 = new Date(Date.now() + 86400000);
+        await t1fs.doc('labClassCodes/' + c.classCode).set({ space: c.space, owner: 't1', joinUntil: past, expireAt: exp1 });
+        await t1fs.doc('labClassCodes/9-9999').set({ space: 'c' + 'q'.repeat(23), owner: 't1', joinUntil: past, expireAt: exp1 });
+        await RUT.assertFails(ctx('s3', 'anonymous').firestore().doc('labClassCodes/' + c.classCode).get());
+        await RUT.assertFails(ctx('s3', 'anonymous').firestore().doc('labClassCodes/9-9999').get());
+        const S3 = as(ctx('s3', 'anonymous'), { uid: 's3' });
+        assert.equal((await S3({ action: 'joinInfo', class: c.classCode })).ok, false, '찾기 기간이 지나면 코드로 못 찾음');
+        assert.equal((await S3({ action: 'joinInfo', class: c.classCode, space: c.space })).ok, true, 'QR(공간)으로는 그대로');
+        // 다른 선생님은 기간이 지난 코드를 새 수업에 다시 쓸 수 있음 (만든 쪽 코드 고르기에서 읽기 거절 = 비어 있음)
+        await RUT.assertSucceeds(ctx('t2', 'google.com').firestore().doc('labClassCodes/9-9999').set({ space: 'c' + 'r'.repeat(23), owner: 't2', joinUntil: new Date(Date.now() + 86400000), expireAt: new Date(Date.now() + 86400000) }));
+        // 아직 유효한(남이 쓰는) 코드는 덮어쓸 수 없음
+        await RUT.assertFails(ctx('t1', 'google.com').firestore().doc('labClassCodes/9-9999').set({ space: c.space, owner: 't1', joinUntil: new Date(Date.now() + 86400000), expireAt: new Date(Date.now() + 86400000) }));
+        // 주인이 '코드 다시 열기' → 다시 찾을 수 있음, 남이 다시 열 수는 없음
+        assert.equal((await T2({ action: 'reopenCode', space: c.space })).ok, false);
+        const ro = await T1({ action: 'reopenCode', space: c.space });
+        assert.equal(ro.ok, true, ro.error);
+        assert.ok(Date.parse(ro.joinUntil) - Date.now() < LabStore.JOIN_DAYS * 86400000 + 60000);
+        assert.equal((await as(ctx('s4', 'anonymous'), { uid: 's4' })({ action: 'joinInfo', class: c.classCode })).ok, true);
         // 다른 교사는 내 수업을 지울 수 없고, 주인은 학생 자료까지 지움
         assert.equal((await T2({ action: 'deleteClass', space: c.space })).ok, false);
         const del = await T1({ action: 'deleteClass', space: c.space });

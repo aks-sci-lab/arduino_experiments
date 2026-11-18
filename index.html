@@ -285,7 +285,7 @@
             var CC = window.ClassCloud, PC = window.PendulumCloud;
             var code = CC.normalizeClass(document.getElementById('joinCode').value);
             if (!CC.isClassCode(code)) { msg.className = 'note join-err'; msg.textContent = '수업 코드는 "반-숫자 4개" 모양이에요 (예: 2-4821).'; return; }
-            // 사이트 저장소(Firestore)에서 수업 코드로 수업 공간을 찾는다 (코드로 찾기는 만든 뒤 14일까지, QR 은 학기 끝까지)
+            // 사이트 저장소(Firestore)에서 수업 코드로 수업 공간을 찾는다 (코드로 찾기는 만든 뒤 2일까지 — 규칙이 막음, QR 은 학기 끝까지)
             msg.className = 'note'; msg.textContent = '⏳ 수업을 찾는 중…';
             var r = await CC.joinInfo('lab:', code);
             var exp = r.ok && CC.expInfo(r.exp);

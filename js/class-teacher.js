@@ -160,13 +160,20 @@
             return '<div class="ct-item"><span><b>' + esc(c.classCode) + '</b> ' + esc(c.ban) + '반 · ' + esc(e ? e.name : c.exp) + ' · ' + esc(c.nStudents) + '명/' + esc(c.groups.length) + '조' +
                 '<br><span class="note">' + esc(new Date(c.created).toLocaleString('ko-KR')) + ' 만듦 · ' + esc(CC.expireText(c.expireAt)) + ' 지워짐</span></span>' +
                 '<span class="ct-row" style="margin:0"><button class="secondary" data-show="' + esc(c.space) + '">QR 보기</button><button data-watch="' + esc(c.space) + '">진행·내려받기</button>' +
-                '<button class="danger" data-del="' + esc(c.space) + '">🗑 지우기</button></span></div>';
+                '<button class="secondary" data-reopen="' + esc(c.space) + '">🔓 코드 다시 열기</button><button class="danger" data-del="' + esc(c.space) + '">🗑 지우기</button></span></div>';
         }).join('');
     }
     $('classList').addEventListener('click', async function (e) {
         var b = e.target.closest('button'); if (!b) return;
-        var c = byId(b.dataset.show || b.dataset.watch || b.dataset.del);
+        var c = byId(b.dataset.show || b.dataset.watch || b.dataset.del || b.dataset.reopen);
         if (!c) return;
+        if (b.dataset.reopen) {
+            $('listMsg').className = 'note'; $('listMsg').textContent = '⏳ 수업 코드를 다시 여는 중…';
+            var ro = await CC.reopenCode(c.space);
+            if (!ro.ok) { $('listMsg').className = 'note err'; $('listMsg').textContent = '⚠️ ' + ro.error; return; }
+            $('listMsg').textContent = '🔓 수업 코드 ' + c.classCode + ' 로 ' + new Date(ro.joinUntil).toLocaleString('ko-KR') + ' 까지 찾을 수 있어요.';
+            return;
+        }
         if (b.dataset.show) { showClass(c); $('classOut').scrollIntoView({ behavior: 'smooth' }); }
         else if (b.dataset.watch) { state.watching = c.space; state.last = null; renderWatchSel(); tabs.show('watch', true); }
         else if (confirm('수업 ' + c.classCode + ' 과 학생들이 보낸 자료를 지금 모두 지울까요? 되돌릴 수 없어요. 필요하면 먼저 ② 에서 내려받으세요.')) {

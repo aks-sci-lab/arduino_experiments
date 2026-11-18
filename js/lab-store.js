@@ -35,7 +35,7 @@
     var DATA_MAX = 45000 * 6;        // 자료 글자 수 한도 (예전 셀 6칸과 같게)
     var CELL_MAX = 45000;
     var SUMMARY_KEYS = 20, PLANCK_POINTS = 500;
-    var JOIN_DAYS = 14;              // 수업 코드만으로 찾을 수 있는 기간 (QR·링크는 수업이 지워질 때까지)
+    var JOIN_DAYS = 2;               // 수업 코드만으로 찾을 수 있는 기간 (규칙도 이 기간 뒤 읽기를 막음 — 코드는 99만 개라 훑기 쉬움). QR·링크는 수업이 지워질 때까지
     var GENERIC_EXPS = { idealgas: 1, accel: 1, env: 1, light: 1, uv: 1, phoneaccel: 1, malus: 1, eminduction: 1, freefall: 1, nano: 1, heartrate: 1, qdot: 1 };   // qdot: 퀀텀닷 용액(PR #120)
     var CLASS_EXPS = { planck: 1, pendulum: 1 };
     Object.keys(GENERIC_EXPS).forEach(function (k) { CLASS_EXPS[k] = 1; });
@@ -237,7 +237,7 @@
             var code = body['class'] != null && body['class'] !== '' ? cleanClass(body['class']) : '';
             if (!space) {
                 if (!code) fail('수업 코드 형식이 올바르지 않습니다 (예: 2-4821).');
-                var look = await db.get('labClassCodes/' + code, { cache: cached });
+                var look = await getOrNull('labClassCodes/' + code);   // 찾기 기간이 지나면 규칙이 막음 → 못 찾음
                 if (!look || !isSpace(look.space) || (look.joinUntil && new Date(look.joinUntil) < db.now())) return null;
                 space = look.space;
             }
@@ -259,7 +259,8 @@
             var code = '';
             for (var t = 0; t < 30 && !code; t++) {
                 var c = ban + '-' + ('000' + Math.floor(Math.random() * 10000)).slice(-4);
-                var old = await db.get('labClassCodes/' + c);
+                // 찾기 기간이 지난 코드는 규칙이 읽기를 막음(permission-denied) → 비어 있는 것으로 보고 다시 씀(규칙이 덮어쓰기 허용)
+                var old = await getOrNull('labClassCodes/' + c);
                 if (!old || (old.joinUntil && new Date(old.joinUntil) < db.now())) code = c;
             }
             if (!code) fail('수업 코드를 만들지 못했습니다. 다시 눌러 주세요.');
@@ -269,6 +270,19 @@
             await db.set('labClasses/' + space, rec);
             await db.set('labClassCodes/' + code, { space: space, owner: auth.uid, joinUntil: new Date(now.getTime() + JOIN_DAYS * 86400000), expireAt: exp2 });
             return { ok: true, classCode: code, space: space, ban: ban, nStudents: n, groupSize: size, exp: exp, groups: groups, created: now.toISOString(), expireAt: exp2.toISOString() };
+        }
+        async function getOrNull(path) {
+            try { return await db.get(path); }
+            catch (e) { if (/permission|insufficient/i.test(String(e && (e.code || '') + (e.message || '')))) return null; throw e; }
+        }
+        // 수업 코드 다시 열기 (주인만): 코드로 찾기를 지금부터 JOIN_DAYS 동안 다시 허용
+        async function reopenCode(b, auth) {
+            var c = await ownedClass(b, auth);
+            var cur = await getOrNull('labClassCodes/' + c.classCode);
+            if (cur && cur.space !== c.space) fail('이 수업 코드(' + c.classCode + ')는 지금 다른 수업이 쓰고 있어요. 학생에게 QR·링크로 들어오라고 해 주세요.');
+            var until = new Date(db.now().getTime() + JOIN_DAYS * 86400000);
+            await db.set('labClassCodes/' + c.classCode, { space: c.space, owner: auth.uid, joinUntil: until, expireAt: c.expireAt instanceof Date ? c.expireAt : expireAt() });
+            return { ok: true, classCode: c.classCode, joinUntil: until.toISOString() };
         }
         async function joinInfo(b) {
             var c = await findClass(b, true);
@@ -427,6 +441,7 @@
                 if (a === 'classExport') return await classExport(body, auth);
                 if (a === 'myClasses') return await myClasses(body, auth);
                 if (a === 'deleteClass') return await deleteClass(body, auth);
+                if (a === 'reopenCode') return await reopenCode(body, auth);
                 if (a === 'devSave') return await devSave(body, auth);
                 if (a === 'devExport') return await devExport(body, auth);
                 fail('알 수 없는 요청입니다.');

@@ -217,6 +217,7 @@
     function myClasses(fetchImpl) { return post('lab:', { action: 'myClasses' }, fetchImpl, 20000); }
     function classExport(space, fetchImpl) { return post('lab:' + space, { action: 'classExport' }, fetchImpl, 60000); }
     function deleteClass(space, fetchImpl) { return post('lab:' + space, { action: 'deleteClass' }, fetchImpl, 60000); }
+    function reopenCode(space, fetchImpl) { return post('lab:' + space, { action: 'reopenCode' }, fetchImpl, 20000); }
     // 지워지는 날 (만든 때 + 183일): '2027년 5월 20일'
     function expireText(iso) { var d = new Date(iso); return isNaN(d) ? '' : d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일'; }
     // 스스로 업데이트 (5판): 관리 열쇠도 POST 본문으로만
@@ -240,6 +241,6 @@
         studentUrl: studentUrl, readClassParam: readClassParam,
         studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
         parseResponse: parseResponse, ping: ping, createClass: createClass, joinInfo: joinInfo, heartbeat: heartbeat, classStatus: classStatus,
-        myClasses: myClasses, classExport: classExport, deleteClass: deleteClass, expireText: expireText
+        myClasses: myClasses, classExport: classExport, deleteClass: deleteClass, reopenCode: reopenCode, expireText: expireText
     };
 });
