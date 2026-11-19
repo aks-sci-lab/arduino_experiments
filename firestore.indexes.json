@@ -118,7 +118,7 @@
     {
       "collectionGroup": "aiAsk",
       "fieldPath": "expireAt",
-      "ttl": true,
+      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
@@ -137,7 +137,7 @@
     {
       "collectionGroup": "reports",
       "fieldPath": "expireAt",
-      "ttl": true,
+      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
@@ -156,7 +156,7 @@
     {
       "collectionGroup": "aiDesk",
       "fieldPath": "expireAt",
-      "ttl": true,
+      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
