@@ -4,7 +4,7 @@
     {
       "collectionGroup": "items",
       "fieldPath": "expireAt",
-      "ttl": true,
+      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
@@ -23,7 +23,7 @@
     {
       "collectionGroup": "raw",
       "fieldPath": "expireAt",
-      "ttl": true,
+      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
@@ -42,7 +42,7 @@
     {
       "collectionGroup": "progress",
       "fieldPath": "expireAt",
-      "ttl": true,
+      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
@@ -61,7 +61,7 @@
     {
       "collectionGroup": "labClasses",
       "fieldPath": "expireAt",
-      "ttl": true,
+      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
@@ -80,7 +80,7 @@
     {
       "collectionGroup": "labClassCodes",
       "fieldPath": "expireAt",
-      "ttl": true,
+      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
@@ -99,7 +99,7 @@
     {
       "collectionGroup": "devlog",
       "fieldPath": "expireAt",
-      "ttl": true,
+      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
