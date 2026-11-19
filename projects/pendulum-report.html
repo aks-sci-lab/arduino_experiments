@@ -210,8 +210,10 @@
                 <li>직선에서 가장 멀리 떨어진 점은 어느 것인가요? 그 측정에서 무엇이 달랐을까요?</li>
                 <li>오차 원인을 "공기저항"처럼 일반적으로 말하지 말고, <b>표와 그래프의 어느 값</b>이 근거인지 함께 써 보세요.</li>
             </ol>
-            <p class="note">보고서 쓰기·AI 피드백·제출은 다음 업데이트에서 이 화면에 들어갈 예정이에요.</p>
+            <p class="note">아래 📝 보고서 칸에 항목별로 쓰고, 수업으로 들어왔으면 🤖 AI 에게 피드백을 물어볼 수 있어요.</p>
         </div>
+        <!-- 📝 보고서 쓰기 · AI 피드백 (js/report-ai.js) -->
+        <div id="report-ai"></div>
         <div class="step-next"><button data-go="result">← 6. 결과</button></div>
     </section>
 
@@ -222,5 +224,8 @@
         <button id="btnBigClose">닫기</button>
     </div>
 </main>
+<link rel="stylesheet" href="../css/report-ai.css">
+<script src="../js/report-ai.js"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'pendulum', mount: '#report-ai', contextFrom: '#fitBox, #fitSteps' }); });</script>
 </body>
 </html>

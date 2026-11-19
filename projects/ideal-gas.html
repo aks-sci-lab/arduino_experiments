@@ -464,6 +464,8 @@
             <div class="row"><label>모둠원 <input type="text" id="st-members" data-student="members" size="22" placeholder="함께 실험한 친구 이름"></label></div>
         </details>
     </div>
+        <!-- 📝 보고서 쓰기 · AI 피드백 (js/report-ai.js) -->
+        <div id="report-ai"></div>
     </section>
 
     <!-- 보고서 보기 (미리보기·인쇄, 선생님이 제출된 보고서 보기) -->
@@ -485,5 +487,8 @@
 <script src="../js/class-share.js"></script>
 <script src="../js/ideal-gas-share.js"></script>
 <script src="../js/ideal-gas.js"></script>
+<link rel="stylesheet" href="../css/report-ai.css">
+<script src="../js/report-ai.js"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'idealgas', mount: '#report-ai', contextFrom: '#concl-sum, #res-boyle, #res-gay, #res-comb' }); });</script>
 </body>
 </html>

@@ -378,6 +378,8 @@
             </div>
             <p class="note" id="send2-status"></p>
         </div>
+        <!-- 📝 보고서 쓰기 · AI 피드백 (js/report-ai.js) -->
+        <div id="report-ai"></div>
         <div class="step-next"><button class="secondary" data-go="result">← 이전: 6. 결과</button></div>
     </section>
 </div>
@@ -388,5 +390,8 @@
 <script src="../js/class-share.js"></script>
 <script src="../js/quantum-dot-math.js"></script>
 <script src="../js/quantum-dot.js"></script>
+<link rel="stylesheet" href="../css/report-ai.css">
+<script src="../js/report-ai.js"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'qdot', mount: '#report-ai', contextFrom: '#tbl, #xy-fit' }); });</script>
 </body>
 </html>

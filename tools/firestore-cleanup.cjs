@@ -4,7 +4,7 @@
    대상(컬렉션 그룹): items·raw·progress(labSpaces·labClasses 아래), labClasses, labClassCodes, devlog
    환경 변수: FIREBASE_SERVICE_ACCOUNT(사이트 배포와 같은 서비스 계정 JSON). DRY_RUN=1 이면 세기만 */
 'use strict';
-const GROUPS = ['items', 'raw', 'progress', 'labClasses', 'labClassCodes', 'devlog'];
+const GROUPS = ['items', 'raw', 'progress', 'aiAsk', 'reports', 'aiDesk', 'labClasses', 'labClassCodes', 'devlog'];
 
 // db 는 firebase-admin 의 Firestore (시험에서는 같은 모양의 가짜)
 async function cleanup(db, now, opts) {

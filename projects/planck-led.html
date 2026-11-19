@@ -701,6 +701,8 @@
             <li>개선 방법을 한 가지 이상 썼다.</li>
         </ul>
     </div>
+        <!-- 📝 보고서 쓰기 · AI 피드백 (js/report-ai.js) -->
+        <div id="report-ai"></div>
     </section>
 </div>
 <script src="../js/planck-math.js"></script>
@@ -718,5 +720,8 @@
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-share.js"></script>
 <script src="../js/planck-led.js"></script>
+<link rel="stylesheet" href="../css/report-ai.css">
+<script src="../js/report-ai.js"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'planck', mount: '#report-ai', contextFrom: '#concl-sum, #results, #verdict' }); });</script>
 </body>
 </html>

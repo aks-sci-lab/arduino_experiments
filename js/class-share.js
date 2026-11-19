@@ -655,7 +655,7 @@
         render();
         if (groupOk() && st.auto && !CLASS && mount) pull(true);
         if (groupOk() && typeof opts.onGroup === 'function' && !CLASS) opts.onGroup(st.group);
-        return {
+        var api = {
             send: send, pull: pull, render: render, beat: beat,
             role: function () { return role; }, isPhone: function () { return !!PHONE; },
             openPhone: openPhone, phoneLink: phoneLink, phoneCard: phoneCard,
@@ -673,8 +673,11 @@
             classCode: function () { return CLASS; }, me: function () { return cls.me; },
             server: function () { return srv(); }, state: function () { return st; }
         };
+        EXPORTS.current = api;   // 다른 부품(js/report-ai.js 보고서 AI)이 이 페이지의 수업·조 자리를 알 수 있게
+        return api;
     }
 
-    return { init: init, buildPayloads: buildPayloads, incomingFrom: incomingFrom, rowId: rowId, newDeviceId: newDeviceId, deviceLabel: deviceLabel, fixState: fixState,
-        isPhoneDevice: isPhoneDevice, readPhoneParams: readPhoneParams, phoneUrl: phoneUrl };
+    var EXPORTS = { init: init, buildPayloads: buildPayloads, incomingFrom: incomingFrom, rowId: rowId, newDeviceId: newDeviceId, deviceLabel: deviceLabel, fixState: fixState,
+        isPhoneDevice: isPhoneDevice, readPhoneParams: readPhoneParams, phoneUrl: phoneUrl, current: null };
+    return EXPORTS;
 });

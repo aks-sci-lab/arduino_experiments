@@ -354,6 +354,8 @@
                 <li>샘플링이 느려 좁은 봉우리의 꼭대기를 놓친 경우</li>
                 <li>코일 저항 때문에 단자 전압이 기전력보다 작게 재지는 효과</li>
             </ul>
+            <!-- 📝 보고서 쓰기 · AI 피드백 (js/report-ai.js) -->
+            <div id="report-ai"></div>
             <div class="step-next">
                 <button data-go="result">← 6. 결과</button>
                 <button data-go="purpose">처음으로: 1. 목적</button>
@@ -897,5 +899,8 @@
     LabUI.initSteps({ key: 'em-induction', onShow: step => { currentStep = step; fit(); if (share) share.stepChanged(); } });
 })();
 </script>
+<link rel="stylesheet" href="../css/report-ai.css">
+<script src="../js/report-ai.js"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'eminduction', mount: '#report-ai', contextFrom: '#results, #trials' }); });</script>
 </body>
 </html>
