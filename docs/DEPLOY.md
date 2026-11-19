@@ -71,11 +71,8 @@ Firebase 콘솔 → 프로젝트 `web-experiment-f9b24` → Firestore Database �
 
 모든 수업 자료 문서에 `expireAt`(만든 날 + 183일)이 붙습니다. 두 가지가 지웁니다.
 
-- **TTL 정책**(Firestore 가 스스로 지움, 하루쯤 늦을 수 있음): `firestore.indexes.json` 이 머지되면 "Deploy Firestore rules" 가 함께 게시합니다.
-  권한 오류(`datastore.indexes`)가 나면 서비스 계정에 **Cloud Datastore 색인 관리자(Cloud Datastore Index Admin)** 역할을 더하거나, 콘솔에서 직접:
-  Firestore Database → **TTL** 탭 → 정책 만들기 → 컬렉션 그룹 `items`, 타임스탬프 필드 `expireAt` → 만들기.
-  같은 방법으로 `raw`, `progress`, `labClasses`, `labClassCodes`, `devlog` 도 (모두 필드는 `expireAt`).
-- **정리 작업**(`.github/workflows/firestore-cleanup.yml`, 매일 새벽): TTL 을 못 켰어도 같은 키(`FIREBASE_SERVICE_ACCOUNT`)로 `expireAt` 가 지난 문서를 지웁니다. Actions 탭에서 손으로 돌릴 수도 있어요. 이 작업은 `expireAt` 색인(위 파일)이 있어야 동작합니다.
+- **TTL 정책**(Firestore 가 스스로 지움): **결제 계정(Blaze 요금제)이 있어야만 켜진다**(2026-11-19 게시 때 "billing disabled" 로 거절). 지금은 무료(Spark)라 `firestore.indexes.json` 의 `ttl` 을 모두 `false` 로 두고 색인만 게시한다. 나중에 Blaze 로 바꾸면 `ttl` 을 `true` 로 바꿔 머지하면 된다.
+- **정리 작업**(`.github/workflows/firestore-cleanup.yml`, 매일 새벽) — **지금 실제로 지우는 것은 이것**: TTL 을 못 켰어도 같은 키(`FIREBASE_SERVICE_ACCOUNT`)로 `expireAt` 가 지난 문서를 지웁니다. Actions 탭에서 손으로 돌릴 수도 있어요. 이 작업은 `expireAt` 색인(위 파일)이 있어야 동작합니다.
 
 ### 비용
 
