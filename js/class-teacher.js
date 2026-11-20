@@ -23,13 +23,73 @@
         $('btnSettings').hidden = !ok || v !== 'main';
         $('btnMain').hidden = !ok || v !== 'settings';
         if (v === 'settings') { if (tab) tabs.show(tab); window.dispatchEvent(new CustomEvent('lab-teacher-tab', { detail: tabs.current() })); stopWatch(); renderDlFor(); }
-        else if (ok) startWatch();
+        renderSub();
         window.scrollTo(0, 0);
     }
+    // ----- 첫 화면 = 내 수업 목록 → 수업(#class=공간): 큰 QR → 진행 보기(#class=공간&view=run). 뒤로 가기로 앞 화면 (2026-11-20 선생님 의견) -----
+    state.sub = 'list';
+    function parseHash() {
+        var m = /class=([a-z0-9]{24})/.exec(location.hash || '');
+        return m ? { space: m[1], sub: /view=run/.test(location.hash) ? 'run' : 'qr' } : { space: '', sub: 'list' };
+    }
+    function go(space, sub) {
+        var h = space ? '#class=' + space + (sub === 'run' ? '&view=run' : '') : '';
+        if ((location.hash || '') !== h) {
+            if (h) location.hash = h;   // hashchange → route
+            else { history.pushState(null, '', location.pathname + location.search); route(); }
+        } else route();
+    }
+    function route() {
+        var h = parseHash();
+        if (h.space && state.view === 'settings') state.view = 'main';
+        if (h.space && !state.loaded) { state.pendingRoute = true; return; }   // 수업 목록을 받은 뒤 다시
+        var c = h.space ? byId(h.space) : null;
+        if (h.space && !c) { state.sub = 'list'; $('listMsg').className = 'note err'; $('listMsg').textContent = '⚠️ 그 수업을 찾지 못했어요 (지웠거나 다른 계정의 수업).'; }
+        else state.sub = h.sub;
+        if (c && state.watching !== c.space) { state.watching = c.space; state.last = null; state.detail = null; $('detail').hidden = true; }
+        setView(state.view);
+    }
+    window.addEventListener('hashchange', route);
+    window.addEventListener('popstate', route);
+    function renderSub() {
+        var ok = !!(state.user && state.user.google), main = ok && state.view === 'main', sub = state.sub, c = watched();
+        if (sub !== 'list' && !c) sub = 'list';
+        $('viewList').hidden = sub !== 'list';
+        $('viewClass').hidden = sub === 'list';
+        $('classOut').hidden = sub !== 'qr';
+        $('runPane').hidden = sub !== 'run';
+        $('cornerQr').hidden = !(main && sub === 'run');
+        document.body.classList.toggle('ct-has-corner', main && sub === 'run');
+        if (c && sub !== 'list') {
+            var e = CC.expInfo(c.exp);
+            $('classTitle').innerHTML = (e ? e.icon + ' ' : '') + '<b>' + esc(e ? e.name : c.exp) + '</b> <span class="note">' + esc(c.ban) + '반 · 수업 코드 ' + esc(c.classCode) + (c.done ? ' · ✅ 마침' : '') + '</span>';
+            $('btnDone').textContent = c.done ? '↩ 다시 진행 중으로' : '✅ 수업 마치기';
+            $('btnShowQr').hidden = sub === 'qr';
+            $('btnRefresh').hidden = sub !== 'run';
+            if (!state.shown || state.shown.space !== c.space) showClass(c);
+            renderWatchSel();
+        }
+        if (main && sub === 'run') startWatch(); else stopWatch();
+    }
+    $('btnToList').addEventListener('click', function () { $('doneMsg').textContent = ''; go('', 'list'); });
+    $('btnShowQr').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'qr'); });
+    $('btnToRun').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'run'); });
+    $('btnDone').addEventListener('click', async function () {
+        var c = watched(); if (!c) return;
+        var to = !c.done;
+        if (to && !confirm('수업 ' + c.classCode + ' 을 ‘마친 수업’으로 표시할까요?\n학생 화면과 자료는 그대로예요. 다시 눌러 되돌릴 수 있어요.')) return;
+        $('doneMsg').className = 'note'; $('doneMsg').textContent = '⏳ 저장하는 중…';
+        var r = await CC.classDone(c.space, to);
+        if (!r.ok) { $('doneMsg').className = 'note err'; $('doneMsg').textContent = '⚠️ ' + r.error; return; }
+        c.done = r.done; c.doneAt = r.done ? new Date().toISOString() : '';
+        $('doneMsg').textContent = r.done ? '✅ 마친 수업으로 표시했어요. 목록 아래 ‘마친 수업’에 있어요.' : '⏳ 다시 진행 중인 수업이에요.';
+        renderList(); renderSub();
+    });
+    $('cornerQr').addEventListener('click', function () { $('btnBig').click(); });
     $('btnSettings').addEventListener('click', function () { setView('settings'); });
     $('btnMain').addEventListener('click', function () { setView('main'); });
     $('btnGoMake').addEventListener('click', function () { setView('settings', 'make'); });
-    function renderDlFor() { var c = watched(); $('dlFor').textContent = c ? '수업 ' + c.classCode + ' (' + c.ban + '반) 의 자료 — 다른 수업은 진행 화면 맨 위에서 고르세요.' : '아직 만든 수업이 없어요.'; }
+    function renderDlFor() { var c = watched(); $('dlFor').textContent = c ? '수업 ' + c.classCode + ' (' + c.ban + '반) 의 자료 — 다른 수업은 수업 목록에서 그 수업을 누른 뒤 오세요.' : '수업 목록에서 수업을 먼저 고르세요.'; }
 
     // ---------- 구글 로그인 ----------
     function renderLogin() {
@@ -58,7 +118,7 @@
     });
     $('btnLogout').addEventListener('click', async function () {
         if (!confirm('로그아웃할까요? (만든 수업과 학생 자료는 그대로예요)')) return;
-        await LS.signOut(); state.user = null; state.classes = []; renderLogin(); renderList(); renderWatchSel();
+        await LS.signOut(); state.user = null; state.classes = []; state.watching = null; state.sub = 'list'; renderLogin(); renderList();
     });
     // 개발 데이터 수집: 선생님 폰으로 이 화면을 열어 같은 계정으로 로그인 (js/dev-collect.js)
     // 개발 메뉴는 사이트 관리 교사 계정(firestore.rules 의 isTeacher 와 같은 기준 — LabStore.isTeacher)으로 로그인했을 때만 (2026-11-20 선생님 결정)
@@ -175,25 +235,28 @@
         if (!r.ok) { msg.className = 'note err'; msg.textContent = '⚠️ ' + r.error; return; }
         msg.className = 'note'; msg.textContent = '✅ 수업 ' + r.classCode + ' 을 만들었어요.';
         state.classes = [r].concat(state.classes.filter(function (c) { return c.space !== r.space; }));
-        state.watching = r.space;
-        showClass(r); renderList(); renderWatchSel();
-        setView('main');   // 만든 수업의 진행 화면 + QR 로
+        state.watching = r.space; state.shown = null;
+        renderList();
+        state.view = 'main'; go(r.space, 'qr');   // 만든 수업의 첫 화면(큰 QR)으로
     });
     function studentLink(c) { return CC.studentUrl(siteRoot(), c.exp, c.classCode, c.space); }
-    function qrSvg(text) {
+    // level 'H': 오류 정정 높게 (멀리서 확대해 찍는 오른쪽 위 QR)
+    function qrSvg(text, level) {
         if (typeof window.qrcode !== 'function') return null;
-        var qr = window.qrcode(0, 'M'); qr.addData(text); qr.make();
+        var qr = window.qrcode(0, level || 'M'); qr.addData(text); qr.make();
         return qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true });
     }
     function expireNote(c) { var t = CC.expireText(c.expireAt); return t ? '🗓 이 수업의 학생 자료는 ' + t + '에 저절로 지워져요. 그 전에 ⚙ 설정 → 📥 자료 내려받기에서 받아 두세요.' : ''; }
     function showClass(c) {
         var link = studentLink(c), e = CC.expInfo(c.exp);
         $('classOut').hidden = false;
-        $('outTitle').textContent = '— ' + c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + (c.mode === 'team' ? '팀 이름으로 입장 (최대 ' + c.groups.length + '팀)' : c.nStudents + '명, ' + c.groups.length + '개 조 · AI 질문 조마다 ' + (c.aiLimit == null ? 20 : c.aiLimit) + '번');
+        $('outTitle').textContent = c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + (c.mode === 'team' ? '팀 이름으로 입장 (최대 ' + c.groups.length + '팀)' : c.nStudents + '명, ' + c.groups.length + '개 조 · AI 질문 조마다 ' + (c.aiLimit == null ? 20 : c.aiLimit) + '번');
         $('outCode').textContent = c.classCode;
         $('outLink').href = link; $('outLink').textContent = link;
         $('outExpire').textContent = expireNote(c);
         $('qr').innerHTML = qrSvg(link) || '<p class="note">QR 을 만드는 도구를 불러오지 못했어요(인터넷 확인). 학생은 메인 페이지 → 학생으로 시작에서 수업 코드를 넣어도 돼요.</p>';
+        $('cornerQrImg').innerHTML = qrSvg(link, 'H') || '';
+        $('cornerCode').textContent = c.classCode;
         state.shown = c;
     }
     $('btnCopy').addEventListener('click', async function () {
@@ -217,28 +280,41 @@
         if (!r.ok) { $('listMsg').className = 'note err'; $('listMsg').textContent = '⚠️ ' + r.error; return; }
         $('listMsg').textContent = '';
         state.classes = r.classes;
-        if (!state.watching || !byId(state.watching)) state.watching = state.classes[0] ? state.classes[0].space : null;
-        renderList(); renderWatchSel();
-        if (state.view === 'main') refresh();
+        state.loaded = true;
+        renderList(); route();
     }
     function byId(space) { return state.classes.filter(function (c) { return c.space === space; })[0] || null; }
+    function whenText(iso) {
+        var d = new Date(iso); if (isNaN(d)) return '';
+        return d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' }) + ' ' + d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+    }
+    function classCard(c) {
+        var e = CC.expInfo(c.exp), si = CC.stageInfo(c.exp, c.stage), en = e && e.steps && si ? e.steps[si.cur] : '';
+        var who = c.mode === 'team' ? '최대 ' + c.groups.length + '팀' : c.nStudents + '명 · ' + c.groups.length + '개 조';
+        var st = c.done ? '<b class="ok">✅ 마침</b>' + (c.doneAt ? '<br><span class="note">' + esc(whenText(c.doneAt)) + '</span>' : '') : '<b>⏳ 진행 중</b>' + (si ? '<br><span class="note">' + (si.all ? '모든 단계 열림' : '단계 ' + si.n + ' / ' + si.gate.length + (en ? ' · ' + esc(en) : '')) + '</span>' : '');
+        return '<div class="ct-cls' + (c.done ? ' done' : '') + '"><button type="button" class="ct-cls-main" data-open="' + esc(c.space) + '">' +
+            '<span class="ct-cls-ic" aria-hidden="true">' + esc(e ? e.icon : '🧪') + '</span>' +
+            '<span class="ct-cls-body"><b>' + esc(e ? e.name : c.exp) + '</b><span class="note">' + esc(c.ban) + '반 · ' + esc(who) + ' · 코드 ' + esc(c.classCode) + '</span>' +
+            '<span class="note">📅 ' + esc(whenText(c.created)) + ' 만듦</span></span>' +
+            '<span class="ct-cls-st">' + st + '</span></button>' +
+            '<span class="ct-cls-act"><button type="button" class="secondary" data-reopen="' + esc(c.space) + '" title="수업 코드로 찾기 다시 열기 (2일)">🔓 코드 다시 열기</button><button type="button" class="danger" data-del="' + esc(c.space) + '">🗑 지우기</button></span></div>';
+    }
     function renderList() {
         window.dispatchEvent(new CustomEvent('lab-classes', { detail: state.user && state.user.google ? state.classes : [] }));   // ③ 보고서 AI (js/class-teacher-ai.js)
-        var el = $('classList');
-        if (!state.user || !state.user.google) { el.innerHTML = '<p class="note">구글 로그인하면 이 계정으로 만든 수업이 여기에 보여요.</p>'; return; }
-        if (!state.classes.length) { el.innerHTML = '<p class="note">아직 만든 수업이 없어요.</p>'; return; }
-        el.innerHTML = state.classes.map(function (c) {
-            var e = CC.expInfo(c.exp);
-            return '<div class="ct-item"><span><b>' + esc(c.classCode) + '</b> ' + esc(c.ban) + '반 · ' + esc(e ? e.name : c.exp) + ' · ' + (c.mode === 'team' ? '최대 ' + esc(c.groups.length) + '팀' : esc(c.nStudents) + '명/' + esc(c.groups.length) + '조') +
-                '<br><span class="note">' + esc(new Date(c.created).toLocaleString('ko-KR')) + ' 만듦 · ' + esc(CC.expireText(c.expireAt)) + ' 지워짐</span></span>' +
-                '<span class="ct-row" style="margin:0"><button class="secondary" data-show="' + esc(c.space) + '">QR 보기</button><button data-watch="' + esc(c.space) + '">진행·내려받기</button>' +
-                '<button class="secondary" data-reopen="' + esc(c.space) + '">🔓 코드 다시 열기</button><button class="danger" data-del="' + esc(c.space) + '">🗑 지우기</button></span></div>';
-        }).join('');
+        var el = $('classList'), ok = !!(state.user && state.user.google);
+        var sorted = state.classes.slice().sort(function (a, b) { return String(b.created).localeCompare(String(a.created)); });
+        var live = sorted.filter(function (c) { return !c.done; }), done = sorted.filter(function (c) { return c.done; });
+        $('noClass').hidden = !ok || !!state.classes.length || !state.loaded;
+        el.innerHTML = !ok ? '' : live.length ? live.map(classCard).join('') : state.classes.length ? '<p class="note">진행 중인 수업이 없어요. 아래 ‘마친 수업’을 열거나 새 수업을 만드세요.</p>' : '';
+        $('doneBox').hidden = !done.length;
+        $('doneSum').textContent = '✅ 마친 수업 (' + done.length + ')';
+        $('doneList').innerHTML = done.map(classCard).join('');
     }
-    $('classList').addEventListener('click', async function (e) {
-        var b = e.target.closest('button'); if (!b) return;
-        var c = byId(b.dataset.show || b.dataset.watch || b.dataset.del || b.dataset.reopen);
+    $('viewList').addEventListener('click', async function (e) {
+        var b = e.target.closest('button[data-open], button[data-reopen], button[data-del]'); if (!b) return;
+        var c = byId(b.dataset.open || b.dataset.del || b.dataset.reopen);
         if (!c) return;
+        if (b.dataset.open) { go(c.space, 'qr'); return; }
         if (b.dataset.reopen) {
             $('listMsg').className = 'note'; $('listMsg').textContent = '⏳ 수업 코드를 다시 여는 중…';
             var ro = await CC.reopenCode(c.space);
@@ -246,34 +322,24 @@
             $('listMsg').textContent = '🔓 수업 코드 ' + c.classCode + ' 로 ' + new Date(ro.joinUntil).toLocaleString('ko-KR') + ' 까지 찾을 수 있어요.';
             return;
         }
-        if (b.dataset.show) { state.watching = c.space; state.last = null; renderWatchSel(); showClass(c); setView('main'); }
-        else if (b.dataset.watch) { state.watching = c.space; state.last = null; renderWatchSel(); $('classOut').hidden = true; setView('main'); }
-        else if (confirm('수업 ' + c.classCode + ' 과 학생들이 보낸 자료를 지금 모두 지울까요? 되돌릴 수 없어요. 필요하면 먼저 ② 에서 내려받으세요.')) {
+        if (confirm('수업 ' + c.classCode + ' 과 학생들이 보낸 자료를 지금 모두 지울까요? 되돌릴 수 없어요. 필요하면 먼저 ② 에서 내려받으세요.')) {
             $('listMsg').className = 'note'; $('listMsg').textContent = '⏳ 지우는 중…';
             var r = await CC.deleteClass(c.space);
             if (!r.ok) { $('listMsg').className = 'note err'; $('listMsg').textContent = '⚠️ ' + r.error; return; }
             $('listMsg').textContent = '🗑 수업 ' + c.classCode + ' 을 지웠어요.';
             state.classes = state.classes.filter(function (x) { return x !== c; });
-            if (state.shown === c) { state.shown = null; $('classOut').hidden = true; }
-            if (state.watching === c.space) state.watching = state.classes[0] ? state.classes[0].space : null;
-            renderList(); renderWatchSel();
+            if (state.shown === c) state.shown = null;
+            if (state.watching === c.space) state.watching = null;
+            renderList();
         }
     });
 
     // ---------- ② 진행 보기 ----------
     function renderWatchSel() {
-        var sel = $('watchSel');
-        sel.innerHTML = state.classes.length ? state.classes.map(function (c) {
-            return '<option value="' + esc(c.space) + '"' + (c.space === state.watching ? ' selected' : '') + '>' + esc(c.classCode) + ' (' + esc(c.ban) + '반)</option>';
-        }).join('') : '<option value="">만든 수업 없음</option>';
         var c = watched();
         $('dlGroup').innerHTML = '<option value="">전체 조</option>' + (c ? c.groups.map(function (g) { return '<option value="' + esc(g.code) + '">' + g.jo + '조 (' + esc(g.code) + ')</option>'; }).join('') : '');
         $('watchExpire').textContent = c ? expireNote(c) : '';
         $('dlCard').hidden = !c;
-        $('noClass').hidden = !!c || !(state.user && state.user.google);
-        $('btnShowQr').hidden = $('btnRefresh').hidden = !c;
-        if (!c) $('classOut').hidden = true;
-        else if (state.shown && state.shown.space !== c.space && !$('classOut').hidden) showClass(c);
         renderStage(); renderDlFor();
         var team = !!(c && c.mode === 'team');
         $('boardCard').hidden = !team;
@@ -312,8 +378,6 @@
         setStage(si.n - 1);
     });
     $('btnStageAll').addEventListener('click', function () { setStage(CC.STAGE_ALL); });
-    $('btnShowQr').addEventListener('click', function () { var c = watched(); if (!c) return; if ($('classOut').hidden || !state.shown || state.shown.space !== c.space) { showClass(c); $('classOut').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } else $('classOut').hidden = true; });
-    $('btnHideQr').addEventListener('click', function () { $('classOut').hidden = true; });
     $('btnSetupSave').addEventListener('click', async function () {
         var c = watched(); if (!c) return;
         var setup = readSetup($('teamSetupEdit'));
@@ -356,10 +420,12 @@
         var c = watched(); $('boardBigTitle').textContent = '🏆 팀 결과판' + (c && c.setup ? ' · 목표 ' + c.setup.targetTime + '초 · 아이 키 ' + (c.setup.targetPct || 100) + '%' : '');
         $('groups').innerHTML = '';
     }
-    $('btnBoardBig').addEventListener('click', function () { $('boardBig').hidden = false; $('btnBoardClose').focus(); });
+    $('btnBoardBig').addEventListener('click', function () {
+        var c = watched(); $('boardBigQr').innerHTML = c ? (qrSvg(studentLink(c), 'H') || '') + '<b>' + esc(c.classCode) + '</b>' : '';
+        $('boardBig').hidden = false; $('btnBoardClose').focus();
+    });
     $('btnBoardClose').addEventListener('click', function () { $('boardBig').hidden = true; });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('boardBig').hidden = true; });
-    $('watchSel').addEventListener('change', function (e) { state.watching = e.target.value; state.last = null; state.detail = null; $('detail').hidden = true; renderWatchSel(); refresh(); });
     $('btnRefresh').addEventListener('click', function () { refresh(); });
     function watched() { return byId(state.watching); }
     function startWatch() { stopWatch(); refresh(); }
@@ -369,7 +435,7 @@
         if (!c || state.liveSpace === c.space) return;
         if (state.liveOff) { try { state.liveOff(); } catch (e) { /* 무시 */ } state.liveOff = null; }
         state.liveSpace = c.space;
-        LS.watchClass('lab:' + c.space, c.classCode, function () { if (state.view === 'main' && !document.hidden) refresh(); })
+        LS.watchClass('lab:' + c.space, c.classCode, function () { if (state.view === 'main' && state.sub === 'run' && !document.hidden) refresh(); })
             .then(function (off) { if (state.liveSpace === c.space) state.liveOff = off; else if (off) off(); });
     }
     async function refresh() {
@@ -391,7 +457,7 @@
             liveFor(c);
         }
         if (state.again) { state.again = false; return refresh(); }
-        if (state.view === 'main') state.timer = setTimeout(refresh, POLL_MS);
+        if (state.view === 'main' && state.sub === 'run') state.timer = setTimeout(refresh, POLL_MS);
     }
     // ---------- 📥 자료 내려받기 ----------
     function download(name, text, type) {
@@ -472,7 +538,7 @@
         $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
     $('btnCloseDetail').addEventListener('click', function () { state.detail = null; $('detail').hidden = true; });
-    document.addEventListener('visibilitychange', function () { if (!document.hidden && state.view === 'main') refresh(); });
-    renderPreview(); renderList(); renderWatchSel();
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && state.view === 'main' && state.sub === 'run') refresh(); });
+    renderPreview(); renderList();
     LS.onUser(function (u) { state.user = u && u.google ? u : null; renderLogin(); loadClasses(); });
 })();

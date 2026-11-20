@@ -10,7 +10,7 @@ try { RUT = require('@firebase/rules-unit-testing'); firebase = require('firebas
 const HOST = process.env.FIRESTORE_EMULATOR_HOST;
 const skip = (!HOST && 'FIRESTORE_EMULATOR_HOST 없음') || (!RUT && '@firebase/rules-unit-testing 없음');
 
-test('규칙: 선생님이 여는 단계 stage (에뮬레이터)', { skip, timeout: 120000 }, async () => {
+test('규칙: 선생님이 여는 단계 stage·수업 마치기 done (에뮬레이터)', { skip, timeout: 120000 }, async () => {
     const [host, port] = HOST.split(':');
     const env = await RUT.initializeTestEnvironment({ projectId: 'demo-stage-' + Date.now(), firestore: { host, port: Number(port), rules: fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf8') } });
     const ctxs = {};
@@ -36,6 +36,17 @@ test('규칙: 선생님이 여는 단계 stage (에뮬레이터)', { skip, timeo
         await RUT.assertSucceeds(doc('t1').update({ stage: 99 }));
         // 만들 때 이상한 stage 는 막음
         await RUT.assertFails(ctx('t1', 'google.com').firestore().doc('labClasses/c' + 'z'.repeat(23)).set({ owner: 't1', classCode: '1-1234', ban: 1, nStudents: 1, groupSize: 1, exp: 'malus', groups: [], stage: 500, createdAt: new Date(), expireAt: new Date(Date.now() + 86400000) }));
+        // '✅ 수업 마치기' (done·doneAt): 주인만, bool 만
+        const dn = await T1({ action: 'classDone', space: c.space, done: true }); assert.equal(dn.ok, true, JSON.stringify(dn));
+        const ji = await as(ctx('s2', 'anonymous'), { uid: 's2' })({ action: 'joinInfo', space: c.space }); assert.equal(ji.done, true, '학생도 마침 표시를 읽음');
+        assert.equal((await T1({ action: 'classDone', space: c.space, done: false })).ok, true);
+        assert.equal((await T2({ action: 'classDone', space: c.space, done: true })).ok, false, '다른 교사는 못 바꿈');
+        await RUT.assertFails(doc('s1').update({ done: true }), '학생은 못 바꿈');
+        await RUT.assertFails(doc('t2').update({ done: true }), '다른 교사는 못 바꿈');
+        await RUT.assertFails(doc('t1').update({ done: 'yes' }), 'bool 만');
+        await RUT.assertFails(doc('t1').update({ done: true, doneAt: new Date(2000, 1, 1) }), '마친 시각은 지금(서버 시각)만');
+        await RUT.assertSucceeds(doc('t1').update({ done: true, doneAt: firebase.firestore.FieldValue.serverTimestamp() }));
+        await RUT.assertSucceeds(doc('t1').update({ done: false, doneAt: null }));
         // 행사 설정도 그대로 됨 (팀 수업)
         const r = await T1({ action: 'createClass', ban: 2, mode: 'team', nTeams: 2, exp: 'rocket', setup: { targetTime: 10 } });
         assert.equal((await T1({ action: 'classSetup', space: r.space, setup: { targetTime: 12 } })).ok, true);

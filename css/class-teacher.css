@@ -122,3 +122,46 @@ html.big-view .ct-boardbig { zoom: calc(1 / 1.35); }
 .ct-stage-steps li.open { background: var(--c-ok-bg); color: var(--c-ok-text); }
 .ct-stage-steps li.cur { outline: 2px solid var(--c-success); font-weight: 700; }
 .ct-wrap button.ct-big { font-size: 1.15rem; min-height: 56px; padding: 0 var(--sp-5); }
+
+/* 내 수업 목록 (첫 화면) */
+.ct-listhead { justify-content: space-between; }
+.ct-classes { display: grid; gap: var(--sp-2); margin: var(--sp-2) 0; }
+.ct-cls { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: stretch; border: 1px solid var(--c-line); border-radius: var(--r-card); background: var(--c-card); padding: var(--sp-2); }
+.ct-cls.done { background: var(--c-fill); }
+.ct-wrap button.ct-cls-main { flex: 1 1 320px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center; text-align: left; background: transparent; color: var(--c-text); font-weight: 400; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); }
+.ct-wrap button.ct-cls-main:hover { background: var(--c-primary-soft); }
+.ct-cls-ic { font-size: 2rem; line-height: 1; }
+.ct-cls-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ct-cls-body b { font-size: 1.1rem; color: var(--c-primary); }
+.ct-cls-st { text-align: right; font-size: var(--fs-sm); }
+.ct-cls-st .ok { color: var(--c-ok-text); }
+.ct-cls-act { display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items: center; }
+.ct-wrap .ct-cls-act button { font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
+.ct-classtitle { font-size: 1.05rem; }
+
+/* 수업 첫 화면: 큰 QR */
+.ct-qrpage { text-align: center; }
+.ct-qrlead { font-size: clamp(1.2rem, 3vw, 2rem); font-weight: 800; margin: 0 0 var(--sp-2); }
+.ct-qr.ct-qr-xl { max-width: min(68vh, 92vw, 640px); margin: 0 auto; }
+.ct-code.ct-code-xl { font-size: clamp(2.4rem, 8vw, 4.5rem); }
+.ct-center { justify-content: center; }
+
+/* 진행 보기 오른쪽 위 QR: 교실 뒤에서 폰 카메라로 확대해 찍을 크기 (한 변 약 190px, 흰 여백 넉넉히) */
+.ct-wrap ~ button.ct-corner, button.ct-corner { position: fixed; top: 12px; right: 12px; z-index: 50; width: 214px; padding: 12px; border: 1px solid var(--c-line); border-radius: var(--r-card); background: #fff; box-shadow: var(--shadow); cursor: zoom-in; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--c-text); }
+button.ct-corner[hidden] { display: none; }
+.ct-corner-img { display: block; width: 190px; height: 190px; }
+.ct-corner-img svg { width: 100%; height: 100%; display: block; }
+.ct-corner b { font-size: 1.3rem; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.ct-corner-mini { display: none; }
+@media (min-width: 900px) { body.ct-has-corner .ct-wrap { padding-right: 240px; } }
+@media (max-width: 899px) {
+    button.ct-corner { width: auto; min-height: var(--tap); padding: var(--sp-1) var(--sp-3); top: auto; bottom: 12px; }
+    .ct-corner-img, .ct-corner b { display: none; }
+    .ct-corner-mini { display: inline; font-weight: 700; }
+}
+html.big-view button.ct-corner { zoom: calc(1 / 1.35); }
+.ct-boardqr { position: absolute; top: var(--sp-3); right: var(--sp-3); width: 210px; text-align: center; background: #fff; }
+.ct-boardqr svg { width: 190px; height: 190px; display: block; margin: 0 auto; }
+.ct-boardqr b { font-size: 1.3rem; }
+.ct-boardbig { padding-right: 240px; }
+@media (max-width: 899px) { .ct-boardqr { display: none; } .ct-boardbig { padding-right: var(--sp-4); } }

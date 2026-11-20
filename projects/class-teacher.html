@@ -17,7 +17,7 @@
         <h1>👩‍🏫 수업 진행</h1>
         <span class="ct-head-r">
             <button id="btnSettings" class="secondary" hidden>⚙ 설정</button>
-            <button id="btnMain" class="secondary" hidden>← 진행 화면</button>
+            <button id="btnMain" class="secondary" hidden>← 돌아가기</button>
         </span>
     </header>
 
@@ -29,18 +29,56 @@
         <p id="loginMsg" class="note" role="status" aria-live="polite"></p>
     </section>
 
-    <!-- 진행 화면 (첫 화면, 학생과 함께 보는 화면) -->
+    <!-- 첫 화면 = 내 수업 목록 → 수업을 누르면 그 수업: 큰 QR → 진행 보기 (주소 #class=…, 뒤로 가기로 목록) -->
     <div id="viewMain" hidden>
+      <div id="viewList">
+        <section class="ct-card">
+            <div class="ct-row ct-listhead">
+                <h2 style="margin:0">📚 내 수업</h2>
+                <button id="btnGoMake" class="good ct-big">➕ 새 수업 만들기</button>
+            </div>
+            <p id="noClass" class="ct-status" hidden>아직 만든 수업이 없어요. <b>➕ 새 수업 만들기</b>를 눌러 주세요.</p>
+            <div id="classList" class="ct-classes"></div>
+            <details id="doneBox" class="ct-key" hidden><summary id="doneSum">✅ 마친 수업</summary><div id="doneList" class="ct-classes"></div></details>
+            <p id="listMsg" class="note" role="status" aria-live="polite"></p>
+            <p class="note">수업을 누르면 학생 연결 QR 이 크게 나오고, <b>다음 → 진행 보기</b>로 단계 열기·결과판으로 가요. 학생 자료는 만든 날부터 6개월 뒤 저절로 지워져요.</p>
+        </section>
+      </div>
+
+      <div id="viewClass" hidden>
         <section class="ct-card ct-bar">
             <div class="ct-row">
-                <label class="ct-field ct-inline">수업 <select id="watchSel"></select></label>
+                <button id="btnToList" class="secondary">← 수업 목록</button>
+                <span id="classTitle" class="ct-classtitle"></span>
+            </div>
+            <div class="ct-row">
                 <button id="btnRefresh" class="secondary">🔄 새로 보기</button>
-                <button id="btnShowQr" class="secondary">📱 QR·수업 코드</button>
+                <button id="btnShowQr" class="secondary">📱 QR 화면</button>
+                <button id="btnDone" class="secondary">✅ 수업 마치기</button>
             </div>
             <p id="watchMsg" class="note" role="status" aria-live="polite"></p>
-            <p id="noClass" class="ct-status" hidden>아직 만든 수업이 없어요. 오른쪽 위 <b>⚙ 설정</b> → <b>➕ 새 수업 만들기</b>에서 수업을 만들어 주세요. <button id="btnGoMake" class="good">➕ 수업 만들기</button></p>
+            <p id="doneMsg" class="note" role="status" aria-live="polite"></p>
         </section>
 
+        <!-- 수업 첫 화면: 교실 앞 화면에서 찍을 큰 QR -->
+        <section class="ct-card ct-qrpage" id="classOut" hidden>
+            <p class="ct-qrlead">📱 폰 카메라로 QR 을 찍어 들어오세요</p>
+            <div id="qr" class="ct-qr ct-qr-xl" aria-label="학생 연결 QR 코드"></div>
+            <p class="note">또는 메인 페이지 → <b>학생</b> → 수업 코드</p>
+            <p class="ct-code ct-code-xl" id="outCode"></p>
+            <p class="note" id="outTitle"></p>
+            <div class="ct-row ct-center">
+                <button id="btnToRun" class="good ct-big">다음 → 진행 보기</button>
+                <button id="btnBig" class="secondary">🔍 QR 화면 가득</button>
+                <button id="btnCopy" class="secondary">📋 주소 복사</button>
+            </div>
+            <p><a id="outLink" class="ct-link" target="_blank" rel="noopener"></a></p>
+            <p id="copyMsg" class="note"></p>
+            <p class="note"><b>수업 코드로 찾기는 만든 뒤 2일까지</b>예요(그 뒤에는 QR·주소로, 필요하면 목록의 🔓 코드 다시 열기).</p>
+            <p class="ct-status warn" id="outExpire"></p>
+        </section>
+
+        <div id="runPane" hidden>
         <!-- 학생에게 여는 단계 -->
         <section class="ct-card ct-stage" id="stageCard" hidden>
             <p class="note">학생 화면에서 지금 열린 단계</p>
@@ -54,25 +92,6 @@
             <p id="stageMsg" class="note" role="status" aria-live="polite"></p>
         </section>
 
-        <!-- 학생 연결 QR (수업을 만들면·📱 단추로) -->
-        <section class="ct-card" id="classOut" hidden>
-            <h2>학생 연결 <span id="outTitle" class="note"></span></h2>
-            <div class="ct-join">
-                <div id="qr" class="ct-qr" aria-label="학생 연결 QR 코드"></div>
-                <div>
-                    <p class="note">학생은 QR 을 찍거나, 메인 페이지 → <b>학생으로 시작</b>에서 아래 수업 코드를 넣어요. <b>수업 코드로 찾기는 만든 뒤 2일까지</b>예요(그 뒤에는 QR·주소로, 필요하면 ⚙ 설정 → 내 수업의 🔓 코드 다시 열기).</p>
-                    <p class="ct-code" id="outCode"></p>
-                    <p><a id="outLink" class="ct-link" target="_blank" rel="noopener"></a></p>
-                    <div class="ct-row">
-                        <button id="btnCopy" class="secondary">📋 주소 복사</button>
-                        <button id="btnBig" class="good">🔍 QR 크게</button>
-                        <button id="btnHideQr" class="secondary">접기</button>
-                    </div>
-                    <p id="copyMsg" class="note"></p>
-                </div>
-            </div>
-            <p class="ct-status warn" id="outExpire"></p>
-        </section>
 
         <div id="watchSum" class="ct-sum"></div>
         <!-- 가족 행사(팀 이름 수업): 결과판 -->
@@ -89,7 +108,12 @@
             <div id="detailBody"></div>
             <div class="ct-row"><button id="btnCloseDetail" class="secondary">닫기</button></div>
         </section>
+        </div><!-- /runPane -->
+      </div><!-- /viewClass -->
     </div>
+
+    <!-- 진행 보기 오른쪽 위 QR (교실 뒤에서 폰 카메라로 확대해 찍을 수 있는 크기, 누르면 크게) -->
+    <button type="button" id="cornerQr" class="ct-corner" hidden aria-label="학생 연결 QR 크게 보기"><span id="cornerQrImg" class="ct-corner-img"></span><b id="cornerCode"></b><span class="ct-corner-mini">📱 QR</span></button>
 
     <!-- ⚙ 설정 (첫 화면에 안 보임) -->
     <div id="viewSettings" hidden>
@@ -129,11 +153,6 @@
             <p id="createMsg" class="note" role="status" aria-live="polite"></p>
         </section>
 
-        <section class="ct-card">
-            <h2>내 수업 <span class="note">(이 구글 계정으로 만든 수업 — 어느 컴퓨터에서나 보여요)</span></h2>
-            <div id="classList" class="ct-list"></div>
-            <p id="listMsg" class="note" role="status" aria-live="polite"></p>
-        </section>
     </div>
         <div class="tab-panel" data-tab="dl">
             <p class="note" id="dlFor"></p>
@@ -210,6 +229,7 @@
 <!-- 팀 결과판 크게 보기 (프로젝터) -->
 <div id="boardBig" class="ct-boardbig" hidden role="dialog" aria-label="팀 결과판 크게 보기">
     <div class="ct-row"><h2 id="boardBigTitle">🏆 팀 결과판</h2><button id="btnBoardClose">닫기</button></div>
+    <div id="boardBigQr" class="ct-boardqr" aria-label="학생 연결 QR"></div>
     <div id="boardBigBody"></div>
 </div>
 

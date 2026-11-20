@@ -304,7 +304,8 @@
         function publicClass(c) {
             return { ok: true, classCode: c.classCode, space: c.space, ban: c.ban, nStudents: c.nStudents, groupSize: c.groupSize, exp: c.exp,
                 groups: c.groups || [], aiLimit: aiLimitOf(c), created: iso(c.createdAt), expireAt: iso(c.expireAt), mode: c.mode === 'team' ? 'team' : '', setup: c.setup || null,
-                stage: c.stage == null || !isFinite(Number(c.stage)) ? null : Number(c.stage) };
+                stage: c.stage == null || !isFinite(Number(c.stage)) ? null : Number(c.stage),
+                done: c.done === true, doneAt: c.done === true && c.doneAt ? iso(c.doneAt) : '' };
         }
         // ----- 팀 이름으로 입장 (mode 'team') -----
         async function teamList(c) {
@@ -352,6 +353,13 @@
             if (st % 1) fail('열 단계는 정수로 넣어 주세요.');
             await db.update('labClasses/' + c.space, { stage: st });
             return { ok: true, stage: st };
+        }
+        // 교사: '✅ 수업 마치기' 표시 (저절로 판단하지 않음, 되돌릴 수 있음). 학생 화면은 그대로 둠
+        async function classDone(b, auth) {
+            var c = await ownedClass(b, auth);
+            var done = b.done === true || b.done === 'true';
+            await db.update('labClasses/' + c.space, { done: done, doneAt: done ? db.stamp() : null });
+            return { ok: true, done: done };
         }
         // 교사: 행사 설정만 고치기 (예비 실험 값·목표)
         async function classSetup(b, auth) {
@@ -718,6 +726,7 @@
                 if (a === 'classInfo') return await classInfo(body);
                 if (a === 'classSetup') return await classSetup(body, auth);
                 if (a === 'classStage') return await classStage(body, auth);
+                if (a === 'classDone') return await classDone(body, auth);
                 if (a === 'classStatus') return await classStatus(body, auth);
                 if (a === 'classExport') return await classExport(body, auth);
                 if (a === 'myClasses') return await myClasses(body, auth);
