@@ -43,13 +43,19 @@
             <h2>① 수업 만들기</h2>
             <div class="ct-grid3">
                 <label class="ct-field">반 <input type="number" id="inBan" min="1" max="99" inputmode="numeric" value="1"></label>
-                <label class="ct-field">학생 수 <input type="number" id="inN" min="1" max="60" inputmode="numeric" value="24"></label>
-                <label class="ct-field">조별 인원 <input type="number" id="inSize" min="1" max="10" inputmode="numeric" value="4"></label>
+                <label class="ct-field" id="rowN">학생 수 <input type="number" id="inN" min="1" max="60" inputmode="numeric" value="24"></label>
+                <label class="ct-field" id="rowSize">조별 인원 <input type="number" id="inSize" min="1" max="10" inputmode="numeric" value="4"></label>
+                <label class="ct-field" id="rowTeams" hidden>팀 수 (최대) <input type="number" id="inTeams" min="1" max="40" inputmode="numeric" value="12"></label>
             </div>
             <label class="ct-field">실험
                 <select id="inExp"></select>
             </label>
-            <label class="ct-field">🤖 AI 질문 한도 (조마다, 이 수업에서 몇 번까지. 0 이면 끔)
+            <!-- 가족 행사(팀 이름으로 입장): 조를 미리 나누지 않음. 예비 실험으로 정한 값 (js/class-teacher.js 의 teamSetupHtml) -->
+            <div id="teamBox" class="ct-team" hidden>
+                <p class="note">👨‍👩‍👧 <b>팀 이름으로 입장</b>: 조를 미리 나누지 않아요. 가족이 QR 로 들어와 팀 이름(별명)을 정하면 빈 자리 하나를 차지해요. 이름·학번은 받지 않아요.</p>
+                <details class="ct-key" open><summary>🧪 예비 실험 값 (가족 화면의 고르기 범위·목표)</summary><div id="teamSetup"></div></details>
+            </div>
+            <label class="ct-field" id="rowAi">🤖 AI 질문 한도 (조마다, 이 수업에서 몇 번까지. 0 이면 끔)
                 <input type="number" id="inAiLimit" min="0" max="200" inputmode="numeric" value="20">
             </label>
             <label class="ct-field" id="customRow" hidden>선생님이 만든 실험의 번호 (주소 <code>custom-lab.html?id=</code> 뒤의 글자)
@@ -109,6 +115,14 @@
             </div>
             <p id="dlMsg" class="note" role="status" aria-live="polite"></p>
         </section>
+        <!-- 가족 행사(팀 이름 수업): 결과판·예비 실험 값 고치기 -->
+        <section class="ct-card" id="boardCard" hidden>
+            <div class="ct-row"><h2 style="margin:0">🏆 팀 결과판</h2><button id="btnBoardBig" class="good">🖥 크게 보기 (프로젝터)</button></div>
+            <div id="board"></div>
+            <details class="ct-key"><summary>🧪 예비 실험 값·목표 고치기</summary><div id="teamSetupEdit"></div>
+                <div class="ct-row"><button id="btnSetupSave" class="good">💾 설정 저장</button></div><p id="setupMsg" class="note" role="status" aria-live="polite"></p>
+                <p class="note">가족 화면은 도전 화면을 열 때 새 목표를 받아요.</p></details>
+        </section>
         <div id="groups" class="ct-groups"></div>
         <section class="ct-card" id="detail" hidden>
             <h2 id="detailTitle"></h2>
@@ -161,6 +175,12 @@
         </section>
     </div>
 </main>
+
+<!-- 팀 결과판 크게 보기 (프로젝터) -->
+<div id="boardBig" class="ct-boardbig" hidden role="dialog" aria-label="팀 결과판 크게 보기">
+    <div class="ct-row"><h2 id="boardBigTitle">🏆 팀 결과판</h2><button id="btnBoardClose">닫기</button></div>
+    <div id="boardBigBody"></div>
+</div>
 
 <!-- QR 크게 보기 -->
 <div id="bigQr" class="ct-bigqr" hidden role="dialog" aria-label="QR 크게 보기">

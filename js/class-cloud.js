@@ -39,7 +39,9 @@
         // 서버 9판부터 공용 저장에 heartrate. 숨 참기 탐구 회차는 kind 'breath' 자료 (js/heart-rate-breath.js)
         heartrate: { name: '스마트폰 카메라 심박수 (숨 참기 탐구)', icon: '❤️', page: 'projects/heart-rate.html', steps: { live: '심박수 재기', breath: '숨 참기 탐구' }, ready: true },
         // 탄소 양자점 형광 (시료 하나 = 한 줄). 저장은 Firestore 로 옮기는 중이라 Apps Script(Code.gs) 에는 넣지 않음 (2026-11-18 결정)
-        qdot: { name: '탄소 양자점 형광 실험', icon: '🌈', page: 'projects/quantum-dot.html', steps: STEPS7, ready: true }
+        qdot: { name: '탄소 양자점 형광 실험', icon: '🌈', page: 'projects/quantum-dot.html', steps: STEPS7, ready: true },
+        // 가족 행사 (행사형 화면): 조를 미리 나누지 않고 가족이 팀 이름을 정해 들어옴 (team: true → 수업 만들 때 '팀 수'·예비 실험 값)
+        rocket: { name: '발포비타민 필름통 로켓 (가족 행사)', icon: '🚀', page: 'projects/film-rocket.html', steps: { enter: '입장', think: '생각 열기', t1: '1차시 열리는 시간', t2: '2차시 로켓 높이', end: '정리' }, ready: true, team: true }
     };
     var CUSTOM_RE = /^custom:([A-Za-z0-9_-]{1,40})$/;
     var CUSTOM_STEPS = Object.assign({ live: '한 화면' }, STEPS7);
@@ -205,8 +207,16 @@
     }
     function ping(url, fetchImpl) { return getQ(url, { action: 'ping', _: Date.now() }, fetchImpl); }
     function createClass(url, o, fetchImpl) {
-        return post(url, { action: 'createClass', ban: Number(o.ban), nStudents: Number(o.nStudents), groupSize: Number(o.groupSize), exp: o.exp, aiLimit: o.aiLimit == null || o.aiLimit === '' ? '' : Number(o.aiLimit) }, fetchImpl);
+        var b = { action: 'createClass', ban: Number(o.ban), nStudents: Number(o.nStudents), groupSize: Number(o.groupSize), exp: o.exp, aiLimit: o.aiLimit == null || o.aiLimit === '' ? '' : Number(o.aiLimit) };
+        if (o.mode === 'team') { b.mode = 'team'; b.nTeams = Number(o.nTeams); }
+        if (o.setup) b.setup = o.setup;
+        return post(url, b, fetchImpl);
     }
+    // 팀 이름으로 입장 (가족 행사): 빈 조 자리 하나를 그 팀 이름으로 잡음 → { jo, num: 1, name, group }
+    function joinTeam(url, o, fetchImpl) { return post(url, { action: 'teamJoin', 'class': o.classCode, name: String(o.name || ''), device: o.device || '' }, fetchImpl, 20000); }
+    // 수업 정보 새로 읽기 (선생님이 행사 설정을 고친 뒤)
+    function classInfo(url, classCode, fetchImpl) { return post(url, { action: 'classInfo', 'class': classCode }, fetchImpl, 15000); }
+    function classSetup(space, setup, fetchImpl) { return post('lab:' + space, { action: 'classSetup', setup: setup }, fetchImpl, 20000); }
     function joinInfo(url, classCode, fetchImpl) { return getQ(url, { action: 'joinInfo', 'class': classCode, _: Date.now() }, fetchImpl); }
     function heartbeat(url, o, fetchImpl) {
         return post(url, {
@@ -242,7 +252,7 @@
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
         studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
-        parseResponse: parseResponse, ping: ping, createClass: createClass, joinInfo: joinInfo, heartbeat: heartbeat, classStatus: classStatus,
+        parseResponse: parseResponse, ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, heartbeat: heartbeat, classStatus: classStatus,
         myClasses: myClasses, classExport: classExport, deleteClass: deleteClass, reopenCode: reopenCode, expireText: expireText
     };
 });

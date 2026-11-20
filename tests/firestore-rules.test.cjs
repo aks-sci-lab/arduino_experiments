@@ -135,7 +135,7 @@ test('정리 도구: expireAt 가 지난 문서만 지움 (가짜 Firestore)', a
         batch: () => { const del = []; return { delete: r => del.push(r), commit: async () => del.forEach(p => docs.delete(p)) }; }
     };
     const r = await cleanup(db, now);
-    assert.deepEqual(r, { items: 1, raw: 0, progress: 1, aiAsk: 0, reports: 0, aiDesk: 0, labClasses: 1, labClassCodes: 0, devlog: 0 });
+    assert.deepEqual(r, { items: 1, raw: 0, progress: 1, aiAsk: 0, reports: 0, aiDesk: 0, teams: 0, labClasses: 1, labClassCodes: 0, devlog: 0 });
     assert.deepEqual([...docs.keys()].sort(), ['customExperiments/x', 'labSpaces/c1/items/b']);
-    assert.ok(GROUPS.includes('labClassCodes'));
+    assert.ok(GROUPS.includes('labClassCodes')); assert.ok(GROUPS.includes('teams'), '팀 이름 수업의 팀 자리');
 });

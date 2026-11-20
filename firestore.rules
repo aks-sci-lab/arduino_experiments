@@ -130,11 +130,17 @@ service cloud.firestore {
              d.keys().size() <= 40 && okExpire(d);
     }
     function classOwner(space) { return get(/databases/$(database)/documents/labClasses/$(space)).data.owner; }
+    // 팀 이름 수업(필름통 로켓, mode 'team'): 이 실험의 줄은 그 팀 자리(teams/{조 번호})를 잡은 폰(익명 uid)만 만들고 고친다
+    function teamUid(space, group) { return get(/databases/$(database)/documents/labClasses/$(space)/teams/$(group.split('-')[1])).data.uid; }
+    function okTeamItem(space, d) {
+      return d.exp != 'rocket' || (space.matches('^c[a-z0-9]{23}$') && d.uid == request.auth.uid && teamUid(space, d.group) == request.auth.uid &&
+             (resource == null || resource.data.uid == request.auth.uid));
+    }
 
     match /labSpaces/{space}/items/{doc} {
       allow get, list: if signedIn() && okSpace(space);
       allow create, update: if signedIn() && okSpace(space) && okItem(request.resource.data) &&
-                            doc.size() <= 120;
+                            doc.size() <= 120 && okTeamItem(space, request.resource.data);
       allow delete: if signedIn() && space.matches('^c[a-z0-9]{23}$') && classOwner(space) == request.auth.uid;
     }
     match /labSpaces/{space}/raw/{doc} {
@@ -150,12 +156,32 @@ service cloud.firestore {
       allow get: if signedIn() && space.matches('^c[a-z0-9]{23}$');
       allow list: if signedIn() && resource.data.owner == request.auth.uid;
       allow create: if isGoogle() && space.matches('^c[a-z0-9]{23}$') && request.resource.data.owner == request.auth.uid &&
-                    request.resource.data.keys().hasOnly(['owner', 'classCode', 'ban', 'nStudents', 'groupSize', 'exp', 'groups', 'aiLimit', 'createdAt', 'expireAt']) &&
+                    request.resource.data.keys().hasOnly(['owner', 'classCode', 'ban', 'nStudents', 'groupSize', 'exp', 'groups', 'aiLimit', 'mode', 'setup', 'createdAt', 'expireAt']) &&
+                    (!('mode' in request.resource.data) || request.resource.data.mode == 'team') &&
+                    (!('setup' in request.resource.data) || (request.resource.data.setup is map && request.resource.data.setup.size() <= 24)) &&
                     (!('aiLimit' in request.resource.data) || (request.resource.data.aiLimit is int && request.resource.data.aiLimit >= 0 && request.resource.data.aiLimit <= 200)) &&
                     request.resource.data.classCode is string && request.resource.data.classCode.matches('^[0-9]{1,2}-[0-9]{4}$') &&
                     request.resource.data.groups is list && request.resource.data.groups.size() <= 60 && okExpire(request.resource.data);
-      allow update: if false;
+      // 주인 교사: 행사 설정(예비 실험 값·목표)만 고칠 수 있음
+      allow update: if isGoogle() && resource.data.owner == request.auth.uid &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['setup']) &&
+                    request.resource.data.setup is map && request.resource.data.setup.size() <= 24;
       allow delete: if signedIn() && resource.data.owner == request.auth.uid;
+    }
+    // 팀 이름으로 입장: 팀 하나 = 조 자리 하나. 공간 id 를 아는 가족(익명)은 팀 이름을 보고(같은 이름 막기), 빈 자리만 자기 uid 로 잡음.
+    // 잡은 자리는 고칠 수 없음(다른 가족이 덮어쓰지 못하게). 지우기는 수업 주인 교사만
+    match /labClasses/{space}/teams/{jo} {
+      allow get, list: if signedIn() && exists(/databases/$(database)/documents/labClasses/$(space));
+      allow create: if signedIn() && jo.matches('^[0-9]{1,2}$') &&
+                    get(/databases/$(database)/documents/labClasses/$(space)).data.mode == 'team' &&
+                    int(jo) >= 1 && int(jo) <= get(/databases/$(database)/documents/labClasses/$(space)).data.groups.size() &&
+                    request.resource.data.keys().hasOnly(['name', 'key', 'uid', 'device', 'createdAt', 'expireAt']) &&
+                    request.resource.data.uid == request.auth.uid &&
+                    request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 24 &&
+                    shortStr(request.resource.data.key, 24) && shortStr(request.resource.data.device, 20) &&
+                    request.resource.data.createdAt == request.time && okExpire(request.resource.data);
+      allow update: if false;
+      allow delete: if isOwner(space);
     }
     // 학생 진행(하트비트): 수업이 있을 때 누구나(익명 학생) 쓰기, 읽기는 수업 주인만
     match /labClasses/{space}/progress/{pid} {

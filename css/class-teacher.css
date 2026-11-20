@@ -92,3 +92,20 @@ html.big-view .ct-bigqr { zoom: calc(1 / 1.35); }
 .ct-ai-rep h3 { font-size: 1rem; margin: 0 0 var(--sp-2); }
 .ct-ai-ans { background: var(--c-primary-soft); border-radius: var(--r-ctl); padding: var(--sp-2); }
 .ct-ai-ask pre { white-space: pre-wrap; font-size: .8rem; }
+
+/* 가족 행사 (팀 이름으로 입장, 필름통 로켓): 예비 실험 값·결과판 */
+.ct-team .ct-setup { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); }
+.ct-team .ct-setup h4, #teamSetupEdit .ct-setup h4 { grid-column: 1 / -1; margin: var(--sp-2) 0 0; }
+#teamSetupEdit .ct-setup { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); }
+.ct-pieces { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); }
+.ct-pieces label { display: inline-flex; align-items: center; gap: 4px; min-height: var(--tap); }
+.ct-board { width: 100%; border-collapse: collapse; }
+.ct-board th, .ct-board td { padding: var(--sp-2); border-bottom: 1px solid var(--c-line); text-align: center; }
+.ct-board td:first-child, .ct-board th:first-child { text-align: left; }
+.ct-board .ok { color: var(--c-ok-text); font-weight: 700; }
+.ct-board-wrap { overflow-x: auto; }
+.ct-boardbig { position: fixed; inset: 0; z-index: 1000; background: var(--c-card); padding: var(--sp-4); overflow: auto; }
+.ct-boardbig .ct-board { font-size: clamp(1.2rem, 2.4vw, 2.2rem); }
+.ct-boardbig h2 { font-size: clamp(1.4rem, 3vw, 2.6rem); margin: 0; }
+.ct-boardbig button { min-height: var(--tap); padding: var(--sp-2) var(--sp-5); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: 1rem; }
+html.big-view .ct-boardbig { zoom: calc(1 / 1.35); }

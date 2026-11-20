@@ -20,7 +20,7 @@ test('모든 실험: 수업 QR → 조·번호 고르기 → 수업 공간에 �
     await new Promise(r => api.listen(0, r)); await new Promise(r => stat.listen(0, r));
     const API = 'http://127.0.0.1:' + api.address().port + '/exec', ROOT = 'http://127.0.0.1:' + stat.address().port;
     const browser = await chromium.launch();
-    const exps = Object.keys(CC.EXPS).concat(['custom:ohm01']);
+    const exps = Object.keys(CC.EXPS).filter(k => !CC.EXPS[k].team).concat(['custom:ohm01']);   // 팀 이름 수업(rocket)은 tests/film-rocket-ui.test.cjs
     const done = [];
     try {
         for (const exp of exps) {
