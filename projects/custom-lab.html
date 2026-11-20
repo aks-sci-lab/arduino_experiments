@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <script src="../js/ble-help.js"></script>
     <title>실험 | 센서 기반 실험실</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/class-share.css">
@@ -56,6 +57,13 @@
         .readout { background: #f1f3f5; border-radius: 8px; padding: 8px; text-align: center; }
         .readout .k { font-size: 0.85em; color: #555; }
         .readout .v { font-size: 1.5em; font-weight: 700; font-variant-numeric: tabular-nums; }
+        /* 버니어 센서: 칸마다 채널 고르기 */
+        .vernier-map { margin: 8px 0; padding: 8px; border: 1px solid var(--c-line); border-radius: var(--r-card); }
+        .vernier-map p { margin: 0 0 6px; }
+        .vernier-map .map-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0; }
+        .vernier-map .map-row span { font-weight: 600; min-width: 4.5em; }
+        .vernier-map select { flex: 1 1 180px; min-width: 0; min-height: var(--tap); }
+        .credit { font-size: .78rem; }
         .sensor-chart { position: relative; height: 200px; margin-top: 8px; }
         #edSensorFields label { display: block; margin: 6px 0; }
         button.rec { background: var(--c-danger); border-color: var(--c-danger); color: #fff; }
@@ -134,11 +142,12 @@
         <div class="card" id="sensorCard" hidden>
             <h2>🔌 센서 <span id="sensorName" class="muted"></span></h2>
             <div class="row no-print" id="sensorButtons">
-                <button id="btnSensorConnect" class="primary">🔌 센서 연결</button>
+                <button id="btnSensorConnect" class="primary" data-ble-connect>🔌 센서 연결</button>
                 <button id="btnSensorDisconnect" hidden>연결 해제</button>
                 <label>측정 주기 <select id="selRate"></select></label>
             </div>
             <div id="sensorStatus" class="muted" style="margin-top:6px"></div>
+            <div id="vernierMap" class="vernier-map no-print" hidden></div>
             <div id="sensorReadouts" class="readouts"></div>
             <div class="row no-print" id="sensorRecButtons">
                 <button id="btnRec" disabled>● 기록 시작</button>
@@ -304,8 +313,9 @@
 <script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-share.js"></script>
-<script src="../js/custom-lab-math.js?v=3"></script>
+<script src="../js/custom-lab-math.js?v=4"></script>
 <script src="../js/custom-lab-sensor.js?v=1"></script>
-<script src="../js/custom-lab.js?v=3"></script>
+<script src="../js/vernier-godirect.js?v=1"></script>
+<script src="../js/custom-lab.js?v=4"></script>
 </body>
 </html>

@@ -146,6 +146,7 @@
         { uuid: '1819', name: '위치·길찾기', on: false },
         { uuid: '1815', name: '자동화 입출력', on: false },
         { uuid: '6e400001-b5a3-f393-e0a9-e50e24dcca9e', name: 'Nordic UART (여러 센서가 쓰는 글자 통로)', on: true },
+        { uuid: 'd91714ef-28b9-4f91-ba16-f0d9a604f112', name: 'Vernier Go Direct (공개 방식)', on: true },
         { uuid: '19b10000-e8f2-537e-4f6c-d104768a1214', name: '우리 Pico·Nano 센서 보드 (시험용)', on: false }
     ];
     const KNOWN_NAMES = {
@@ -155,7 +156,7 @@
         '2a26': '펌웨어 판', '2a27': '하드웨어 판', '2a28': '소프트웨어 판', '2a23': '시스템 ID', '2a19': '배터리 잔량',
         '2a6e': '온도', '2a6f': '습도', '2a6d': '기압', '2a1c': '체온 측정', '2a37': '심박 측정', '2a00': '기기 이름',
         '6e400001-b5a3-f393-e0a9-e50e24dcca9e': 'Nordic UART', '6e400002-b5a3-f393-e0a9-e50e24dcca9e': 'UART 받기(쓰기)',
-        '6e400003-b5a3-f393-e0a9-e50e24dcca9e': 'UART 보내기(알림)', '19b10000-e8f2-537e-4f6c-d104768a1214': '우리 센서 보드'
+        '6e400003-b5a3-f393-e0a9-e50e24dcca9e': 'UART 보내기(알림)', '19b10000-e8f2-537e-4f6c-d104768a1214': '우리 센서 보드', 'd91714ef-28b9-4f91-ba16-f0d9a604f112': 'Vernier Go Direct'
     };
     function knownName(uuid) {
         const u = normUuid(uuid);
@@ -356,7 +357,35 @@
         };
     }
 
+    // 해석하지 않아도 공개된 연결 방식으로 바로 쓸 수 있는 센서인지 (기기 이름·서비스로 판단). 없으면 null
+    const KNOWN_VENDORS = [
+        { id: 'vernier', name: 'Vernier Go Direct', service: 'd91714ef-28b9-4f91-ba16-f0d9a604f112', namePrefix: 'GDX' }
+    ];
+    // 버니어 Go Direct 명령 묶음 (공개 도구 godirect-js, BSD 3-Clause 의 Device._sendCommand 와 같은 모양):
+    // [0x58, 전체 길이, 순번, 합계, …명령]. 합계 = 모든 바이트 합(합계 칸 0) 의 아래 8비트
+    const VERNIER = {
+        SERVICE: 'd91714ef-28b9-4f91-ba16-f0d9a604f112',
+        COMMAND: 'f4bf14a6-c7d5-4b6d-8aa8-df1a7c83adcb',
+        RESPONSE: 'b41e6675-a329-40e0-aa01-44d2f444babe',
+        INIT: [0x1a, 0xa5, 0x4a, 0x06, 0x49, 0x07, 0x48, 0x08, 0x47, 0x09, 0x46, 0x0a, 0x45, 0x0b, 0x44, 0x0c, 0x43, 0x0d, 0x42, 0x0e, 0x41],
+        GET_STATUS: [0x10]
+    };
+    function vernierCommand(sub, counter) {
+        const b = new Uint8Array(4 + sub.length);
+        b[0] = 0x58; b[1] = b.length; b[2] = counter & 0xff; b[3] = 0;
+        b.set(sub, 4);
+        let sum = 0;
+        for (let i = 0; i < b.length; i++) sum = (sum + b[i]) & 0xff;
+        b[3] = sum;
+        return b;
+    }
+    function knownVendor(deviceName, serviceUuids) {
+        const svcs = (serviceUuids || []).map(normUuid);
+        return KNOWN_VENDORS.find(v => svcs.includes(v.service) || String(deviceName || '').startsWith(v.namePrefix)) || null;
+    }
+
     const api = {
+        knownVendor, KNOWN_VENDORS, VERNIER, vernierCommand,
         FORMATS, FORMAT_BY_ID, STANDARD_SERVICES, DEVICE_INFO_CHARS, SCHEMA,
         toBytes, readRaw, parseMask, readField, decodePacket, toHex, parseHex, normUuid, shortUuid, knownName,
         changingBytes, fitLine, niceNumber, findCandidates, candidateToField, validateDecoder,

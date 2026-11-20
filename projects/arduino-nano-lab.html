@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="../css/lab-base.css">
     <link rel="stylesheet" href="../css/class-share.css">
     <script src="../js/lab-ui.js"></script>
+    <script src="../js/ble-help.js"></script>
     <title>아두이노 Nano 33 BLE Sense 센서 실험</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
     <style>
@@ -70,7 +71,7 @@
         <!-- 연결·상태 띠 (위에 붙어 있음) -->
         <div class="dash-bar">
             <span id="status" class="dash-status" role="status" aria-live="polite">연결 대기 — <strong>블루투스 연결</strong>을 누르세요.</span>
-            <button id="connectButton" class="btn-primary">블루투스 연결</button>
+            <button id="connectButton" class="btn-primary" data-ble-connect>블루투스 연결</button>
             <button id="disconnectButton" style="display:none;">연결 끊기</button>
             <button id="startButton" class="btn-primary" disabled>▶ 측정 시작</button>
             <button id="stopButton" class="btn-danger" disabled>■ 측정 중지</button>

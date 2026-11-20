@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <script src="../js/ble-help.js"></script>
     <title>LED 로 플랑크 상수 측정</title>
     <link rel="stylesheet" href="../css/planck-led.css">
     <link rel="stylesheet" href="../css/class-share.css">
@@ -549,7 +550,7 @@
             </div>
             <div id="box-sensor" hidden>
                 <div class="row">
-                    <button id="btn-sensor" class="secondary">🔗 센서 연결</button>
+                    <button id="btn-sensor" class="secondary" data-ble-connect>🔗 센서 연결</button>
                     <span id="sensor-status" class="note">4. 실험 과정의 '📡 블루투스 센서로 재기' 대로 회로를 꾸민 뒤 연결하세요.</span>
                 </div>
                 <div class="row sensor-live" id="sensor-live">
