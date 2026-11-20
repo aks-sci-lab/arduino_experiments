@@ -1,22 +1,24 @@
-// 수업 연결(교사·학생 로그인 없이): 조 나누기·코드·학생 링크·진행 요약, 그리고 Apps Script(Code.gs 4판)의 classes·progress
+// 수업 연결(교사 구글 로그인, 학생 로그인 없이): 조 나누기·코드·학생 링크·진행 요약, 그리고 저장소(js/lab-store.js, 가짜 메모리 DB)의 수업·진행
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const CC = require('../js/class-cloud.js');
-const PC = require('../js/planck-cloud.js');
 const PD = require('../js/pendulum-cloud.js');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
-test('조 나누기: 인원을 고르게 (26명·4명 → 4·4·4·4·4·3·3), 서버와 같음', () => {
+test('조 나누기: 인원을 고르게 (26명·4명 → 4·4·4·4·4·3·3), 저장소와 같음', async () => {
     assert.deepEqual(CC.splitGroups(26, 4), [4, 4, 4, 4, 4, 3, 3]);
     assert.deepEqual(CC.splitGroups(24, 4), [4, 4, 4, 4, 4, 4]);
     assert.deepEqual(CC.splitGroups(5, 4), [3, 2]);
     assert.deepEqual(CC.splitGroups(1, 4), [1]);
     assert.deepEqual(CC.splitGroups(0, 4), []);
     assert.deepEqual(CC.splitGroups(30, 11), []);
-    const app = loadCodeGs();
+    const app = loadLabStore();
+    for (const [n, g] of [[26, 4], [7, 4], [30, 6], [13, 3], [1, 1]]) {
+        const r = await app.post({ action: 'createClass', ban: 2, nStudents: n, groupSize: g, exp: 'planck' });
+        assert.deepEqual(r.groups.map(x => x.size), CC.splitGroups(n, g), n + '/' + g);
+    }
     for (let n = 1; n <= 60; n++) for (let g = 1; g <= 10; g++) {
         const a = CC.splitGroups(n, g);
-        assert.deepEqual(Array.from(app.ctx.splitGroups(n, g)), a, n + '/' + g);
         assert.equal(a.reduce((x, y) => x + y, 0), n);
         assert.ok(Math.max(...a) <= g && Math.max(...a) - Math.min(...a) <= 1);
     }
@@ -57,130 +59,53 @@ test('진행 요약: 들어옴·활동 중·쉬는 중(5분)·제출한 조', ()
     assert.equal(CC.stepName('planck', 'data'), '5 데이터');
 });
 
-test('Apps Script: 수업 만들기 → 수업 코드·조 코드가 날짜로 바뀌지 않고, 열쇠는 해시만 저장', () => {
-    const app = loadCodeGs();
-    const r = app.post({ action: 'createClass', ban: 2, nStudents: 26, groupSize: 4, exp: 'planck' });
+test('저장소: 수업 만들기 → 수업 코드·조 코드·수업 공간, 학생용 정보에는 주인 정보 없음', async () => {
+    const app = loadLabStore();
+    const r = await app.post({ action: 'createClass', ban: 2, nStudents: 26, groupSize: 4, exp: 'planck' });
     assert.equal(r.ok, true, r.error);
     assert.match(r.classCode, /^2-\d{4}$/);
     const four = r.classCode.split('-')[1];
-    assert.deepEqual(r.groups.map(g => g.size), [4, 4, 4, 4, 4, 3, 3]);
     assert.deepEqual(r.groups.map(g => g.code), [1, 2, 3, 4, 5, 6, 7].map(j => '2-' + j + '-' + four));
     r.groups.forEach(g => assert.ok(PD.isGroupCode(g.code)));
-    assert.match(r.key, /^[0-9a-f]{12}$/);
-    const sh = app.ss.getSheetByName('classes');
-    assert.equal(sh.rows[1][1], r.classCode, '수업 코드가 글자 그대로 (날짜 아님)');
-    assert.equal(sh.written[1][1], "'" + r.classCode);
-    assert.ok(!JSON.stringify(sh.rows).includes(r.key), '열쇠 자체는 시트에 없음');
-    assert.match(String(sh.rows[1][7]), /^[0-9a-f]{64}$/);
-    // 학생용 정보: 열쇠·해시 없음
-    const j = app.get({ action: 'joinInfo', class: r.classCode });
-    assert.equal(j.ok, true);
+    assert.match(r.space, /^c[a-z0-9]{23}$/);
+    const j = await app.post({ action: 'joinInfo', class: r.classCode }, {});
+    assert.equal(j.ok, true, j.error);
     assert.deepEqual(j.groups, r.groups);
-    assert.ok(!('key' in j) && !('keyHash' in j));
-    assert.match(app.get({ action: 'joinInfo', class: '2-0000' === r.classCode ? '2-0001' : '2-0000' }).error, /찾지 못했습니다/);
-    assert.match(app.get({ action: 'joinInfo', class: '2-3-4821' }).error, /형식/);
-    // 수업 코드가 겹치지 않음
-    const codes = new Set([r.classCode]);
-    for (let i = 0; i < 30; i++) codes.add(app.post({ action: 'createClass', ban: 2, nStudents: 4, groupSize: 2, exp: 'planck' }).classCode);
-    assert.equal(codes.size, 31);
+    assert.ok(!JSON.stringify(j).includes('teacher-1'), '학생용 정보에 선생님 uid 없음');
+    assert.match((await app.post({ action: 'joinInfo', class: '2-3-4821' }, {})).error, /형식/);
 });
 
-test('Apps Script: 수업 만들기 값 검사', () => {
-    const app = loadCodeGs();
-    const bad = o => app.post(Object.assign({ action: 'createClass', ban: 2, nStudents: 20, groupSize: 4, exp: 'planck' }, o)).error;
-    assert.match(bad({ ban: 0 }), /반/);
-    assert.match(bad({ nStudents: 61 }), /학생 수/);
-    assert.match(bad({ groupSize: 0 }), /조별 인원/);
-    assert.match(bad({ nStudents: 2.5 }), /정수/);
-    assert.match(bad({ exp: 'nope' }), /수업 연결을 쓸 수 없습니다/);
-    assert.match(bad({ exp: 'custom:a b' }), /수업 연결을 쓸 수 없습니다/);
-    assert.equal(app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'custom:abcDEF_12' }).ok, true);
+test('저장소: 수업 만들기 값 검사', async () => {
+    const app = loadLabStore();
+    const bad = async o => (await app.post(Object.assign({ action: 'createClass', ban: 2, nStudents: 20, groupSize: 4, exp: 'planck' }, o))).error;
+    assert.match(await bad({ ban: 0 }), /반/);
+    assert.match(await bad({ nStudents: 61 }), /학생 수/);
+    assert.match(await bad({ groupSize: 0 }), /조별 인원/);
+    assert.match(await bad({ exp: 'nope' }), /수업 연결을 쓸 수 없습니다/);
+    assert.equal((await app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'custom:abcDEF_12' })).ok, true);
 });
 
-test('Apps Script: 학생 신호는 조·번호마다 한 줄 고쳐 쓰고, 없는 자리는 거절', () => {
-    const app = loadCodeGs();
-    const c = app.post({ action: 'createClass', ban: 3, nStudents: 7, groupSize: 4, exp: 'planck' });   // 4·3
-    const beat = o => app.post(Object.assign({ action: 'heartbeat', class: c.classCode, jo: 1, num: 2, step: 'data', points: 4, submitted: false, device: 'nab12cd' }, o));
-    assert.deepEqual(beat({}), { ok: true, updated: false });
-    assert.deepEqual(beat({ step: 'result', points: 9, submitted: true }), { ok: true, updated: true });
-    assert.deepEqual(beat({ jo: 2, num: 3 }), { ok: true, updated: false });
-    assert.match(beat({ jo: 2, num: 4 }).error, /없는 조·번호/);
-    assert.match(beat({ jo: 3, num: 1 }).error, /없는 조·번호/);
-    assert.match(beat({ class: '3-9999' === c.classCode ? '3-9998' : '3-9999' }).error, /찾지 못했습니다/);
-    assert.equal(beat({ step: '<b>x</b>', device: '!!' }).ok, true);
-    const rows = app.ss.getSheetByName('progress').rows;
-    assert.equal(rows.length, 1 + 2);
-    assert.equal(rows[1][1], c.classCode); assert.equal(rows[1][2], '3-1-' + c.classCode.split('-')[1]);
-    assert.equal(rows[1][5], '', '이상한 단계 이름은 빈칸'); assert.equal(rows[1][9], '');
-});
-
-test('Apps Script: 진행 보기는 열쇠가 맞을 때만, 조별 플랑크 제출 요약 포함', () => {
-    const app = loadCodeGs();
-    const c = app.post({ action: 'createClass', ban: 2, nStudents: 8, groupSize: 4, exp: 'planck' });
-    app.post({ action: 'heartbeat', class: c.classCode, jo: 1, num: 1, step: 'data', points: 4, submitted: true, device: 'nab12cd' });
-    app.post({ action: 'heartbeat', class: c.classCode, jo: 2, num: 3, step: 'theory', points: 0, device: 'nzz9999' });
-    // 1조가 플랑크 조 공유로 보냄 (기존 planck 시트), 다른 수업의 조는 섞이지 않음
-    const ivFor = vt => [0, 0.1, 0.2, 0.3].map(d => ({ v: +(vt + d).toFixed(3), i: +(d * 40).toFixed(3) }));
-    const leds = [{ id: 'red', key: 'red', name: '빨강', lambda: 625, iv: ivFor(1.8), glow: [] }, { id: 'blue', key: 'blue', name: '파랑', lambda: 470, iv: ivFor(2.5), glow: [] }];
-    const pls = PC.buildPayloads({ group: c.groups[0].code, device: 'nab12cd', leds, v0: () => 1.8, summary: { hCurrent: 6.5, errorPct: -1.9 }, now: '2026-11-16T01:00:00.000Z' }, PD.isGroupCode).payloads;
-    pls.forEach(p => assert.equal(app.post(p).ok, true));
-    app.post(Object.assign({}, pls[0], { group: '9-1-0000' }));
-    assert.match(app.post({ action: 'classStatus', class: c.classCode, key: 'wrong' }).error, /열쇠/);
-    assert.match(app.post({ action: 'classStatus', class: c.classCode }).error, /열쇠/);
-    // GET 으로는 받지 않음 (열쇠가 주소에 남지 않게)
-    assert.match(app.get({ action: 'classStatus', class: c.classCode, key: c.key }).error, /알 수 없는|형식/);
-    const st = app.post({ action: 'classStatus', class: c.classCode, key: c.key });
+test('저장소: 학생 신호는 조·번호마다 하나, 없는 자리는 거절, 진행 요약까지', async () => {
+    const app = loadLabStore();
+    const c = await app.post({ action: 'createClass', ban: 3, nStudents: 7, groupSize: 4, exp: 'planck' });   // 4·3
+    const STU = { uid: 'stu-1', anonymous: true };
+    const beat = o => app.post(Object.assign({ action: 'heartbeat', class: c.classCode, space: c.space, jo: 1, num: 2, step: 'data', points: 4, submitted: false, device: 'nab12cd' }, o), STU);
+    assert.equal((await beat({})).ok, true);
+    assert.equal((await beat({ step: 'result', points: 9, submitted: true })).ok, true);
+    assert.equal((await beat({ jo: 2, num: 3 })).ok, true);
+    assert.match((await beat({ jo: 2, num: 4 })).error, /없는 조·번호/);
+    assert.equal(app.progress().length, 2, '같은 자리는 고쳐 씀');
+    const st = await app.post({ action: 'classStatus', class: c.classCode, space: c.space });
     assert.equal(st.ok, true, st.error);
-    assert.equal(st.students.length, 2);
-    const s1 = st.students.find(x => x.jo === 1);
-    assert.deepEqual([s1.num, s1.step, s1.points, s1.submitted, s1.device], [1, 'data', 4, true, 'nab12cd']);
-    assert.equal(typeof s1.lastSeen, 'string');
-    assert.equal(st.submissions[0].rows, 2); assert.deepEqual(st.submissions[0].leds, ['빨강', '파랑']);
-    assert.equal(st.submissions[0].hCurrent, 6.5); assert.equal(st.submissions[0].devices, 1);
-    assert.equal(st.submissions[1].rows, 0);
     const sum = CC.summarize(st);
-    assert.deepEqual([sum.joined, sum.total, sum.submittedGroups], [2, 8, 1]);
-    // 진자·플랑크 기존 동작은 그대로
-    assert.equal(app.get({ action: 'list', exp: 'planck', group: c.groups[0].code }).items.length, 2);
-    assert.equal(app.get({ action: 'list', group: c.groups[0].code }).items.length, 0);
-    assert.ok(app.get({ action: 'ping' }).version >= 4);
+    assert.equal(sum.joined, 2);
 });
 
-test('요청 도우미: 주소 없음·로그인 화면·열쇠는 POST 본문으로', async () => {
-    assert.equal((await CC.ping('')).noConfig, true);
-    let seen = null;
-    const fake = async (url, init) => { seen = { url, init }; return { text: async () => '{"ok":true}' }; };
-    await CC.classStatus('https://s/exec', '2-4821', 'abc123', fake);
-    assert.equal(seen.init.method, 'POST');
-    assert.equal(seen.init.headers['Content-Type'], 'text/plain;charset=utf-8');
-    assert.ok(!seen.url.includes('abc123'));
-    assert.deepEqual(JSON.parse(seen.init.body), { action: 'classStatus', class: '2-4821', key: 'abc123' });
-    await CC.joinInfo('https://s/exec', '2-4821', fake);
-    assert.match(seen.url, /\?action=joinInfo&class=2-4821&_=\d+$/);
-    assert.equal(seen.init.method, 'GET');
-    const html = async () => ({ text: async () => '<html>login</html>' });
-    assert.match((await CC.ping('https://s/exec', html)).error, /모든 사용자/);
-    const boom = async () => { throw new Error('Failed to fetch'); };
-    assert.equal((await CC.heartbeat('https://s/exec', { classCode: '2-4821', jo: 1, num: 1 }, boom)).network, true);
-});
-
-test('서버 판 비교: 손으로(5판 전) · 단추로 업데이트 · 최신(되돌리기만)', () => {
-    assert.deepEqual(CC.updatePlan({ version: 4 }, { version: 5 }), { show: true, kind: 'manual', from: 4, to: 5, canRollback: false });
-    assert.deepEqual(CC.updatePlan({ version: 5, canRollback: false }, { version: 6 }), { show: true, kind: 'update', from: 5, to: 6, canRollback: false });
-    assert.deepEqual(CC.updatePlan({ version: 6, canRollback: true }, { version: 6 }), { show: true, kind: 'latest', from: 6, to: 6, canRollback: true });
-    assert.equal(CC.updatePlan({ version: 6 }, { version: 6 }).show, false);
-    assert.equal(CC.updatePlan({ version: 6 }, null).show, false);
-    assert.equal(CC.updatePlan({ version: 7 }, { version: 6 }).show, false, '시트가 사이트보다 새로우면 띄우지 않음');
-});
-
-test('요청 도우미: 업데이트·되돌리기도 관리 열쇠를 POST 본문으로', async () => {
-    let seen = null;
-    const fake = async (url, init) => { seen = { url, init }; return { text: async () => '{"ok":true,"to":6}' }; };
-    assert.equal((await CC.update('https://s/exec', 'k123', fake)).to, 6);
-    assert.deepEqual(JSON.parse(seen.init.body), { action: 'update', key: 'k123' });
-    assert.ok(!seen.url.includes('k123'));
-    await CC.rollback('https://s/exec', 'k123', fake);
-    assert.deepEqual(JSON.parse(seen.init.body), { action: 'rollback', key: 'k123' });
-    await CC.claimAdmin('https://s/exec', fake);
-    assert.deepEqual(JSON.parse(seen.init.body), { action: 'claimAdmin' });
+test('요청 도우미: 예전 시트 주소는 쓰지 않고 안내만', async () => {
+    const r = await CC.joinInfo('https://script.google.com/macros/s/AKfycbx_abcdefghijklmnopqrstuvwxyz/exec', '2-4821');
+    assert.equal(r.ok, false);
+    assert.equal(r.legacy, true);
+    assert.match(r.error, /새 QR/);
+    assert.equal(typeof CC.update, 'undefined', '서버 업데이트 기능은 없앰');
+    assert.equal(typeof CC.claimAdmin, 'undefined');
 });

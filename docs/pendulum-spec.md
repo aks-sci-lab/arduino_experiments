@@ -1,5 +1,7 @@
 # 스마트폰 진자 실험 웹앱 – 개발 명세서
 
+> **2026-11-18~20 바뀜: 백엔드는 Apps Script 대신 사이트 저장소(Firestore, `js/lab-store.js`), AI 는 선생님 브라우저의 개인 키(`js/report-ai.js`·`js/class-teacher-ai.js`). 아래 Apps Script·시트 이야기는 처음 원문 그대로 남긴 것.**
+>
 > 사용자(교사)가 2026-11-14 준 원문. 결정 사항(이 사이트에 두기, Apps Script + 구글 시트)은 `docs/HANDOVER-2026-11-14.md` 참고.
 > 이 문서는 Claude Code에 전달하는 개발 요구사항입니다. 1단계부터 순서대로 구현하고, 단계마다 동작을 확인한 뒤 다음 단계로 넘어가 주세요.
 

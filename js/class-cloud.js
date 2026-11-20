@@ -13,12 +13,10 @@
     'use strict';
 
     var CLASS_RE = /^\d{1,2}-\d{4}$/;
-    var MIN_VERSION = 4;           // 수업 연결을 쓰려면 Apps Script 가 4판 이상
-    var UPDATE_VERSION = 5;        // 이 판부터 교사 화면의 단추로 서버가 스스로 업데이트
     var IDLE_MS = 5 * 60 * 1000;   // 이만큼 신호가 없으면 '쉬는 중'
 
     // 실험별 페이지와 단계 이름
-    // 실험별 페이지와 단계 이름. 서버 Code.gs 의 CLASS_EXPS 와 같게 둔다.
+    // 실험별 페이지와 단계 이름. 저장소 js/lab-store.js 의 CLASS_EXPS 와 같게 둔다.
     //   ready: 그 페이지가 '?c=' 수업 참여(js/class-share.js)를 붙였는지. 실험 페이지를 붙인 세션이 true 로 바꾼다 (docs/class-share.md)
     //   'custom:<실험 id>' 는 선생님이 만든 실험 (projects/custom-lab.html?id=…)
     var STEPS7 = { purpose: '1 목적', theory: '2 이론', materials: '3 준비물', procedure: '4 과정', data: '5 데이터', result: '6 결과', conclusion: '7 결론' };
@@ -38,7 +36,7 @@
         phoneaccel: { name: '스마트폰 가속도 센서 실험', icon: '📱', page: 'projects/phone-accelerometer.html', steps: DASH, ready: true },
         // 서버 9판부터 공용 저장에 heartrate. 숨 참기 탐구 회차는 kind 'breath' 자료 (js/heart-rate-breath.js)
         heartrate: { name: '스마트폰 카메라 심박수 (숨 참기 탐구)', icon: '❤️', page: 'projects/heart-rate.html', steps: { live: '심박수 재기', breath: '숨 참기 탐구' }, ready: true },
-        // 탄소 양자점 형광 (시료 하나 = 한 줄). 저장은 Firestore 로 옮기는 중이라 Apps Script(Code.gs) 에는 넣지 않음 (2026-11-18 결정)
+        // 탄소 양자점 형광 (시료 하나 = 한 줄, 저장은 Firestore)
         qdot: { name: '탄소 양자점 형광 실험', icon: '🌈', page: 'projects/quantum-dot.html', steps: STEPS7, ready: true },
         // 가족 행사 (행사형 화면): 조를 미리 나누지 않고 가족이 팀 이름을 정해 들어옴 (team: true → 수업 만들 때 '팀 수'·예비 실험 값)
         rocket: { name: '발포비타민 필름통 로켓 (가족 행사)', icon: '🚀', page: 'projects/film-rocket.html', steps: { enter: '입장', think: '생각 열기', t1: '1차시 열리는 시간', t2: '2차시 로켓 높이', end: '정리' }, ready: true, team: true }
@@ -62,7 +60,7 @@
     }
     function isClassCode(s) { return CLASS_RE.test(String(s || '')); }
 
-    // 학생 수를 조별 인원에 맞춰 고르게: 26명·4명 → [4,4,4,4,4,3,3] (서버 Code.gs 의 splitGroups 와 같음)
+    // 학생 수를 조별 인원에 맞춰 고르게: 26명·4명 → [4,4,4,4,4,3,3] (js/lab-store.js 의 splitGroups 와 같음)
     function splitGroups(n, size) {
         n = Math.round(Number(n)); size = Math.round(Number(size));
         if (!(n >= 1 && n <= 60) || !(size >= 1 && size <= 10)) return [];
@@ -167,35 +165,12 @@
     }
 
     // ---------- 요청 (fetchImpl 은 시험에서 가짜로 바꿈) ----------
-    function parseResponse(text) {
-        var j;
-        try { j = typeof text === 'string' ? JSON.parse(text) : text; }
-        catch (e) {
-            return { ok: false, error: /<html/i.test(String(text)) ? '서버가 로그인 화면을 보냈습니다. 웹 앱의 액세스를 "모든 사용자"로 배포했는지 확인하세요.' : '서버 응답을 읽지 못했습니다.' };
-        }
-        if (!j || typeof j !== 'object') return { ok: false, error: '서버 응답이 비어 있습니다.' };
-        if (!j.ok) return { ok: false, error: String(j.error || '서버 오류') };
-        return j;
-    }
+    // 요청은 모두 사이트 저장소(Firestore, js/lab-store.js, 'lab:공간' 주소)로 — js/pendulum-cloud.js 가 불러 줌 (2026-11-20 Apps Script 길 지움)
     function request(url, init, fetchImpl, ms) {
-        // Firestore 저장소 (js/lab-store.js, 'lab:공간' 주소) — js/pendulum-cloud.js 가 불러 줌
+        if (!/^lab:/.test(String(url || ''))) return Promise.resolve({ ok: false, error: '예전 선생님 시트(Apps Script) 주소는 이제 쓰지 않아요. 선생님께 새 QR 을 받으세요.', legacy: true });
         var PC = typeof self !== 'undefined' && self.PendulumCloud;
-        if (/^lab:/.test(String(url || ''))) {
-            if (PC && PC.labRequest) return PC.labRequest(url, init, ms);
-            try { return require('./pendulum-cloud.js').labRequest(url, init, ms); } catch (e) { return Promise.resolve({ ok: false, error: '저장소 도구가 없습니다.' }); }
-        }
-        var f = fetchImpl || (typeof fetch === 'function' ? fetch : null);
-        if (!url) return Promise.resolve({ ok: false, error: '선생님 시트가 아직 연결되지 않았습니다 (Apps Script 주소 없음).', noConfig: true });
-        if (!f) return Promise.resolve({ ok: false, error: '이 브라우저는 서버에 연결할 수 없습니다.' });
-        return new Promise(function (resolve) {
-            var done = false;
-            var t = setTimeout(function () { if (!done) { done = true; resolve({ ok: false, error: '서버에 연결하지 못했습니다 (시간 초과).', network: true }); } }, ms || 15000);
-            f(url, init).then(function (res) { return res.text(); }).then(function (txt) {
-                if (done) return; done = true; clearTimeout(t); resolve(parseResponse(txt));
-            }, function (e) {
-                if (done) return; done = true; clearTimeout(t); resolve({ ok: false, error: '서버에 연결하지 못했습니다 (' + (e && e.message || e) + ').', network: true });
-            });
-        });
+        if (PC && PC.labRequest) return PC.labRequest(url, init, ms);
+        try { return require('./pendulum-cloud.js').labRequest(url, init, ms); } catch (e) { return Promise.resolve({ ok: false, error: '저장소 도구가 없습니다.' }); }
     }
     function getQ(url, params, fetchImpl) {
         if (!url) return request('', null, fetchImpl);
@@ -232,27 +207,14 @@
     function reopenCode(space, fetchImpl) { return post('lab:' + space, { action: 'reopenCode' }, fetchImpl, 20000); }
     // 지워지는 날 (만든 때 + 183일): '2027년 5월 20일'
     function expireText(iso) { var d = new Date(iso); return isNaN(d) ? '' : d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일'; }
-    // 스스로 업데이트 (5판): 관리 열쇠도 POST 본문으로만
-    function claimAdmin(url, fetchImpl) { return post(url, { action: 'claimAdmin' }, fetchImpl); }
-    function update(url, key, fetchImpl) { return post(url, { action: 'update', key: key }, fetchImpl, 120000); }
-    function rollback(url, key, fetchImpl) { return post(url, { action: 'rollback', key: key }, fetchImpl, 60000); }
-    /* 서버 판(ping) 과 사이트 공식 판(release.json) 비교 → 교사 화면에 보일 것
-       돌려주는 값: { show, kind: 'manual'|'update'|'latest', from, to, canRollback } */
-    function updatePlan(ping, release) {
-        var from = Number(ping && ping.version) || 0, to = Number(release && release.version) || 0;
-        var canRollback = !!(ping && ping.canRollback) && from >= UPDATE_VERSION;
-        if (!from || !to || to <= from) return { show: canRollback, kind: 'latest', from: from, to: to, canRollback: canRollback };
-        return { show: true, kind: from >= UPDATE_VERSION ? 'update' : 'manual', from: from, to: to, canRollback: canRollback };
-    }
 
     return {
         expInfo: expInfo, isExp: isExp, STEPS7: STEPS7,
-        CLASS_RE: CLASS_RE, MIN_VERSION: MIN_VERSION, UPDATE_VERSION: UPDATE_VERSION, IDLE_MS: IDLE_MS, EXPS: EXPS,
-        claimAdmin: claimAdmin, update: update, rollback: rollback, updatePlan: updatePlan,
+        CLASS_RE: CLASS_RE, IDLE_MS: IDLE_MS, EXPS: EXPS,
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
         studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
-        parseResponse: parseResponse, ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, heartbeat: heartbeat, classStatus: classStatus,
+        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, heartbeat: heartbeat, classStatus: classStatus,
         myClasses: myClasses, classExport: classExport, deleteClass: deleteClass, reopenCode: reopenCode, expireText: expireText
     };
 });

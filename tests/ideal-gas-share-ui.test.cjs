@@ -1,5 +1,5 @@
 // 이상기체 실험 조 공유 화면 시험 (Playwright): 교사 수업 만들기 → 학생 2명 같은 조 → 보내기 → 다른 학생 자동 불러오기 → 교사 진행 보기
-// 서버는 tests/fake-apps-script.cjs 의 가짜 Apps Script(진짜 시트처럼 '2-3-5376' 이 날짜로 바뀜)에서 apps-script/Code.gs 를 그대로 돌린다.
+// 서버는 tests/fake-lab-store.cjs 의 가짜 저장소.
 // 사이트 파일은 작은 정적 서버로 연다. Playwright 가 없는 컴퓨터에서는 건너뛴다. 스크린숏: IDEAL_SHOTS=폴더
 const test = require('node:test');
 const assert = require('node:assert/strict');

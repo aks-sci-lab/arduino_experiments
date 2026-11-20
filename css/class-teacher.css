@@ -109,3 +109,10 @@ html.big-view .ct-bigqr { zoom: calc(1 / 1.35); }
 .ct-boardbig h2 { font-size: clamp(1.4rem, 3vw, 2.6rem); margin: 0; }
 .ct-boardbig button { min-height: var(--tap); padding: var(--sp-2) var(--sp-5); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: 1rem; }
 html.big-view .ct-boardbig { zoom: calc(1 / 1.35); }
+
+/* 플랑크 상수 결과 (js/class-teacher-planck.js) */
+.ctp-scroll { overflow-x: auto; max-width: 100%; }
+.ctp-row { cursor: pointer; }
+.ctp-row:hover, .ctp-row:focus { background: var(--c-primary-soft); }
+.ctp-chart { width: 100%; max-width: 560px; height: auto; display: block; margin: var(--sp-2) 0; }
+.ctp-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid #333; vertical-align: middle; }

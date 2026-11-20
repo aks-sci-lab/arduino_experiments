@@ -1,6 +1,6 @@
 // 📱 노트북의 '폰으로 측정해 보내기' 카드 (js/class-share.js 의 share.phoneCard) — 폰 측정 · 노트북 분석 이원화
 //  조 코드 없이 열어도 이 노트북용 조 코드를 저절로 만들고 QR 주소(role=phone&group&s)를 보임 → 폰이 보내면 카드에 🆕
-//  가짜 Apps Script(Code.gs 를 Node 에서), Playwright 가 없으면 건너뜀
+//  가짜 저장소(tests/fake-lab-store.cjs), Playwright 가 없으면 건너뜀
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');

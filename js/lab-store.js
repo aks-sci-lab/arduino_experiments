@@ -1,5 +1,5 @@
 /* 실험실 저장소 — Firebase(Firestore) 로 수업 연결·조 공유·폰→노트북 전송 (2026-11-18, Apps Script 대신)
-   브라우저·Node 공용. 예전 서버(apps-script/Code.gs)가 하던 요청을 같은 모양으로 받아 Firestore 에 저장한다.
+   브라우저·Node 공용. 예전 서버(Apps Script, 2026-11-20 지움)가 하던 요청을 같은 모양으로 받아 Firestore 에 저장한다.
    그래서 실험 페이지(js/class-share.js·pendulum-*·planck-*)는 거의 고치지 않고, 요청이 가는 곳만 바뀐다.
 
    주소 대신 '공간(space)': 'lab:<공간 id>'

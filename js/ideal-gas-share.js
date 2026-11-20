@@ -29,7 +29,7 @@
         return list.map(q => ({ s: (q.at - t0) / 1000, t: q.t, p: q.p }));
     }
 
-    // 요약 이름은 서버 규칙 ^[A-Za-z0-9_가-힣 .()-]{1,30}$ 에 맞춘다 (apps-script/Code.gs cleanSummary)
+    // 요약 이름은 서버 규칙 ^[A-Za-z0-9_가-힣 .()-]{1,30}$ 에 맞춘다 (예전 Code.gs 규칙. 지금 저장소 js/lab-store.js 는 더 넓게 받음)
     /* 보낼 것: o = { boyle, gay, dead, ba, ga } (ba·ga 는 내 기록만으로 낸 분석, 없으면 null) */
     function buildItems(o) {
         const items = [];

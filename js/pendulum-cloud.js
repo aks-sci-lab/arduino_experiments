@@ -3,7 +3,7 @@
    - 원본 데이터 줄이기: 정수로 바꾼 뒤 '앞 값과의 차이'를 36진수로 적어 글자 수를 줄이고,
      셀 한 칸(45,000자) × 6칸 안에 들어가게 나눔. 그래도 크면 점을 2개 중 1개만 남김
    - 서버 요청은 '단순 요청'(GET, 또는 Content-Type: text/plain 인 POST)이라 미리보기 요청이 생기지 않음
-   'lab:' 주소 요청은 js/lab-store.js 로 (예전 Apps Script 주소 요청 길은 정리 PR 에서 지움), 시험: tests/pendulum-cloud.test.cjs */
+   요청은 모두 'lab:' 주소로 js/lab-store.js 에 (예전 Apps Script 길은 2026-11-20 지움), 시험: tests/pendulum-cloud.test.cjs */
 (function (root, factory) {
     if (typeof module === 'object' && module.exports) module.exports = factory();
     else root.PendulumCloud = factory();
@@ -39,24 +39,15 @@
         return s;
     }
 
-    // ---------- 선생님마다 다른 시트: 웹 앱 주소 ↔ 스크립트 ID ----------
-    /* 웹 앱 주소 https://script.google.com/macros/s/<스크립트 ID>/exec 에서 ID 만 주고받는다.
-       학생 링크·QR 에는 ?s=<ID> 만 넣어 짧게 하고, 받은 쪽은 이 모양 그대로 주소를 다시 만든다
-       (그래서 아무 주소로나 보내게 할 수 없다: 늘 script.google.com 의 웹 앱). */
+    // 예전 Apps Script 웹 앱 ID(?s=AKfy…) 모양 — 예전 링크로 들어오면 안내만 (2026-11-20 Apps Script 길 지움)
     var SCRIPT_ID_RE = /^[A-Za-z0-9_-]{20,120}$/;
     function isScriptId(id) { return SCRIPT_ID_RE.test(String(id || '')); }
-    function scriptIdFromUrl(url) {
-        var m = /^https:\/\/script\.google\.com\/(?:a\/macros\/[^\/?#]+|macros)\/s\/([A-Za-z0-9_-]{20,120})\/(?:exec|dev)\/?(?:[?#].*)?$/.exec(String(url || '').trim());
-        return m ? m[1] : null;
-    }
-    function urlFromScriptId(id) { return isScriptId(id) ? 'https://script.google.com/macros/s/' + id + '/exec' : ''; }
     /* 이 화면이 쓸 저장 공간 정하기 (2026-11-18 Firestore 로 바꿈, js/lab-store.js)
        - 주소의 ?s=공간 이 있으면 그것 (수업 QR·폰 QR 이 담아 줌, 남이 맞히기 어려운 24자)
        - 없으면 조 코드로 정해지는 공간 ('lab:' — 같은 조 코드를 넣은 기기끼리 만남)
        - 예전 Apps Script 링크(?s=AKfy…)는 'legacy' 로 알려 주고 조 코드 공간을 쓴다
        공간은 이 브라우저에 기억하지 않는다 (기억한 수업 공간과 조 코드 공간이 섞이지 않게)
        돌려주는 값: { url: 'lab:…', id: 공간 또는 null, from: 'link'|'default'|'legacy' } */
-    var SERVER_KEY = 'pendulum:server';
     var SPACE_RE = /^[cp][a-z0-9]{23}$/;
     function resolveServer(search) {
         var m = /[?&]s=([^&#]*)/.exec(search || ''), id = m ? decodeURIComponent(m[1]) : '';
@@ -64,7 +55,6 @@
         if (id && isScriptId(id)) return { url: 'lab:', id: null, from: 'legacy' };
         return { url: 'lab:', id: null, from: 'default' };
     }
-    function forgetServer(store) { try { store.removeItem(SERVER_KEY); } catch (e) { /* 저장 불가 */ } }
 
     /* 폰 측정 · 노트북 분석 이원화: 측정 화면 ↔ 분석 화면으로 갈 때 사이트 저장소(s)·수업 코드(c)를 그대로 넘긴다
        otherPage('pendulum-report.html', '?s=AK…&c=ABC&group=…&device=phone') → 'pendulum-report.html?s=AK…&c=ABC' */
@@ -145,18 +135,7 @@
     }
     function round(v, d) { return Number.isFinite(v) ? +v.toFixed(d) : ''; }
 
-    // ---------- 서버 응답 ----------
-    function parseResponse(text) {
-        var j;
-        try { j = typeof text === 'string' ? JSON.parse(text) : text; }
-        catch (e) {
-            // 로그인 화면(HTML)이 오면 웹앱 '액세스: 모든 사용자' 설정이 빠진 것
-            return { ok: false, error: /<html/i.test(String(text)) ? '서버가 로그인 화면을 보냈습니다. 선생님: 웹 앱의 액세스를 "모든 사용자"로 배포했는지 확인하세요.' : '서버 응답을 읽지 못했습니다.' };
-        }
-        if (!j || typeof j !== 'object') return { ok: false, error: '서버 응답이 비어 있습니다.' };
-        if (!j.ok) return { ok: false, error: String(j.error || '서버 오류') };
-        return j;
-    }
+    // ---------- 저장소 응답 ----------
     // 서버 목록 한 줄을 화면 표의 한 줄로
     function itemFromServer(x) {
         var T = Number(x.T_mean);
@@ -182,13 +161,7 @@
         return { items: out, added: added };
     }
 
-    // ---------- 요청 (fetchImpl 은 시험에서 가짜로 바꿈) ----------
-    function withTimeout(promise, ms) {
-        return new Promise(function (resolve, reject) {
-            var t = setTimeout(function () { reject(new Error('시간 초과')); }, ms);
-            promise.then(function (v) { clearTimeout(t); resolve(v); }, function (e) { clearTimeout(t); reject(e); });
-        });
-    }
+    // ---------- 요청 (모두 사이트 저장소 'lab:' 로) ----------
     // Firestore 저장소(js/lab-store.js)를 아직 안 불렀으면 이 파일 옆에서 불러온다
     var labLoading = null;
     function labStore() {
@@ -213,12 +186,7 @@
     }
     function request(url, init, fetchImpl, ms) {
         if (isLab(url)) return labRequest(url, init, ms);
-        var f = fetchImpl || (typeof fetch === 'function' ? fetch : null);
-        if (!url) return Promise.resolve({ ok: false, error: '선생님 설정이 아직 안 되었습니다 (Apps Script 주소 없음).', noConfig: true });
-        if (!f) return Promise.resolve({ ok: false, error: '이 브라우저는 서버에 연결할 수 없습니다.' });
-        return withTimeout(f(url, init), ms || 15000)
-            .then(function (res) { return res.text(); })
-            .then(parseResponse, function (e) { return { ok: false, error: '서버에 연결하지 못했습니다 (' + (e && e.message || e) + ').', network: true }; });
+        return Promise.resolve({ ok: false, error: '예전 선생님 시트(Apps Script) 주소는 이제 쓰지 않아요. 선생님께 새 QR 을 받으세요.', legacy: true });
     }
     function query(base, params) {
         var q = Object.keys(params).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
@@ -236,11 +204,11 @@
 
     return {
         GROUP_RE: GROUP_RE, CELL_MAX: CELL_MAX, RAW_CELLS: RAW_CELLS,
-        isScriptId: isScriptId, scriptIdFromUrl: scriptIdFromUrl, urlFromScriptId: urlFromScriptId,
-        resolveServer: resolveServer, isLab: isLab, labStore: labStore, labRequest: labRequest, SPACE_RE: SPACE_RE, otherPage: otherPage, forgetServer: forgetServer, SERVER_KEY: SERVER_KEY,
+        isScriptId: isScriptId,
+        resolveServer: resolveServer, isLab: isLab, labStore: labStore, labRequest: labRequest, SPACE_RE: SPACE_RE, otherPage: otherPage,
         normalizeGroup: normalizeGroup, isGroupCode: isGroupCode, makeGroupCode: makeGroupCode, groupParts: groupParts, newId: newId,
         packSamples: packSamples, unpackSamples: unpackSamples, buildSavePayload: buildSavePayload,
-        parseResponse: parseResponse, itemFromServer: itemFromServer, mergeItems: mergeItems,
+        itemFromServer: itemFromServer, mergeItems: mergeItems,
         save: save, list: list, raw: raw
     };
 });
