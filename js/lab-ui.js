@@ -15,6 +15,7 @@
     }
     function apply(on) {
         root.classList.toggle('big-view', on);
+        if (typeof presentFit === 'function') presentFit();
         // 그래프(Chart.js 등)가 새 크기에 맞춰 다시 그려지도록 알림
         window.dispatchEvent(new Event('resize'));
     }
@@ -382,6 +383,38 @@
        기기는 늘 노트북(측정 부분은 숨김, 기억하지 않음), <html class="lab-present"> 로 측정·조 공유·수업 참여 띠를 숨김 (css/lab-base.css) */
     var PRESENT = /[?&]present=1(?:&|#|$)/.test(location.search || '');
     if (PRESENT) root.classList.add('lab-present');
+    /* 발표용 크기: 교사 화면 틀(iframe) 높이에 맞춰 페이지를 통째로 키움(zoom) — 4K 프로젝터에서도 본문 ≈ 화면 높이의 3 %, 그림·표·그래프도 함께.
+       - 보통 실험: 본문 16px × 배율 ≈ 틀 높이 × 0.032 (가로로 최소 760px 은 남겨 휴대폰 모양이 되지 않게), 1~6 배
+       - 행사형(필름통 로켓, body.ev-body): 폰 화면 400 × 820 이 틀에 꽉 차게
+       - 크게 보기(Alt+B)는 body 를 한 번 더 키우는 대신 이 배율을 1.25 배로 (교사 화면에서 눌러도 같은 브라우저 저장값으로 따라옴)
+       zoom 을 걸면 vh 도 함께 커지므로 발표용에서는 그래프 높이를 고정값으로 (css/lab-base.css 의 html.lab-present) */
+    function presentFit() {
+        if (!PRESENT || !document.body) return;
+        var W = window.innerWidth || 0, H = window.innerHeight || 0, big = root.classList.contains('big-view');
+        if (!W || !H) return;
+        var z = document.body.classList.contains('ev-body') ? Math.min(W / 400, H / 820) : Math.min(H * 0.002, W / 760);
+        if (big) z = Math.min(z * 1.25, document.body.classList.contains('ev-body') ? z * 1.25 : W / 600);
+        z = Math.max(1, Math.min(6, z));
+        var v = String(Math.round(z * 100) / 100);
+        if (root.style.zoom !== v) { root.style.zoom = v; window.dispatchEvent(new Event('resize')); }
+    }
+    // 발표용은 학생과 함께 보는 화면이라 페이지 제목·소개 글(단계 탭 위의 글)·이전 페이지 링크는 숨김
+    function presentTidy() {
+        if (!PRESENT || !document.body) return;
+        var nav = document.querySelector('nav.steps');
+        Array.prototype.forEach.call(document.querySelectorAll('a.back, h1'), function (el) { el.classList.add('hide-on-present'); });
+        if (nav && nav.parentNode) {
+            for (var el = nav.previousElementSibling; el; el = el.previousElementSibling) if (el.tagName === 'P') el.classList.add('hide-on-present');
+        }
+    }
+    if (PRESENT) {
+        var presentReady = function () { presentTidy(); presentFit(); };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', presentReady); else presentReady();
+        var fitTimer = null;
+        window.addEventListener('resize', function () { clearTimeout(fitTimer); fitTimer = setTimeout(presentFit, 60); });
+        // 교사 화면에서 Alt+B 를 누르면(같은 브라우저 저장값) 발표용도 따라감
+        window.addEventListener('storage', function (e) { if (e.key === KEY) { root.classList.toggle('big-view', read()); presentFit(); } });
+    }
     function guessDevice() {
         var nav = window.navigator || {}, touch = (nav.maxTouchPoints || 0) > 0;
         var coarse = false;

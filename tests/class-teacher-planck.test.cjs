@@ -113,6 +113,7 @@ test('교사 화면: 플랑크 수업이면 조별 h 표·그래프·CSV 가 나
         await T.waitForSelector('#ctpDetail:not([hidden])');
         assert.equal(await T.locator('#ctpChart circle').count(), 3);
         assert.equal(await T.locator('#ctpLeds img').count(), 0, '받은 LED 이름을 HTML 로 넣지 않음');
+        await T.evaluate(() => { const d = document.querySelector('#planckCard details.ct-teach'); if (d) d.open = true; });   // CSV 는 선생님용 접기 안
         const [dl] = await Promise.all([T.waitForEvent('download'), T.click('#ctpCsv')]);
         const csv = fs.readFileSync(await dl.path(), 'utf8');
         assert.equal(csv.charCodeAt(0), 0xfeff); assert.match(csv, /파랑/);

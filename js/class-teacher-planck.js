@@ -100,10 +100,13 @@
         var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
         var st = { cls: null, sum: null, pick: '' };
         card.innerHTML = '<div class="ct-row"><h2 style="margin:0">💡 플랑크 상수 결과 (조별 V₀–f)</h2><button id="ctpReload" class="secondary">🔄 다시 불러오기</button></div>' +
-            '<p class="note">조원이 보낸 LED 측정점으로 문턱 전압을 다시 계산하고, 조마다 V₀–f 최소제곱 직선의 기울기 × e 로 h 를 구해요. 조를 누르면 LED 표와 그래프가 나와요.</p>' +
+
             '<p id="ctpMsg" class="note" role="status" aria-live="polite"></p><div class="ctp-scroll"><table class="ct-detail-table" id="ctpTable"></table></div>' +
             '<div id="ctpDetail" hidden><h3 id="ctpTitle"></h3><div id="ctpStats" class="ct-sum"></div><div id="ctpChart"></div><div class="ctp-scroll"><table class="ct-detail-table" id="ctpLeds"></table></div></div>' +
-            '<div class="ct-row"><button id="ctpCsv" class="good">📥 플랑크 결과 CSV</button><button id="ctpCsvGroup" class="secondary" hidden>📥 이 조만 CSV</button></div>';
+            // 학생과 함께 보는 진행 화면이라 계산 설명·CSV 는 선생님용 접기 안에
+            '<details class="ct-teach"><summary>🔧 선생님용: 계산 방법·CSV 내려받기</summary>' +
+            '<p class="note">조원이 보낸 LED 측정점으로 문턱 전압을 다시 계산하고, 조마다 V₀–f 최소제곱 직선의 기울기 × e 로 h 를 구해요. 조를 누르면 LED 표와 그래프가 나와요.</p>' +
+            '<div class="ct-row"><button id="ctpCsv" class="good">📥 플랑크 결과 CSV</button><button id="ctpCsvGroup" class="secondary" hidden>📥 이 조만 CSV</button></div></details>';
         var pct = function (x) { return (x > 0 ? '+' : '') + x.toFixed(1) + ' %'; };
         var when = function (iso) { var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
         function render() {
