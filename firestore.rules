@@ -192,14 +192,18 @@ service cloud.firestore {
       allow delete: if isOwner(space);
     }
     // 학생 진행(하트비트): 수업이 있을 때 누구나(익명 학생) 쓰기, 읽기는 수업 주인만
+    // 학생 자리 진행 신호: '조-번호'(노트북·수업 QR 로 연 기기), '조-번호-p'(그 자리의 📱 폰 측정 화면, 2026-11-21 따로 둠).
+    // uid = 쓴 기기(있으면 자기 uid 만). 지우기는 수업 주인, 또는 그 문서를 마지막에 쓴 기기 자신(조·번호를 바꿀 때 옛 자리 치우기)만
     match /labClasses/{space}/progress/{pid} {
       allow read: if signedIn() && classOwner(space) == request.auth.uid;
-      allow create, update: if signedIn() && pid.matches('^[0-9]{1,2}-[0-9]{1,2}$') &&
+      allow create, update: if signedIn() && pid.matches('^[0-9]{1,2}-[0-9]{1,2}(-p)?$') &&
                             exists(/databases/$(database)/documents/labClasses/$(space)) &&
-                            request.resource.data.keys().hasOnly(['jo', 'num', 'group', 'step', 'points', 'submitted', 'device', 'lastSeen', 'expireAt']) &&
+                            request.resource.data.keys().hasOnly(['jo', 'num', 'group', 'step', 'points', 'submitted', 'device', 'lastSeen', 'expireAt', 'uid']) &&
+                            (!('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid) &&
                             shortStr(request.resource.data.step, 20) && shortStr(request.resource.data.device, 20) &&
                             request.resource.data.lastSeen == request.time && okExpire(request.resource.data);
-      allow delete: if signedIn() && classOwner(space) == request.auth.uid;
+      allow delete: if signedIn() && (classOwner(space) == request.auth.uid ||
+                       (('uid' in resource.data) && resource.data.uid == request.auth.uid));
     }
     // ----- 보고서 AI 피드백 (2026-11-19, js/report-ai.js) -----
     // 학생(익명)이 질문을 만들면, 켜 둔 교사 화면이 선생님 키로 AI 를 불러 답을 씀. API 키는 교사 브라우저에만 있고 여기엔 오지 않음.

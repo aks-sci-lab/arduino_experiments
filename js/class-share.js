@@ -415,7 +415,7 @@
             var stepNow = opts.getStep ? String(opts.getStep() || '') : '';
             if (PHONE) stepNow = ('phone-' + (stepNow || 'live')).slice(0, 20);   // 교사 화면에 📱 로 보임
             CC.heartbeat(srv().url, { classCode: CLASS, jo: cls.me.jo, num: cls.me.num, step: stepNow,
-                points: opts.getPoints ? opts.getPoints() : '', submitted: submitted, device: st.device })
+                points: opts.getPoints ? opts.getPoints() : '', submitted: submitted, device: st.device, phone: !!PHONE })
                 .then(function (r) { els.cmsg.innerHTML = r.ok ? '' : '⚠ 선생님께 진행 상황을 보내지 못했습니다: ' + esc(r.error); });
         }
         function renderBar() {
@@ -466,6 +466,8 @@
             clearInterval(cls.timer);
             // 폰은 측정·보내기 때만 신호 (노트북의 신호와 번갈아 덮어쓰지 않게). 무료 한도를 아끼려고 3분마다 (5분 넘게 없으면 '쉬는 중')
             if (!PHONE) cls.timer = setInterval(function () { if (!document.hidden) beat(true); }, 180000);
+            // 폰 화면을 껐다 켜거나 다른 앱에서 돌아오면 바로 한 번 (잠든 동안 3분 신호를 놓쳐 '쉬는 중'으로 보이지 않게)
+            if (!cls.visHook) { cls.visHook = true; document.addEventListener('visibilitychange', function () { if (!document.hidden && cls.me) beat(false); }); }
         }
         function tellClass() { if (typeof opts.onClass === 'function') { try { opts.onClass(cls.info, cls.me); } catch (e) { /* 실험 쪽 오류 */ } } }
         async function startClass() {
@@ -644,7 +646,9 @@
             });
             els.cchange.addEventListener('click', function () {
                 if (!confirm('조·번호를 다시 고를까요? (이 기기에서 잰 값은 그대로 남습니다)')) return;
-                cls.me = null; clearInterval(cls.timer); saveMe(); renderBar();
+                // 옛 자리 진행 신호를 지워 선생님 화면 '들어온 학생'에 남지 않게 (이 기기가 쓴 것만 — 다른 기기가 그 자리를 쓰면 그대로)
+                if (cls.me && cls.info) CC.leaveSeat(srv().url, { classCode: CLASS, jo: cls.me.jo, num: cls.me.num, phone: !!PHONE }).catch(function () { /* 다음 3분 신호가 없으면 '쉬는 중'으로 */ });
+                cls.me = null; clearInterval(cls.timer); clearTimeout(cls.pending); cls.pending = null; saveMe(); renderBar();
             });
             startClass();
         }
@@ -850,6 +854,7 @@
             // 실험이 측정 하나를 저장했을 때 부른다: 폰 화면(또는 autoSendOnSave)이면 바로 보내기
             // 폰은 기본으로 회차 목록에 쌓기만 하고(고른 회차 보내기), autoSendOnSave: true 면 바로 보낸다
             saved: function () {
+                beat(false);   // 저장하면 점 수가 바뀜 → 선생님 화면에도 (5초 안이면 조금 뒤 한 번)
                 if (PICK) { renderRuns(); els.pmsg.classList.remove('cs-err'); els.pmsg.innerHTML = '💾 저장했어요. 보낼 회차에 체크하고 <b>📤 고른 회차 보내기</b>를 누르세요.'; return Promise.resolve({ ok: true, skipped: true, listed: true }); }
                 return (PHONE || opts.autoSendOnSave) && groupOk() ? send() : Promise.resolve({ ok: true, skipped: true });
             },

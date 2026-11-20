@@ -10,7 +10,7 @@
      labSpaces/{공간}/items/{실험~조~id}   측정 한 줄 (진자·플랑크·공용 모두)
      labSpaces/{공간}/raw/{같은 id}         진자 원본(목록에서 빼려고 따로)
      labClasses/{공간}                      수업 (주인 = 교사 uid)
-     labClasses/{공간}/progress/{조-번호}   학생 진행 (하트비트)
+     labClasses/{공간}/progress/{조-번호}   학생 진행 (하트비트, 그 자리의 📱 폰 측정 화면은 {조-번호-p}, uid = 쓴 기기)
      labClassCodes/{수업 코드}              학생이 메인 화면에서 수업 코드만 넣었을 때 공간 찾기
      devlog/{실험~id}                       개발 데이터 (선생님 기기)
      labClasses/{공간}/aiAsk/{a…}           보고서 AI 질문 하나 (학생 익명 uid 가 만들고, 켜 둔 교사 화면이 답을 씀 — 키는 교사 브라우저에만, js/report-ai.js)
@@ -420,18 +420,56 @@
             if (!c) return { ok: false, error: '그 수업 코드를 찾지 못했습니다. 선생님이 보여 준 코드나 QR 을 다시 확인하세요.' };
             return publicClass(c);
         }
-        async function heartbeat(b) {
+        // 학생 자리 문서: 노트북(또는 수업 QR 로 연 폰·태블릿)은 '조-번호', 그 자리의 📱 폰 측정 화면(폰 QR)은 '조-번호-p' 에 따로
+        //  (2026-11-21: 같은 문서를 번갈아 덮어써 단계·점 수·제출 표시가 마지막에 쓴 쪽으로 바뀌던 것). uid = 쓴 기기(익명 로그인) — 옮길 때 자기 것만 지움
+        function seatPath(c, jo, num, phone) { return 'labClasses/' + c.space + '/progress/' + jo + '-' + num + (phone ? '-p' : ''); }
+        async function seatOf(b) {
             var c = await findClass(b, true);
             if (!c) fail('그 수업 코드를 찾지 못했습니다.');
             var jo = numIn(b.jo, 1, 99, '조'), num = numIn(b.num, 1, 10, '번호');
             var g = (c.groups || []).filter(function (x) { return Number(x.jo) === jo; })[0];
             if (!g || num % 1 || num > Number(g.size)) fail('이 수업에 없는 조·번호입니다.');
+            return { c: c, jo: jo, num: num, g: g };
+        }
+        async function heartbeat(b, auth) {
+            var s = await seatOf(b), c = s.c;
             var step = String(b.step || ''), device = String(b.device || '');
-            await db.set('labClasses/' + c.space + '/progress/' + jo + '-' + num, {
-                jo: jo, num: num, group: g.code, step: STEP_RE.test(step) ? step : '', points: numIn(b.points, 0, 100000, '측정 점 수', true),
+            var doc = {
+                jo: s.jo, num: s.num, group: s.g.code, step: STEP_RE.test(step) ? step : '', points: numIn(b.points, 0, 100000, '측정 점 수', true),
                 submitted: !!b.submitted, device: DEVICE_RE.test(device) ? device : '', lastSeen: db.stamp(), expireAt: c.expireAt instanceof Date ? c.expireAt : expireAt()
-            });
+            };
+            if (auth && auth.uid) doc.uid = String(auth.uid);
+            await db.set(seatPath(c, s.jo, s.num, !!b.phone), doc);
             return { ok: true };
+        }
+        // 조·번호를 바꾼 기기: 옛 자리 문서를 지움. 그 사이 다른 기기가 그 자리를 쓰고 있으면(uid 가 다름) 그대로 둠 — 규칙도 자기 uid 문서만 지우게 함
+        async function leaveSeat(b, auth) {
+            var s = await seatOf(b), path = seatPath(s.c, s.jo, s.num, !!b.phone), d;
+            try { d = await db.get(path); } catch (e) { d = undefined; }   // 학생은 진행 문서를 읽을 수 없음(규칙) → 지우기 시도만, 규칙이 가림
+            if (d === null) return { ok: true, removed: false };
+            if (d && (!auth || !auth.uid || d.uid !== auth.uid)) return { ok: true, removed: false, kept: true };
+            try { await db.del(path); } catch (e) { return { ok: true, removed: false, kept: true }; }
+            return { ok: true, removed: true };
+        }
+        // 교사 화면용: 한 자리의 노트북 문서와 📱 폰 문서를 한 학생으로 합침 (점 수는 큰 쪽, 제출은 한 번이라도, 마지막 활동은 늦은 쪽)
+        function mergeSeats(rows) {
+            var by = {}, order = [];
+            rows.forEach(function (r) {
+                var x = r.data, phone = /-p$/.test(String(r.id || '')), key = Number(x.jo) + '-' + Number(x.num);
+                var one = { jo: Number(x.jo), num: Number(x.num), step: String(x.step || ''), points: x.points === '' || x.points == null ? null : Number(x.points),
+                    submitted: !!x.submitted, lastSeen: iso(x.lastSeen), device: String(x.device || '') };
+                if (!by[key]) { by[key] = { main: null, phone: null }; order.push(key); }
+                by[key][phone ? 'phone' : 'main'] = one;
+            });
+            return order.map(function (k) {
+                var m = by[k].main, p = by[k].phone;
+                if (!p) return m;
+                if (!m) return p;
+                var pts = [m.points, p.points].filter(function (v) { return v != null; });
+                return { jo: m.jo, num: m.num, step: m.step, points: pts.length ? Math.max.apply(null, pts) : null, submitted: m.submitted || p.submitted,
+                    lastSeen: String(p.lastSeen) > String(m.lastSeen) ? p.lastSeen : m.lastSeen, device: m.device,
+                    phone: { step: p.step, points: p.points, submitted: p.submitted, lastSeen: p.lastSeen, device: p.device } };
+            });
         }
         async function ownedClass(b, auth) {
             if (!auth || !auth.google) fail('선생님 구글 로그인이 필요합니다.');
@@ -444,11 +482,7 @@
         async function classStatus(b, auth) {
             var c = await ownedClass(b, auth);
             var prog = await db.query('labClasses/' + c.space + '/progress', [], { live: true });
-            var students = prog.map(function (r) {
-                var x = r.data;
-                return { jo: Number(x.jo), num: Number(x.num), step: String(x.step || ''), points: x.points === '' || x.points == null ? null : Number(x.points),
-                    submitted: !!x.submitted, lastSeen: iso(x.lastSeen), device: String(x.device || '') };
-            });
+            var students = mergeSeats(prog);
             var subs = {}, devs = {};
             (c.groups || []).forEach(function (g) { subs[g.code] = { code: g.code, jo: g.jo, rows: 0, labels: [], leds: [], devices: 0, lastSent: '', hCurrent: '', errorPct: '', summary: null }; });
             (await classItems(c, true)).forEach(function (r) {
@@ -724,7 +758,8 @@
                 }
                 if (a === 'createClass') return await createClass(body, auth);
                 if (a === 'joinInfo') return await joinInfo(body);
-                if (a === 'heartbeat') return await heartbeat(body);
+                if (a === 'heartbeat') return await heartbeat(body, auth);
+                if (a === 'leaveSeat') return await leaveSeat(body, auth);
                 if (a === 'teamJoin') return await teamJoin(body, auth);
                 if (a === 'classInfo') return await classInfo(body);
                 if (a === 'classSetup') return await classSetup(body, auth);
