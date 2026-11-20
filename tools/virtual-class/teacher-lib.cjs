@@ -11,7 +11,8 @@
 // 제품 코드는 고치지 않는다. 그림 파일은 저장소에 넣지 않는다.
 'use strict';
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
-const REPO = path.join(__dirname, '..', '..');
+// VC_REPO: 다른 브랜치를 따로 받아 둔 폴더(git worktree)의 제품 파일로 띄울 때
+const REPO = process.env.VC_REPO || path.join(__dirname, '..', '..');
 const { loadLabStore, labServer, configJs } = require(path.join(REPO, 'tests', 'fake-lab-store.cjs'));
 const { chromium, devices } = require('playwright');
 
