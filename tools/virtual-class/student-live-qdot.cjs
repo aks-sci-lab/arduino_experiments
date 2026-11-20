@@ -27,6 +27,16 @@ const CODE = '2-5512', PAGE = 'projects/quantum-dot.html?c=2-5512&s=cyuk7hbdrs76
             await W.tap(L1, '이론', 0, true); await L1.waitForTimeout(500);   // 1조: 잠긴 2 이론 눌러 봄
             for (const pg of [L1, L2, P3, L6]) note(pg.vcName, { 띠: await band(pg), 단계: await cur(pg) });
             await W.shot(L6, '6조 참여 전'); await L1.waitForTimeout(4000);
+        },
+        2: async () => {   // 3~7분: 교사 말("참여하기까지 눌러야", "2조 2번 누구?", "폰으로 해도 돼요")에 반응
+            const P3 = await live.student('3조폰', 'phone'), L6 = await live.student('6조노트북', 'laptop'), L1 = await live.student('1조노트북', 'laptop'), L2 = await live.student('2조노트북', 'laptop');
+            note('다시 연 화면(지난 차례 이어짐)', { '3조폰': await band(P3), '1조': await band(L1), '6조': await band(L6) });
+            await W.tap(P3, '조·번호 바꾸기'); await P3.waitForTimeout(500); await join(P3, 3, 1);          // 3조: 고침
+            await join(L6, 6, 1);                                                                           // 6조: 이제 참여
+            const P4 = await live.student('4조폰', 'phone'); await P4.goto(W.ROOT + PAGE); await P4.waitForTimeout(1500); await join(P4, 4, 1);   // 4조: 폰으로
+            await W.shot(P4, '4조 폰 1 목적'); note('4조 폰 화면 길이', (await W.check(P4)).pages);
+            for (const pg of [L1, L2, P3, P4, L6]) note(pg.vcName, { 띠: await band(pg), 단계: await cur(pg) });
+            await L1.waitForTimeout(4000);
         }
         // TURNS
     };
