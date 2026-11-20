@@ -18,7 +18,7 @@ const pct = (a, b) => (a / b * 100).toFixed(1) + '%';
         await T.goto(S.ROOT + 'projects/class-teacher.html'); await S.tap(T, '구글 계정으로 로그인');
         const make = async exp => { await T.goto(S.ROOT + 'projects/class-teacher.html'); await T.waitForTimeout(500); await S.tap(T, '새 수업 만들기'); await T.selectOption('#inExp', exp); await S.tap(T, '수업 만들기', 'last'); await T.waitForTimeout(600); return T.url(); };
         const mainFont = fr => fr.evaluate(() => { const m = {}; const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let t;
-            while ((t = w.nextNode())) { const s = t.nodeValue.trim(), p = t.parentElement; if (!s || !p || !p.offsetParent) continue; const r = p.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) continue; const f = Math.round(parseFloat(getComputedStyle(p).fontSize)); m[f] = (m[f] || 0) + s.length; }
+            while ((t = w.nextNode())) { const s = t.nodeValue.trim(), p = t.parentElement; if (!s || !p || !p.offsetParent) continue; const r = p.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) continue; const f = Math.round(parseFloat(getComputedStyle(p).fontSize) * (p.currentCSSZoom || 1)); m[f] = (m[f] || 0) + s.length; }   // 화면에 보이는 크기(확대 포함)
             return Number(Object.keys(m).sort((a, b) => m[b] - m[a])[0]); });
         for (const exp of ['rocket', 'qdot']) {
             const url = await make(exp);
@@ -35,13 +35,13 @@ const pct = (a, b) => (a / b * 100).toFixed(1) + '%';
                     await S.tap(T, '크게 보기'); await T.waitForTimeout(400); const b = await T.evaluate(() => { const t = document.querySelector('#boardBigBody td, #boardBigBody th'); const tb = document.querySelector('#boardBigBody table') || document.getElementById('boardBigBody'); return { f: Math.round(parseFloat(getComputedStyle(t).fontSize)), w: Math.round(tb.getBoundingClientRect().width), h: Math.round(tb.getBoundingClientRect().height) }; });
                     r['결과판 크게: 글자'] = b.f + 'px (' + pct(b.f, h) + ')'; r['결과판 표 폭·높이 / 화면'] = pct(b.w, w) + ' · ' + pct(b.h, h) + ' (3팀)'; await S.shot(T, '결과판크게-' + name.replace(/[ %×]/g, '')); await S.tap(T, '닫기'); }
                 await S.tap(T, '발표 보기'); await T.waitForTimeout(1800); const fr = T.frames()[1];
-                if (exp === 'qdot') { await T.keyboard.press('ArrowRight'); await T.waitForTimeout(400); await T.keyboard.press('Enter'); await T.waitForTimeout(3000); }   // 2 이론(글이 많은 단계)에서 잼
+                if (exp === 'qdot') { for (let k = 0; k < 8; k++) { await T.keyboard.press('ArrowRight'); await T.waitForTimeout(450); if ((await S.seen(T)).split('\n').some(l => /열까요/.test(l))) break; } await T.keyboard.press('Enter'); await T.waitForTimeout(3000); }   // 글을 먼저 내리는 판에서도 '열까요?'가 나올 때까지   // 2 이론(글이 많은 단계)에서 잼
                 const pres = async tag => { const f = await T.evaluate(() => { const b = document.querySelector('iframe').getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height) }; }); const mf = await mainFont(fr); const io = await fr.evaluate(() => ({ page: document.documentElement.scrollHeight, view: innerHeight, contentW: Math.round((document.querySelector('.step-panel:not([hidden]), .ev-app, #ev-app') || document.body).getBoundingClientRect().width), vw: innerWidth }));
                     const zoom = await T.evaluate(() => { const z = parseFloat(getComputedStyle(document.documentElement).zoom || 1) || 1; return z; });
                     r[tag + ': 틀 / 화면'] = pct(f.w * zoom, w) + ' × ' + pct(f.h * zoom, h); r[tag + ': 본문 글자'] = mf + 'px' + (zoom !== 1 ? '×' + zoom : '') + ' (' + pct(mf * zoom, h) + ')'; r[tag + ': 내용 폭 / 틀 폭'] = pct(io.contentW, io.vw); r[tag + ': 글 잘림(전체/보이는)'] = io.page > io.view + 8 ? '✂ ' + io.page + '/' + io.view : '없음'; };
                 await pres('발표'); await S.shot(T, exp + '-발표-' + name.replace(/[ %×]/g, ''));
                 await T.keyboard.press('Alt+b'); await T.waitForTimeout(500); await pres('발표+Alt+B'); await S.shot(T, exp + '-발표AltB-' + name.replace(/[ %×]/g, '')); await T.keyboard.press('Alt+b'); await T.waitForTimeout(300);
-                if (exp === 'qdot') { await S.tap(T, '진행 화면으로'); await S.tap(T, '하나 되돌리기'); await T.waitForTimeout(800); }
+                if (exp === 'qdot') { await S.tap(T, '진행 화면으로'); if (await T.locator('#btnStagePrev:not([disabled])').count()) { await S.tap(T, '하나 되돌리기'); await T.waitForTimeout(800); } }
                 rows.push(r);
             }
         }
