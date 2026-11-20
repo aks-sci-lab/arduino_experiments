@@ -361,13 +361,31 @@
     const KNOWN_VENDORS = [
         { id: 'vernier', name: 'Vernier Go Direct', service: 'd91714ef-28b9-4f91-ba16-f0d9a604f112', namePrefix: 'GDX' }
     ];
+    // 버니어 Go Direct 명령 묶음 (공개 도구 godirect-js, BSD 3-Clause 의 Device._sendCommand 와 같은 모양):
+    // [0x58, 전체 길이, 순번, 합계, …명령]. 합계 = 모든 바이트 합(합계 칸 0) 의 아래 8비트
+    const VERNIER = {
+        SERVICE: 'd91714ef-28b9-4f91-ba16-f0d9a604f112',
+        COMMAND: 'f4bf14a6-c7d5-4b6d-8aa8-df1a7c83adcb',
+        RESPONSE: 'b41e6675-a329-40e0-aa01-44d2f444babe',
+        INIT: [0x1a, 0xa5, 0x4a, 0x06, 0x49, 0x07, 0x48, 0x08, 0x47, 0x09, 0x46, 0x0a, 0x45, 0x0b, 0x44, 0x0c, 0x43, 0x0d, 0x42, 0x0e, 0x41],
+        GET_STATUS: [0x10]
+    };
+    function vernierCommand(sub, counter) {
+        const b = new Uint8Array(4 + sub.length);
+        b[0] = 0x58; b[1] = b.length; b[2] = counter & 0xff; b[3] = 0;
+        b.set(sub, 4);
+        let sum = 0;
+        for (let i = 0; i < b.length; i++) sum = (sum + b[i]) & 0xff;
+        b[3] = sum;
+        return b;
+    }
     function knownVendor(deviceName, serviceUuids) {
         const svcs = (serviceUuids || []).map(normUuid);
         return KNOWN_VENDORS.find(v => svcs.includes(v.service) || String(deviceName || '').startsWith(v.namePrefix)) || null;
     }
 
     const api = {
-        knownVendor, KNOWN_VENDORS,
+        knownVendor, KNOWN_VENDORS, VERNIER, vernierCommand,
         FORMATS, FORMAT_BY_ID, STANDARD_SERVICES, DEVICE_INFO_CHARS, SCHEMA,
         toBytes, readRaw, parseMask, readField, decodePacket, toHex, parseHex, normUuid, shortUuid, knownName,
         changingBytes, fitLine, niceNumber, findCandidates, candidateToField, validateDecoder,

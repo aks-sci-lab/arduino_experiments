@@ -20,6 +20,9 @@
         truths: {},              // 특성 UUID → [{ truth, bytes, t }]
         meta: { deviceName: '', maker: '', model: '', firmware: '' },
         candidates: [],
+        events: [],              // 연결 기록: { at(ISO), kind, text } — 끊긴 시각을 선생님이 보내 줄 수 있게
+        connectedAt: null,
+        gdxCounter: 0xff,
         dirty: true
     };
 
@@ -113,7 +116,15 @@
         await disconnect(true);
         S.device = device;
         S.meta = { deviceName: device.name || '', maker: '', model: '', firmware: '' };
+        await connectDevice(device);
+    }
+
+    // 고른 기기에 연결해 서비스·특성을 읽는다 (다시 연결할 때도 이것만 다시 부름 — 기기 고르는 창 없이)
+    async function connectDevice(device) {
+        device.removeEventListener('gattserverdisconnected', onDisconnected);
         device.addEventListener('gattserverdisconnected', onDisconnected);
+        $('btnReconnect').hidden = true;
+        S.chars.clear();
         try {
             setStatus('"' + (device.name || '이름 없는 기기') + '" 에 연결하는 중…');
             const server = await device.gatt.connect();
@@ -143,12 +154,60 @@
             if (vendor && vendor.id === 'vernier') {
                 $('vendorNote').textContent = '✅ 이 센서는 버니어 공개 방식(Go Direct)으로 바로 쓸 수 있어요. 해석하지 않아도 됩니다 — 선생님이 만든 실험의 센서 기능에서 "Vernier Go Direct 센서"를 고르세요.';
             }
+            S.connectedAt = performance.now();
+            logEvent('connect', '연결됨: ' + (device.name || '이름 없는 기기') + ' · 서비스 ' + tree.length + '개');
             $('btnDisconnect').disabled = false;
+            $('vernierBox').hidden = !(vendor && vendor.id === 'vernier');
+            if (vendor && vendor.id === 'vernier' && $('vernierAuto').checked) await vernierInit();
             setStatus('✓ 연결됨: ' + (device.name || '이름 없는 기기') + ' · 서비스 ' + tree.length + '개', 'ok');
             if (!tree.length) setStatus('연결됐지만 열 수 있는 서비스가 없어요. 서비스 UUID 를 직접 넣고 다시 연결해 보세요.', 'error');
             refreshCharSelects();
         } catch (e) {
             setStatus('연결 실패: ' + (e && e.message || e), 'error');
+            logEvent('error', '연결 실패: ' + (e && e.message || e));
+            $('btnReconnect').hidden = false;
+        }
+    }
+
+    // ---------- 연결 기록 ----------
+    function logEvent(kind, text) {
+        S.events.push({ at: new Date().toISOString(), kind, text });
+        if (S.events.length > 200) S.events.shift();
+        const list = $('eventLog');
+        if (!list) return;
+        list.innerHTML = S.events.slice().reverse().map(e => '<li><span class="note">' + esc(e.at.slice(11, 19)) + '</span> ' + esc(e.text) + '</li>').join('');
+        $('eventBox').hidden = false;
+    }
+    const eventText = () => S.events.map(e => e.at + '\t' + e.kind + '\t' + e.text).join('\n');
+
+    // ---------- 버니어 Go Direct: 연결 직후 공개 도구와 같은 처음 인사(init)·상태 묻기를 보낸다 ----------
+    // 이 센서는 연결만 하고 명령을 받지 못하면 10초쯤 뒤 스스로 끊는 것으로 보여(선생님 실측), 같은 순서를 보낸다
+    async function vernierInit() {
+        const V = B.VERNIER;
+        const cmd = S.chars.get(V.COMMAND), resp = S.chars.get(V.RESPONSE);
+        const msg = $('vernierMsg');
+        if (!cmd || !resp) { msg.textContent = '⚠ 버니어 명령·응답 특성을 찾지 못했어요. 서비스 고르기에 "Vernier Go Direct" 가 켜져 있는지 보세요.'; return false; }
+        try {
+            if (!resp.notifying) {
+                const btn = document.querySelector('[data-notify="' + CSS.escape(V.RESPONSE) + '"]');
+                await toggleNotify(V.RESPONSE, btn);   // 센서의 답도 기록에 남도록
+            }
+            for (const sub of [V.INIT, V.GET_STATUS]) {
+                S.gdxCounter = (S.gdxCounter - 1) & 0xff;
+                const packet = B.vernierCommand(sub, S.gdxCounter);
+                for (let i = 0; i < packet.length; i += 20) {
+                    const part = packet.slice(i, i + 20);
+                    if (cmd.obj.writeValue) await cmd.obj.writeValue(part);
+                    else await cmd.obj.writeValueWithResponse(part);
+                }
+            }
+            msg.textContent = '✓ 버니어 처음 인사(init)·상태 묻기를 보냈어요 (' + new Date().toLocaleTimeString() + ').';
+            logEvent('vernier-init', '버니어 처음 인사·상태 묻기 보냄');
+            return true;
+        } catch (e) {
+            msg.textContent = '⚠ 보내기 실패: ' + (e && e.message || e);
+            logEvent('error', '버니어 처음 인사 실패: ' + (e && e.message || e));
+            return false;
         }
     }
 
@@ -245,7 +304,13 @@
         document.querySelectorAll('[data-notify]').forEach(b => { b.textContent = '🔔 알림 켜기'; b.classList.remove('on'); b.disabled = true; });
         document.querySelectorAll('[data-read]').forEach(b => { b.disabled = true; });
         $('btnDisconnect').disabled = true;
-        setStatus('연결이 끊겼어요. 기록은 그대로 있어요. 다시 🔍 로 연결하세요.', 'error');
+        const after = S.connectedAt !== null ? (performance.now() - S.connectedAt) / 1000 : null;
+        S.connectedAt = null;
+        const when = new Date().toLocaleTimeString();
+        const how = after !== null ? '끊김: ' + after.toFixed(1) + '초 만에 (' + when + ')' : '끊김 (' + when + ')';
+        setStatus('⚠ ' + how + ' — 기록은 그대로 있어요. 🔄 다시 연결을 누르세요.', 'error');
+        logEvent('disconnect', how);
+        $('btnReconnect').hidden = !S.device;
     }
     async function disconnect(quiet) {
         const d = S.device;
@@ -572,6 +637,16 @@
         $('stdServices').addEventListener('change', saveServiceChoices);
         $('customUuids').addEventListener('input', saveServiceChoices);
         $('btnScan').addEventListener('click', scan);
+        $('btnReconnect').addEventListener('click', () => { if (S.device) { setStatus('다시 연결하는 중…'); connectDevice(S.device); } });
+        $('btnVernierInit').addEventListener('click', vernierInit);
+        try { $('vernierAuto').checked = localStorage.getItem('ble-explorer:vernierAuto') !== '0'; } catch (e) { /* 기본 켬 */ }
+        $('vernierAuto').addEventListener('change', () => { try { localStorage.setItem('ble-explorer:vernierAuto', $('vernierAuto').checked ? '1' : '0'); } catch (e) { /* 무시 */ } });
+        $('btnCopyEvents').addEventListener('click', () => {
+            const t = eventText();
+            const done = () => { $('eventMsg').textContent = '✓ 연결 기록을 복사했어요.'; };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => { $('eventMsg').textContent = t; });
+            else $('eventMsg').textContent = t;
+        });
         $('btnDisconnect').addEventListener('click', () => disconnect(false));
         $('btnPause').addEventListener('click', () => {
             S.paused = !S.paused;
@@ -661,7 +736,7 @@
         });
         $('btnLogJson').addEventListener('click', () => {
             if (!S.records.length) { $('logMsg').textContent = '기록이 없어요.'; return; }
-            download('ble-log-' + stamp() + '.json', B.recordsToJson(S.records, { device: S.meta, services: S.charService }), 'application/json');
+            download('ble-log-' + stamp() + '.json', B.recordsToJson(S.records, { device: S.meta, services: S.charService, events: S.events }), 'application/json');
         });
         $('logFileIn').addEventListener('change', e => readFile(e.target, text => {
             let got;

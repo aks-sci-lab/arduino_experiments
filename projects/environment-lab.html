@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <script src="../js/ble-help.js"></script>
     <link rel="stylesheet" href="../css/class-share.css">
     <title>환경 센서 실시간 모니터</title>
 
@@ -75,7 +76,7 @@
         <!-- 1. 연결·상태 띠 (위에 붙어 있음) -->
         <div class="dash-bar">
             <span id="status" class="dash-status" role="status">연결 대기</span>
-            <button id="connectBleButton" class="ble-button">Bluetooth 연결</button>
+            <button id="connectBleButton" class="ble-button" data-ble-connect>Bluetooth 연결</button>
             <button id="disconnectBleButton" class="ble-button btn-secondary" style="display:none;">연결 해제</button>
             <button id="recordButton" disabled>측정 시작</button>
             <label title="센서 값은 1초마다 받고, 표·그래프에는 고른 간격으로 기록합니다">기록 간격
@@ -195,7 +196,7 @@
         <p id="description" class="note"></p>
         <div class="dash-bar">
             <span id="status" class="dash-status" role="status">연결 대기</span>
-            <button id="connectButton" class="ble-button">Bluetooth 연결</button>
+            <button id="connectButton" class="ble-button" data-ble-connect>Bluetooth 연결</button>
             <button id="disconnectButton" style="display:none;">연결 해제</button>
             <button id="recordButton" disabled>측정 시작</button>
             <label>샘플링 <select id="samplingRateSelect"><option value="1000">1초</option><option value="2000">2초</option><option value="5000">5초</option></select></label>

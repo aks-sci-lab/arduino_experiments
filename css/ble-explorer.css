@@ -105,3 +105,5 @@ thead th { position: sticky; top: 0; background: var(--c-fill); z-index: 1; }
 }
 /* 맨 위 다섯 탭: 휴대폰에서도 한 줄, 낱말 중간에서 줄바꿈하지 않게 */
 #bxTabs button { white-space: nowrap; padding-left: 2px; padding-right: 2px; letter-spacing: -.02em; }
+.events { list-style: none; padding: 0; margin: 0; font-size: var(--fs-sm); max-height: 30vh; overflow: auto; }
+.events li { padding: 2px 0; border-bottom: 1px dashed var(--c-line); }

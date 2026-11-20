@@ -59,7 +59,7 @@
         const onChannels = options.onChannels || function () {};
         let rate = String(options.rate || 'auto');
         let device = null, mapping = {}, channelList = [], count = 0, period = 0, lastSampleAt = null, latest = {};
-        let connecting = false, leaving = false;
+        let connecting = false, leaving = false, connectedAt = null;
         const listeners = [];
 
         function channels() { return channelList.slice(); }
@@ -127,11 +127,13 @@
                 const d = await lib.selectDevice(true);
                 if (leaving) { try { await d.close(); } catch (e) { /* 무시 */ } return; }
                 device = d;
+                connectedAt = performance.now();
                 d.on('device-closed', () => {
                     if (device !== d) return;
+                    const after = connectedAt !== null ? ((performance.now() - connectedAt) / 1000).toFixed(1) + '초 만에 ' : '';
                     device = null;
                     clean();
-                    onStatus('연결 해제됨 — 기록한 값은 그대로 있습니다.');
+                    onStatus('⚠ 끊김: ' + after + '(' + new Date().toLocaleTimeString() + ') — 기록한 값은 그대로 있습니다. "센서 연결"을 다시 누르세요.');
                 });
                 channelList = d.sensors.map(s => ({ number: s.number, name: s.name, unit: s.unit }));
                 if (!channelList.length) throw new Error('이 센서가 알려 준 측정 채널이 없습니다.');

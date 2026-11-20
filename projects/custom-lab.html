@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <script src="../js/ble-help.js"></script>
     <title>실험 | 센서 기반 실험실</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/class-share.css">
@@ -141,7 +142,7 @@
         <div class="card" id="sensorCard" hidden>
             <h2>🔌 센서 <span id="sensorName" class="muted"></span></h2>
             <div class="row no-print" id="sensorButtons">
-                <button id="btnSensorConnect" class="primary">🔌 센서 연결</button>
+                <button id="btnSensorConnect" class="primary" data-ble-connect>🔌 센서 연결</button>
                 <button id="btnSensorDisconnect" hidden>연결 해제</button>
                 <label>측정 주기 <select id="selRate"></select></label>
             </div>

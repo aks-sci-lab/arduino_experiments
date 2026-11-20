@@ -99,12 +99,13 @@ test('CSV: BOM, 단위 붙은 머리글, 빈 행 제외, 따옴표 처리', () =
     assert.strictEqual(csv, '﻿전류 (A),메모\r\n1,"좋음, ""최고"""\r\n2,\r\n');
 });
 
-test('센서 기능 목록: 다섯 기능, 값 이름이 겹치지 않음', () => {
-    assert.deepStrictEqual(Object.keys(M.SENSORS), ['env', 'light', 'uv', 'voc', 'imu', 'iv']);
+test('센서 기능 목록: 우리 보드 기능 + 버니어, 값 이름이 겹치지 않음', () => {
+    assert.deepStrictEqual(Object.keys(M.SENSORS), ['env', 'light', 'uv', 'voc', 'imu', 'iv', 'vernier']);
     Object.values(M.SENSORS).forEach(s => {
         const keys = s.fields.map(f => f[0]);
         assert.strictEqual(new Set(keys).size, keys.length);
-        assert.ok(s.rates.length >= 1 && s.command);
+        // 우리 보드 기능은 펌웨어 명령이 있고, 시판 센서(버니어)는 공개 도구가 연결을 맡는다
+        assert.ok(s.rates.length >= 1 && (s.command || s.vendor === 'vernier'));
     });
 });
 

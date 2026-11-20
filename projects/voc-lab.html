@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <script src="../js/ble-help.js"></script>
     <title>VOC Index 측정 | 센서 기반 실험실</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/sensor-lab.css?v=layout-v3">
@@ -54,7 +55,7 @@
                 <a href="../vendor/sensirion/LICENSE">라이선스</a></p>
         </details>
         <div class="lab-controls">
-            <button id="connectButton" class="ble-button">Bluetooth 연결</button>
+            <button id="connectButton" class="ble-button" data-ble-connect>Bluetooth 연결</button>
             <button id="disconnectButton" style="display:none;">연결 해제</button>
             <button id="recordButton" disabled>측정 시작</button>
             <label>샘플링 <select id="samplingRateSelect"><option value="1000">1초 (고정)</option></select></label>

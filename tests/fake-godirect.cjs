@@ -3,13 +3,14 @@
 // Playwright: page.addInitScript(fakeGoDirect, { install: true }) → navigator.bluetooth.requestDevice 가 이 기기를 돌려줌
 // 채널: 1 힘 Force (N, 기본으로 켜짐), 2 X-axis acceleration (m/s²), 3 Y-axis acceleration (m/s²)
 // 값 바꾸기: window.__gdx.force = 2.5 (브라우저), dev.state.force (Node)
+// cfg.idleMs: 연결한 뒤 이 시간 안에 처음 인사(init, 0x1a)를 받지 못하면 스스로 끊는다 (선생님 실측: 약 10초)
 function fakeGoDirect(cfg) {
     cfg = cfg || {};
     const g = typeof window !== 'undefined' ? window : globalThis;
     const SERVICE = 'd91714ef-28b9-4f91-ba16-f0d9a604f112';
     const CMD = 'f4bf14a6-c7d5-4b6d-8aa8-df1a7c83adcb';
     const RESP = 'b41e6675-a329-40e0-aa01-44d2f444babe';
-    const state = { force: 1.25, ax: 0.5, ay: -9.8, commands: [], period: 0, mask: 0, starts: 0, requestOpts: null };
+    const state = { force: 1.25, ax: 0.5, ay: -9.8, commands: [], period: 0, mask: 0, starts: 0, requestOpts: null, inited: false, connects: 0, idleDrops: 0 };
     const CHANNELS = [
         { number: 1, name: 'Force', unit: 'N', typical: 100000, read: () => state.force },
         { number: 2, name: 'X-axis acceleration', unit: 'm/s²', typical: 100000, read: () => state.ax },
@@ -17,12 +18,12 @@ function fakeGoDirect(cfg) {
     ];
     const DEFAULT_MASK = 1 << 1;
     const NAME = cfg.name || 'GDX-FOR 0F1000123';
-    let timer = null, pending = [];
+    let timer = null, pending = [], idleTimer = null;
     const listeners = {};
 
     const enc = s => new TextEncoder().encode(s);
     const resp = {
-        uuid: RESP, l: [],
+        uuid: RESP, properties: { notify: true }, l: [],
         addEventListener(n, f) { this.l.push(f); }, removeEventListener(n, f) { this.l = this.l.filter(x => x !== f); },
         async startNotifications() {}, async stopNotifications() {},
         emit(bytes) {
@@ -74,7 +75,7 @@ function fakeGoDirect(cfg) {
         const counter = buf[2], command = buf[4];
         state.commands.push(command);
         switch (command) {
-            case 0x1a: reply(command, counter, [0]); break;                                  // 처음 인사
+            case 0x1a: state.inited = true; clearTimeout(idleTimer); reply(command, counter, [0]); break;   // 처음 인사
             case 0x10: reply(command, counter, [0, 0, 1, 2, 0, 0, 1, 0, 0, 3, 87, 0]); break; // 상태(배터리 87%)
             case 0x55: {                                                                      // 기기 정보
                 const p = new Uint8Array(64);
@@ -102,7 +103,7 @@ function fakeGoDirect(cfg) {
         }
     }
     const cmd = {
-        uuid: CMD,
+        uuid: CMD, properties: { write: true, writeWithoutResponse: true },
         async writeValue(chunk) {
             pending = pending.concat(Array.from(new Uint8Array(chunk.buffer ? chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) : chunk)));
             if (pending.length >= pending[1]) { const buf = Uint8Array.from(pending.splice(0, pending[1])); handle(buf); }
@@ -114,7 +115,12 @@ function fakeGoDirect(cfg) {
         removeEventListener(n, f) { listeners[n] = (listeners[n] || []).filter(x => x !== f); },
         gatt: {
             connected: false,
-            async connect() { this.connected = true; return this; },
+            async connect() {
+                this.connected = true; state.inited = false; state.connects++;
+                clearTimeout(idleTimer);
+                if (cfg.idleMs) idleTimer = setTimeout(() => { if (!state.inited && this.connected) { state.idleDrops++; this.disconnect(); } }, cfg.idleMs);
+                return this;
+            },
             async getPrimaryService(uuid) {
                 if (uuid !== SERVICE) throw Object.assign(new Error('No service'), { name: 'NotFoundError' });
                 return { uuid: SERVICE, async getCharacteristics() { return [cmd, resp]; } };
@@ -122,7 +128,7 @@ function fakeGoDirect(cfg) {
             async getPrimaryServices() { return [{ uuid: SERVICE, async getCharacteristics() { return [cmd, resp]; } }]; },
             disconnect() {
                 if (!this.connected) return;
-                this.connected = false; clearInterval(timer);
+                this.connected = false; clearInterval(timer); clearTimeout(idleTimer); state.inited = false;
                 (listeners.gattserverdisconnected || []).forEach(f => f({ target: device }));
             }
         }
