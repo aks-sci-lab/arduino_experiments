@@ -90,6 +90,38 @@ const CODE = '1-5411', SP = 'labClasses/cixem6przhsi57h2j9suc5cc', PAGE = 'proje
                 await W.tap(A, '다시 도전'); await W.stroll(A, 'A', 6, 0, /초시계로 재기|시작 \(뚜껑/, quiet); await sw(A, 4); note('A 다시 도전', await top(A)); } catch (e) { note('A 다시 도전에서 막힘', String(e.message).split('\n')[0]); note('A 화면', { 글: await top(A), 단추: (await W.buttons(A)).slice(0, 12) }); }
             note('C 끊긴 채', await top(C));
             await A.waitForTimeout(3000);
+        },
+        4: async () => {   // 52~85분: 2차시가 제대로 열림
+            setStage(2); W.offline['C로켓왕'] = true;
+            const A = await live.student('A별빛', 'phone'), B = await live.student('B달님', 'phone'), C = await live.student('C로켓왕', 'Pixel 7'), D = await live.student('D번개', 'phone'), E = await live.student('E코드', 'phone');
+            setStage(3); await A.waitForTimeout(7000);
+            for (const [n, pg] of Object.entries(W.pages)) note('2차시 열림 ' + n, (await top(pg)).slice(0, 230));
+            // C: 다시 연결
+            W.offline['C로켓왕'] = false; const t0 = Date.now(); let ok = null;
+            while (Date.now() - t0 < 60000) { await C.waitForTimeout(3000); if (!/폰에 저장됨/.test(await top(C))) { ok = Math.round((Date.now() - t0) / 1000); break; } }
+            note('C 다시 연결 뒤', { 보내기까지_초: ok, 화면: (await top(C)).slice(0, 260), 탭: (await W.buttons(C)).slice(0, 4), 저장소_측정수: (W.app.items('rocket').find(d => d.title === '로켓왕👑') || {}).summary });
+            const toT2 = async (pg, pick) => { if (await pg.getByText(/2차시로/).locator('visible=true').count()) await W.tap(pg, /2차시로/); else await W.tap(pg, /^2차시$/); await pg.waitForTimeout(600); await W.stroll(pg, 't2', 22, pick || 0, /영상으로 재기/, quiet); };
+            // A: 영상으로 세 곳 누르기 → 기록 → 한 번 더(눈으로) → 그래프 → 도전(눈으로) → 정리로
+            await toT2(A, 0); await W.tap(A, '영상으로 재기'); await A.waitForTimeout(1000); await W.tap(A, '녹화 시작'); await A.waitForTimeout(2500); await W.tap(A, '녹화 끝'); await A.waitForTimeout(2000);
+            note('A 영상 연 위치', (await W.text(A)).split('\n').find(l => /^영상 \d|^⏱/.test(l)) || '');
+            await W.tap(A, '이 장면이 가장 높아요'); await A.waitForTimeout(800);
+            const pic = A.locator('canvas').locator('visible=true').first(), bx = await pic.boundingBox();
+            for (const [fx, fy] of [[0.3, 0.95], [0.3, 0.5], [0.6, 0.42]]) { await A.touchscreen.tap(bx.x + bx.width * fx, bx.y + bx.height * fy); await A.waitForTimeout(500); }
+            note('A 세 점 뒤', (await top(A)).slice(0, 260)); await W.tap(A, '이 결과 기록'); await A.waitForTimeout(600);
+            await W.tap(A, '바꿔서 다시 발사'); await W.tap(A, '+'); await W.stroll(A, 'A', 6, 0, /눈으로 보고 고르기/, quiet); await W.tap(A, '눈으로 보고 고르기'); await W.tap(A, '아이 키와 비슷'); await A.waitForTimeout(500);
+            note('A 두 번 쏜 뒤', { 글: (await top(A)).slice(0, 260), 단추: (await W.buttons(A)).slice(4) });
+            await W.tap(A, '그래프 보기'); await A.waitForTimeout(700); await W.tap(A, /도전: 딱/); await W.tap(A, '도전하기'); await W.stroll(A, 'A도전', 6, 0, /눈으로 보고 고르기/, quiet); await W.tap(A, '눈으로 보고 고르기'); await W.tap(A, '아이 키와 비슷'); await A.waitForTimeout(600);
+            note('A 2차시 도전 결과', { 글: (await top(A)).slice(0, 300), 단추: (await W.buttons(A)).slice(4) });
+            await W.tap(A, /정리로/).catch(e => note('A 정리로', e.message)); await A.waitForTimeout(600); note('A 2차시 끝낸 뒤 서 있는 화면', { 글: (await top(A)).slice(0, 260), 단추: (await W.buttons(A)).slice(4) });
+            // B: 2차시 눈으로 한 번
+            await toT2(B, 0); await W.tap(B, '눈으로 보고 고르기'); await W.tap(B, '아이 키보다 높다'); await B.waitForTimeout(500); note('B 2차시 한 번', (await top(B)).slice(0, 220));
+            // D: 1차시를 한 번만 재고(초시계) 2차시로
+            await W.stroll(D, 'D', 16, 0, /초시계로 재기|시작 \(뚜껑/, quiet); if (await D.getByText('초시계로 재기').locator('visible=true').count()) await W.tap(D, '초시계로 재기'); await W.tap(D, '시작 (뚜껑'); await D.waitForTimeout(2200); await W.tap(D, /펑/); await D.waitForTimeout(400); if (await D.getByText('이 시간으로 기록').locator('visible=true').count()) await W.tap(D, '이 시간으로 기록'); await D.waitForTimeout(500);
+            note('D 1차시 한 번 잰 뒤(2차시로 가는 길이 보이나)', { 글: (await top(D)).slice(0, 220), 단추: (await W.buttons(D)).slice(0, 12) });
+            await W.tap(D, /^2차시$/); await D.waitForTimeout(600); await W.stroll(D, 'D2', 5, 0, /영상으로 재기/, quiet); note('D 2차시', (await top(D)).slice(0, 200));
+            // E: 2차시 촬영 안내까지 와서 '눈으로 보고 고르기' 화면(발사를 기다리는 중)에 멈춤
+            await toT2(E, 0); await W.tap(E, '눈으로 보고 고르기'); await E.waitForTimeout(500); note('E (85분, 발사 보고 고르려는 중)', (await top(E)).slice(0, 260));
+            await A.waitForTimeout(3000);
         }
         // TURNS
     };
