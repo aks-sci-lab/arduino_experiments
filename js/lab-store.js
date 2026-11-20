@@ -727,17 +727,24 @@
                 fail('알 수 없는 요청입니다.');
             } catch (err) {
                 if (err && err.userError) return { ok: false, error: err.message };
-                return { ok: false, error: friendlyError(err) };
+                return isNetworkError(err) ? { ok: false, error: friendlyError(err), network: true } : { ok: false, error: friendlyError(err) };
             }
         }
         return { handle: handle };
     }
+    /* 진짜 인터넷 문제인지 (시간 초과·오프라인·fetch 실패·도구를 못 불러옴). 로그인 꺼짐·권한·한도 오류는 아님
+       → network: true 는 이때만 붙인다 (필름통 로켓 등은 이때만 '폰에 저장하고 나중에 보내기', 아니면 진짜 이유를 보여 줌) */
+    function isNetworkError(err) {
+        var code = String(err && err.code || ''), msg = String(err && err.message || err);
+        if (/operation-not-allowed|admin-restricted|permission-denied|insufficient permissions|resource-exhausted|quota|unauthenticated/i.test(code + msg)) return false;
+        return /auth\/network-request-failed|unavailable|deadline-exceeded|offline|failed to fetch|load failed|networkerror|network ?error|시간 초과|불러오지 못함/i.test(code + ' ' + msg);
+    }
     function friendlyError(err) {
         var code = String(err && err.code || ''), msg = String(err && err.message || err);
-        if (/permission-denied|insufficient permissions/i.test(code + msg)) return '저장소가 요청을 막았어요 (권한 없음). 링크·QR 을 다시 확인하거나 선생님께 알려 주세요.';
-        if (/unavailable|network|offline|failed to get document because the client is offline/i.test(code + msg)) return '인터넷에 연결하지 못했어요 (' + msg.slice(0, 80) + ').';
-        if (/resource-exhausted|quota/i.test(code + msg)) return '오늘 저장소 사용 한도를 넘었어요. 선생님께 알려 주세요.';
         if (/operation-not-allowed|admin-restricted/i.test(code + msg)) return '익명 로그인이 꺼져 있어요. 선생님: Firebase 콘솔 → Authentication → 로그인 방법 → 익명 사용.';
+        if (/permission-denied|insufficient permissions/i.test(code + msg)) return '저장소가 요청을 막았어요 (권한 없음). 링크·QR 을 다시 확인하거나 선생님께 알려 주세요.';
+        if (isNetworkError(err) || /unavailable|network|offline/i.test(code + msg)) return '인터넷에 연결하지 못했어요 (' + msg.slice(0, 80) + ').';
+        if (/resource-exhausted|quota/i.test(code + msg)) return '오늘 저장소 사용 한도를 넘었어요. 선생님께 알려 주세요.';
         return msg.slice(0, 200);
     }
 
@@ -818,7 +825,11 @@
     }
     // 지금 사용자 (없으면 화면에 안 보이는 익명 로그인)
     async function ensureUser() {
-        if (fakeUrl()) return fakeUser();
+        if (fakeUrl()) {
+            // 시험: 익명 로그인이 꺼진 Firebase 흉내 (window.LAB_STORE_FAKE_AUTH_ERROR = 'auth/admin-restricted-operation')
+            if (window.LAB_STORE_FAKE_AUTH_ERROR) { var ae = new Error('Firebase: Error (' + window.LAB_STORE_FAKE_AUTH_ERROR + ').'); ae.code = String(window.LAB_STORE_FAKE_AUTH_ERROR); throw ae; }
+            return fakeUser();
+        }
         var fb = await firebaseReady();
         var u = fb.auth().currentUser || await waitUser(fb);
         if (!u) u = (await fb.auth().signInAnonymously()).user;
@@ -937,7 +948,7 @@
             }
             return (await getCore()).handle(b, auth);
         })();
-        return withTimeout(run, ms || 20000).catch(function (e) { return { ok: false, error: friendlyError(e), network: true }; });
+        return withTimeout(run, ms || 20000).catch(function (e) { var o = { ok: false, error: friendlyError(e) }; if (isNetworkError(e)) o.network = true; return o; });
     }
     function withTimeout(p, ms) {
         return new Promise(function (res, rej) {
@@ -1052,6 +1063,7 @@
         newSpace: newSpace, isSpace: isSpace, isLabUrl: isLabUrl, urlOf: urlOf, spaceOf: spaceOf, groupSpace: groupSpace, parseUrl: parseUrl, docKey: docKey,
         ensureUser: ensureUser, currentUser: currentUser, signInGoogle: signInGoogle, signOut: signOut, onUser: onUser, isTeacher: isTeacher,
         cleanTeamName: cleanTeamName, teamKey: teamKey, cleanSetup: cleanSetup, TEAM: TEAM,
+        friendlyError: friendlyError, isNetworkError: isNetworkError,
         toCsv: toCsv, csvCell: csvCell, isClassExp: isClassExp, isGenericExp: isGenericExp, GENERIC_EXPS: GENERIC_EXPS
     };
 });
