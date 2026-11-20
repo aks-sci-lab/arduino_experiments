@@ -104,6 +104,36 @@ async function startWorld(opts) {
             await W.tap(pg, ch[((pick || 0) + tries[key] - 1) % ch.length].t.slice(0, 12));   // 같은 문제면 다음 보기를 눌러 봄
         }
     };
+    // 교사 흉내: 보고서 AI 켜 두기 (교사 화면을 하나 열어 가짜 AI 서버로 답하게 함. 진짜 AI·진짜 키는 쓰지 않음)
+    //   const desk = await W.aiDesk();  desk.busy = true (한도 오류 429 흉내) / desk.off() / desk.on()
+    W.aiDesk = async () => {
+        const desk = { busy: false, calls: [] };
+        const c = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ko-KR' });
+        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API) }));
+        await c.route(/cdn\.jsdelivr|cdnjs/, r => r.fulfill({ contentType: 'text/javascript', body: /qrcode/.test(r.request().url()) ? QR : CHART }));
+        await c.route(/gstatic|accounts\.google/, r => r.abort());
+        const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
+        await c.route(/api\.anthropic\.com/, async route => {
+            const req = route.request();
+            if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+            const json = (status, o) => route.fulfill({ status, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(o) });
+            if (req.method() === 'GET') return json(200, { data: [{ id: 'claude-sonnet-5-5' }] });
+            if (desk.busy) return json(429, { error: { type: 'rate_limit_error', message: 'rate limit' } });
+            const body = JSON.parse(req.postData() || '{}'); const user = body.messages && body.messages[0].content || '';
+            desk.calls.push({ system: body.system, user });
+            const text = /한 단어/.test(body.system || '') ? '준비' : '(가짜 AI 답 ' + desk.calls.length + ') 주장은 분명해요. 그런데 어느 측정값이 그 주장의 근거인가요? 가열 시간이 다른 시료끼리 견준 숫자를 한 문장으로 넣어 보세요. 측정의 한계도 하나 적어 볼까요?';
+            return json(200, { content: [{ type: 'text', text }] });
+        });
+        const T = await c.newPage(); desk.page = T; T.vcName = '교사AI';
+        T.on('dialog', d => d.accept());
+        await T.goto(ROOT + 'projects/class-teacher.html');
+        await T.click('#btnLogin');
+        await T.waitForSelector('#btnSettings:not([hidden])'); await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="ai"]');
+        await T.selectOption('#aiProvider', 'claude'); await T.fill('#aiKey', 'sk-ant-fake-virtual-class'); await T.click('#aiTest');
+        await T.waitForFunction(() => /AI 답하기 켜짐/.test(document.getElementById('aiDeskNow').textContent), null, { timeout: 20000 });
+        desk.off = () => T.uncheck('#aiOn'); desk.on = () => T.check('#aiOn');
+        return desk;
+    };
     W.close = async () => { await browser.close(); api.close(); stat.close(); };
     return W;
 }
