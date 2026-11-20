@@ -1,9 +1,9 @@
-// 스마트폰 진자: 조 코드·원본 데이터 줄이기·보낼 내용·서버 응답 해석·Apps Script(Code.gs) 시험
+// 스마트폰 진자: 조 코드·원본 데이터 줄이기·보낼 내용·저장소(js/lab-store.js, 가짜 메모리 DB) 시험
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const P = require('../js/pendulum-math.js');
 const C = require('../js/pendulum-cloud.js');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 test('조 코드: 만들기·형식 검사·정리', () => {
     assert.equal(C.makeGroupCode(2, 3, () => 0.4821), '2-3-4821');
@@ -60,13 +60,6 @@ test('보낼 내용: 조 코드·L·계산 결과가 없으면 쉬운 말로 막
     assert.match(C.buildSavePayload({ ...base, result: { error: 'x' } }).error, /주기/);
 });
 
-test('서버 응답 해석: 정상·오류·로그인 화면(HTML)', () => {
-    assert.deepEqual(C.parseResponse('{"ok":true,"items":[]}'), { ok: true, items: [] });
-    assert.equal(C.parseResponse('{"ok":false,"error":"조 코드"}').error, '조 코드');
-    assert.match(C.parseResponse('<!DOCTYPE html><html>로그인').error, /모든 사용자/);
-    assert.equal(C.parseResponse('???').ok, false);
-});
-
 test('목록 합치기: 새 측정은 뒤에, 같은 id 는 고친 값으로', () => {
     const a = { id: 'a', L: 1, T: 2 }, b = { id: 'b', L: 0.5, T: 1.4 };
     let m = C.mergeItems([], [a]);
@@ -77,73 +70,42 @@ test('목록 합치기: 새 측정은 뒤에, 같은 id 는 고친 값으로', (
     assert.deepEqual(m.added, ['a']); assert.equal(m.items[0].T, 2.01);
 });
 
-test('요청: 주소가 없으면 선생님 설정 안내, 연결 실패는 network 표시', async () => {
-    assert.equal((await C.list('', '2-3-4821')).noConfig, true);
-    const fail = await C.list('https://x', '2-3-4821', () => Promise.reject(new Error('offline')));
-    assert.equal(fail.network, true);
-    let seen;
-    const ok = await C.save('https://x/exec', { a: 1 }, (url, init) => { seen = init; return Promise.resolve({ text: () => Promise.resolve('{"ok":true,"id":"m1"}') }); });
-    assert.equal(ok.ok, true);
-    assert.equal(seen.method, 'POST');
-    assert.equal(seen.headers['Content-Type'], 'text/plain;charset=utf-8', '미리보기 요청이 생기지 않는 단순 요청');
+test('요청: 예전 시트(Apps Script) 주소는 보내지 않고 안내, 저장소 주소는 저장소로', async () => {
+    const old = await C.list('https://script.google.com/macros/s/AKfycb' + 'X'.repeat(40) + '/exec', '2-3-4821');
+    assert.equal(old.ok, false); assert.equal(old.legacy, true); assert.match(old.error, /새 QR/);
+    assert.equal(typeof C.parseResponse, 'undefined');
+    assert.equal(typeof C.scriptIdFromUrl, 'undefined');
 });
 
-test('Apps Script: 저장 → 목록 → 원본, 같은 id 는 고쳐 씀, 다른 조는 안 보임', () => {
-    const gs = loadCodeGs();
-    assert.equal(gs.get({ action: 'ping' }).ok, true);
+test('저장소: 저장 → 목록 → 원본, 같은 id 는 고쳐 씀, 다른 조는 안 보임', async () => {
+    const gs = loadLabStore();
     const s = P.simulate({ L: 0.7, duration: 25, seed: 8 });
     const r = P.analyze(s, { nPeriods: 10 });
     const { payload } = C.buildSavePayload({ id: 'mtest000001', group: '2-3-4821', conditions: { L: '0.70', amplitude: '5' }, result: r, samples: s, source: 'sensor', device: 'iOS' });
-    const res = gs.post(payload);
-    assert.deepEqual(res, { ok: true, id: 'mtest000001', updated: false });
-    assert.deepEqual(gs.ss.sheets.get('measurements').rows[0].slice(0, 10),
-        ['timestamp', 'groupCode', 'L', 'amplitude', 'sensorAxis', 'nPeriods', 'T_mean', 'T_std', 'rawData', 'note'], '명세서 4절 열 순서');
-    // 다른 조
-    gs.post({ ...payload, id: 'mtest000002', group: '2-4-1111' });
-    const list = gs.get({ action: 'list', group: '2-3-4821' });
+    const res = await gs.post(payload);
+    assert.equal(res.ok, true, res.error); assert.equal(res.updated, false);
+    await gs.post({ ...payload, id: 'mtest000002', group: '2-4-1111' });
+    const list = await gs.get({ action: 'list', group: '2-3-4821' });
     assert.equal(list.items.length, 1);
     const item = C.itemFromServer(list.items[0]);
     assert.equal(item.L, 0.7); assert.ok(Math.abs(item.T - r.T) < 1e-4); assert.equal(item.hasRaw, true);
     assert.equal(list.items[0].rawData, undefined, '목록에는 원본을 빼서 가볍게');
-    // 같은 id 로 다시 보내면 한 줄을 고침
-    assert.equal(gs.post({ ...payload, T_mean: 1.7 }).updated, true);
-    assert.equal(gs.get({ action: 'list', group: '2-3-4821' }).items[0].T_mean, 1.7);
-    // 원본
-    const raw = gs.get({ action: 'raw', group: '2-3-4821', id: 'mtest000001' });
+    assert.equal((await gs.post({ ...payload, T_mean: 1.7 })).updated, true);
+    assert.equal((await gs.get({ action: 'list', group: '2-3-4821' })).items[0].T_mean, 1.7);
+    const raw = await gs.get({ action: 'raw', group: '2-3-4821', id: 'mtest000001' });
     assert.equal(C.unpackSamples(raw.raw).length, s.length);
-    // 시트를 고르는 4단계용 시트는 아직 없음(첫 요청에 measurements 만)
-    assert.ok(gs.ss.sheets.has('measurements'));
 });
 
-test('Apps Script: 잘못된 요청은 막고 이유를 알려 줌, 수식처럼 보이는 글은 글자로 저장', () => {
-    const gs = loadCodeGs();
+test('저장소: 잘못된 요청은 막고 이유를 알려 줌, 받지 않은 항목은 저장 안 함', async () => {
+    const gs = loadLabStore();
     const good = { action: 'save', id: 'mtest000003', group: '1-1-0001', L: 1, nPeriods: 10, T_mean: 2.0, T_std: 0.01, raw: [] };
-    assert.match(gs.post({ ...good, group: '1-1' }).error, /조 코드/);
-    assert.match(gs.post({ ...good, L: -1 }).error, /줄 길이/);
-    assert.match(gs.post({ ...good, T_mean: 'x' }).error, /주기/);
-    assert.match(gs.post({ ...good, id: 'a b' }).error, /id/);
-    assert.match(gs.post({ ...good, raw: ['x'.repeat(50000)] }).error, /원본/);
-    assert.match(gs.post('x'.repeat(400001)).error, /너무 큽니다/);
-    assert.match(gs.post('not json').error, /JSON|Unexpected|token/i);
-    assert.match(gs.get({ action: 'list', group: 'abc' }).error, /조 코드/);
-    assert.equal(gs.post({ ...good, note: '=IMPORTXML("x")', name: '홍길동', email: 'a@b.c' }).ok, true);
-    const row = gs.ss.sheets.get('measurements').rows[1];
-    assert.equal(gs.ss.sheets.get('measurements').written[1][9], "'=IMPORTXML(\"x\")", "앞에 ' 를 붙여 글자로 저장(수식 실행 안 됨)");
-    assert.equal(row[9], '=IMPORTXML("x")', '시트 값에는 \' 가 남지 않음');
-    assert.ok(!JSON.stringify(row).includes('홍길동') && !JSON.stringify(row).includes('a@b.c'), '받지 않은 항목은 저장 안 함');
-});
-
-test('선생님 시트: 웹 앱 주소 ↔ 스크립트 ID', () => {
-    const id = 'AKfycbxX-2giNNmH-2loNRX3UDzJqWKYXnFT2zjfWMXFgsXjfpU_JBlQ2DA6DSK1pQyJunjI';
-    const url = 'https://script.google.com/macros/s/' + id + '/exec';
-    assert.equal(C.scriptIdFromUrl(url), id);
-    assert.equal(C.scriptIdFromUrl('  ' + url + '?action=ping '), id);
-    assert.equal(C.scriptIdFromUrl('https://script.google.com/a/macros/school.kr/s/' + id + '/exec'), id, '학교 Workspace 주소');
-    assert.equal(C.urlFromScriptId(id), url);
-    for (const bad of ['', 'http://script.google.com/macros/s/' + id + '/exec', 'https://evil.com/macros/s/' + id + '/exec',
-        'https://script.google.com/macros/s/short/exec', 'https://script.google.com/macros/s/' + id + '/edit']) assert.equal(C.scriptIdFromUrl(bad), null, bad);
-    assert.equal(C.urlFromScriptId('a/b'), '');
-    assert.equal(C.isScriptId('<script>alert(1)</script>xxxxxxxxxxxx'), false);
+    assert.match((await gs.post({ ...good, group: '1-1' })).error, /조 코드/);
+    assert.match((await gs.post({ ...good, L: -1 })).error, /줄 길이/);
+    assert.match((await gs.post({ ...good, T_mean: 'x' })).error, /주기/);
+    assert.match((await gs.post({ ...good, id: 'a b' })).error, /id/);
+    assert.equal((await gs.post({ ...good, note: '=IMPORTXML("x")', name: '홍길동', email: 'a@b.c' })).ok, true);
+    const docs = JSON.stringify(gs.items());
+    assert.ok(!docs.includes('홍길동') && !docs.includes('a@b.c'), '받지 않은 항목은 저장 안 함');
 });
 
 test('저장 공간 고르기 (2026-11-18 Firestore): 링크의 ?s=공간 > 조 코드 공간, 예전 Apps Script 링크는 legacy, 기억하지 않음', () => {
@@ -154,21 +116,6 @@ test('저장 공간 고르기 (2026-11-18 Firestore): 링크의 ?s=공간 > 조 
     assert.equal(C.resolveServer('?s=AKfycb' + 'X'.repeat(40)).from, 'legacy');
     assert.equal(C.resolveServer('?s=AKfycb' + 'X'.repeat(40)).url, 'lab:');
     assert.equal(C.resolveServer('?s=bad!id').from, 'default');
+    assert.equal(C.isScriptId('<script>alert(1)</script>xxxxxxxxxxxx'), false);
     assert.equal(C.isLab('lab:'), true); assert.equal(C.isLab('https://script.google.com/x'), false);
-});
-
-test('Apps Script: 조 코드·id 가 시트에서 날짜·숫자로 바뀌지 않아 목록·고쳐 쓰기·원본이 됨 (2026-11-14 실제 문제)', () => {
-    const gs = loadCodeGs();
-    const base = { action: 'save', group: '2-3-5376', L: 0.9, nPeriods: 10, T_mean: 1.9, raw: ['P1|3|10|0,a,b'] };
-    assert.equal(gs.post({ ...base, id: '1234567890' }).ok, true);           // 숫자만 있는 id
-    assert.equal(gs.post({ ...base, id: 'abc-123', note: '1-2' }).ok, true);   // 날짜처럼 보이는 메모
-    const sh = gs.ss.sheets.get('measurements');
-    assert.equal(typeof sh.rows[1][1], 'string', '조 코드가 글자로 저장');
-    const list = gs.get({ action: 'list', group: '2-3-5376' });
-    assert.equal(list.items.length, 2);
-    assert.deepEqual(list.items.map(it => String(it.id)).sort(), ['1234567890', 'abc-123']);
-    assert.equal(list.items.find(it => it.id === 'abc-123').note, '1-2');
-    assert.equal(gs.post({ ...base, id: '1234567890', T_mean: 1.95 }).updated, true, '같은 id 는 고쳐 씀');
-    assert.equal(gs.get({ action: 'list', group: '2-3-5376' }).items.length, 2);
-    assert.deepEqual(gs.get({ action: 'raw', group: '2-3-5376', id: 'abc-123' }).raw, ['P1|3|10|0,a,b']);
 });

@@ -193,6 +193,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                     prepare: async characteristics => {
                         [tx, cmd] = characteristics;
+                        // 펌웨어 판 확인 (예전 판이면 한 줄 안내, 측정은 막지 않음). 페이지 알림을 붙이기 전에 한 번.
+                        if (typeof PicoFirmware !== 'undefined') {
+                            connectionStage = '펌웨어 판 확인';
+                            PicoFirmware.showNotice(await PicoFirmware.probe(tx, cmd), status);
+                            ensureSetup();
+                        }
                         connectionStage = '센서 알림 등록';
                         tx.addEventListener('characteristicvaluechanged', notification);
                         await tx.startNotifications();

@@ -267,7 +267,7 @@
 
     // ---------- 조 공유 (js/class-share.js, 구글 로그인 없이 사이트 저장소로) ----------
     const SHARE_SERIES = MAX_SUBMIT_SERIES;   // 보낼 때 센서 기록 점 수 한도 (넘으면 고르게 솎아 냄)
-    // 서버 요약 이름 규칙 (apps-script/Code.gs cleanSummary): 영어·숫자·한글·공백·.()- 30자
+    // 서버 요약 이름 규칙 (예전 Code.gs 규칙. 지금 저장소 js/lab-store.js 는 더 넓게 받음): 영어·숫자·한글·공백·.()- 30자
     function summaryKey(s, fallback) {
         const k = String(s == null ? '' : s).replace(/[^A-Za-z0-9_가-힣 .()-]/g, '').trim().slice(0, 30);
         return k || fallback;

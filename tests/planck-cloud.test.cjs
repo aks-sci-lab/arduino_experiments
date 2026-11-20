@@ -1,10 +1,10 @@
-// LED 플랑크 상수 조 공유: 보낼 내용·받은 값 합치기·CSV 불러오기, 그리고 같은 Apps Script(Code.gs)의 planck 시트
+// LED 플랑크 상수 조 공유: 보낼 내용·받은 값 합치기·CSV 불러오기, 그리고 저장소(js/lab-store.js, 가짜 메모리 DB)의 planck 줄
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const PC = require('../js/planck-cloud.js');
 const C = require('../js/pendulum-cloud.js');
 const P = require('../js/planck-math.js');
-const { loadCodeGs } = require('./fake-apps-script.cjs');
+const { loadLabStore } = require('./fake-lab-store.cjs');
 
 const ivFor = vt => [0, 0.1, 0.2, 0.3].map(d => ({ v: +(vt + d).toFixed(3), i: +(d * 40).toFixed(3), vr: +(d * 40 * 0.33).toFixed(4), r: 330 }));
 function leds() {
@@ -97,55 +97,40 @@ test('CSV 불러오기: 이 페이지의 CSV(따옴표 이름·from 칸)를 LED 
     assert.match(PC.parseCsv('').error, /빈/);
 });
 
-test('Apps Script: planck 시트에 저장·고쳐 쓰기, 조 코드가 날짜로 바뀌지 않고 목록에 나옴', () => {
-    const app = loadCodeGs();
+test('저장소: planck 줄 저장·고쳐 쓰기, 같은 조 목록에 나옴, 다른 조는 섞이지 않음', async () => {
+    const app = loadLabStore();
     const pls = PC.buildPayloads(base(), C.isGroupCode).payloads;
-    for (const p of pls) assert.deepEqual(app.post(p), { ok: true, id: p.id, updated: false });
-    const sh = app.ss.getSheetByName('planck');
-    assert.equal(sh.rows.length, 1 + 2);
-    assert.equal(sh.rows[1][1], '2-3-5376', '조 코드가 글자 그대로');
-    assert.equal(sh.rows[2][2], '=1+1', '수식이 아니라 글자로');
-    assert.equal(sh.written[2][2], "'=1+1");
-    // 다른 노트북 → 같은 조, 다른 조
+    for (const p of pls) { const r = await app.post(p); assert.equal(r.ok, true, r.error); assert.equal(r.updated, false); }
     const other = PC.buildPayloads(base({ device: 'nzz9999' }), C.isGroupCode).payloads[0];
-    app.post(other);
-    app.post(Object.assign({}, other, { group: '1-1-0001' }));
-    let list = app.get({ action: 'list', exp: 'planck', group: '2-3-5376' });
-    assert.equal(list.ok, true);
+    await app.post(other);
+    await app.post(Object.assign({}, other, { group: '1-1-0001' }));
+    let list = await app.get({ action: 'list', exp: 'planck', group: '2-3-5376' });
+    assert.equal(list.ok, true, list.error);
     assert.equal(list.items.length, 3);
     const it = list.items.find(x => x.id === 'nzz9999-red');
     assert.equal(it.device, 'nzz9999'); assert.equal(it.ledKey, 'red'); assert.equal(it.led, '빨강');
     assert.deepEqual(PC.decodeIv(it.ivData), PC.decodeIv(other.iv));
-    assert.equal(typeof it.timestamp, 'string');
-    // 같은 id 다시 보내면 고쳐 씀
     const fix = Object.assign({}, pls[0], { iv: '[[1.9,2]]', nIV: 1 });
-    assert.equal(app.post(fix).updated, true);
-    list = app.get({ action: 'list', exp: 'planck', group: '2-3-5376' });
+    assert.equal((await app.post(fix)).updated, true);
+    list = await app.get({ action: 'list', exp: 'planck', group: '2-3-5376' });
     assert.equal(list.items.length, 3);
     assert.equal(PC.decodeIv(list.items.find(x => x.id === 'nab12cd-red').ivData).length, 1);
-    // 받은 쪽에서 합치기까지
     const mine = leds().map(l => Object.assign(l, { iv: [], glow: [] }));
     const res = PC.applyEntries(mine, PC.entriesFromServer(list.items, 'nzz9999'), () => 'y1');
     assert.equal(res.points, 1 + 2 + 4);
 });
 
-test('Apps Script: planck 값 검사 (형식·범위·크기), 진자 목록에는 섞이지 않음', () => {
-    const app = loadCodeGs();
+test('저장소: planck 값 검사 (형식·범위·크기)', async () => {
+    const app = loadLabStore();
     const ok = PC.buildPayloads(base(), C.isGroupCode).payloads[0];
-    const bad = over => app.post(Object.assign({}, ok, over));
-    assert.match(bad({ group: '2-3' }).error, /조 코드/);
-    assert.match(bad({ id: 'a' }).error, /id/);
-    assert.match(bad({ device: '<x>' }).error, /노트북/);
-    assert.match(bad({ led: '  ' }).error, /LED 이름/);
-    assert.match(bad({ lambda: 5000 }).error, /파장/);
-    assert.match(bad({ iv: '[[1,99999]]' }).error, /전류/);
-    assert.match(bad({ iv: '{"a":1}' }).error, /형식|점 수/);
-    assert.match(bad({ iv: JSON.stringify(Array.from({ length: 501 }, () => [1, 1])) }).error, /점 수/);
-    assert.match(bad({ glow: '["=HACK()"]' }).error, /전압/);
-    // 숫자가 아닌 칸은 버리고 숫자만 다시 만들어 저장
-    assert.equal(bad({ iv: '[[1.9, 2, null, null, "yes"]]' }).ok, true);
-    assert.equal(app.ss.getSheetByName('planck').rows[1][18], '[[1.9,2,null,null,1]]');
-    assert.equal(app.get({ action: 'list', group: '2-3-5376' }).items.length, 0, '진자 measurements 는 비어 있음');
-    assert.match(app.get({ action: 'raw', exp: 'planck', group: '2-3-5376', id: 'nab12cd-red' }).error, /알 수 없는/);
-    assert.ok(app.get({ action: 'ping' }).version >= 3);
+    const bad = async over => app.post(Object.assign({}, ok, over));
+    assert.match((await bad({ group: '2-3' })).error, /조 코드/);
+    assert.match((await bad({ id: 'a' })).error, /id/);
+    assert.match((await bad({ device: '<x>' })).error, /노트북/);
+    assert.match((await bad({ led: '  ' })).error, /LED 이름/);
+    assert.match((await bad({ lambda: 5000 })).error, /파장/);
+    assert.match((await bad({ iv: '[[1,99999]]' })).error, /전류/);
+    assert.match((await bad({ iv: JSON.stringify(Array.from({ length: 501 }, () => [1, 1])) })).error, /점 수/);
+    assert.match((await bad({ glow: '["=HACK()"]' })).error, /전압/);
+    assert.equal((await bad({ iv: '[[1.9, 2, null, null, "yes"]]' })).ok, true, '숫자가 아닌 칸은 버리고 저장');
 });

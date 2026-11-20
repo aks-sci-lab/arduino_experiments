@@ -455,6 +455,8 @@
             msg.textContent = '🟢 ' + new Date().toLocaleTimeString('ko-KR') + ' · 학생이 움직이면 바로 바뀌어요';
             render(r);
             liveFor(c);
+            // 실험별 결과 부품(플랑크 js/class-teacher-planck.js 등)에 지금 보는 수업을 알림
+            try { window.dispatchEvent(new CustomEvent('ct-watch', { detail: { cls: c } })); } catch (e) { /* 무시 */ }
         }
         if (state.again) { state.again = false; return refresh(); }
         if (state.view === 'main' && state.sub === 'run') state.timer = setTimeout(refresh, POLL_MS);

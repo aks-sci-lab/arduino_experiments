@@ -123,6 +123,13 @@ html.big-view .ct-boardbig { zoom: calc(1 / 1.35); }
 .ct-stage-steps li.cur { outline: 2px solid var(--c-success); font-weight: 700; }
 .ct-wrap button.ct-big { font-size: 1.15rem; min-height: 56px; padding: 0 var(--sp-5); }
 
+/* 플랑크 상수 결과 (js/class-teacher-planck.js) */
+.ctp-scroll { overflow-x: auto; max-width: 100%; }
+.ctp-row { cursor: pointer; }
+.ctp-row:hover, .ctp-row:focus { background: var(--c-primary-soft); }
+.ctp-chart { width: 100%; max-width: 560px; height: auto; display: block; margin: var(--sp-2) 0; }
+.ctp-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid #333; vertical-align: middle; }
+
 /* 내 수업 목록 (첫 화면) */
 .ct-listhead { justify-content: space-between; }
 .ct-classes { display: grid; gap: var(--sp-2); margin: var(--sp-2) 0; }

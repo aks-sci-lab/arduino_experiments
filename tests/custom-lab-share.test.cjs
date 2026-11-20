@@ -1,6 +1,6 @@
 // 선생님이 만든 실험 — 조 공유(구글 로그인 없이) 시험
 //  1) Node: 보낼 것(shareItems)·받은 것 합치기(mergeIncoming)·CSV 불러오기(rowsFromCsv)
-//  2) Playwright(있으면): 가짜 Apps Script(tests/fake-apps-script.cjs, 진짜 시트처럼 '2-3-5376' → 날짜)로
+//  2) Playwright(있으면): 가짜 저장소(tests/fake-lab-store.cjs)로
 //     교사 수업 만들기 → 학생 2명 같은 조(보내기 → 다른 학생 자동 불러오기) → 교사 진행 보기의 단계·점 수, 375px
 //  Firebase·Chart.js 는 시험 환경에서 막혀 있어, 실험 설정은 이 기기 저장값으로 열고 Chart 는 작은 가짜로 바꾼다.
 const test = require('node:test');

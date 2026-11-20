@@ -1,4 +1,4 @@
-// 아두이노 Nano 페이지 조 공유 화면 시험 (Playwright). 가짜 Apps Script(Code.gs 를 Node 에서 실행) + 가짜 블루투스 보드
+// 아두이노 Nano 페이지 조 공유 화면 시험 (Playwright). 가짜 저장소(tests/fake-lab-store.cjs) + 가짜 블루투스 보드
 // 교사 수업 만들기(nano) → 학생 2명 같은 조 → 한 명이 회차 기록·📤 보내기 → 다른 학생이 자동으로 📥 불러옴 → 교사 진행 보기
 // Playwright 가 없으면 건너뛴다.
 const test = require('node:test');
@@ -58,7 +58,7 @@ async function openPage(browser, app, url, width, withBoard) {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('dialog', d => d.accept());
-    // 가짜 Apps Script: 진짜 웹 앱 주소로 가는 요청을 Code.gs(Node) 로 돌린다
+    // 가짜 저장소로 요청을 돌린다
     await page.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
     await page.route('https://script.google.com/macros/s/**', async route => {
         const req = route.request();

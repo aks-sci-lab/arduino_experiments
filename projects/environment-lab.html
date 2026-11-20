@@ -264,6 +264,7 @@
     <script src="../js/environment-share.js?v=share-v1"></script>
     <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
     <script src="../js/pico-ble.js?v=setup-v3"></script>
+    <script src="../js/pico-firmware.js?v=fw-v1"></script>
     <script src="../js/sensor-definitions.js?v=voc-index-v3"></script>
     <script src="../js/voc-index.js?v=official-v1"></script>
     <script src="../js/environment-metrics.js?v=env-voc-v1"></script>
@@ -437,6 +438,11 @@
                         },
                         prepare: async characteristics => {
                             [dataCharacteristic, commandCharacteristic] = characteristics;
+                            // 펌웨어 판 확인 (예전 판이면 한 줄 안내, 측정은 막지 않음). 페이지 알림을 붙이기 전에 한 번.
+                            if (typeof PicoFirmware !== 'undefined') {
+                                PicoFirmware.showNotice(await PicoFirmware.probe(dataCharacteristic, commandCharacteristic), statusSpan);
+                                if (pageLeaving || bleDevice !== device) throw new Error('연결 준비가 취소되었습니다.');
+                            }
                             dataCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
                             await dataCharacteristic.startNotifications();
                             for (const command of ['STOP', 'START:ENV_VOC']) {

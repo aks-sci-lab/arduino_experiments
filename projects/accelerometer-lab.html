@@ -197,6 +197,7 @@
     <script src="../js/environment-protocol.js?v=extra-v1"></script>
     <script src="../js/accelerometer-protocol.js?v=batch-200-v4"></script>
     <script src="../js/pico-ble.js?v=discovery-v2"></script>
+    <script src="../js/pico-firmware.js?v=fw-v1"></script>
 
     <script>
     document.addEventListener('DOMContentLoaded', (event) => {
@@ -354,6 +355,10 @@
                 if (pageLeaving) {
                     device.gatt.disconnect();
                     throw new Error('페이지 이동으로 연결을 취소했습니다.');
+                }
+                // 펌웨어 판 확인 (예전 판이면 한 줄 안내, 측정은 막지 않음). 페이지 알림을 붙이기 전에 한 번.
+                if (typeof PicoFirmware !== 'undefined') {
+                    PicoFirmware.showNotice(await PicoFirmware.probe(statusCharacteristic, commandCharacteristic), statusSpan);
                 }
                 device.addEventListener('gattserverdisconnected', onDisconnected);
                 receiver.reset();
