@@ -14,6 +14,11 @@
     <a href="../index.html">&laquo; 메인 페이지로 돌아가기</a>
     <h1>❤️ 스마트폰 카메라 심박수</h1>
     <div id="class-bar-mount"></div>
+    <!-- 📱 수업(?c=) QR 로 연 폰만: 원본을 선생님께도 보낼지 (js/heart-rate-breath-ui.js) -->
+    <div id="raw-consent-box" class="br-card raw-consent" hidden>
+        <label class="chk"><input type="checkbox" id="raw-consent"><span>📤 보내는 측정의 <b>원본 숫자</b>(밝기·노출, 영상 아님)를 같은 조 노트북과 <b>선생님께도</b> 보내도 돼요. 이름·학번은 보내지 않아요.</span></label>
+        <p class="note" id="raw-consent-st"></p>
+    </div>
     <!-- 화면 고르기: 그냥 심박수 재기 / 숨 참기 탐구 (js/heart-rate-breath-ui.js) -->
     <div class="seg pick mode-pick" role="group" aria-label="측정 방식">
         <button type="button" id="mode-live" aria-pressed="true"><span class="ic" aria-hidden="true">❤️</span>심박수 재기<small>한 번 재기 · 손목 비교</small></button>
@@ -24,7 +29,7 @@
     <!-- 💻 노트북·PC: 측정 기능 없이 분석만 (폰 측정 · 노트북 분석 이원화). 태블릿·폰은 그대로 측정 -->
     <section class="br-card hr-laptop-only" id="phone-card-box">
         <h2>📱 폰으로 측정해 보내기</h2>
-        <p class="note">노트북에서는 재지 않고 <b>분석만</b> 해요. 폰으로 QR 을 찍어 폰에서 재고(한 번 재기·숨 참기), 보낼 회차를 골라 📤 보내면 여기 회차 목록에 들어와 이 노트북이 계산해요. 폰이 보낸 원본(밝기 숫자, 영상 아님)은 사이트 저장소를 거쳐 같은 조 기기만 불러와요.</p>
+        <p class="note">노트북에서는 재지 않고 <b>분석만</b> 해요. 폰으로 QR 을 찍어 폰에서 재고(한 번 재기·숨 참기), 보낼 회차를 골라 📤 보내면 여기 회차 목록에 들어와 이 노트북이 계산해요. 폰이 보낸 원본(밝기 숫자, 영상 아님)은 사이트 저장소를 거쳐 와요. 수업 없이 열면 <b>이 노트북과 그 폰만</b> 읽고, 선생님 수업 QR 로 들어왔으면 폰에서 '선생님께도 보내기'에 동의한 원본만 <b>선생님 화면에도</b> 보여요.</p>
         <div id="phone-card"></div>
     </section>
 
@@ -102,7 +107,7 @@
                 <label>키(cm) <select id="br-h"><option value="">안 씀</option></select></label>
                 <label>몸무게(kg) <select id="br-w"><option value="">안 씀</option></select></label>
             </div>
-            <label class="chk"><input type="checkbox" id="br-consent"><span>이 자료를 <b>수업 분석에 써도 돼요</b> (체크하지 않으면 선생님께 보내지 않고 이 화면에서만 봐요)</span></label>
+            <label class="chk"><input type="checkbox" id="br-consent"><span>이 회차의 <b>계산 결과</b>(곡선·지표)와 함께 적는 항목을 <b>수업 분석에 써도 돼요</b> (체크하지 않으면 결과를 선생님께 보내지 않고 이 화면에서만 봐요)</span></label>
             <p class="note">성별은 받지 않아요. 키·몸무게는 구간으로만 적어요. 작은 반에서는 구간만으로도 누구인지 알 수 있으니, 적기 싫으면 비워 두세요.</p>
         </details>
 
@@ -115,8 +120,8 @@
             <div class="row"><button id="br-send" class="good" disabled>📤 동의한 회차 선생님께 보내기 (0개)</button><button id="br-csv-all" class="info" disabled>⬇ 숨 참기 CSV (모든 회차)</button></div>
             <p id="br-send-st" class="note" role="status"></p>
             <div id="br-share-mount"></div>
-            <p class="note">📤 보내기는 '수업 분석 동의'를 체크한 회차만 보내요. 이름·학번·성별은 보내지 않아요.</p>
-            <p class="note">📱 <b>폰으로 재고 노트북에서 분석</b>: 폰이 보낸 원본(밝기 숫자, 영상 아님)은 사이트 저장소를 거쳐 같은 조 기기만 불러와요. 결과(곡선·지표)는 이 노트북이 계산하고, 동의하지 않은 회차의 결과는 이 노트북에만 남아요.</p>
+            <p class="note">📤 이 단추는 '수업 분석 동의'를 체크한 회차의 <b>계산 결과</b>(곡선·지표·함께 적는 항목)만 보내요. 이름·학번·성별은 보내지 않아요.</p>
+            <p class="note">📱 <b>폰으로 재고 노트북에서 분석</b>: 폰이 보낸 <b>원본</b>(밝기 숫자, 영상 아님)은 폰에서 따로 묻는 '선생님께도 보내기' 동의를 따라요 — 동의하면 선생님 화면에도, 안 하면 이 노트북만 받아요(수업 없이 열면 늘 이 노트북과 그 폰만). 결과(곡선·지표)는 이 노트북이 계산하고, '수업 분석 동의'를 하지 않은 회차의 결과는 이 노트북에만 남아요.</p>
         </details>
     </section>
 
