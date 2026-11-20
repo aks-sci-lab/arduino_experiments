@@ -80,6 +80,7 @@ test('교사 수업 목록 → 큰 QR → 진행 보기(오른쪽 위 QR) → �
         await T.reload();
         await T.waitForSelector('#stageCard:not([hidden])');
         assert.match(await T.textContent('#classTitle'), /탄소 양자점/);
+        assert.equal(await T.isVisible('#classOut'), false, '주소로 바로 연 진행 화면에 큰 QR 이 겹쳐 나오지 않음');
         // 뒤로 가기 → 큰 QR → 목록
         await T.goBack(); await T.waitForSelector('#classOut:not([hidden])');
         await T.goBack(); await T.waitForSelector('#viewList:not([hidden])');
