@@ -148,3 +148,63 @@ test('선생님이 만든 실험 보고서 AI: 가설연역 수업 글·질문·
         await browser.close();
     }
 });
+
+// 교사 화면이 AI 를 부를 때: 선생님이 만든 실험은 공개 실험 제목(ClassCloud.checkCustom, Firestore 공개 문서)을 실험 이름으로 넘김. 비공개면 기본 이름
+test('교사 화면 AI: 선생님이 만든 실험은 실험 제목을 AI 에 알려 줌 (비공개면 기본 이름)', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
+    const app = loadLabStore();
+    const browser = await chromium.launch();
+    const users = [];
+    try {
+        const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+        await ctx.route('**/*', async route => {
+            const req = route.request(), u = new URL(req.url());
+            if (u.hostname === 'script.google.com') {
+                const body = req.method() === 'POST' ? await app.post(req.postData() || '{}') : await app.get(Object.fromEntries(u.searchParams));
+                return route.fulfill({ contentType: 'application/json', body: JSON.stringify(body), headers: { 'access-control-allow-origin': '*' } });
+            }
+            if (u.hostname === 'firestore.googleapis.com') {   // 공개 실험 문서 (ohm01 공개, sec02 비공개)
+                const CORS = { 'access-control-allow-origin': '*' };
+                if (/customExperiments\/ohm01/.test(u.pathname)) return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ fields: { published: { booleanValue: true }, title: { stringValue: '옴의 법칙 확인' } } }) });
+                return route.fulfill({ status: 403, headers: CORS, contentType: 'application/json', body: '{}' });
+            }
+            if (u.hostname === 'api.anthropic.com') {
+                const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' };
+                if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+                if (req.method() === 'POST') { try { users.push(JSON.parse(req.postData()).messages[0].content); } catch (e) { users.push(''); } }
+                const body = req.method() === 'GET' ? { data: [{ id: 'claude-sonnet-5-5' }] } : { content: [{ type: 'text', text: '답' }] };
+                return route.fulfill({ status: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(body) });
+            }
+            if (/cdn\.jsdelivr|cdnjs/.test(u.hostname)) return route.fulfill({ contentType: 'application/javascript', body: /qrcode/.test(u.pathname) ? QR : FAKE_CHART });
+            if (u.origin !== ORIGIN) return route.abort();
+            const file = path.join(ROOT, decodeURIComponent(u.pathname));
+            if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return route.fulfill({ status: 404, body: '' });
+            return route.fulfill({ contentType: TYPES[path.extname(file)] || 'application/octet-stream', body: fs.readFileSync(file) });
+        });
+        await ctx.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });
+        const errors = [];
+        const T = await ctx.newPage(); T.on('pageerror', e => errors.push(e.message)); T.on('dialog', d => d.accept());
+        const c1 = await app.post({ action: 'createClass', ban: 4, nStudents: 2, groupSize: 2, exp: 'custom:ohm01', aiLimit: 5 });
+        const c2 = await app.post({ action: 'createClass', ban: 5, nStudents: 2, groupSize: 2, exp: 'custom:sec02', aiLimit: 5 });
+        let n = 0;
+        const put = async (c, exp) => {   // 학생이 Firestore 에 쓴 질문 (화면 대신 바로)
+            const id = 'a' + String(++n).padStart(19, '0');
+            await app.db.set('labClasses/' + c.space + '/aiAsk/' + id, { uid: 'u' + n, group: c.groups[0].code, jo: 1, exp, section: 'hypothesis', sectionName: '가설', prompt: '내 가설 봐 줘', attach: ['draft'], draft: '전압을 늘리면 전류가 늘 것이다', calc: '', device: '', status: 'wait', createdAt: new Date(Date.now() - 30000 + n * 1000), expireAt: new Date(Date.now() + 86400000) });
+            return 'labClasses/' + c.space + '/aiAsk/' + id;
+        };
+        const p1 = await put(c1, 'custom:ohm01'), p2 = await put(c2, 'custom:sec02');
+        await T.goto(ORIGIN + '/projects/class-teacher.html');
+        await T.click('#btnLogin'); await T.waitForSelector('#btnSettings:not([hidden])');
+        await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); });
+        await T.click('#ctTabs button[data-tab="ai"]');
+        await T.selectOption('#aiProvider', 'claude'); await T.fill('#aiKey', 'sk-ant-x');
+        const done = await until(() => app.db.docs.get(p1).status === 'done' && app.db.docs.get(p2).status === 'done', 20000);
+        assert.ok(done, '두 질문 모두 답함: ' + app.db.docs.get(p1).status + ' / ' + app.db.docs.get(p2).status);
+        const u1 = users.find(x => /전압을 늘리면/.test(x) && /옴의 법칙/.test(x));
+        assert.ok(u1, 'AI 가 받은 글에 실험 제목: ' + users.join(' ---- '));
+        assert.match(u1, /\[실험\] 옴의 법칙 확인 \(선생님이 만든 실험\)/);
+        assert.ok(users.some(x => /\[실험\] 선생님이 만든 실험 \(sec02\)/.test(x)), '비공개 실험은 기본 이름');
+        assert.deepEqual(errors, []);
+    } finally {
+        await browser.close();
+    }
+});
