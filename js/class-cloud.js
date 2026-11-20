@@ -20,6 +20,11 @@
     //   ready: 그 페이지가 '?c=' 수업 참여(js/class-share.js)를 붙였는지. 실험 페이지를 붙인 세션이 true 로 바꾼다 (docs/class-share.md)
     //   'custom:<실험 id>' 는 선생님이 만든 실험 (projects/custom-lab.html?id=…)
     var STEPS7 = { purpose: '1 목적', theory: '2 이론', materials: '3 준비물', procedure: '4 과정', data: '5 데이터', result: '6 결과', conclusion: '7 결론' };
+    // 가설연역 6단계 (js/lab-ui.js 의 LabUI.FLOWS.hd 와 같은 키·이름). 수업 문서 flow: 'hd' 면 7단계 대신 이 단계로 (docs/inquiry-types-design.md)
+    var STEPS_HD = { problem: '① 문제 인식', hypothesis: '② 가설 설정', design: '③ 탐구 설계', perform: '④ 탐구 수행', interpret: '⑤ 자료 해석', conclude: '⑥ 결론 도출' };
+    var HD_OF = { purpose: 'problem', theory: 'hypothesis', materials: 'design', procedure: 'design', data: 'perform', result: 'interpret', conclusion: 'conclude' };
+    var FLOW_NAMES = { report: '📋 7단계 (보고서 순서)', hd: '🔍 가설연역 (6단계)' };
+    function flowOf(f) { return f === 'hd' ? 'hd' : 'report'; }
     var DASH = { live: '측정 중', record: '기록', more: '안내' };
     var EXPS = {
         planck: { name: 'LED 로 플랑크 상수 측정', icon: '💡', page: 'projects/planck-led.html', steps: STEPS7, ready: true },
@@ -37,7 +42,7 @@
         // 서버 9판부터 공용 저장에 heartrate. 숨 참기 탐구 회차는 kind 'breath' 자료 (js/heart-rate-breath.js)
         heartrate: { name: '스마트폰 카메라 심박수 (숨 참기 탐구)', icon: '❤️', page: 'projects/heart-rate.html', steps: { live: '심박수 재기', breath: '숨 참기 탐구' }, ready: true },
         // 탄소 양자점 형광 (시료 하나 = 한 줄, 저장은 Firestore)
-        qdot: { name: '탄소 양자점 형광 실험', icon: '🌈', page: 'projects/quantum-dot.html', steps: STEPS7, ready: true },
+        qdot: { name: '탄소 양자점 형광 실험', icon: '🌈', page: 'projects/quantum-dot.html', steps: STEPS7, ready: true, flows: true },
         // 가족 행사 (행사형 화면): 조를 미리 나누지 않고 가족이 팀 이름을 정해 들어옴 (team: true → 수업 만들 때 '팀 수'·예비 실험 값)
         rocket: { name: '발포비타민 필름통 로켓 (가족 행사)', icon: '🚀', page: 'projects/film-rocket.html', steps: { enter: '입장', think: '생각 열기', t1: '1차시 열리는 시간', t2: '2차시 로켓 높이', end: '정리' }, gate: ['think', 't1', 't2', 'end'], ready: true, team: true }
     };
@@ -55,15 +60,18 @@
     /* 교사가 하나씩 여는 단계 (교사 화면 '▶ 다음 단계 열기', 학생 화면 잠금은 js/class-share.js)
        7단계 보고서 실험 = 목적…결론, 필름통 로켓 = 생각 열기·1차시·2차시·정리 (입장은 늘 열림), 한 화면 실험·선생님이 만든 실험 = 없음(null) */
     var STAGE_ALL = 99;
-    function gateSteps(exp) {
+    // flow: 수업의 진행 방법 ('hd' = 가설연역 6단계, 그 밖 = 7단계). 가설연역은 그 페이지가 붙였을 때(flows: true)만
+    function canFlow(exp) { var e = EXPS[exp]; return !!(e && e.flows && e.steps === STEPS7); }
+    function gateSteps(exp, flow) {
         var e = EXPS[exp];
         if (!e) return null;
         if (e.gate) return e.gate.slice();
-        return e.steps === STEPS7 ? Object.keys(STEPS7) : null;
+        if (e.steps !== STEPS7) return null;
+        return flowOf(flow) === 'hd' && canFlow(exp) ? Object.keys(STEPS_HD) : Object.keys(STEPS7);
     }
     // 지금 열린 단계: { n(열린 수), all, keys(열린 단계들), cur(가장 뒤 열린 단계) } — stage 가 없으면(예전 수업) 모두 열림
-    function stageInfo(exp, stage) {
-        var g = gateSteps(exp);
+    function stageInfo(exp, stage, flow) {
+        var g = gateSteps(exp, flow);
         if (!g) return null;
         var n = stage == null || !isFinite(Number(stage)) ? g.length : Math.max(1, Math.min(g.length, Math.round(Number(stage))));
         return { gate: g, n: n, all: n >= g.length, keys: g.slice(0, n), cur: g[n - 1] };
@@ -115,12 +123,14 @@
         if (s < 3600) return Math.floor(s / 60) + '분 전';
         return Math.floor(s / 3600) + '시간 전';
     }
-    function stepName(exp, step) {
+    function stepName(exp, step, flow) {
         // 폰 연결(📱)로 연 화면은 단계 앞에 'phone-' 을 붙여 보낸다
         var ph = /^phone-/.test(String(step || ''));
         if (ph) step = String(step).slice(6);
         var e = expInfo(exp);
-        var name = (e && e.steps[step]) || (step ? step : '–');
+        // 가설연역 수업: 학생 화면이 7단계 패널 키(data 등)를 보내도 가설연역 단계 이름으로
+        var hd = flowOf(flow) === 'hd' && e && e.steps === STEPS7;
+        var name = (hd && (STEPS_HD[step] || STEPS_HD[HD_OF[step]])) || (e && e.steps[step]) || STEPS_HD[step] || (step ? step : '–');
         return ph ? '📱 ' + (name === 'live' ? '폰으로 측정 중' : name) : name;
     }
     /* 선생님이 만든 실험이 학생에게 공개되었는지 (로그인 없이 Firestore 를 읽어 봄. 규칙: published == true 일 때만 누구나 읽기)
@@ -201,6 +211,7 @@
         var b = { action: 'createClass', ban: Number(o.ban), nStudents: Number(o.nStudents), groupSize: Number(o.groupSize), exp: o.exp, aiLimit: o.aiLimit == null || o.aiLimit === '' ? '' : Number(o.aiLimit) };
         if (o.mode === 'team') { b.mode = 'team'; b.nTeams = Number(o.nTeams); }
         if (o.setup) b.setup = o.setup;
+        if (o.flow === 'hd') b.flow = 'hd';
         return post(url, b, fetchImpl);
     }
     // 팀 이름으로 입장 (가족 행사): 빈 조 자리 하나를 그 팀 이름으로 잡음 → { jo, num: 1, name, group }
@@ -232,7 +243,7 @@
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
         studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
-        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, classStage: classStage, classDone: classDone, gateSteps: gateSteps, stageInfo: stageInfo, STAGE_ALL: STAGE_ALL, heartbeat: heartbeat, classStatus: classStatus,
+        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, classStage: classStage, classDone: classDone, gateSteps: gateSteps, stageInfo: stageInfo, canFlow: canFlow, flowOf: flowOf, STEPS_HD: STEPS_HD, HD_OF: HD_OF, FLOW_NAMES: FLOW_NAMES, STAGE_ALL: STAGE_ALL, heartbeat: heartbeat, classStatus: classStatus,
         myClasses: myClasses, classExport: classExport, deleteClass: deleteClass, reopenCode: reopenCode, expireText: expireText
     };
 });

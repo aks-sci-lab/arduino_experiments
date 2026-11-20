@@ -188,6 +188,8 @@
         var team = isTeamExp(chosenExp());
         var o = { ban: Number($('inBan').value), nStudents: Number($('inN').value), groupSize: Number($('inSize').value), exp: chosenExp(), aiLimit: $('inAiLimit').value === '' ? 20 : Number($('inAiLimit').value) };
         if (team) { o.mode = 'team'; o.nTeams = Number($('inTeams').value); o.nStudents = o.nTeams; o.groupSize = 1; o.aiLimit = 0; o.setup = readSetup($('teamSetup')); }
+        var fl = document.querySelector('input[name=inFlow]:checked');
+        if (!team && CC.canFlow(o.exp) && fl && fl.value === 'hd') o.flow = 'hd';
         return o;
     }
     function renderPreview() {
@@ -196,6 +198,7 @@
         $('btnCreate').disabled = !ok;
         $('customRow').hidden = $('inExp').value !== 'custom';
         $('rowN').hidden = $('rowSize').hidden = $('rowAi').hidden = team; $('rowTeams').hidden = $('teamBox').hidden = !team;
+        $('rowFlow').hidden = team || !CC.canFlow(o.exp);
         if (team) {
             $('expNote').innerHTML = '';
             $('preview').innerHTML = ok ? '👨‍👩‍👧 <b>팀 이름으로 입장</b> · 최대 ' + o.nTeams + '팀 · 1차시 목표 ' + esc(o.setup.targetTime) + '초(±' + esc(o.setup.tolTime) + '초) · 2차시 아이 키의 ' + esc(o.setup.targetPct) + '%(±' + esc(o.setup.tolPct) + '%)'
@@ -207,10 +210,11 @@
             : e && !e.ready ? '⚠️ 이 실험 페이지는 아직 수업 참여 띠를 붙이는 중이에요. 수업은 만들 수 있지만, 학생 화면에 조·번호 고르기가 아직 안 나올 수 있어요.' : '';
         $('preview').innerHTML = ok
             ? '👥 ' + o.nStudents + '명 → <b>' + g.length + '개 조</b>: ' + g.map(function (k, i) { return (i + 1) + '조 ' + k + '명'; }).join(', ')
-            + ' · 🤖 AI 질문 조마다 ' + o.aiLimit + '번' : '반(1~99), 학생 수(1~60), 조별 인원(1~10), AI 질문 한도(0~200)를 정수로 넣어 주세요.';
+            + ' · 🤖 AI 질문 조마다 ' + o.aiLimit + '번' + (CC.canFlow(o.exp) ? ' · ' + CC.FLOW_NAMES[CC.flowOf(o.flow)] : '') : '반(1~99), 학생 수(1~60), 조별 인원(1~10), AI 질문 한도(0~200)를 정수로 넣어 주세요.';
     }
     ['inBan', 'inN', 'inSize', 'inExp', 'inCustom', 'inAiLimit', 'inTeams'].forEach(function (id) { $(id).addEventListener('input', renderPreview); });
     $('teamSetup').addEventListener('input', renderPreview); $('teamSetup').addEventListener('change', renderPreview);
+    document.querySelectorAll('input[name=inFlow]').forEach(function (r) { r.addEventListener('change', renderPreview); });
     $('inExp').addEventListener('change', renderPreview);
     // 선생님이 만든 실험은 '공개'여야 학생이 열 수 있다 → 번호를 넣으면 확인해 알려 줌
     var customState = { id: '', state: '', timer: null };
@@ -257,7 +261,7 @@
     function expireNote(c) { var t = CC.expireText(c.expireAt); return t ? '🗓 이 수업의 학생 자료는 ' + t + '에 저절로 지워져요. 그 전에 ⚙ 설정 → 📥 자료 내려받기에서 받아 두세요.' : ''; }
     function showClass(c) {
         var link = studentLink(c), e = CC.expInfo(c.exp);
-        $('outTitle').textContent = c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + (c.mode === 'team' ? '팀 이름으로 입장 (최대 ' + c.groups.length + '팀)' : c.nStudents + '명, ' + c.groups.length + '개 조 · AI 질문 조마다 ' + (c.aiLimit == null ? 20 : c.aiLimit) + '번');
+        $('outTitle').textContent = c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + (c.mode === 'team' ? '팀 이름으로 입장 (최대 ' + c.groups.length + '팀)' : c.nStudents + '명, ' + c.groups.length + '개 조 · AI 질문 조마다 ' + (c.aiLimit == null ? 20 : c.aiLimit) + '번' + (CC.canFlow(c.exp) || c.flow === 'hd' ? ' · ' + CC.FLOW_NAMES[CC.flowOf(c.flow)] : ''));
         $('outCode').textContent = c.classCode;
         $('outLink').href = link; $('outLink').textContent = link;
         $('outExpire').textContent = expireNote(c);
@@ -296,12 +300,12 @@
         return d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' }) + ' ' + d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
     }
     function classCard(c) {
-        var e = CC.expInfo(c.exp), si = CC.stageInfo(c.exp, c.stage), en = e && e.steps && si ? e.steps[si.cur] : '';
+        var e = CC.expInfo(c.exp), si = CC.stageInfo(c.exp, c.stage, c.flow), en = si ? CC.stepName(c.exp, si.cur, c.flow) : '';
         var who = c.mode === 'team' ? '최대 ' + c.groups.length + '팀' : c.nStudents + '명 · ' + c.groups.length + '개 조';
         var st = c.done ? '<b class="ok">✅ 마침</b>' + (c.doneAt ? '<br><span class="note">' + esc(whenText(c.doneAt)) + '</span>' : '') : '<b>⏳ 진행 중</b>' + (si ? '<br><span class="note">' + (si.all ? '모든 단계 열림' : '단계 ' + si.n + ' / ' + si.gate.length + (en ? ' · ' + esc(en) : '')) + '</span>' : '');
         return '<div class="ct-cls' + (c.done ? ' done' : '') + '"><button type="button" class="ct-cls-main" data-open="' + esc(c.space) + '">' +
             '<span class="ct-cls-ic" aria-hidden="true">' + esc(e ? e.icon : '🧪') + '</span>' +
-            '<span class="ct-cls-body"><b>' + esc(e ? e.name : c.exp) + '</b><span class="note">' + esc(c.ban) + '반 · ' + esc(who) + ' · 코드 ' + esc(c.classCode) + '</span>' +
+            '<span class="ct-cls-body"><b>' + esc(e ? e.name : c.exp) + '</b><span class="note">' + esc(c.ban) + '반 · ' + esc(who) + ' · 코드 ' + esc(c.classCode) + (c.flow === 'hd' ? ' · 🔍 가설연역' : '') + '</span>' +
             '<span class="note">📅 ' + esc(whenText(c.created)) + ' 만듦</span></span>' +
             '<span class="ct-cls-st">' + st + '</span></button>' +
             '<span class="ct-cls-act"><button type="button" class="secondary" data-reopen="' + esc(c.space) + '" title="수업 코드로 찾기 다시 열기 (2일)">🔓 코드 다시 열기</button><button type="button" class="danger" data-del="' + esc(c.space) + '">🗑 지우기</button></span></div>';
@@ -354,10 +358,10 @@
     }
     // ----- 학생에게 여는 단계 (▶ 다음 단계 열기) -----
     function renderStage() {
-        var c = watched(), si = c && CC.stageInfo(c.exp, c.stage), e = c && CC.expInfo(c.exp);
+        var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow), e = c && CC.expInfo(c.exp);
         $('stageCard').hidden = !si;
         if (!si) return;
-        var name = function (k) { return (e && e.steps && e.steps[k]) || k; };
+        var name = function (k) { return CC.stepName(c.exp, k, c.flow); };
         $('stageNow').innerHTML = si.all ? '✅ 모든 단계 열림' + (c.stage == null ? ' <span class="note">(예전 수업)</span>' : '') : '🔓 ' + esc(name(si.cur)) + ' <span class="note">까지 열림 (' + si.n + ' / ' + si.gate.length + ')</span>';
         $('stageSteps').innerHTML = si.gate.map(function (k, i) { return '<li class="' + (i < si.n ? 'open' : 'lock') + (i === si.n - 1 && !si.all ? ' cur' : '') + '">' + (i < si.n ? '' : '🔒 ') + esc(name(k)) + '</li>'; }).join('');
         $('btnStageNext').disabled = si.all || state.stageBusy;
@@ -368,20 +372,20 @@
     }
     async function setStage(to) {
         var c = watched(); if (!c) return;
-        var si = CC.stageInfo(c.exp, c.stage); if (!si) return;
+        var si = CC.stageInfo(c.exp, c.stage, c.flow); if (!si) return;
         state.stageBusy = true; renderStage();
         $('stageMsg').className = 'note'; $('stageMsg').textContent = '⏳ 학생 화면에 알리는 중…';
         var r = await CC.classStage(c.space, to >= si.gate.length ? CC.STAGE_ALL : to);
         state.stageBusy = false;
         if (!r.ok) { $('stageMsg').className = 'note err'; $('stageMsg').textContent = '⚠️ ' + r.error; renderStage(); return; }
         c.stage = r.stage;
-        var n = CC.stageInfo(c.exp, c.stage);
-        $('stageMsg').textContent = '✅ ' + (n.all ? '모든 단계를 열었어요' : '‘' + ((CC.expInfo(c.exp).steps || {})[n.cur] || n.cur) + '’ 까지 열었어요') + '. 학생 화면이 저절로 바뀌어요.';
+        var n = CC.stageInfo(c.exp, c.stage, c.flow);
+        $('stageMsg').textContent = '✅ ' + (n.all ? '모든 단계를 열었어요' : '‘' + CC.stepName(c.exp, n.cur, c.flow) + '’ 까지 열었어요') + '. 학생 화면이 저절로 바뀌어요.';
         renderStage();
     }
-    $('btnStageNext').addEventListener('click', function () { var c = watched(), si = c && CC.stageInfo(c.exp, c.stage); if (si && !si.all) setStage(si.n + 1); });
+    $('btnStageNext').addEventListener('click', function () { var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow); if (si && !si.all) setStage(si.n + 1); });
     $('btnStagePrev').addEventListener('click', function () {
-        var c = watched(), si = c && CC.stageInfo(c.exp, c.stage); if (!si || si.n <= 1) return;
+        var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow); if (!si || si.n <= 1) return;
         if (!confirm('학생 화면에서 마지막 단계를 다시 잠글까요? (그 단계에 있던 학생은 앞 단계로 돌아가요)')) return;
         setStage(si.n - 1);
     });
@@ -402,7 +406,7 @@
             var sub = subs[t.jo], sm = (sub && sub.summary) || {}, pg = prog[t.jo] || null;
             return { jo: t.jo, name: t.name, score: Number(sm['팀 점수']) || 0, quiz: sm['퀴즈 맞힘'], tDiff: sm['시간 도전 차이(초)'], tOk: sm['시간 도전 성공'] === 1,
                 hMax: sm['높이 최고(%)'], hDiff: sm['높이 도전 차이(%)'], hOk: sm['높이 도전 성공'] === 1, spark: sm['생각 바뀜 ✨'],
-                step: pg ? CC.stepName(st.exp, pg.step) : '–', state: CC.studentState(pg, st.now) };
+                step: pg ? CC.stepName(st.exp, pg.step, st.flow) : '–', state: CC.studentState(pg, st.now) };
         }).sort(function (a, b) { return b.score - a.score || a.jo - b.jo; });
     }
     function boardTable(rows, big) {
@@ -491,10 +495,10 @@
         pres.space = ''; pres.ask = false; $('presentFrame').src = 'about:blank'; $('pAsk').hidden = true;
         if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () { /* 무시 */ });
     }
-    function stepNames(c) { var e = CC.expInfo(c.exp); return function (k) { return (e && e.steps && e.steps[k]) || k; }; }
+    function stepNames(c) { return function (k) { return CC.stepName(c.exp, k, c.flow); }; }
     function renderPresentBar() {
         var c = watched(); if (!c || !pres.space) return;
-        var si = CC.stageInfo(c.exp, c.stage), name = stepNames(c);
+        var si = CC.stageInfo(c.exp, c.stage, c.flow), name = stepNames(c);
         $('pStage').innerHTML = si ? (si.all ? '✅ 모든 단계 열림' : '🔓 <b>' + esc(name(si.cur)) + '</b> 까지 열림 (' + si.n + ' / ' + si.gate.length + ')') : '';
         var j = '';
         try { if (state.last) { var s = CC.summarize(state.last); j = c.mode === 'team' ? '👨‍👩‍👧 팀 ' + ((state.last.teams || []).length || s.joined) : '🧑‍🎓 들어온 학생 ' + s.joined + ' / ' + s.total; } } catch (e) { j = ''; }
@@ -504,7 +508,7 @@
         if (pres.ask && (!si || si.all)) askOpen(false);
     }
     function askOpen(on) {
-        var c = watched(), si = c && CC.stageInfo(c.exp, c.stage);
+        var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow);
         pres.ask = !!(on && si && !si.all);
         $('pAsk').hidden = !pres.ask;
         if (pres.ask) { $('pAskText').innerHTML = '▶ <b>' + esc(stepNames(c)(si.gate[si.n])) + '</b> 단계를 열까요? 학생 폰도 함께 넘어가요.'; $('btnPAskYes').focus(); }
@@ -615,7 +619,7 @@
                 '<p class="ct-sub' + (sub && sub.rows ? ' done' : '') + '">' + subTxt + '</p>' +
                 g.members.map(function (m) {
                     var x = m.st, stt = m.state;
-                    var right = stt.joined ? esc(CC.stepName(st.exp, x.step)) + ' · 점 ' + (x.points == null ? '–' : x.points) + (x.submitted ? ' · ✅' : '') + '<br><span class="note">' + (stt.idle ? '💤 ' : '') + esc(CC.agoText(stt.ago)) + '</span>' : '아직 안 들어옴';
+                    var right = stt.joined ? esc(CC.stepName(st.exp, x.step, st.flow)) + ' · 점 ' + (x.points == null ? '–' : x.points) + (x.submitted ? ' · ✅' : '') + '<br><span class="note">' + (stt.idle ? '💤 ' : '') + esc(CC.agoText(stt.ago)) + '</span>' : '아직 안 들어옴';
                     return '<button class="ct-mem ' + stt.cls + '" data-jo="' + esc(g.jo) + '" data-num="' + m.num + '"><b>' + m.num + '번</b><span class="ct-mem-r">' + right + '</span></button>';
                 }).join('') + '</section>';
         }).join('');
@@ -633,7 +637,7 @@
         $('detailBody').innerHTML = !x ? '<p class="note">아직 이 자리로 들어온 학생이 없어요. 학생이 QR 로 들어와 ' + esc(jo) + '조 ' + esc(num) + '번을 고르면 나타나요.</p>' :
             '<table class="ct-detail-table"><tbody>' +
             '<tr><th>상태</th><td>' + (m.state.idle ? '💤 쉬는 중 (5분 넘게 신호 없음)' : '🟢 활동 중') + '</td></tr>' +
-            '<tr><th>보고 있는 단계</th><td>' + esc(CC.stepName(st.exp, x.step)) + '</td></tr>' +
+            '<tr><th>보고 있는 단계</th><td>' + esc(CC.stepName(st.exp, x.step, st.flow)) + '</td></tr>' +
             '<tr><th>마지막 활동</th><td>' + esc(new Date(x.lastSeen).toLocaleTimeString('ko-KR')) + ' (' + esc(CC.agoText(m.state.ago)) + ')</td></tr>' +
             '<tr><th>이 학생이 잰 점</th><td>' + (x.points == null ? '–' : esc(x.points) + '개') + '</td></tr>' +
             '<tr><th>선생님께 보냄</th><td>' + (x.submitted ? '✅ 보냄' : '아직') + '</td></tr>' +

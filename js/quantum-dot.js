@@ -675,7 +675,7 @@
     };
 
     tabs = window.LabUI && LabUI.initTabs('#qdTabs', { key: PHONE ? 'quantum-dot-meas-phone' : 'quantum-dot-meas', onShow: onMeasTab });
-    steps = window.LabUI && LabUI.initSteps({ key: PHONE ? 'quantum-dot-phone' : 'quantum-dot', start: PHONE ? 'data' : undefined, onShow: onStep });
+    steps = window.LabUI && LabUI.initSteps({ key: PHONE ? 'quantum-dot-phone' : 'quantum-dot', start: PHONE ? 'data' : undefined, onShow: onStep, flows: true });
     if (PHONE && steps && state.tab !== 'data') steps.show('data', true);
     if (window.LabUI && LabUI.autoSubtabs) LabUI.autoSubtabs();
     refreshButtons();
