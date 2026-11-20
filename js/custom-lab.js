@@ -275,6 +275,29 @@
     }
 
     // ---------- 조 공유 (구글 로그인 없이: 같은 조 다른 기기와 사이트 저장소로) ----------
+    // 보고서 AI 에 함께 보낼 '코드로 계산한 결과': 표 값·맞춤 결과·센서 기록 요약 (AI 가 새로 계산하지 않게, 페이지가 가진 숫자만)
+    function reportContext() {
+        const def = view.def, out = [];
+        const rows = (view.rows || []).filter(r => r.some(v => String(v == null ? '' : v).trim() !== ''));
+        if (rows.length) {
+            out.push('[측정값 표] ' + def.columns.map(c => c.name + (c.unit ? ' (' + c.unit + ')' : '')).join(' | '));
+            rows.slice(0, 40).forEach(r => out.push(def.columns.map((c, i) => String(r[i] == null ? '' : r[i]).trim()).join(' | ')));
+            if (rows.length > 40) out.push('… (모두 ' + rows.length + '줄)');
+        }
+        const fit = $('fitResult') ? $('fitResult').textContent.trim() : '';
+        if (fit) out.push('[그래프 맞춤] ' + fit);
+        const t = sensor.series && sensor.series.t ? sensor.series.t : [];
+        if (t.length) {
+            out.push('[센서 기록] ' + t.length + '점, ' + Math.round((t[t.length - 1] - t[0]) * 10) / 10 + '초');
+            (sensor.fields || []).forEach(f => {
+                const v = (sensor.series[f.key] || []).filter(Number.isFinite);
+                if (!v.length) return;
+                const mean = v.reduce((a, b) => a + b, 0) / v.length;
+                out.push('  ' + (f.name || f.key) + (f.unit ? ' (' + f.unit + ')' : '') + ': 평균 ' + mean.toPrecision(4) + ', 최소 ' + Math.min(...v).toPrecision(4) + ', 최대 ' + Math.max(...v).toPrecision(4));
+            });
+        }
+        return out.join('\n');
+    }
     function myPoints() { return M.filledRowCount(view.rows) + sensor.series.t.length; }
     function initShare() {
         if (!window.ClassShare || !window.PendulumCloud || !window.ClassCloud) {
@@ -366,7 +389,7 @@
         procedure: ['procedureCard'],
         data: ['shareCard', 'sensorCard', 'tableCard', 'incomingCard'],
         result: ['graphCard'],
-        conclusion: ['questionCard', 'submitCard']
+        conclusion: ['questionCard', 'reportAiCard', 'submitCard']
     };
     const STEP_NAMES = { purpose: '1. 목적', theory: '2. 이론', materials: '3. 준비물', procedure: '4. 과정', data: '5. 데이터', result: '6. 결과', conclusion: '7. 결론' };
     let stepsArranged = false;
@@ -396,6 +419,11 @@
         // 진행 방법은 선생님이 만들 때 고른 것으로 고정 (7단계 / 가설연역)
         if (LabUI.setFlow) LabUI.setFlow(view.def.layout === 'hd' ? 'hd' : 'report', { lock: true });
         LabUI.initSteps({ key: 'custom-lab:' + expId, flows: true, onShow: step => { curStep = step; if (share) share.stepChanged(); if (step === 'result') refreshGraph(); } });
+        // 📝 보고서 쓰기 · AI 피드백: 결론 단계에. 가설연역이면 ① ② ③ ⑥ 단계 안 쓰기 칸도 (다른 보고서 실험과 같은 부품)
+        if (window.ReportAI && !view.readOnly) {
+            $('reportAiCard').hidden = false;
+            ReportAI.init({ exp: 'custom:' + expId, title: view.def.title, mount: '#report-ai', getContext: reportContext });
+        }
     }
 
     // ---------- 센서 (실험 설정에서 센서 기능을 고른 경우) ----------

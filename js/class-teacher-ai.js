@@ -136,6 +136,20 @@
         if (q.uid && done(function (a) { return a.uid === q.uid; }) >= limit) return { status: 'limit', used: used, error: '이 기기에서 쓸 수 있는 AI 질문(' + limit + '번)을 다 썼어요.' };
         return { ok: true, used: used };
     }
+    // AI 에게 알려 줄 실험 이름. 선생님이 만든 실험('custom:<id>')은 공개된 실험 제목을 한 번 읽어 기억 (ClassCloud.checkCustom, 로그인 없이)
+    //   학생이 보낸 값이 아니라 선생님이 만든 실험 문서의 제목이라 믿을 수 있음. 못 읽으면(비공개·인터넷) 기본 이름 그대로
+    var customTitle = {};
+    async function expNameFor(exp) {
+        var info = CC && CC.expInfo ? CC.expInfo(exp) : null, base = info ? info.name : String(exp || '');
+        var m = /^custom:([A-Za-z0-9_-]{1,40})$/.exec(String(exp || ''));
+        if (!m || !CC.checkCustom) return base;
+        if (customTitle[m[1]] == null) {
+            var r = await CC.checkCustom(m[1]);
+            if (r.state === 'unknown') return base;   // 다음 질문 때 다시 해 봄
+            customTitle[m[1]] = r.state === 'public' && r.title ? String(r.title).slice(0, 80) : '';
+        }
+        return customTitle[m[1]] ? customTitle[m[1]] + ' (선생님이 만든 실험)' : base;
+    }
     async function answer(x) {
         var c = x.c, q = x.q, limit = x.r.limit, gd = guard(x), used = gd.used;
         if (!gd.ok) {
@@ -145,8 +159,7 @@
         }
         var cl = await call(c.space, { action: 'aiClaim', id: q.id });
         if (!cl.ok) return;   // 다른 화면이 잡음
-        var info = CC && CC.expInfo ? CC.expInfo(q.exp) : null;
-        var pr = RA.buildPrompt(q, info ? info.name : q.exp);
+        var pr = RA.buildPrompt(q, await expNameFor(q.exp));
         var res = await RA.callAI({ provider: prov(), model: $('aiModel').value.trim(), key: keyNow(), system: pr.system, user: pr.user });
         if (res.ok) {
             await call(c.space, { action: 'aiAnswer', id: q.id, status: 'done', answer: res.text, provider: prov(), model: $('aiModel').value.trim(), used: used + 1, limit: limit });
