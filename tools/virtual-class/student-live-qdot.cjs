@@ -9,7 +9,7 @@ const CODE = '2-5512', PAGE = 'projects/quantum-dot.html?c=2-5512&s=cyuk7hbdrs76
     const live = await openLive(dir), W = live.W, out = [];
     const note = (k, v) => out.push([k, v]);
     // 교사 묶음은 기본으로 먼저 넣지만, LATE 에 든 차례는 학생 화면을 연 뒤에 넣는다(수업 중에 단계가 열리는 것을 그대로 보려고)
-    const LATE = { 3: 1, 4: 1, 5: 1 };
+    const LATE = { 3: 1, 4: 1, 5: 1, 6: 1 };
     const teacher = () => { if (bundleFile) live.apply(JSON.parse(fs.readFileSync(bundleFile, 'utf8'))); };
     if (!LATE[turn]) teacher();
     const cur = pg => pg.evaluate(() => { const b = document.querySelector('nav.steps button[aria-selected="true"]'); return b ? b.textContent.trim() : ''; });
@@ -128,6 +128,17 @@ const CODE = '2-5512', PAGE = 'projects/quantum-dot.html?c=2-5512&s=cyuk7hbdrs76
             await W.tap(P3, '결론 및 검토'); await P3.locator('#report-ai textarea').locator('visible=true').first().fill('150초 시료는 초록색(약 538 nm)이었다. 시료가 하나라 가열 시간과의 관계는 알 수 없다.'); await P3.waitForTimeout(1200);
             await W.tap(P3, '제출·인쇄'); await W.tap(P3, '최종 제출'); await P3.waitForTimeout(2000); note('3조 제출 뒤', (await rai(P3)).split(' / ').filter(l => /제출|고칠/.test(l)).slice(0, 3));
             await L1.waitForTimeout(3000);
+        },
+        6: async () => {   // 75~90분: AI 답이 옴 → 1조 검증 메모·최종 제출, 2조는 7-1 글을 보고서로 옮김
+            const L1 = await live.student('1조노트북', 'laptop'), L2 = await live.student('2조노트북', 'laptop');
+            const rai = async pg => (await pg.locator('#report-ai').innerText()).replace(/\n+/g, ' / ');
+            await W.tap(L1, '결론 및 검토'); note('답 오기 전(다시 연 화면)', (await rai(L1)).split(' / ').filter(l => /⏳|🤖 가짜|기다리는/.test(l)).slice(0, 3));
+            teacher(); await L1.waitForTimeout(6000);
+            note('답 온 뒤', (await rai(L1)).split(' / ').filter(l => /🤖 가짜|남은|번|검증/.test(l)).slice(0, 5));
+            const memo = L1.locator('#report-ai textarea').locator('visible=true').nth(2); await memo.fill('≈ 값은 분광기 봉우리가 아니라 사진 색 추정이라는 점을 결론에 한 문장 더 넣었다.'); await W.tap(L1, '메모 저장'); await L1.waitForTimeout(800);
+            await W.tap(L1, '제출·인쇄'); await W.tap(L1, '최종 제출'); await L1.waitForTimeout(2000); note('1조 제출 뒤', (await rai(L1)).split(' / ').filter(l => /제출했|저장됨/.test(l)).slice(0, 2));
+            await W.tap(L2, '데이터 분석'); await L2.locator('#report-ai textarea').locator('visible=true').first().fill('가열 시간이 달라도 파장이 거의 같았다. 우리 조는 점이 하나(90초)라 직선을 그릴 수 없었고, 가열 시간이 다른 시료가 더 있어야 한다.'); await L2.waitForTimeout(1500);
+            note('2조 보고서 저장 표시', (await rai(L2)).split(' / ').filter(l => /저장됨|💾|☁️/.test(l)).slice(0, 2));
         }
         // TURNS
     };
