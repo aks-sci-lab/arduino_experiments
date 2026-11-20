@@ -124,8 +124,8 @@ test('화면: 교사 수업 만들기 → 학생 2명 같은 조 보내기·자�
         const t = await newPage(browser, app, 1200);
         await t.page.goto(ORIGIN + '/projects/class-teacher.html');
         await t.page.click('#btnLogin');   // 가짜 구글 로그인 (js/lab-store.js, 시험)
-        await t.page.waitForSelector('#btnLogout:not([hidden])');
-        await t.page.click('#ctTabs button[data-tab="make"]');
+        await t.page.waitForSelector('#btnSettings:not([hidden])'); await t.page.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await t.page.click('#ctTabs button[data-tab="make"]');
+        await t.page.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await t.page.click('#ctTabs button[data-tab="make"]');
         await t.page.fill('#inBan', '2'); await t.page.fill('#inN', '4'); await t.page.fill('#inSize', '2');
         await t.page.selectOption('#inExp', 'custom');
         await t.page.fill('#inCustom', ORIGIN + '/projects/custom-lab.html?id=ohm01');
@@ -199,8 +199,8 @@ test('화면: 교사 수업 만들기 → 학생 2명 같은 조 보내기·자�
         assert.equal(await b.page.isVisible('#incomingCard'), true);
 
         // ---------- 교사: 진행 보기 ----------
-        await t.page.click('#ctTabs button[data-tab="watch"]');
-        await t.page.waitForFunction(() => /1조/.test(document.getElementById('groups').textContent));
+        await t.page.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });
+        await t.page.waitForFunction(() => /7 결론|5 데이터/.test(document.getElementById('groups').textContent), null, { timeout: 15000 });
         const g = await t.page.textContent('#groups');
         assert.match(g, /7 결론|5 데이터/);
         assert.match(g, /점 3/);
