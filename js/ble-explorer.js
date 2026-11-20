@@ -137,6 +137,12 @@
             }
             await readDeviceInfo();
             renderTree(tree);
+            // 공개된 연결 방식이 있는 센서면 해석할 필요가 없다고 알림
+            const vendor = B.knownVendor(device.name, tree.map(t => t.uuid));
+            $('vendorNote').hidden = !vendor;
+            if (vendor && vendor.id === 'vernier') {
+                $('vendorNote').textContent = '✅ 이 센서는 버니어 공개 방식(Go Direct)으로 바로 쓸 수 있어요. 해석하지 않아도 됩니다 — 선생님이 만든 실험의 센서 기능에서 "Vernier Go Direct 센서"를 고르세요.';
+            }
             $('btnDisconnect').disabled = false;
             setStatus('✓ 연결됨: ' + (device.name || '이름 없는 기기') + ' · 서비스 ' + tree.length + '개', 'ok');
             if (!tree.length) setStatus('연결됐지만 열 수 있는 서비스가 없어요. 서비스 UUID 를 직접 넣고 다시 연결해 보세요.', 'error');
