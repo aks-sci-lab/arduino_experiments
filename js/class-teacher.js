@@ -249,7 +249,6 @@
     function expireNote(c) { var t = CC.expireText(c.expireAt); return t ? '🗓 이 수업의 학생 자료는 ' + t + '에 저절로 지워져요. 그 전에 ⚙ 설정 → 📥 자료 내려받기에서 받아 두세요.' : ''; }
     function showClass(c) {
         var link = studentLink(c), e = CC.expInfo(c.exp);
-        $('classOut').hidden = false;
         $('outTitle').textContent = c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + (c.mode === 'team' ? '팀 이름으로 입장 (최대 ' + c.groups.length + '팀)' : c.nStudents + '명, ' + c.groups.length + '개 조 · AI 질문 조마다 ' + (c.aiLimit == null ? 20 : c.aiLimit) + '번');
         $('outCode').textContent = c.classCode;
         $('outLink').href = link; $('outLink').textContent = link;
