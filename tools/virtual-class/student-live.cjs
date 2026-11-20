@@ -21,7 +21,7 @@ async function openLive(dir) {
     const snap = () => { const o = {}; docs.forEach((d, p) => { o[p] = JSON.stringify(enc(d)); }); return o; };
     let before = snap();
     const live = { W, urls };
-    live.apply = b => { for (const [p, d] of Object.entries(b.set || {})) docs.set(p, dec(d)); for (const p of b.del || []) docs.delete(p); before = snap(); };
+    live.apply = b => { for (const [p, d] of Object.entries(b.set || {})) docs.set(p, dec(d)); for (const p of b.del || []) docs.delete(p); for (const p of Object.keys(b.set || {})) before[p] = JSON.stringify(enc(docs.get(p))); for (const p of b.del || []) delete before[p]; };   // 교사가 준 문서만 기준에 반영(학생이 이미 바꾼 것은 그대로 '바뀐 것'으로 남김)
     live.student = async (name, device) => {
         const f = path.join(dir, 'storage-' + name + '.json');
         const pg = await W.student(name, device, fs.existsSync(f) ? { storageState: f } : {});

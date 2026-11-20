@@ -85,6 +85,49 @@ const CODE = '2-5512', PAGE = 'projects/quantum-dot.html?c=2-5512&s=cyuk7hbdrs76
             note('노트북에 도착', { '1조': (await W.text(L1)).split('\n').filter(l => /🆕/.test(l)), '2조': (await W.text(L2)).split('\n').filter(l => /🆕/.test(l)) });
             for (const [n, pg] of Object.entries(W.pages)) note(n + ' 끝', await cur(pg));
             note('저장소 시료 줄', W.app.items('qdot').map(d => [d.group, d.title || '', JSON.stringify(d.summary || {}).slice(0, 80)]));
+        },
+        5: async () => {   // 45~75분: 3·4조 보내기 찾기, 6조 측정, 6 결과 → 7 결론, 보고서·AI 질문
+            const SP = 'labClasses/cyuk7hbdrs768zt8ndurn3au'; W.app.db.docs.get(SP).stage = 5;
+            const pgs = {}; for (const [n, d] of [['1조노트북', 'laptop'], ['2조노트북', 'laptop'], ['3조폰', 'phone'], ['4조폰', 'phone'], ['6조노트북', 'laptop']]) pgs[n] = await live.student(n, d);
+            const L1 = pgs['1조노트북'], L2 = pgs['2조노트북'], P3 = pgs['3조폰'], P4 = pgs['4조폰'], L6 = pgs['6조노트북'];
+            const five = async pg => { if (!/5/.test(await cur(pg))) { await W.tap(pg, /^5\s*데이터/); await pg.waitForTimeout(800); } };
+            // 3조·4조: 다시 연 폰에 저장한 시료가 남아 있나 → '보내기' 찾기
+            for (const [n, P] of [['3조', P3], ['4조', P4]]) {
+                await five(P);
+                note(n + ' 폰: 보이는 보내기 단추', (await W.buttons(P)).filter(t => /보내기|조 공유/.test(t)));
+                const send = P.locator('button').filter({ hasText: /^\s*📤 선생님께 보내기/ }).locator('visible=true');
+                if (!(await send.count())) { await P.locator('summary').filter({ hasText: '조 공유' }).first().click(); await P.waitForTimeout(400); note(n + ' 조 공유 펼침', '접혀 있어서 펼쳐야 했음'); }
+                await W.tap(P, /^\s*📤 선생님께 보내기/); await P.waitForTimeout(2500);
+                note(n + ' 보낸 뒤', (await P.locator('[class*="cs-"]').locator('visible=true').allInnerTexts()).join(' | ').replace(/\s+/g, ' ').split(' | ').filter(l => /보냈|실패|없/.test(l) && l.length < 160).slice(0, 2));
+            }
+            // 6조: QR → 폰 → 180초 시료 → 보내기
+            await five(L6); const u6 = await L6.evaluate(() => (document.querySelector('a[href*="role=phone"]') || {}).href || ''); const P6 = await live.student('6조폰', 'phone'); await P6.goto(u6); await P6.waitForTimeout(2000);
+            await P6.locator('input[type=number]').locator('visible=true').first().fill('180'); await W.tap(P6, '다음: ② 형광 색'); await W.tap(P6, '카메라 켜기'); await P6.waitForTimeout(2500); await W.tap(P6, '이 색 기록'); await W.tap(P6, '건너뛰고 ④ 저장'); await W.tap(P6, '시료 저장'); await P6.evaluate(() => scrollTo(0, 0)); await W.tap(P6, '고른 회차 보내기'); await P6.waitForTimeout(2500);
+            // 6 결과 열림
+            W.app.db.docs.get(SP).stage = 6; await L1.waitForTimeout(6000);
+            note('6 열린 뒤 단계', Object.fromEntries(await Promise.all(Object.entries(pgs).map(async ([n, pg]) => [n, await cur(pg)]))));
+            note('1조 6 결과 표·직선', (await L1.locator('.step-panel').locator('visible=true').first().innerText()).split('\n').filter(l => /시료 \d|최소제곱|R²|≈ 표시/.test(l)).slice(0, 8));
+            note('3조 폰 6 결과(폰 한 대로 분석)', { 글: (await P3.locator('.step-panel').locator('visible=true').first().innerText()).split('\n').filter(l => /시료 \d|최소제곱|점 \d|필요/.test(l)).slice(0, 5), 점검: await W.check(P3) });
+            // 7 결론 + AI 켬
+            teacher(); await L1.waitForTimeout(6000);
+            note('7 열린 뒤 단계', Object.fromEntries(await Promise.all(Object.entries(pgs).map(async ([n, pg]) => [n, await cur(pg)]))));
+            const rai = async pg => (await pg.locator('#report-ai').innerText()).replace(/\n+/g, ' / ');
+            note('1조 AI 안내 줄', (await rai(L1)).split(' / ').filter(l => /선생님 화면|켜져|꺼져|한도|번/.test(l)).slice(0, 3));
+            // 1조: 데이터 분석·결론 쓰고 AI 에게 두 번 물음
+            await W.tap(L1, '데이터 분석'); let ta = L1.locator('#report-ai textarea').locator('visible=true');
+            await ta.nth(0).fill('가열 시간 60·120·180초 시료의 색 추정 파장은 539.7, 539.9, 537.7 nm 였다. 6-2 그래프의 기울기는 거의 0 이고 R² 도 작아, 가열 시간이 길수록 파장이 길어진다는 경향은 보이지 않았다.');
+            await ta.nth(1).fill('내 데이터 분석에서 근거가 약한 곳을 질문으로 알려 줘.'); await W.tap(L1, 'AI에게 묻기'); await L1.waitForTimeout(1500);
+            await W.tap(L1, '결론 및 검토'); ta = L1.locator('#report-ai textarea').locator('visible=true');
+            await ta.nth(0).fill('우리 예상(60초는 파랑, 180초는 초록)은 결과와 달랐다. 세 시료 모두 초록(약 538 nm)으로 나왔다. 까닭은 (1) 분광기 보정을 못 해 사진 색에서 어림한 값만 썼고 (2) 탄소 양자점은 크기만으로 색이 정해지지 않을 수 있기 때문이라고 생각한다.');
+            await ta.nth(1).fill('사진 색으로 어림한 파장의 한계를 내가 제대로 썼는지 물음으로 짚어 줘.'); await W.tap(L1, 'AI에게 묻기'); await L1.waitForTimeout(2500);
+            note('1조 물은 뒤', (await rai(L1)).split(' / ').filter(l => /보냈|기다리는|⏳|🙋/.test(l)).slice(0, 5));
+            // 2조: 7-1 분석 질문 첫 칸에만 쓰고(보고서는 비움) '내 시료 선생님께 보내기'를 누르고 끝난 줄 앎
+            await L2.locator('.step-panel').locator('visible=true').first().locator('textarea').first().fill('가열 시간이 달라도 파장이 거의 같았다.');
+            await W.tap(L2, '내 시료 선생님께 보내기').then(async () => { await L2.waitForTimeout(2000); note('2조 내 시료 보내기 뒤', (await W.text(L2)).split('\n').filter(l => /보냈|보낼|없/.test(l)).slice(0, 3)); }, e => note('2조 내 시료 보내기', e.message));
+            // 3조(폰): 보고서 '결론 및 검토'만 쓰고 최종 제출
+            await W.tap(P3, '결론 및 검토'); await P3.locator('#report-ai textarea').locator('visible=true').first().fill('150초 시료는 초록색(약 538 nm)이었다. 시료가 하나라 가열 시간과의 관계는 알 수 없다.'); await P3.waitForTimeout(1200);
+            await W.tap(P3, '제출·인쇄'); await W.tap(P3, '최종 제출'); await P3.waitForTimeout(2000); note('3조 제출 뒤', (await rai(P3)).split(' / ').filter(l => /제출|고칠/.test(l)).slice(0, 3));
+            await L1.waitForTimeout(3000);
         }
         // TURNS
     };
