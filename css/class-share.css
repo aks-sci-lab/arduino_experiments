@@ -53,3 +53,6 @@ html.big-view .cs-dlg { zoom: calc(1 / 1.35); }
 nav.steps button.cs-locked, nav.tabs button.cs-locked { opacity: .45; cursor: not-allowed; position: relative; }
 nav.steps button.cs-locked::after, nav.tabs button.cs-locked::after { content: '🔒'; position: absolute; top: 2px; right: 4px; font-size: .7rem; }
 .cs-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 2000; max-width: calc(100vw - 32px); background: var(--c-text); color: #fff; padding: var(--sp-2) var(--sp-4); border-radius: 999px; box-shadow: var(--shadow); font-size: var(--fs-sm); }
+/* 수업 없이 연 화면 (주소에 ?c= 없음, <html class="cs-solo">, js/class-share.js): 조·선생님을 전제로 한 것은 숨기고, 대신 안내를 보인다 */
+html.cs-solo .cs-hide-solo { display: none !important; }
+html:not(.cs-solo) .cs-show-solo { display: none !important; }

@@ -835,7 +835,7 @@
     try {
         if (window.ClassShare) {
             share = ClassShare.init({
-                exp: 'heartrate', shareMount: PHONE ? null : '#share-mount', phone: true, autoSendOnSave: true,
+                exp: 'heartrate', shareMount: PHONE ? null : '#share-mount', phone: true, autoSendOnSave: true, solo: false,   // 선생님 개발 페이지: 수업 없이도 조 공유 칸(두 번째 폰 연결)을 그대로
                 csvHint: '④ 내보내기의 JSON',
                 getItems: () => (PHONE ? phoneItems() : []),
                 onIncoming: items => (PHONE ? false : onIncoming(items)),
