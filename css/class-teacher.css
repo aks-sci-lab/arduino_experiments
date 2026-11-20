@@ -193,3 +193,10 @@ body.ct-presenting .ct-wrap { max-width: none; padding-top: var(--sp-2); }
 .ct-flow label { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); min-height: var(--tap); font-weight: 600; }
 .ct-flow label .note { font-weight: 400; flex-basis: 100%; margin-left: 28px; margin-top: -6px; }
 .ct-flow input[type=radio] { width: 20px; height: 20px; min-height: 0; margin: 0; }
+
+/* 행사(팀 수업): 기다리는 팀 수·끊긴 팀 (4K 프로젝터에서도 읽히게 진행 화면 큰 글씨, 결과판 크게 보기에서 함께 커짐) */
+.ct-stage-wait { font-size: clamp(1.15rem, 2.2vw, 2rem); font-weight: 700; margin: 0 0 var(--sp-2); padding: var(--sp-1) var(--sp-3); border-radius: var(--r-ctl); background: var(--c-fill); color: var(--c-text); }
+.ct-stage-wait.all { background: var(--c-ok-bg); color: var(--c-ok-text); border: 2px solid var(--c-success); }
+.ct-boardbig .ct-stage-wait { font-size: clamp(1.3rem, 2.6vw, 2.4rem); margin-top: var(--sp-2); }
+.ct-off { color: var(--c-warn-text); font-weight: 700; white-space: nowrap; }
+.ct-waitmark, .ct-waitcell { color: var(--c-ok-text); font-weight: 700; }

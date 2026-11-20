@@ -52,7 +52,7 @@
                 return [{ id: 'team', title: st.team.name, n: 1 + st.t1.trials.length + st.t1.challenge.length + st.t2.trials.length + st.t2.challenge.length,
                     summary: M.summary(st, st.setup), data: M.payload(st) }];
             },
-            getStep: function () { return st.stage; },
+            getStep: function () { return stepNow(); },
             getPoints: function () { return st.t1.trials.length + st.t1.challenge.length + st.t2.trials.length + st.t2.challenge.length; },
             getSubmitted: function () { return !!st.sentAt; },
             pull: function () { return Promise.resolve({ ok: true }); },   // 다른 팀 것은 불러오지 않음
@@ -65,9 +65,19 @@
                     if (to && STAGE_START[to] && stageOf(st.screen) !== to) show(STAGE_START[to]); else renderTop();
                     return;
                 }
-                if (o && o.moved && o.moved.to && st.team) { show(STAGE_START[o.moved.to]); flash('▶ 선생님이 ‘' + stageName(o.moved.to) + '’ 단계를 열었어요'); }
-                else if (stageLocked(stageOf(st.screen))) show(st.screen, { back: true });
+                // 2026-11-20 선생님 결정 "기다리는 팀만 옮기기": 앞 단계를 끝내고 잠김 화면에서 기다리던 팀만 저절로 옮김.
+                //  하는 중인 팀은 그대로 두고 위 띠 '선생님이 ○○ 단계를 열었어요 · 끝나면 넘어가요'(renderTop) → 그 단계를 마치면 잠김 화면 없이 바로.
+                //  되돌리기(◀): 그 단계에 들어가 있던 팀은 잠김 안내(측정 중이면 측정을 마칠 때까지 그대로), '돌아가기'는 마지막으로 하던 화면으로
+                var n = open ? open.length : STAGES.length, shrank = lastOpenN != null && n < lastOpenN;
+                lastOpenN = n;
+                if (shrank) { var fl = $('#ev-flash'); if (fl) fl.hidden = true; }
+                var cur = stageOf(st.screen), onLock = app.getAttribute('data-screen') === 'locked';
+                if (st.team && onLock && !stageLocked(cur)) {
+                    show(resumeId(st.screen), { back: true });
+                    flash('▶ 선생님이 ‘' + stageName(cur) + '’ 단계를 열었어요');
+                } else if (st.team && !onLock && stageLocked(cur) && !busy()) show(st.screen, { back: true });
                 else renderTop();
+                beatIfChanged();
             },
             onClass: function (info, me) {
                 if (info && info.setup) { st.setup = info.setup; }
@@ -126,6 +136,29 @@
 
     // ---------- 맨 위 띠: 단계·팀·점수·보냄 ----------
     var STAGES = [['think', '생각 열기'], ['t1', '1차시'], ['t2', '2차시'], ['end', '정리']];
+    var STAGE_KEYS = STAGES.map(function (x) { return x[0]; }), lastOpenN = null;
+    // 교사 화면에 보내는 지금 단계: 잠긴 단계(앞 단계를 끝내고 기다림)면 '앞단계-done' (예 think-done → '생각 열기 ✓ 기다림')
+    function stepNow() {
+        var i = STAGE_KEYS.indexOf(st.stage);
+        if (i > 0 && stageLocked(st.stage)) return STAGE_KEYS[i - 1] + '-done';
+        return st.stage;
+    }
+    var lastStep = null;
+    function beatIfChanged() { var s = stepNow(); if (share && st.team && s !== lastStep) { lastStep = s; share.stepChanged(); } }
+    // 측정 중(🎥 녹화·⏱ 초시계·장면 고르기)이면 화면을 바꾸지 않음
+    function busy() { return /measure$/.test(st.screen) && app.getAttribute('data-screen') === st.screen; }
+    // 측정 화면은 처음부터 다시 (조건 화면으로), 나머지는 그 화면 그대로
+    function resumeId(id) { return /measure$/.test(id) ? id.replace(/measure$/, 'cond') : id; }
+    // 선생님이 내 단계보다 뒤 단계를 열었을 때 위에 늘 보이는 띠
+    function openNotice() {
+        if (!st.team || app.getAttribute('data-screen') === 'locked') return '';
+        // 모두 열림(stageOpen null)은 선생님이 단계를 여는 수업(수업 문서에 stage 가 있음)일 때만 '정리까지'로 봄 (수업 없이·예전 수업은 띠 없음)
+        var ci = share && share.classInfo && share.classInfo();
+        if (!stageOpen && !(ci && ci.stage != null)) return '';
+        var i = STAGE_KEYS.indexOf(st.stage), last = stageOpen ? stageOpen[stageOpen.length - 1] : STAGE_KEYS[STAGE_KEYS.length - 1], j = STAGE_KEYS.indexOf(last);
+        if (i < 0 || j <= i) return '';
+        return '▶ 선생님이 ‘' + stageName(last) + '’ 단계' + (j > i + 1 ? '까지' : '를') + ' 열었어요 · 지금 단계를 끝내면 넘어가요';
+    }
     var STAGE_START = { think: 'think-intro', t1: 't1-intro', t2: 't2-intro', end: 'end-intro' };
     function syncText() {
         if (!CLASS) return { cls: 'solo', t: '📱 이 폰에만 저장' };
@@ -147,6 +180,7 @@
             var lock = stageLocked(x[0]);
             return '<button type="button" class="ev-stage' + (st.stage === x[0] ? ' on' : '') + (lock ? ' locked' : '') + '" data-stage="' + x[0] + '"' + (st.team ? '' : ' disabled') + (lock ? ' aria-disabled="true" title="선생님이 열면 넘어가요"' : '') + '>' + (lock ? '🔒 ' : '') + x[1] + '</button>';
         }).join('');
+        var nt = $('#ev-notice'), nx = openNotice(); if (nt) { nt.textContent = nx; nt.hidden = !nx; }
         $('#ev-top').hidden = st.screen === 'enter';
         if (!saveOk) { s.hidden = false; s.className = 'ev-sync warn'; s.textContent = '⚠ 이 브라우저는 저장이 안 돼요 (사생활 보호 모드?)'; }
     }
@@ -167,19 +201,30 @@
         var el = $('#ev-flash'); if (!el) return;
         el.textContent = t; el.hidden = false; clearTimeout(flashT); flashT = setTimeout(function () { el.hidden = true; }, 3500);
     }
-    function lockScreen(stage) {
+    // 잠김 화면 '돌아가기': 열린 단계에서 마지막으로 하던 화면 (되돌리기 뒤에도 하던 곳으로), 없으면 열린 마지막 단계 첫 화면
+    function backTarget() {
+        for (var k = st.history.length - 1; k >= 0; k--) {
+            var h = st.history[k];
+            if (SCREENS[h] && h !== 'enter' && !stageLocked(stageOf(h))) return resumeId(h);
+        }
         var last = stageOpen && stageOpen.length ? stageOpen[stageOpen.length - 1] : 'think';
+        return STAGE_START[last];
+    }
+    function lockScreen(stage) {
+        var to = backTarget();
         return { html: '<div class="ev-hero"><div class="ev-hero-ic" aria-hidden="true">⏳</div><h2>‘' + esc(stageName(stage)) + '’ 은 아직 잠겨 있어요</h2>' +
             '<p>선생님이 다음 단계를 열면 <b>저절로 넘어가요</b>. 그동안 앞 단계를 다시 보거나 기다려요.</p></div>' +
-            '<div class="ev-nav col"><button type="button" class="ev-next secondary" data-go="' + STAGE_START[last] + '">← ‘' + esc(stageName(last)) + '’ 으로 돌아가기</button></div>' };
+            '<div class="ev-nav col"><button type="button" class="ev-next secondary" data-go="' + to + '">← ‘' + esc(stageName(stageOf(to))) + '’ 으로 돌아가기</button></div>' };
     }
     function show(id, opt) {
         cleanup.forEach(function (f) { try { f(); } catch (e) { /* 무시 */ } }); cleanup = [];
         if (!SCREENS[id]) id = 'enter';
         if (stageLocked(stageOf(id))) {   // 잠긴 단계: 화면 자리는 기억하고 잠금 안내만
+            if (!(opt && opt.back) && st.screen !== id && st.screen !== 'enter') { st.history.push(st.screen); if (st.history.length > 40) st.history.shift(); }
             st.screen = id; st.stage = stageOf(id); save();
             app.innerHTML = '<section class="ev-screen" data-screen="locked">' + lockScreen(stageOf(id)).html + '</section>';
             app.setAttribute('data-screen', 'locked'); renderTop(); window.scrollTo(0, 0);
+            beatIfChanged();
             return;
         }
         if (!(opt && opt.back) && st.screen !== id) { st.history.push(st.screen); if (st.history.length > 40) st.history.shift(); }
@@ -193,7 +238,7 @@
         renderTop();
         window.scrollTo(0, 0);
         var h = app.querySelector('h2'); if (h) { h.setAttribute('tabindex', '-1'); try { h.focus({ preventScroll: true }); } catch (e) { /* 무시 */ } }
-        if (stageMoved && share) share.stepChanged();
+        if (stageMoved && share) { lastStep = stepNow(); share.stepChanged(); } else beatIfChanged();
     }
     function back() { var p = st.history.pop(); show(p || 'enter', { back: true }); }
     app.addEventListener('click', function (e) {
