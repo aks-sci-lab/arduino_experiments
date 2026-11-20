@@ -96,7 +96,7 @@ test('메인 화면에 이상기체 실험 링크가 있고 페이지의 로컬 
     }
     // 보고서 순서 탭 7개
     for (const t of ['purpose', 'theory', 'materials', 'procedure', 'data', 'result', 'conclusion']) {
-        assert.ok(html.includes(`data-tab="${t}"`), t);
+        assert.ok(html.includes(`data-step="${t}"`), t);   // 공통 단계 부품(nav.steps) — 7단계 / 가설연역
     }
     // 다른 센서 페이지처럼 화면에 보드 모델명을 쓰지 않는다
     assert.doesNotMatch(html, /Pico 2 W/i);

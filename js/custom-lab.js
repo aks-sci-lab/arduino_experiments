@@ -225,7 +225,7 @@
         document.title = def.title + ' | 센서 기반 실험실';
         $('title').textContent = def.title;
         $('description').textContent = def.description;
-        const useSteps = def.layout === 'steps' && !view.readOnly;   // 제출 내용 보기는 늘 한 화면
+        const useSteps = (def.layout === 'steps' || def.layout === 'hd') && !view.readOnly;   // 제출 내용 보기는 늘 한 화면
         $('descHeading').textContent = useSteps ? '🎯 목적 · 실험 안내' : '📖 실험 안내';
         $('descCard').hidden = !useSteps && !def.description.trim();
         M.STEP_TEXTS.forEach(k => {
@@ -284,9 +284,9 @@
                     if (r.changed) { view.ext = r.ext; saveNow(); renderIncoming(); refreshGraph(); }
                     return r.changed;
                 },
-                getStep: () => curStep,
+                getStep: () => (view.def.layout === 'hd' && window.LabUI && LabUI.steps() ? LabUI.steps().flowStep() : curStep),   // 가설연역이면 그 단계 키(perform 등) → 교사 화면이 ④ 탐구 수행으로
                 getPoints: myPoints,
-                pollWhen: () => view.def.layout !== 'steps' || ['data', 'result', 'conclusion'].includes(curStep),
+                pollWhen: () => view.def.layout === 'single' || ['data', 'result', 'conclusion'].includes(curStep),
                 incomingCount: () => M.incomingCount(view.ext),
                 clearIncoming: () => { view.ext = {}; saveNow(); renderIncoming(); refreshGraph(); },
                 csvImport: async files => {
@@ -382,7 +382,9 @@
             panel.appendChild(nav);
         });
         $('stepNav').hidden = false;
-        LabUI.initSteps({ key: 'custom-lab:' + expId, onShow: step => { curStep = step; if (share) share.stepChanged(); if (step === 'result') refreshGraph(); } });
+        // 진행 방법은 선생님이 만들 때 고른 것으로 고정 (7단계 / 가설연역)
+        if (LabUI.setFlow) LabUI.setFlow(view.def.layout === 'hd' ? 'hd' : 'report', { lock: true });
+        LabUI.initSteps({ key: 'custom-lab:' + expId, flows: true, onShow: step => { curStep = step; if (share) share.stepChanged(); if (step === 'result') refreshGraph(); } });
     }
 
     // ---------- 센서 (실험 설정에서 센서 기능을 고른 경우) ----------
@@ -933,7 +935,7 @@
         return r ? r.value : 'single';
     }
     function renderEdLayout() {
-        const steps = edLayout() === 'steps';
+        const steps = edLayout() !== 'single';
         $('edStepTexts').hidden = !steps;
         $('edDescLabel').textContent = steps
             ? '실험 안내 = 1. 목적 (실험 목표와 하는 일, 줄바꿈 그대로 보임)'

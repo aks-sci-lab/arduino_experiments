@@ -101,7 +101,9 @@
             if (fh) flow = fh[1];
             if (pendingFlow) { flow = pendingFlow.flow; locked = !!pendingFlow.o.lock; pendingFlow = null; }
         }
-        var origNext = panels.map(function (p) { var n = p.querySelector(':scope > .step-next'); return n ? n.innerHTML : null; });
+        // 패널의 이전·다음 단추 줄 (.step-next, 플랑크·이상기체는 .row.next). 작은 탭 안으로 옮겨졌어도 마지막 것
+        function nextRow(p) { var a = p.querySelectorAll('.step-next, .row.next'); return a.length ? a[a.length - 1] : null; }
+        var origNext = panels.map(function (p) { var n = nextRow(p); return n ? n.innerHTML : null; });
         var steps, order, buttons, saved, seen, cur = null, key;
         // 단계 목록: [{ key, no, label, panels }]
         function makeSteps() {
@@ -149,7 +151,7 @@
                     if (!tag) { tag = document.createElement('span'); tag.className = 'flow-tag'; h.insertBefore(tag, h.firstChild); }
                     tag.textContent = s.no + ' ' + s.label + ' · ';
                 } else if (tag) tag.remove();
-                var nx = p.querySelector(':scope > .step-next');
+                var nx = nextRow(p);
                 if (!nx || origNext[i] == null) return;
                 if (flow !== 'hd' || !s) { nx.innerHTML = origNext[i]; nx.hidden = false; return; }
                 // 묶인 단계의 앞 패널(준비물)은 이전·다음 단추를 숨김, 마지막 패널에 단계 순서대로 다시 씀
@@ -237,6 +239,7 @@
         var fromHash = /^#step-(\d)$/.exec(location.hash);
         show(fromHash && order[Number(fromHash[1]) - 1] ? order[Number(fromHash[1]) - 1] : (opts.start || saved.step || order[0]));
         activeSteps = api;
+        try { document.dispatchEvent(new CustomEvent('lab-flow', { detail: { flow: flow } })); } catch (e) { /* 무시 */ }
         return api;
     }
 

@@ -18,7 +18,8 @@ test('ClassCloud: 진행 방법(flow)에 따른 단계 목록·이름', () => {
     assert.deepEqual(CC.gateSteps('qdot', 'hd'), HD);
     assert.deepEqual(CC.gateSteps('qdot'), ['purpose', 'theory', 'materials', 'procedure', 'data', 'result', 'conclusion'], '예전 수업(flow 없음) = 7단계');
     assert.equal(CC.gateSteps('qdot', 'report').length, 7);
-    assert.equal(CC.gateSteps('planck', 'hd').length, 7, '아직 가설연역을 붙이지 않은 실험은 7단계');
+    for (const e of ['planck', 'pendulum', 'idealgas', 'malus', 'eminduction', 'freefall']) assert.equal(CC.gateSteps(e, 'hd').length, 6, e + ' 가설연역');
+    assert.equal(CC.gateSteps('custom:abc', 'hd'), null, '선생님이 만든 실험은 단계 열기 없음 (방법은 만들 때 고름)');
     assert.equal(CC.gateSteps('rocket', 'hd').length, 4, '행사형은 그대로');
     assert.equal(CC.canFlow('qdot'), true); assert.equal(CC.canFlow('env'), false); assert.equal(CC.canFlow('rocket'), false);
     const si = CC.stageInfo('qdot', 2, 'hd');
@@ -125,8 +126,10 @@ test('진행 방법 화면: 수업 없이 고르기·기억, 가설연역 수업
         await T.waitForSelector('#btnSettings:not([hidden])');
         await T.click('#btnGoMake');
         await T.fill('#inBan', '5'); await T.fill('#inN', '4'); await T.fill('#inSize', '2');
+        await T.selectOption('#inExp', 'env');
+        assert.equal(await T.isVisible('#rowFlow'), false, '한 화면 실험은 진행 방법 고르기 없음');
         await T.selectOption('#inExp', 'planck');
-        assert.equal(await T.isVisible('#rowFlow'), false, '가설연역을 아직 안 붙인 실험은 고르기 없음');
+        assert.equal(await T.isVisible('#rowFlow'), true, '플랑크도 가설연역을 고를 수 있음');
         await T.selectOption('#inExp', 'qdot');
         assert.equal(await T.isVisible('#rowFlow'), true);
         await T.check('input[name=inFlow][value=hd]');

@@ -27,12 +27,12 @@
     function flowOf(f) { return f === 'hd' ? 'hd' : 'report'; }
     var DASH = { live: '측정 중', record: '기록', more: '안내' };
     var EXPS = {
-        planck: { name: 'LED 로 플랑크 상수 측정', icon: '💡', page: 'projects/planck-led.html', steps: STEPS7, ready: true },
-        pendulum: { name: '스마트폰 진자 (노트북 분석)', icon: '⏱️', page: 'projects/pendulum-report.html', steps: STEPS7, ready: true },
-        idealgas: { name: '이상기체 상태 방정식 검증', icon: '🎈', page: 'projects/ideal-gas.html', steps: STEPS7, ready: true },
-        malus: { name: '말루스 법칙 실험', icon: '🕶️', page: 'projects/malus-law.html', steps: STEPS7, ready: true },
-        eminduction: { name: '전자기 유도 전압·전류 측정', icon: '🧲', page: 'projects/em-induction.html', steps: STEPS7, ready: true },
-        freefall: { name: '자유낙하 궤적 분석', icon: '🏀', page: 'projects/free-fall.html', steps: STEPS7, ready: true },
+        planck: { name: 'LED 로 플랑크 상수 측정', icon: '💡', page: 'projects/planck-led.html', steps: STEPS7, ready: true, flows: true },
+        pendulum: { name: '스마트폰 진자 (노트북 분석)', icon: '⏱️', page: 'projects/pendulum-report.html', steps: STEPS7, ready: true, flows: true },
+        idealgas: { name: '이상기체 상태 방정식 검증', icon: '🎈', page: 'projects/ideal-gas.html', steps: STEPS7, ready: true, flows: true },
+        malus: { name: '말루스 법칙 실험', icon: '🕶️', page: 'projects/malus-law.html', steps: STEPS7, ready: true, flows: true },
+        eminduction: { name: '전자기 유도 전압·전류 측정', icon: '🧲', page: 'projects/em-induction.html', steps: STEPS7, ready: true, flows: true },
+        freefall: { name: '자유낙하 궤적 분석', icon: '🏀', page: 'projects/free-fall.html', steps: STEPS7, ready: true, flows: true },
         env: { name: '환경 센서 (온도·습도·기압·VOC)', icon: '🌡️', page: 'projects/environment-lab.html', steps: DASH, ready: true },
         light: { name: '조도 센서', icon: '🔆', page: 'projects/environment-lab.html?sensor=light', steps: DASH, ready: true },
         uv: { name: '자외선 센서', icon: '🟣', page: 'projects/environment-lab.html?sensor=uv', steps: DASH, ready: true },

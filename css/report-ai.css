@@ -9,14 +9,14 @@
 .rai .rai-status.warn { background: var(--c-warn-bg); color: var(--c-warn-text); }
 .rai .rai-tabs { margin: var(--sp-2) 0; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
 .rai .rai-tabs button { word-break: keep-all; }
-.rai .rai-label { display: block; margin: var(--sp-2) 0 var(--sp-1); font-size: var(--fs-sm); }
-.rai .rai-note { color: var(--c-muted); font-size: var(--fs-sm); font-weight: 400; }
+.rai .rai-label, .rai-inline .rai-label { display: block; margin: var(--sp-2) 0 var(--sp-1); font-size: var(--fs-sm); }
+.rai .rai-note, .rai-inline .rai-note { color: var(--c-muted); font-size: var(--fs-sm); font-weight: 400; }
 .rai textarea { width: 100%; max-width: 100%; box-sizing: border-box; font: inherit; font-size: 1rem; padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); resize: vertical; min-height: var(--tap); }
 .rai textarea[readonly] { background: var(--c-fill); }
 .rai .rai-ask { margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); background: var(--c-primary-soft); }
-.rai .rai-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin: var(--sp-2) 0; }
-.rai .rai-check { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: var(--tap); font-size: var(--fs-sm); }
-.rai .rai-check input { width: 20px; height: 20px; }
+.rai .rai-row, .rai-inline .rai-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin: var(--sp-2) 0; }
+.rai .rai-check, .rai-inline .rai-check { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: var(--tap); font-size: var(--fs-sm); }
+.rai .rai-check input, .rai-inline .rai-check input { width: 20px; height: 20px; }
 .rai .rai-btn { min-height: var(--tap); padding: var(--sp-2) var(--sp-4); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font: inherit; font-size: .95rem; font-weight: 600; cursor: pointer; }
 .rai .rai-btn:hover { background: var(--c-primary-dark); }
 .rai .rai-btn.good { background: var(--c-success); }
@@ -31,3 +31,8 @@
 .rai .rai-wait { margin: var(--sp-1) 0; color: var(--c-warn-text); font-size: var(--fs-sm); }
 .rai .rai-err { color: var(--c-danger); }
 @media print { .rai { display: none; } }
+/* 가설연역: 단계 안의 쓰기 칸 (① 탐구 문제·② 가설·③ 탐구 설계·⑥ 가설 판정, js/report-ai.js buildInline) */
+.rai-inline { display: block; margin: var(--sp-3) 0; padding: var(--sp-3); background: var(--c-card); border: 1px solid var(--c-line); border-left: 4px solid var(--c-primary); border-radius: 10px; }
+.rai-inline[hidden] { display: none; }
+.rai-inline textarea { width: 100%; box-sizing: border-box; font: inherit; padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); }
+.rai-inline .rai-verdict label { min-height: var(--tap); }
