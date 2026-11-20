@@ -182,28 +182,22 @@ test('노트북 두 대 같은 조: 보내기 → 다른 노트북 자동 불러
     }
 });
 
-test('?c= 없이 열면 예전처럼: 띠 없음, 조 공유 칸은 있음, 로그인 없이 동작', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
+test('?c= 없이 열면: 띠·조 공유 칸·선생님께 보내기 없음, 로그인 없이 동작 (2026-11-20)', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
     const app = loadLabStore();
     const srv = await staticServer();
     const base = 'http://127.0.0.1:' + srv.address().port;
     const browser = await chromium.launch();
     try {
         const L = await openLaptop(browser, base, app, '#step-5', 375, { points: runPoints(1, 0.6, 20, 0.05), run: 1 });
-        await L.page.waitForSelector('#cs-group');
+        await L.page.waitForFunction(() => document.documentElement.classList.contains('cs-solo'));
         assert.equal(await L.page.$('.cs-bar'), null);
-        // 조 코드 직접 넣기 → 보내기
-        await L.page.fill('#cs-group', '2-3-5376');
-        // 조 코드를 넣으면 먼저 한 번 불러오기 → 끝난 뒤 보내기 (불러오는 동안은 보내기를 받지 않음, class-share.js)
-        await L.page.waitForFunction(() => /연결됨/.test(document.getElementById('cs-status').textContent));
-        await L.page.click('#cs-send');
-        await L.page.waitForFunction(() => /보냈|✅/.test(document.getElementById('cs-status').textContent), null, { timeout: 5000 }).catch(async e => {
-            throw new Error(e.message + ' / 상태: ' + await L.page.textContent('#cs-status') + ' / ' + await L.page.textContent('#cs-server'));
-        });
-        const listed = (await app.get({ action: 'list', exp: 'malus', group: '2-3-5376' }));
-        assert.deepEqual(listed.items.map(x => x.title), ['1회차'], '조 코드가 날짜로 바뀌지 않음');
-        // 6. 결과: 내 기록만 (불러온 값 없음)
+        assert.equal(await L.page.$('#cs-share'), null, '조 공유 칸 없음');
+        assert.equal(await L.page.$('#cs-group'), null, '조 코드 칸 없음');
+        // 6. 결과: 내 기록 그대로, 7. 결론에 선생님께 보내기 없음
         await L.page.click('nav.steps button[data-step="result"]');
         assert.match(await L.page.textContent('#cnt'), /^\(13개\)$/);
+        await L.page.click('nav.steps button[data-step="conclusion"]');
+        assert.equal(await L.page.isVisible('#btn-send2'), false);
         assert.ok(await noSideScroll(L.page));
         assert.deepEqual(L.errors, []);
     } finally {
@@ -381,9 +375,10 @@ test('태블릿은 측정·분석 둘 다, QR 없이 연 폰도 측정·분석, 
         assert.equal(await L.isVisible('#btn-cam'), false);
         await L.waitForSelector('#cs-cardqr', { state: 'attached' });
         assert.equal(await noSideScroll(L), true, '노트북 375px 가로 스크롤');
-        await L.evaluate(() => { document.getElementById('cs-share').open = true; });
+        // 수업 없이 연 화면: 조 공유 칸 대신 CSV 불러오기만 남음 (js/class-share.js)
+        assert.equal(await L.locator('#cs-share').count(), 0);
         await L.setInputFiles('#cs-csv', csvPath);
-        await L.waitForFunction(() => /측정값 3개/.test(document.getElementById('cs-status').textContent + document.getElementById('cs-share').textContent), null, { timeout: 10000 });
+        await L.waitForFunction(() => /측정값 3개/.test(document.getElementById('cs-status').textContent + document.getElementById('share-mount').textContent), null, { timeout: 10000 });
         await L.click('nav.steps button[data-step="result"]');
         assert.match(await L.textContent('#cnt'), /불러온 값 3개/);
         assert.match(await L.textContent('#tbody'), /📂 malus-law-\d+\.csv · 1회차/);

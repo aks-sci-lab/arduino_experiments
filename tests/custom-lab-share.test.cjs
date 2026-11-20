@@ -214,22 +214,21 @@ test('화면: 교사 수업 만들기 → 학생 2명 같은 조 보내기·자�
     }
 });
 
-test('화면: 한 화면 방식 · ?c= 없이 열면 조 공유 칸만 (로그인 없이), 휴대폰 375px', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
+test('화면: 한 화면 방식 · ?c= 없이 열면 조 공유·선생님께 보내기 없음, 인쇄 안내 (2026-11-20), 휴대폰 375px', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
     const app = loadLabStore();
     const browser = await chromium.launch();
     try {
         const def = Object.assign({}, DEF, { layout: 'single' });
         const s = await newPage(browser, app, 375, def);
         await s.page.goto(ORIGIN + '/projects/custom-lab.html?id=ohm01');
-        await s.page.waitForSelector('#share-mount #cs-share');
+        await s.page.waitForFunction(() => document.documentElement.classList.contains('cs-solo'));
         assert.equal(await s.page.$('.cs-bar'), null, '?c= 없으면 수업 참여 띠 없음');
+        assert.equal(await s.page.$('#cs-share'), null, '?c= 없으면 조 공유 칸 없음');
         assert.equal(await s.page.isVisible('#btnSignIn'), false);
-        assert.match(await s.page.textContent('#submitCard'), /구글 로그인은 필요 없/);
-        // 조 코드 없이 보내기를 누르면 안내
+        assert.equal(await s.page.isVisible('#btnSubmit'), false, '선생님께 보내기 단추 없음');
+        assert.equal(await s.page.isVisible('#btnPrint'), true, '인쇄는 그대로');
+        assert.match(await s.page.innerText('#submitCard'), /수업 QR 로 들어오지 않아/);
         await s.page.fill('#dataTable input[data-r="0"][data-c="0"]', '1');
-        s.page.on('dialog', d => d.accept());
-        await s.page.click('#btnSubmit');
-        await s.page.waitForFunction(() => /조 코드를 정하세요/.test(document.getElementById('submitStatus').textContent));
         assert.ok(await noSideScroll(s.page));
         assert.deepEqual(await smallButtons(s.page), []);
         assert.deepEqual(s.errors, []);
