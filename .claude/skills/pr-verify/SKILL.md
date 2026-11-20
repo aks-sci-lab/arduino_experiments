@@ -55,6 +55,7 @@ cd <작업 폴더> && NODE_PATH=$E/node_modules $E/node_modules/.bin/firebase em
 - 기기: 노트북 `{ viewport: { width: 1280, height: 900 } }`, 폰 `devices['iPhone 13']`, 태블릿 `devices['Galaxy Tab S4']`, 또는 주소 `?device=`.
 - 볼 것: 노트북에 측정 단추가 없는지·QR 카드, 폰에 측정 단추, 태블릿 둘 다, `document.documentElement.scrollWidth > innerWidth`(가로 스크롤), `pageerror` 없음. 7단계 실험은 1단계로 열고 5단계를 눌러도 QR 이 나오는지.
 - 사용자에게 보여 줄 캡처는 `SendUserFile` 로(폰 하나·노트북 하나면 충분).
+- **새 수업(실험 페이지·수업에 쓰는 화면)을 만들거나 크게 고친 PR** 은 머지를 묻기 전에 '가상 수업: 교사'·'가상 수업: 학생' 세션에 그 브랜치로 가상 수업을 맡기고(세션 번호 `docs/MANAGEMENT.md`, 규칙 `AGENTS.md` '가상 수업'), 돌아온 '상' 항목은 같은 PR 로 돌려보낸다.
 
 ## 5. 결과 정리
 

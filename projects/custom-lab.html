@@ -9,6 +9,7 @@
     <title>실험 | 센서 기반 실험실</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/class-share.css">
+    <link rel="stylesheet" href="../css/report-ai.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
     <style>
         body { padding: 10px; }
@@ -200,6 +201,9 @@
             <div id="questions"></div>
         </div>
 
+        <!-- 📝 보고서 쓰기 · AI 피드백 (js/report-ai.js): 7단계·가설연역 방식의 결론 단계에만 (한 화면 방식은 없음) -->
+        <div class="no-print" id="reportAiCard" hidden><div id="report-ai"></div></div>
+
         <div class="card no-print" id="submitCard">
             <h2 class="cs-hide-solo">📤 선생님께 보내기</h2><h2 class="cs-show-solo">🖨 인쇄 · PDF 저장</h2>
             <p class="muted cs-show-solo">수업 QR 로 들어오지 않아 선생님께 보내기는 없어요. 인쇄하거나 PDF 로 저장해 선생님이 정한 방법으로 내세요.</p>
@@ -318,6 +322,7 @@
 <script src="../js/custom-lab-math.js?v=4"></script>
 <script src="../js/custom-lab-sensor.js?v=1"></script>
 <script src="../js/vernier-godirect.js?v=1"></script>
-<script src="../js/custom-lab.js?v=4"></script>
+<script src="../js/report-ai.js"></script>
+<script src="../js/custom-lab.js?v=5"></script>
 </body>
 </html>
