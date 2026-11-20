@@ -65,6 +65,12 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         await T.waitForFunction(() => /기다리는 팀\s*1\s*\/\s*들어온 팀\s*2/.test(document.getElementById('stageWait').textContent), null, { timeout: 20000 });
         assert.match(await T.textContent('#board'), /별빛가족[\s\S]*생각 열기 ✓ 기다림/);
         assert.doesNotMatch(await T.textContent('#board'), /달님 탐험대[\s\S]*✓ 기다림/);
+        // ② 끝낸 팀이 잠김 화면을 떠나 앞 화면을 다시 봐도 '끝냄'으로 셈 ('✓ 끝냄 · 더 재는 중')
+        await A.locator('.ev-screen [data-go]').last().click(); await go(A, 'think-pressure');
+        await T.waitForFunction(() => /더 재는 중/.test(document.getElementById('board').textContent), null, { timeout: 20000 });
+        assert.match(await T.textContent('#stageWait'), /기다리는 팀\s*1\s*\/\s*들어온 팀\s*2/, '결과를 다시 보는 팀도 기다림으로');
+        assert.match(await T.textContent('#board'), /별빛가족[\s\S]*생각 열기 ✓ 끝냄 · 더 재는 중/);
+        await next(A); await go(A, 'locked');
         // B 도 끝내면 '모든 팀이 기다려요'
         await B.click('.ev-choice[data-k="have"]'); await next(B); await go(B, 'think-accel'); await B.click('.ev-choice[data-k="fast"]');
         await next(B); await go(B, 'think-pressure'); await B.click('.ev-choice[data-k="ok"]'); await next(B); await go(B, 'locked');
@@ -95,18 +101,29 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         // ① 2차시 열기 → A(초시계 도는 중)·B(1차시 첫 화면) 그대로, 위에 띠
         await T.click('#btnStageNext');
         await A.waitForFunction(() => { const n = document.getElementById('ev-notice'); return n && !n.hidden; }, null, { timeout: 15000 });
-        assert.match(await notice(A), /선생님이 ‘2차시’ 단계를 열었어요 · 지금 단계를 끝내면 넘어가요/);
+        assert.match(await notice(A), /선생님이 ‘2차시’ 단계를 열었어요/);
+        // ① 측정 중에는 띠 단추를 누를 수 없음
+        assert.equal(await A.isDisabled('#ev-notice-go'), true, '측정 중에는 못 누름');
+        assert.match(await A.textContent('#ev-notice-go'), /이 측정을 끝내고 가요/);
         await B.waitForFunction(() => { const n = document.getElementById('ev-notice'); return n && !n.hidden; }, null, { timeout: 15000 });
+        assert.equal(await B.isDisabled('#ev-notice-go'), false);
+        assert.match(await B.textContent('#ev-notice-go'), /‘2차시’ 로 가기/);
+        const gb = await B.locator('#ev-notice-go').boundingBox();
+        assert.ok(gb.height >= 55.5, '띠 단추 56px: ' + gb.height);
+        // ③ 교사 화면 '앞 단계에 남은 팀 2' (둘 다 1차시), 결과판 '↩ … (앞 단계)'
+        await T.waitForFunction(() => /앞 단계에 남은 팀\s*2/.test(document.getElementById('stageWait').textContent), null, { timeout: 20000 });
+        await T.waitForFunction(() => /↩ 1차시[^↩]*\(앞 단계\)/.test(document.getElementById('board').textContent), null, { timeout: 20000 });
         assert.equal(await screen(A), 't1-measure', '측정 중인 팀은 옮기지 않음');
         assert.equal(await screen(B), 't1-intro', '하는 중인 팀은 옮기지 않음');
         await A.waitForTimeout(400); await A.click('#ev-sw2'); await A.click('#ev-sw3');
         await go(A, 't1-result');
         assert.equal((await A.evaluate(() => window.__filmRocket.state())).t1.trials.length, 1, '측정이 저장됨');
-        // ③ 그 단계를 마치면 잠김 화면 없이 바로 2차시 (여기서는 마지막 화면의 다음 단추 대신 2차시 첫 화면으로 가는 단추와 같게)
-        await A.evaluate(() => window.__filmRocket.show('t1-challenge'));
-        await go(A, 't1-challenge');
-        await A.locator('.ev-screen [data-go="t2-intro"]').last().click();
+        // ① 측정이 끝나면 띠 단추로 스스로 2차시 (잠김 화면 없이)
+        await A.waitForFunction(() => !document.getElementById('ev-notice-go').disabled, null, { timeout: 5000 });
+        await A.click('#ev-notice-go');
         await go(A, 't2-intro');
+        await T.waitForFunction(() => /앞 단계에 남은 팀\s*1/.test(document.getElementById('stageWait').textContent), null, { timeout: 20000 });
+        assert.match(await T.textContent('#stageWait'), /달님 탐험대/);
         assert.equal(await notice(A), '', '넘어가면 띠가 사라짐');
         await next(A); await go(A, 'q-action');
 
@@ -120,7 +137,7 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         // 새로고침해도 잠김 화면, '돌아가기' 는 마지막으로 하던 1차시 화면
         await A.reload(); await go(A, 'locked');
         const backBtn = A.locator('.ev-screen [data-go]').last();
-        assert.equal(await backBtn.getAttribute('data-go'), 't1-challenge', '돌아가기 = 마지막으로 하던 화면');
+        assert.equal(await backBtn.getAttribute('data-go'), 't1-result', '돌아가기 = 마지막으로 하던 화면');
         assert.match(await backBtn.textContent(), /1차시/);
         // 다시 2차시를 열면 하던 곳(q-action)으로
         await T.click('#btnStageNext');
@@ -130,10 +147,11 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         await T.click('#btnStageAll');
         await B.waitForFunction(() => /‘정리’ 단계까지 열었어요/.test(document.getElementById('ev-notice').textContent), null, { timeout: 15000 });
         assert.equal(await screen(B), 't1-intro', '건너뛰지 않음');
-        // ⑤ 🔌 끊김: B 의 마지막 신호를 10분 전으로
-        for (const [k, d] of app.db.docs) if (k.startsWith('labClasses/' + c.space + '/progress/2-')) d.lastSeen = new Date(Date.now() - 10 * 60 * 1000);
+        // ⑤ 🔌 끊김: 팀 폰은 1분마다 신호 → 2분 넘게 없으면 🔌 (B 의 마지막 신호를 2분 30초 전으로)
+        assert.equal(await B.evaluate(() => window.__filmRocket.share() && true), true);
+        for (const [k, d] of app.db.docs) if (k.startsWith('labClasses/' + c.space + '/progress/2-')) d.lastSeen = new Date(Date.now() - 150 * 1000);
         await T.click('#btnRefresh');
-        await T.waitForFunction(() => /🔌 10분 전/.test(document.getElementById('board').textContent), null, { timeout: 15000 });
+        await T.waitForFunction(() => /🔌 2분 전/.test(document.getElementById('board').textContent), null, { timeout: 15000 });
         assert.match(await T.textContent('#stageWait'), /🔌 연결 끊김 1팀/);
         assert.doesNotMatch(await T.textContent('#board'), /별빛가족 🔌/);
 

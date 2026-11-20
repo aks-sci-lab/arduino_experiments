@@ -135,6 +135,17 @@ test('로켓: 다시 재기 바로 가기·반복 측정·끊긴 채 새로고�
         assert.match(await A.textContent('#ev-sync'), /지난 기록/);
         assert.equal((await A.evaluate(() => window.__filmRocket.state())).t1.trials.length, 3, '지난 기록 그대로');
         assert.equal(await A.evaluate(() => window.__filmRocket.share()), null, '지난 기록은 선생님께 보내지 않음');
+        // 2차시 발사 영상: 가장 높은 장면은 발사 0.5~1초 뒤, 떨어진 뒤 녹화를 멈추므로 끝에서 2.5초 앞에서 열림 (맨 앞 0초가 아님)
+        await A.evaluate(() => window.__filmRocket.show('t2-measure')); await go('t2-measure');
+        await A.waitForFunction(() => { const cv = document.getElementById('ev-cam'); return cv && cv.width > 0; }, null, { timeout: 15000 });
+        await A.click('#ev-r1'); await A.waitForTimeout(4500); await A.click('#ev-r3');
+        await A.waitForSelector('#ev-vid', { timeout: 15000 });
+        await A.waitForFunction(() => { const v = document.getElementById('ev-vid'); return v && v.currentTime > 1; }, null, { timeout: 15000 });
+        const p2 = await A.evaluate(() => { const v = document.getElementById('ev-vid'); return { t: v.currentTime, d: v.duration }; });
+        assert.ok(p2.t > 1.5 && (!isFinite(p2.d) || (p2.t >= p2.d - 2.8 && p2.t <= p2.d - 2.2)), '발사 영상 끝 2.5초 앞: ' + JSON.stringify(p2));
+        await A.click('.ev-frames [data-f="-60"]'); await A.waitForTimeout(500);
+        assert.ok(p2.t - await A.evaluate(() => document.getElementById('ev-vid').currentTime) > 1.5, '⏪ 2초');
+        await layout('발사 장면 고르기');
         assert.deepEqual(errors, []);
     } finally { await browser.close(); api.close(); stat.close(); }
 });

@@ -240,3 +240,7 @@ details.ct-teach > summary { font-size: var(--fs-sm); color: var(--c-muted); fon
 details.ct-teach[open] { color: var(--c-text); }
 details.ct-phint { margin: var(--sp-1) 0 0; }
 details.ct-phint:not([open]) > summary { min-height: 0; padding: 2px 0; }
+.ct-behind { margin-top: var(--sp-1); font-weight: 400; }
+.ct-behind summary { cursor: pointer; min-height: var(--tap); display: flex; align-items: center; color: var(--c-warn-text); font-weight: 700; }
+.ct-behind-team { display: inline-block; margin: 2px var(--sp-2) 2px 0; padding: 2px var(--sp-2); border-radius: var(--r-ctl); background: var(--c-warn-bg); color: var(--c-warn-text); }
+.ct-behindcell { color: var(--c-warn-text); font-weight: 700; }
