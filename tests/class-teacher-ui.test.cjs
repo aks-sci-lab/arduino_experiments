@@ -38,12 +38,14 @@ test('교사 화면: 로그인 → 수업 → 학생·폰 → 진행 보기 → 
         await T.goto(ROOT + 'projects/class-teacher.html');
         await T.waitForSelector('#btnLogin:not([hidden])');
         assert.match(await T.textContent('#loginNow'), /구글 계정으로 로그인/);
-        await T.click('#btnCreate');
-        assert.match(await T.textContent('#createMsg'), /구글 로그인/);
+        assert.equal(await T.isVisible('#viewMain'), false, '로그인 전에는 진행 화면 없음');
+        assert.equal(await T.isVisible('#viewSettings'), false);
+        assert.equal(await T.isVisible('#btnSettings'), false);
         await layout(T, '교사 로그인 전');
         await T.click('#btnLogin');
-        await T.waitForSelector('#btnLogout:not([hidden])');
-        assert.match(await T.textContent('#loginNow'), /로그인됨/);
+        await T.waitForSelector('#btnSettings:not([hidden])'); await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="make"]');
+        assert.match(await T.textContent('#acctNow'), /로그인됨/);
+        assert.equal(await T.isVisible('#acctNow'), false, '이메일 등 계정 정보는 설정 → 계정 안에만');
         await T.fill('#inBan', '2'); await T.fill('#inN', '4'); await T.fill('#inSize', '2');
         await T.selectOption('#inExp', 'phoneaccel');
         await T.click('#btnCreate');
@@ -88,14 +90,14 @@ test('교사 화면: 로그인 → 수업 → 학생·폰 → 진행 보기 → 
         await A.waitForFunction(() => /📱 폰/.test(document.body.textContent), null, { timeout: 15000 });
 
         // ---- 교사 진행 보기 ----
-        await T.click('#ctTabs button[data-tab="watch"]');
+        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });
         await T.waitForFunction(() => /제출: 1개/.test(document.getElementById('groups').textContent), null, { timeout: 15000 });
         const groupsText = await T.textContent('#groups');
         assert.match(groupsText, /1조/); assert.match(groupsText, /2회 · 손에 들고/);
         assert.match(await T.textContent('#watchExpire'), /지워져요/);
         await layout(T, '교사 진행 보기');
         // CSV 내려받기 (전체)
-        const [dl] = await Promise.all([T.waitForEvent('download'), T.click('#btnCsv')]);
+        const [dl] = await (async () => { await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="dl"]'); return Promise.all([T.waitForEvent('download'), T.click('#btnCsv')]); })();
         const csv = fs.readFileSync(await dl.path(), 'utf8');
         assert.equal(csv.charCodeAt(0), 0xFEFF, 'UTF-8 BOM');
         const lines = csv.slice(1).trim().split(/\r\n/);
@@ -105,16 +107,16 @@ test('교사 화면: 로그인 → 수업 → 학생·폰 → 진행 보기 → 
         // 파일 이름(수업2-xxxx_….csv)은 시험 브라우저에서 한글 이름이 'download' 로 나와 확인하지 않음
         // 조별: 2조는 비어 있음
         await T.selectOption('#dlGroup', { index: 2 });
-        const [dl2] = await Promise.all([T.waitForEvent('download'), T.click('#btnCsv')]);
+        const [dl2] = await (async () => { await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="dl"]'); return Promise.all([T.waitForEvent('download'), T.click('#btnCsv')]); })();
         assert.equal(fs.readFileSync(await dl2.path(), 'utf8').slice(1).trim().split(/\r\n/).length, 1);
         // JSON
         await T.selectOption('#dlGroup', '');
-        const [dl3] = await Promise.all([T.waitForEvent('download'), T.click('#btnJson')]);
+        const [dl3] = await (async () => { await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="dl"]'); return Promise.all([T.waitForEvent('download'), T.click('#btnJson')]); })();
         const js = JSON.parse(fs.readFileSync(await dl3.path(), 'utf8'));
         assert.equal(js.items.length, 1); assert.equal(js.items[0].data, '{"t":[0,1],"a":[9.8,12.3]}');
 
         // ---- 지우기 ----
-        await T.click('#ctTabs button[data-tab="make"]');
+        await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="make"]');
         await T.click('#classList button.danger');
         await T.waitForFunction(() => /지웠어요/.test(document.getElementById('listMsg').textContent));
         assert.equal(app.items('phoneaccel').length, 0, '학생 자료도 지움');

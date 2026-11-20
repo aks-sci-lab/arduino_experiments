@@ -85,8 +85,8 @@ test('Nano 페이지: 수업 참여 → 같은 조 보내기·자동 불러오�
         const t = await openPage(browser, app, base + '/projects/class-teacher.html', 1280, false);
         const tp = t.page;
         await tp.click('#btnLogin');   // 가짜 구글 로그인 (js/lab-store.js, 시험)
-        await tp.waitForSelector('#btnLogout:not([hidden])');
-        await tp.click('#ctTabs button[data-tab="make"]');
+        await tp.waitForSelector('#btnSettings:not([hidden])'); await tp.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await tp.click('#ctTabs button[data-tab="make"]');
+        await tp.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await tp.click('#ctTabs button[data-tab="make"]');
         await tp.fill('#inBan', '2'); await tp.fill('#inN', '8'); await tp.fill('#inSize', '4');
         await tp.selectOption('#inExp', 'nano');
         await tp.waitForSelector('#btnCreate:not([disabled])');
@@ -142,7 +142,7 @@ test('Nano 페이지: 수업 참여 → 같은 조 보내기·자동 불러오�
         }
 
         // ---------- 교사: 진행 보기에 단계·점 수·제출 요약 ----------
-        await tp.click('#ctTabs button[data-tab="watch"]');
+        await tp.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });
         await tp.click('#btnRefresh').catch(() => {});
         await tp.waitForFunction(() => /가속도 1회/.test(document.getElementById('groups').textContent), null, { timeout: 30000 });
         const groups = await tp.textContent('#groups');
