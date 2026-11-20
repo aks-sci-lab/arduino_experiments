@@ -31,7 +31,8 @@ async function startWorld(opts) {
         fs.readFile(p, (e, d) => { if (e) { res.writeHead(404); return res.end(); }
             res.writeHead(200, { 'Content-Type': ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' }[path.extname(p)] || 'text/plain') + '; charset=utf-8' }); res.end(d); });
     });
-    await new Promise(r => api.listen(0, r)); await new Promise(r => stat.listen(0, r));
+    const ports = opts.ports || [0, 0];   // 합동 수업은 주소(=브라우저 저장 자리)가 차례마다 같아야 해서 포트를 고정
+    await new Promise(r => api.listen(ports[0], r)); await new Promise(r => stat.listen(ports[1], r));
     const API = 'http://127.0.0.1:' + api.address().port + '/exec', ROOT = 'http://127.0.0.1:' + stat.address().port + '/';
     const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
     const W = { app, API, ROOT, browser, shots, pages: {}, errors: [], dialogs: [], offline: {}, log: [], n: 0 };
