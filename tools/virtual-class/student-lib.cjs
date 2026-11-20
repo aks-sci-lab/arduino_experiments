@@ -7,7 +7,8 @@
 // 실제 사이트·실제 Firestore 가 아니다. 카메라는 크롬 가짜 카메라. 그림 파일은 저장소에 넣지 않는다.
 'use strict';
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
-const REPO = path.join(__dirname, '..', '..');
+// 제품 파일을 띄울 곳: 기본은 이 저장소, VC_REPO 를 주면 그 폴더(예: 고친 PR 브랜치를 따로 받은 곳)
+const REPO = process.env.VC_REPO ? path.resolve(process.env.VC_REPO) : path.join(__dirname, '..', '..');
 const { loadLabStore, labServer, configJs } = require(path.join(REPO, 'tests', 'fake-lab-store.cjs'));
 const { chromium, devices } = require('playwright');
 
