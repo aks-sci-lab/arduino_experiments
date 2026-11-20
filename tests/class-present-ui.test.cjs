@@ -47,6 +47,7 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         assert.match(T.url(), /view=present/);
         assert.equal(await T.isVisible('#cornerQr'), true, '발표 화면에도 오른쪽 위 QR');
         assert.equal(await T.isVisible('.ct-head'), false, '머리말은 숨김');
+        assert.equal(await T.isVisible('#classOut'), false, '큰 QR 화면은 숨김');
         const F = () => T.frames().find(f => /present=1/.test(f.url()));
         await T.waitForFunction(() => { const f = document.getElementById('presentFrame'); const d = f && f.contentDocument; return d && d.querySelector('nav.steps button[data-step="theory"].cs-locked'); }, null, { timeout: 15000 });
         const frame = F();
@@ -119,6 +120,7 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         const r = await app.post({ action: 'createClass', ban: 5, mode: 'team', nTeams: 3, exp: 'rocket', stage: 1 });
         await T.goto(ROOT + 'projects/class-teacher.html#class=' + r.space + '&view=present'); await T.reload();   // 새 수업까지 목록을 다시 받음
         await T.waitForSelector('#presentPane.phone:not([hidden])');
+        assert.equal(await T.isVisible('#classOut'), false, '주소로 바로 연 발표 화면에 큰 QR 이 겹치지 않음');
         await T.waitForFunction(() => { const d = document.getElementById('presentFrame').contentDocument; return d && d.getElementById('ev-app') && d.getElementById('ev-app').getAttribute('data-screen') === 'think-intro'; }, null, { timeout: 15000 });
         const pw = (await T.locator('#presentFrame').boundingBox()).width;
         assert.ok(pw <= 400 && pw >= 360, '폰 틀 폭: ' + pw);
