@@ -65,14 +65,15 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
         const tp = t.page;
         await tp.goto(base + '/projects/class-teacher.html');
         await tp.click('#btnLogin');   // 가짜 구글 로그인 (js/lab-store.js, 시험)
-        await tp.waitForSelector('#btnLogout:not([hidden])');
-        await tp.click('#ctTabs button[data-tab="make"]');
+        await tp.waitForSelector('#btnSettings:not([hidden])'); await tp.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await tp.click('#ctTabs button[data-tab="make"]');
+        await tp.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await tp.click('#ctTabs button[data-tab="make"]');
         await tp.fill('#inBan', '2'); await tp.fill('#inN', '8'); await tp.fill('#inSize', '4');
         assert.ok(await tp.$eval('#inExp', s => [...s.options].some(o => o.value === 'idealgas' && !/준비 중/.test(o.textContent))), '실험 고르기에 이상기체가 준비됨');
         await tp.selectOption('#inExp', 'idealgas');
         assert.equal(await tp.textContent('#expNote'), '');
         await tp.click('#btnCreate');
         await tp.waitForFunction(() => /만들었어요/.test(document.getElementById('createMsg').textContent));
+        await tp.click('#btnStageAll'); await tp.waitForFunction(() => /모든 단계를 열었어요/.test(document.getElementById('stageMsg').textContent));
         const link = await tp.getAttribute('#outLink', 'href');
         assert.match(link, /projects\/ideal-gas\.html\?c=2-\d{4}/);
         const studentUrl = link.replace(/^https?:\/\/[^/]+/, base);
@@ -137,7 +138,7 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
         assert.match(rows[0]._space, /^c[a-z0-9]{23}$/, '수업 공간에 저장');
 
         /* ---------- 선생님 진행 보기: 단계·점 수·제출 ---------- */
-        await tp.click('#ctTabs button[data-tab="watch"]');
+        await tp.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });
         // 학생 화면은 단계 알림을 5초에 한 번까지만 보내므로, 교사 화면이 몇 번 새로 볼 때까지 기다린다
         await tp.waitForFunction(() => /2번7 결론/.test(document.getElementById('groups').textContent), null, { timeout: 30000 });
         const g = await tp.textContent('#groups');

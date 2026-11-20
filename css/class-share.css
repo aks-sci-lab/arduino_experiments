@@ -48,3 +48,8 @@ html.big-view .cs-dlg { zoom: calc(1 / 1.35); }
 .cs-phonecard .cs-qr { width: min(220px, 70vw); margin: 0; flex: 0 0 auto; }
 .cs-phonecard .cs-pcard-txt { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
 .cs-phonecard .cs-pcard-txt p { margin: 0 0 var(--sp-1, 6px); }
+
+/* 선생님이 여는 단계: 잠긴 단계 단추와 알림 (js/class-share.js) */
+nav.steps button.cs-locked, nav.tabs button.cs-locked { opacity: .45; cursor: not-allowed; position: relative; }
+nav.steps button.cs-locked::after, nav.tabs button.cs-locked::after { content: '🔒'; position: absolute; top: 2px; right: 4px; font-size: .7rem; }
+.cs-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 2000; max-width: calc(100vw - 32px); background: var(--c-text); color: #fff; padding: var(--sp-2) var(--sp-4); border-radius: 999px; box-shadow: var(--shadow); font-size: var(--fs-sm); }

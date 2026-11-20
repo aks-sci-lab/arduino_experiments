@@ -53,6 +53,14 @@
             getPoints: function () { return st.t1.trials.length + st.t1.challenge.length + st.t2.trials.length + st.t2.challenge.length; },
             getSubmitted: function () { return !!st.sentAt; },
             pull: function () { return Promise.resolve({ ok: true }); },   // 다른 팀 것은 불러오지 않음
+            // 선생님이 여는 단계 (교사 화면 '▶ 다음 단계 열기'): 열리지 않은 단계는 🔒, 새로 열리면 그 단계 첫 화면으로
+            gateDom: false,
+            onStage: function (open, o) {
+                stageOpen = open;
+                if (o && o.moved && o.moved.to && st.team) { show(STAGE_START[o.moved.to]); flash('▶ 선생님이 ‘' + stageName(o.moved.to) + '’ 단계를 열었어요'); }
+                else if (stageLocked(stageOf(st.screen))) show(st.screen, { back: true });
+                else renderTop();
+            },
             onClass: function (info, me) {
                 if (info && info.setup) { st.setup = info.setup; }
                 if (me && me.team) {
@@ -128,7 +136,8 @@
         $('#ev-score').innerHTML = '⭐ <b>' + sc.points + '</b>점';
         var s = $('#ev-sync'); s.textContent = sy.t; s.className = 'ev-sync ' + sy.cls; s.hidden = !sy.t;
         $('#ev-stages').innerHTML = STAGES.map(function (x) {
-            return '<button type="button" class="ev-stage' + (st.stage === x[0] ? ' on' : '') + '" data-stage="' + x[0] + '"' + (st.team ? '' : ' disabled') + '>' + x[1] + '</button>';
+            var lock = stageLocked(x[0]);
+            return '<button type="button" class="ev-stage' + (st.stage === x[0] ? ' on' : '') + (lock ? ' locked' : '') + '" data-stage="' + x[0] + '"' + (st.team ? '' : ' disabled') + (lock ? ' aria-disabled="true" title="선생님이 열면 넘어가요"' : '') + '>' + (lock ? '🔒 ' : '') + x[1] + '</button>';
         }).join('');
         $('#ev-top').hidden = st.screen === 'enter';
         if (!saveOk) { s.hidden = false; s.className = 'ev-sync warn'; s.textContent = '⚠ 이 브라우저는 저장이 안 돼요 (사생활 보호 모드?)'; }
@@ -141,9 +150,30 @@
     // ---------- 화면 틀 ----------
     var app = $('#ev-app'), cleanup = [];
     function stageOf(id) { return /^t1|^q-pressure|^q-control|^q-gas/.test(id) ? 't1' : /^t2|^q-action|^q-mass/.test(id) ? 't2' : /^end/.test(id) ? 'end' : /^think/.test(id) ? 'think' : 'enter'; }
+    // ----- 선생님이 연 단계 -----
+    var stageOpen = null;   // null = 모두 열림 (수업 없이·예전 수업)
+    function stageLocked(stage) { return !!(stageOpen && STAGE_START[stage] && stageOpen.indexOf(stage) < 0); }
+    function stageName(k) { var x = STAGES.filter(function (y) { return y[0] === k; })[0]; return x ? x[1] : k; }
+    var flashT = null;
+    function flash(t) {
+        var el = $('#ev-flash'); if (!el) return;
+        el.textContent = t; el.hidden = false; clearTimeout(flashT); flashT = setTimeout(function () { el.hidden = true; }, 3500);
+    }
+    function lockScreen(stage) {
+        var last = stageOpen && stageOpen.length ? stageOpen[stageOpen.length - 1] : 'think';
+        return { html: '<div class="ev-hero"><div class="ev-hero-ic" aria-hidden="true">⏳</div><h2>‘' + esc(stageName(stage)) + '’ 은 아직 잠겨 있어요</h2>' +
+            '<p>선생님이 다음 단계를 열면 <b>저절로 넘어가요</b>. 그동안 앞 단계를 다시 보거나 기다려요.</p></div>' +
+            '<div class="ev-nav col"><button type="button" class="ev-next secondary" data-go="' + STAGE_START[last] + '">← ‘' + esc(stageName(last)) + '’ 으로 돌아가기</button></div>' };
+    }
     function show(id, opt) {
         cleanup.forEach(function (f) { try { f(); } catch (e) { /* 무시 */ } }); cleanup = [];
         if (!SCREENS[id]) id = 'enter';
+        if (stageLocked(stageOf(id))) {   // 잠긴 단계: 화면 자리는 기억하고 잠금 안내만
+            st.screen = id; st.stage = stageOf(id); save();
+            app.innerHTML = '<section class="ev-screen" data-screen="locked">' + lockScreen(stageOf(id)).html + '</section>';
+            app.setAttribute('data-screen', 'locked'); renderTop(); window.scrollTo(0, 0);
+            return;
+        }
         if (!(opt && opt.back) && st.screen !== id) { st.history.push(st.screen); if (st.history.length > 40) st.history.shift(); }
         var stage = stageOf(id), stageMoved = stage !== st.stage;
         st.screen = id; st.stage = stage; save();

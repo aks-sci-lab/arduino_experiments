@@ -60,18 +60,19 @@ test('보고서 AI: 교사 키 → 학생 질문 → 답 → 꺼짐 안내 → �
         const T = await ctx({ viewport: { width: 375, height: 800 } }, 'T');
         await T.goto(ROOT + 'projects/class-teacher.html');
         await T.click('#btnLogin');
-        await T.waitForSelector('#btnLogout:not([hidden])');
+        await T.waitForSelector('#btnSettings:not([hidden])'); await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="make"]');
         await T.fill('#inBan', '2'); await T.fill('#inN', '4'); await T.fill('#inSize', '2'); await T.fill('#inAiLimit', '2');
         await T.selectOption('#inExp', 'malus');
         assert.match(await T.textContent('#preview'), /AI 질문 조마다 2번/);
         await T.click('#btnCreate');
         await T.waitForSelector('#classOut:not([hidden])');
+        await T.click('#btnStageAll'); await T.waitForFunction(() => /모든 단계를 열었어요/.test(document.getElementById('stageMsg').textContent));
         const link = await T.getAttribute('#outLink', 'href');
         const space = /[?&]s=(c[a-z0-9]{23})/.exec(link)[1];
         assert.equal(app.db.docs.get('labClasses/' + space).aiLimit, 2);
 
         // ---- 교사: ③ 보고서 AI — 3곳 키 시험 ----
-        await T.click('#ctTabs button[data-tab="ai"]');
+        await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="ai"]');
         assert.match(await T.textContent('#aiDeskNow'), /API 키를 넣으면/);
         for (const p of ['gemini', 'gpt', 'claude']) {
             await T.selectOption('#aiProvider', p);
@@ -231,10 +232,10 @@ test('보고서 AI: 가짜 조 코드·수업 전체 상한·한 기기가 조�
         });
         const T = await c.newPage(); T.on('pageerror', e => errors.push(e.message)); T.on('dialog', d => d.accept());
         await T.goto(ROOT + 'projects/class-teacher.html');
-        await T.click('#btnLogin'); await T.waitForSelector('#btnLogout:not([hidden])');
+        await T.click('#btnLogin'); await T.waitForSelector('#btnSettings:not([hidden])'); await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="make"]');
         // 수업 하나: 조 2개, 조마다 한도 1 → 수업 전체 상한 2
         await T.fill('#inBan', '3'); await T.fill('#inN', '4'); await T.fill('#inSize', '2'); await T.fill('#inAiLimit', '1');
-        await T.selectOption('#inExp', 'malus'); await T.click('#btnCreate'); await T.waitForSelector('#classOut:not([hidden])');
+        await T.selectOption('#inExp', 'malus'); await T.click('#btnCreate'); await T.waitForSelector('#classOut:not([hidden])'); await T.click('#btnStageAll'); await T.waitForFunction(() => /모든 단계를 열었어요/.test(document.getElementById('stageMsg').textContent));
         const cls = Object.entries(app.db.dump('labClasses/')).find(([p]) => p.split('/').length === 2)[1];
         const sp = Object.keys(app.db.dump('labClasses/')).find(p => p.split('/').length === 2).split('/')[1];
         const [g1, g2] = cls.groups.map(g => g.code), four = g1.split('-')[2];
@@ -251,7 +252,7 @@ test('보고서 AI: 가짜 조 코드·수업 전체 상한·한 기기가 조�
         const hop = await put({ uid: 'u1', group: g2, jo: 2 });                        // 같은 기기가 다른 조로 → 기기 상한
         const u2 = await put({ uid: 'u2', group: g2, jo: 2 });                         // 정상 → 답 (수업 전체 2 다 참)
         // 키 넣고 켜기
-        await T.click('#ctTabs button[data-tab="ai"]');
+        await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="ai"]');
         await T.selectOption('#aiProvider', 'claude'); await T.fill('#aiKey', 'sk-ant-x');
         const wait = async (id, s) => { for (let i = 0; i < 100; i++) { if (st(id).status === s) return; await new Promise(r => setTimeout(r, 100)); } assert.fail(id + ' 가 ' + s + ' 이 아님: ' + st(id).status); };
         await wait(u2, 'done');
