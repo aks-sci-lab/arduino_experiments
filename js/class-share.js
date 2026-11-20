@@ -14,6 +14,7 @@
        onIncoming: (items) => true|false,     // 같은 조 다른 노트북이 보낸 것 → 표에 합치고 바뀌었으면 true
        getStep: () => 'data', getPoints: () => 12,
        ...선택: onGroup(code), pollWhen(), csvImport(files), incomingCount(), clearIncoming(), store, send, pull
+       팀 이름 수업(수업 mode 'team', 가족 행사): onClass(info, me) — 수업 정보·내 팀이 정해질 때, teamPicker: false — 띠에 팀 이름 칸을 두지 않음(페이지가 share.joinTeam(이름))
    });
    share.stepChanged();   // 단계(탭)를 바꿀 때 */
 (function (root, factory) {
@@ -391,6 +392,14 @@
                 els.cmsg.innerHTML = '⚠ 이 수업은 <b>' + esc(e ? e.name : i.exp) + '</b> 수업입니다.' + (url ? ' <a href="' + esc(url.href) + '">그 실험 페이지로 가기 →</a>' : '');
                 return;
             }
+            if (i.mode === 'team') {   // 팀 이름으로 입장 (조·번호 고르기 없음)
+                els.cpick.hidden = true; els.cjoined.hidden = !me; els.cteam.hidden = !!me || opts.teamPicker === false;
+                if (els.cchange) els.cchange.hidden = true;
+                if (els.cphone) els.cphone.hidden = true;
+                if (me) els.cme.innerHTML = '팀: <b>' + esc(me.team || (me.jo + '팀')) + '</b> <span class="cs-note">· 결과는 선생님 화면에 모여요</span>';
+                return;
+            }
+            els.cteam.hidden = true;
             els.cpick.hidden = !!me; els.cjoined.hidden = !me;
             if (me) {
                 var g = CC.groupFor(i, me.jo);
@@ -418,20 +427,45 @@
             // 폰은 측정·보내기 때만 신호 (노트북의 신호와 번갈아 덮어쓰지 않게). 무료 한도를 아끼려고 3분마다 (5분 넘게 없으면 '쉬는 중')
             if (!PHONE) cls.timer = setInterval(function () { if (!document.hidden) beat(true); }, 180000);
         }
+        function tellClass() { if (typeof opts.onClass === 'function') { try { opts.onClass(cls.info, cls.me); } catch (e) { /* 실험 쪽 오류 */ } } }
         async function startClass() {
-            var r = await CC.joinInfo(srv().url, CLASS);
-            if (!r.ok) {
-                els.cinfo.innerHTML = '<b>🏫 수업 참여</b>';
-                els.cmsg.innerHTML = '⚠ ' + esc(r.error) + '<br>수업 없이 측정은 그대로 할 수 있습니다' + (mount ? '. 조 공유에 조 코드를 직접 넣어도 됩니다.' : '.');
-                return;
-            }
+            if (cls.starting) return cls.starting;
+            cls.starting = (async function () {
+                var r = await CC.joinInfo(srv().url, CLASS);
+                if (!r.ok) {
+                    els.cinfo.innerHTML = '<b>🏫 수업 참여</b>';
+                    els.cmsg.innerHTML = '⚠ ' + esc(r.error) + '<br>수업 없이 측정은 그대로 할 수 있습니다' + (mount ? '. 조 공유에 조 코드를 직접 넣어도 됩니다.' : '.');
+                    cls.failed = r; tellClass();
+                    return r;
+                }
+                cls.failed = null;
+                startedClass(r);
+                return r;
+            })();
+            try { return await cls.starting; } finally { cls.starting = null; }
+        }
+        function startedClass(r) {
             cls.info = r;
             cls.me = r.exp === exp ? loadMe() : null;
             // 폰 주소에 조·번호가 있으면 그대로 (묻지 않음)
             if (PHONE && PHONE.jo && PHONE.num && r.exp === exp && CC.groupFor(r, PHONE.jo) && CC.groupFor(r, PHONE.jo).code === PHONE.group) { cls.me = { c: CLASS, jo: PHONE.jo, num: PHONE.num }; saveMe(); }
             if (cls.me && !CC.groupFor(r, cls.me.jo)) cls.me = null;
+            if (r.mode === 'team' && cls.me && Number(cls.me.num) !== 1) cls.me = null;
             renderBar();
             if (cls.me) applyMe();
+            tellClass();
+        }
+        // 팀 이름으로 입장: 빈 조 자리 하나를 이 이름으로 잡는다 (이 폰은 한 팀만. 이미 팀이 있으면 그 팀으로)
+        async function joinTeam(name) {
+            if (!CLASS) return { ok: false, error: '선생님 QR 로 들어온 화면이 아니에요.' };
+            if (!cls.info) { var s0 = await startClass(); if (!s0.ok) return Object.assign({ network: true }, s0); }
+            if (cls.info.mode !== 'team') return { ok: false, error: '이 수업은 팀 이름으로 들어가는 수업이 아니에요.' };
+            var r = await CC.joinTeam(srv().url, { classCode: CLASS, name: name, device: st.device });
+            if (!r.ok) return r;
+            cls.me = { c: CLASS, jo: Number(r.jo), num: 1, team: String(r.name || '') };
+            saveMe(); renderBar(); applyMe(); tellClass();
+            els.cmsg.textContent = r.again ? '이 폰은 이미 \u2018' + r.name + '\u2019 팀이에요. 그 팀으로 이어서 해요.' : '';
+            return r;
         }
         if (CLASS) {
             bar = document.createElement('div');
@@ -439,13 +473,21 @@
             bar.innerHTML = '<div id="cs-cinfo"><b>🏫 수업 참여</b> <span class="cs-note">불러오는 중…</span></div>' +
                 '<div class="cs-row" id="cs-cpick" hidden><label>조 <select id="cs-cjo" class="cs-in"></select></label><label>번호 <select id="cs-cnum" class="cs-in"></select></label>' +
                 '<button type="button" id="cs-cjoin" class="cs-btn good">참여하기</button></div>' +
+                '<div class="cs-row" id="cs-cteam" hidden><label>팀 이름 <input type="text" id="cs-tname" class="cs-in" maxlength="12" autocomplete="off" placeholder="예: 별빛 가족"></label>' +
+                '<button type="button" id="cs-tjoin" class="cs-btn good">입장하기</button></div>' +
                 '<div class="cs-row" id="cs-cjoined" hidden><span id="cs-cme"></span><button type="button" id="cs-cchange" class="cs-btn secondary">조·번호 바꾸기</button>' +
                 (opts.phone && !PHONE ? '<button type="button" id="cs-cphone" class="cs-btn" hidden>📱 폰으로 측정하기</button>' : '') + '</div>' +
                 '<div id="cs-cmsg" class="cs-note" role="status" aria-live="polite"></div>';
             var where = opts.barMount ? $q(opts.barMount) : null;
             if (where) where.appendChild(bar);
             else { var h1 = document.querySelector('h1'); if (h1) h1.insertAdjacentElement('afterend', bar); else document.body.insertBefore(bar, document.body.firstChild); }
-            ['cinfo', 'cpick', 'cjo', 'cnum', 'cjoin', 'cjoined', 'cme', 'cchange', 'cmsg', 'cphone'].forEach(function (k) { els[k] = document.getElementById('cs-' + k); });
+            ['cinfo', 'cpick', 'cjo', 'cnum', 'cjoin', 'cjoined', 'cme', 'cchange', 'cmsg', 'cphone', 'cteam', 'tname', 'tjoin'].forEach(function (k) { els[k] = document.getElementById('cs-' + k); });
+            els.tjoin.addEventListener('click', async function () {
+                els.tjoin.disabled = true;
+                var r = await joinTeam(els.tname.value);
+                els.tjoin.disabled = false;
+                if (!r.ok) els.cmsg.innerHTML = '⚠ ' + esc(r.error);
+            });
             if (els.cphone) els.cphone.addEventListener('click', function () { openPhone(); });
             els.cjo.addEventListener('change', fillNums);
             els.cjoin.addEventListener('click', function () {
@@ -671,6 +713,16 @@
             setGroup: setGroup,
             group: function () { return st.group; }, device: function () { return st.device; },
             classCode: function () { return CLASS; }, me: function () { return cls.me; },
+            // 팀 이름 수업: 수업 정보(행사 설정 포함)·입장·다시 연결(인터넷이 끊겼다가 돌아왔을 때)·선생님 설정 새로 받기
+            classInfo: function () { return cls.info; }, classFailed: function () { return cls.failed || null; },
+            joinTeam: joinTeam,
+            reconnect: function () { return CLASS && !cls.info ? startClass() : Promise.resolve(cls.info ? Object.assign({ ok: true }, cls.info) : { ok: false }); },
+            refreshClass: async function () {
+                if (!CLASS) return { ok: false };
+                var r = await CC.classInfo(srv().url, CLASS);
+                if (r.ok && cls.info) { cls.info.setup = r.setup; tellClass(); } else if (r.ok) startedClass(r);
+                return r;
+            },
             server: function () { return srv(); }, state: function () { return st; }
         };
         EXPORTS.current = api;   // 다른 부품(js/report-ai.js 보고서 AI)이 이 페이지의 수업·조 자리를 알 수 있게

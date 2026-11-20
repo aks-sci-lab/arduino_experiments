@@ -16,6 +16,8 @@
      labClasses/{공간}/aiAsk/{a…}           보고서 AI 질문 하나 (학생 익명 uid 가 만들고, 켜 둔 교사 화면이 답을 씀 — 키는 교사 브라우저에만, js/report-ai.js)
      labClasses/{공간}/reports/{조코드~uid} 학생 보고서 글 (기기마다 하나, 최종 제출 뒤에는 학생이 못 고침)
      labClasses/{공간}/aiDesk/status        교사 화면 AI 켜짐 신호 (학생 화면이 '선생님 화면 켜짐'을 보여 줌)
+     labClasses/{공간}/teams/{조 번호}       '팀 이름으로 입장' 수업(mode 'team', 가족 행사 — 필름통 로켓)의 팀 하나: 이름·그 팀 폰(익명 uid)
+                                            팀 이름을 정하면 빈 조 자리 하나를 차지하고, 그 뒤로는 그 조 코드로 저장한다 (조 방식 수업은 그대로)
    모든 문서에 expireAt = 만든 때 + 183일 (학기 끝 자동 삭제: TTL 정책 + .github/workflows/firestore-cleanup.yml)
 
    쓰는 법(브라우저): LabStore.call('lab:<공간>', { action: 'save', … }) → Promise<응답>
@@ -39,7 +41,7 @@
     var CELL_MAX = 45000;
     var SUMMARY_KEYS = 20, PLANCK_POINTS = 500;
     var JOIN_DAYS = 2;               // 수업 코드만으로 찾을 수 있는 기간 (규칙도 이 기간 뒤 읽기를 막음 — 코드는 99만 개라 훑기 쉬움). QR·링크는 수업이 지워질 때까지
-    var GENERIC_EXPS = { idealgas: 1, accel: 1, env: 1, light: 1, uv: 1, phoneaccel: 1, malus: 1, eminduction: 1, freefall: 1, nano: 1, heartrate: 1, qdot: 1 };   // qdot: 퀀텀닷 용액(PR #120)
+    var GENERIC_EXPS = { idealgas: 1, accel: 1, env: 1, light: 1, uv: 1, phoneaccel: 1, malus: 1, eminduction: 1, freefall: 1, nano: 1, heartrate: 1, qdot: 1, rocket: 1 };   // qdot: 퀀텀닷 용액(PR #120), rocket: 필름통 로켓(가족 행사, 팀 이름으로 입장)
     var CLASS_EXPS = { planck: 1, pendulum: 1 };
     Object.keys(GENERIC_EXPS).forEach(function (k) { CLASS_EXPS[k] = 1; });
     var CUSTOM_EXP_RE = /^custom:[A-Za-z0-9_-]{1,40}$/;
@@ -48,6 +50,39 @@
     var AI = { LIMIT_DEFAULT: 20, LIMIT_MAX: 200, PROMPT: 1500, DRAFT: 6000, CALC: 4000, ANSWER: 8000, VERIFY: 2000, TEXT: 8000, EXTERNAL: 3000, SECTIONS: 12, STALE_MS: 3 * 60000, DESK_MS: 150000 };
     var SECTION_RE = /^[a-z0-9_-]{1,20}$/;
     var ASK_ID_RE = /^a[a-z0-9]{19}$/;
+    // '팀 이름으로 입장' (가족 행사): 팀 이름 1~12글자, 같은 수업에서 겹치지 않게. 이 실험의 줄은 그 팀 폰만 쓴다
+    var TEAM = { NAME: 12, MAX: 40 };
+    var TEAM_EXPS = { rocket: 1 };
+    function cleanTeamName(v) {
+        var s = String(v == null ? '' : v);
+        if (s.normalize) s = s.normalize('NFC');
+        s = s.replace(/[\u0000-\u001f\u007f<>"'`\\|{}]/g, ' ').replace(/\s+/g, ' ').trim();
+        var chars = Array.from(s);
+        if (chars.length > TEAM.NAME) s = chars.slice(0, TEAM.NAME).join('').trim();
+        return s;
+    }
+    function teamKey(name) { return cleanTeamName(name).toLowerCase().replace(/\s+/g, ''); }
+    // 행사 설정 (선생님이 예비 실험으로 정한 값): 이름이 정해진 숫자만, 글은 'pieces' 하나
+    var SETUP_NUM = { waterMin: [1, 50], waterMax: [1, 50], waterStep: [1, 20], waterBase: [1, 50],
+        tabletMin: [1, 8], tabletMax: [1, 8], tabletBase: [1, 8], tempMin: [0, 60], tempMax: [0, 60], tempStep: [1, 20], tempBase: [0, 60],
+        targetTime: [1, 300], tolTime: [0, 60], tolPct: [0, 100], repeats: [1, 10], targetPct: [10, 300] };
+    function cleanSetup(v) {
+        if (v == null || v === '') return null;
+        if (typeof v !== 'object' || Array.isArray(v)) fail('행사 설정 형식이 올바르지 않습니다.');
+        var out = {};
+        Object.keys(SETUP_NUM).forEach(function (k) {
+            if (v[k] === '' || v[k] == null) return;
+            var r = SETUP_NUM[k], n = Number(v[k]);
+            if (!isFinite(n) || n < r[0] || n > r[1]) fail('행사 설정 값(' + k + ')이 올바르지 않습니다.');
+            out[k] = Math.round(n * 100) / 100;
+        });
+        if (v.pieces != null && v.pieces !== '') {
+            var ps = String(v.pieces).split(',').filter(function (x, i, a) { return /^(whole|half|quarter|powder)$/.test(x) && a.indexOf(x) === i; });
+            if (ps.length) out.pieces = ps.join(',');
+        }
+        if (v.pieceBase && /^(whole|half|quarter|powder)$/.test(String(v.pieceBase))) out.pieceBase = String(v.pieceBase);
+        return out;
+    }
     function isClassExp(e) { return !!CLASS_EXPS[e] || CUSTOM_EXP_RE.test(e); }
     function isGenericExp(e) { return !!GENERIC_EXPS[e] || CUSTOM_EXP_RE.test(e); }
 
@@ -211,10 +246,19 @@
         }
 
         // --- 공용 저장 (예전 submissions 시트) ---
-        async function saveSubmission(b) {
+        async function saveSubmission(b, auth) {
             var exp = String(b.exp || '');
             if (!isGenericExp(exp)) fail('알 수 없는 실험입니다.');
             var group = cleanGroup(b.group), id = String(b.id || '');
+            // 팀 이름 수업의 실험(필름통 로켓): 그 팀 자리를 잡은 폰만 그 팀 줄을 쓴다 (규칙도 같은 것을 확인)
+            var owner = '';
+            if (TEAM_EXPS[exp]) {
+                needUid(auth);
+                if (!isSpace(b.space)) fail('선생님 QR 로 들어온 팀만 보낼 수 있어요.');
+                var t = await getOrNull('labClasses/' + b.space + '/teams/' + Number(group.split('-')[1]));
+                if (!t || t.uid !== auth.uid) fail('이 팀의 폰이 아니에요. 처음 팀 이름을 정한 폰에서 보내 주세요.');
+                owner = auth.uid;
+            }
             if (!ID_RE.test(id)) fail('측정 번호(id)가 올바르지 않습니다.');
             var device = String(b.device || '');
             if (!DEVICE_RE.test(device)) fail('노트북 번호가 올바르지 않습니다.');
@@ -226,6 +270,7 @@
                 n: numIn(b.n, 0, 100000, '점 수'), summary: cleanSummary(b.summary), sentAt: text(b.sentAt, 40), data: data,
                 timestamp: db.stamp(), expireAt: expireAt()
             };
+            if (owner) rec.uid = owner;
             var path = itemsPath(spaceFor(b, group)) + '/' + docKey(exp, group, id);
             var old = await db.get(path);
             await db.set(path, rec);
@@ -257,14 +302,64 @@
         function aiLimitOf(c) { var n = Number(c && c.aiLimit); return c && c.aiLimit != null && isFinite(n) ? n : AI.LIMIT_DEFAULT; }   // 예전 수업(칸 없음)은 기본 20
         function publicClass(c) {
             return { ok: true, classCode: c.classCode, space: c.space, ban: c.ban, nStudents: c.nStudents, groupSize: c.groupSize, exp: c.exp,
-                groups: c.groups || [], aiLimit: aiLimitOf(c), created: iso(c.createdAt), expireAt: iso(c.expireAt) };
+                groups: c.groups || [], aiLimit: aiLimitOf(c), created: iso(c.createdAt), expireAt: iso(c.expireAt), mode: c.mode === 'team' ? 'team' : '', setup: c.setup || null };
+        }
+        // ----- 팀 이름으로 입장 (mode 'team') -----
+        async function teamList(c) {
+            return (await db.query('labClasses/' + c.space + '/teams', [])).map(function (r) { return { jo: Number(r.id), name: String(r.data.name || ''), key: String(r.data.key || ''), uid: String(r.data.uid || '') }; })
+                .filter(function (t) { return t.jo >= 1; }).sort(function (a, x) { return a.jo - x.jo; });
+        }
+        async function teamJoin(b, auth) {
+            needUid(auth);
+            var c = await findClass(b, false);
+            if (!c) fail('그 수업을 찾지 못했습니다. 선생님이 보여 준 QR 을 다시 찍어 주세요.');
+            if (c.mode !== 'team') fail('이 수업은 팀 이름으로 들어가는 수업이 아니에요.');
+            var name = cleanTeamName(b.name), key = teamKey(name);
+            if (!key) fail('팀 이름을 넣어 주세요 (12글자까지).');
+            var device = String(b.device || '');
+            for (var round = 0; round < 3; round++) {
+                var teams = await teamList(c);
+                var mine = teams.filter(function (t) { return t.uid === auth.uid; })[0];
+                if (mine) {   // 이 폰은 이미 팀이 있음 → 그 팀으로 (새로고침·다시 들어오기)
+                    var g0 = (c.groups || []).filter(function (x) { return Number(x.jo) === mine.jo; })[0];
+                    return { ok: true, again: true, jo: mine.jo, num: 1, name: mine.name, group: g0 ? g0.code : '' };
+                }
+                if (teams.some(function (t) { return t.key === key; })) fail('같은 이름의 팀이 벌써 있어요. 다른 이름을 정해 주세요 (예: 이름 뒤에 숫자).');
+                var used = {}; teams.forEach(function (t) { used[t.jo] = 1; });
+                var g = (c.groups || []).filter(function (x) { return !used[Number(x.jo)]; })[0];
+                if (!g) fail('팀 자리가 다 찼어요 (' + (c.groups || []).length + '팀). 선생님께 알려 주세요.');
+                try {
+                    await db.set('labClasses/' + c.space + '/teams/' + g.jo, { name: name, key: key, uid: auth.uid, device: DEVICE_RE.test(device) ? device : '', createdAt: db.stamp(), expireAt: classExpire(c) }, { create: true });
+                    return { ok: true, jo: Number(g.jo), num: 1, name: name, group: g.code };
+                } catch (e) {
+                    if (!(e && (e.exists || /permission|insufficient|already/i.test(String(e.code || '') + String(e.message || ''))))) throw e;   // 같은 순간 다른 팀이 그 자리를 잡음 → 다시
+                }
+            }
+            fail('팀 자리를 잡지 못했어요. 다시 눌러 주세요.');
+        }
+        // 수업 정보 다시 받기 (선생님이 행사 설정을 고친 뒤: 저장해 둔 것을 쓰지 않고 새로 읽음)
+        async function classInfo(b) {
+            var c = await findClass(b, false);
+            if (!c) return { ok: false, error: '그 수업을 찾지 못했습니다.' };
+            return publicClass(c);
+        }
+        // 교사: 행사 설정만 고치기 (예비 실험 값·목표)
+        async function classSetup(b, auth) {
+            var c = await ownedClass(b, auth);
+            var setup = cleanSetup(b.setup) || {};
+            await db.update('labClasses/' + c.space, { setup: setup });
+            return { ok: true, setup: setup };
         }
         async function createClass(b, auth) {
             if (!auth || !auth.google) fail('선생님 구글 로그인이 필요합니다.');
-            var ban = numIn(b.ban, 1, 99, '반'), n = numIn(b.nStudents, 1, 60, '학생 수'), size = numIn(b.groupSize, 1, 10, '조별 인원');
+            var team = b.mode === 'team';
+            var ban = numIn(b.ban, 1, 99, '반'), n = numIn(team ? b.nTeams : b.nStudents, 1, team ? TEAM.MAX : 60, team ? '팀 수' : '학생 수'), size = team ? 1 : numIn(b.groupSize, 1, 10, '조별 인원');
             if (ban % 1 || n % 1 || size % 1) fail('반·학생 수·조별 인원은 정수로 넣어 주세요.');
             var exp = String(b.exp || '');
             if (!isClassExp(exp)) fail('이 실험은 아직 수업 연결을 쓸 수 없습니다.');
+            if (team && !TEAM_EXPS[exp]) fail('이 실험은 팀 이름으로 입장할 수 없습니다.');
+            if (!team && TEAM_EXPS[exp]) fail('이 실험은 \u2018팀 이름으로 입장\u2019 수업으로만 만들 수 있어요.');
+            var setup = cleanSetup(b.setup);
             var aiLimit = b.aiLimit === '' || b.aiLimit == null ? AI.LIMIT_DEFAULT : numIn(b.aiLimit, 0, AI.LIMIT_MAX, 'AI 질문 한도');
             if (aiLimit % 1) fail('AI 질문 한도는 정수로 넣어 주세요.');
             // 아직 쓰이는(찾기 기간이 남은) 코드와 겹치지 않는 4자리
@@ -279,9 +374,11 @@
             var four = code.split('-')[1], space = newSpace('c'), now = db.now(), exp2 = expireAt();
             var groups = splitGroups(n, size).map(function (k, i) { return { jo: i + 1, code: ban + '-' + (i + 1) + '-' + four, size: k }; });
             var rec = { owner: auth.uid, classCode: code, ban: ban, nStudents: n, groupSize: size, exp: exp, groups: groups, aiLimit: aiLimit, createdAt: now, expireAt: exp2 };
+            if (team) rec.mode = 'team';
+            if (setup) rec.setup = setup;
             await db.set('labClasses/' + space, rec);
             await db.set('labClassCodes/' + code, { space: space, owner: auth.uid, joinUntil: new Date(now.getTime() + JOIN_DAYS * 86400000), expireAt: exp2 });
-            return { ok: true, classCode: code, space: space, ban: ban, nStudents: n, groupSize: size, exp: exp, groups: groups, aiLimit: aiLimit, created: now.toISOString(), expireAt: exp2.toISOString() };
+            return publicClass(Object.assign({ space: space }, rec));
         }
         async function getOrNull(path) {
             try { return await db.get(path); }
@@ -354,6 +451,7 @@
             });
             Object.keys(devs).forEach(function (gc) { subs[gc].devices = Object.keys(devs[gc]).length; });
             var out = publicClass(c);
+            if (c.mode === 'team') out.teams = (await teamList(c)).map(function (t) { return { jo: t.jo, name: t.name }; });
             out.now = db.now().toISOString();
             out.students = students;
             out.submissions = (c.groups || []).map(function (g) { return subs[g.code]; });
@@ -371,6 +469,7 @@
                 }
             }
             var out = publicClass(c);
+            if (c.mode === 'team') out.teams = (await teamList(c)).map(function (t) { return { jo: t.jo, name: t.name }; });
             out.items = rows.filter(function (d) { return c.exp === 'planck' ? Number(d.nIV) + Number(d.nGlow) > 0 : c.exp === 'pendulum' ? true : Number(d.n) > 0; });
             return out;
         }
@@ -387,7 +486,7 @@
             (await db.query('labClasses/' + c.space + '/progress', [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/progress/' + r.id); });
             (await db.query(itemsPath(c.space), [])).forEach(function (r) { paths.push(itemsPath(c.space) + '/' + r.id); });
             (await db.query('labSpaces/' + c.space + '/raw', [])).forEach(function (r) { paths.push('labSpaces/' + c.space + '/raw/' + r.id); });
-            for (var sub of ['aiAsk', 'reports', 'aiDesk']) (await db.query('labClasses/' + c.space + '/' + sub, [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/' + sub + '/' + r.id); });
+            for (var sub of ['aiAsk', 'reports', 'aiDesk', 'teams']) (await db.query('labClasses/' + c.space + '/' + sub, [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/' + sub + '/' + r.id); });
             for (var i = 0; i < paths.length; i++) await db.del(paths[i]);
             var look = await db.get('labClassCodes/' + c.classCode);
             if (look && look.space === c.space) await db.del('labClassCodes/' + c.classCode);
@@ -585,7 +684,7 @@
                 if (a === 'ping') return { ok: true, version: VERSION, store: 'firestore' };
                 if (a === 'save') {
                     if (exp === 'planck') return await savePlanck(body);
-                    if (exp && exp !== 'pendulum') return await saveSubmission(body);
+                    if (exp && exp !== 'pendulum') return await saveSubmission(body, auth);
                     return await saveMeasurement(body);
                 }
                 if (a === 'list' || a === 'raw') {
@@ -604,6 +703,9 @@
                 if (a === 'createClass') return await createClass(body, auth);
                 if (a === 'joinInfo') return await joinInfo(body);
                 if (a === 'heartbeat') return await heartbeat(body);
+                if (a === 'teamJoin') return await teamJoin(body, auth);
+                if (a === 'classInfo') return await classInfo(body);
+                if (a === 'classSetup') return await classSetup(body, auth);
                 if (a === 'classStatus') return await classStatus(body, auth);
                 if (a === 'classExport') return await classExport(body, auth);
                 if (a === 'myClasses') return await myClasses(body, auth);
@@ -650,7 +752,11 @@
             now: function () { return clock(); },
             stamp: function () { return clock(); },
             get: function (path) { return Promise.resolve(docs.has(path) ? clone(docs.get(path)) : null); },
-            set: function (path, data) { docs.set(path, clone(data)); return Promise.resolve(); },
+            // opt.create: 이미 있으면 실패 (Firestore 는 규칙이 팀 자리 덮어쓰기를 막아 같은 결과)
+            set: function (path, data, opt) {
+                if (opt && opt.create && docs.has(path)) { var e = new Error('already exists'); e.exists = true; return Promise.reject(e); }
+                docs.set(path, clone(data)); return Promise.resolve();
+            },
             update: function (path, data) {
                 if (!docs.has(path)) return Promise.reject(Object.assign(new Error('없는 문서: ' + path), { code: 'not-found' }));
                 docs.set(path, Object.assign(docs.get(path), clone(data))); return Promise.resolve();
@@ -872,9 +978,11 @@
     /* exp: 실험, items: classExport 의 items, groups: 수업의 조 목록 → { csv, rows }
        한 줄 = 한 회차. 맨 위 한 줄은 열 이름(단위 포함). summary 는 실험이 정한 이름 그대로 열이 된다 */
     function toCsv(exp, items, groups) {
-        var joOf = {}; (groups || []).forEach(function (g) { joOf[g.code] = g.jo; });
+        var joOf = {}, teamOf = {}, hasTeam = false;
+        (groups || []).forEach(function (g) { joOf[g.code] = g.jo; if (g.team) { teamOf[g.code] = g.team; hasTeam = true; } });   // 팀 이름 수업: groups 에 team 을 붙여 주면 '팀 이름' 열
         var cols = BASE_COLS.slice(), extra = exp === 'pendulum' ? PEND_COLS : exp === 'planck' ? PLANCK_CSV : [];
         cols = cols.concat(extra);
+        if (hasTeam) cols.splice(1, 0, ['team', '팀 이름']);
         var sumKeys = [];
         (items || []).forEach(function (d) { Object.keys(d.summary || {}).forEach(function (k) { if (sumKeys.indexOf(k) < 0) sumKeys.push(k); }); });
         var dataCol = exp === 'pendulum' ? ['raw', '원본 (압축, 진자 분석 화면에서 읽음)'] : exp === 'planck' ? null : ['data', '자료 (JSON)'];
@@ -886,6 +994,7 @@
         sorted.forEach(function (d) {
             var row = cols.map(function (c) {
                 if (c[0] === 'jo') return joOf[d.group] || '';
+                if (c[0] === 'team') return teamOf[d.group] || '';
                 if (c[0] === 'title' && exp === 'pendulum') return 'L ' + d.L + ' m';
                 if (c[0] === 'title' && exp === 'planck') return d.led;
                 if (c[0] === 'n' && exp === 'pendulum') return d.nPeriods;
@@ -942,6 +1051,7 @@
         core: core, memoryDb: memoryDb, firestoreDb: firestoreDb, call: call, watch: watch, watchClass: watchClass,
         newSpace: newSpace, isSpace: isSpace, isLabUrl: isLabUrl, urlOf: urlOf, spaceOf: spaceOf, groupSpace: groupSpace, parseUrl: parseUrl, docKey: docKey,
         ensureUser: ensureUser, currentUser: currentUser, signInGoogle: signInGoogle, signOut: signOut, onUser: onUser, isTeacher: isTeacher,
+        cleanTeamName: cleanTeamName, teamKey: teamKey, cleanSetup: cleanSetup, TEAM: TEAM,
         toCsv: toCsv, csvCell: csvCell, isClassExp: isClassExp, isGenericExp: isGenericExp, GENERIC_EXPS: GENERIC_EXPS
     };
 });

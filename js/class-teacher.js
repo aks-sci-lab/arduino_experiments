@@ -58,12 +58,55 @@
         var id = $('inCustom').value.trim().replace(/^.*[?&]id=/, '').replace(/[&#].*$/, '');
         return /^[A-Za-z0-9_-]{1,40}$/.test(id) ? 'custom:' + id : '';
     }
-    function inputs() { return { ban: Number($('inBan').value), nStudents: Number($('inN').value), groupSize: Number($('inSize').value), exp: chosenExp(), aiLimit: $('inAiLimit').value === '' ? 20 : Number($('inAiLimit').value) }; }
+    // ----- 가족 행사 (팀 이름으로 입장): 예비 실험 값 -----
+    var SETUP_FIELDS = [
+        ['h', '💧 물의 양 (mL)'], ['waterMin', '최소', 5], ['waterMax', '최대', 20], ['waterStep', '간격', 5], ['waterBase', '기본(같게 할 값)', 10],
+        ['h', '💊 발포비타민 양 (¼ 알 단위: 2 = ½ 알)'], ['tabletMin', '최소', 1], ['tabletMax', '최대', 4], ['tabletBase', '기본', 2],
+        ['h', '🌡 물의 온도 (°C)'], ['tempMin', '최소', 10], ['tempMax', '최대', 40], ['tempStep', '간격', 10], ['tempBase', '기본', 20],
+        ['pieces'],
+        ['h', '🎯 1차시 (열리는 시간)'], ['targetTime', '목표 시간 (초)', 15], ['tolTime', '‘맞췄다’ 허용 오차 (초)', 2], ['repeats', '같은 조건 반복 횟수', 3],
+        ['h', '🚀 2차시 (아이 키만큼)'], ['targetPct', '목표 (아이 키의 %)', 100], ['tolPct', '‘맞췄다’ 허용 오차 (%)', 10]
+    ];
+    var PIECE_NAMES = { whole: '한 덩어리', half: '2조각', quarter: '4조각', powder: '가루' };
+    function teamSetupHtml(prefix, v) {
+        v = v || {};
+        var pieces = String(v.pieces || 'whole,half,quarter,powder').split(','), base = v.pieceBase || 'whole';
+        return '<div class="ct-setup">' + SETUP_FIELDS.map(function (f) {
+            if (f[0] === 'h') return '<h4>' + esc(f[1]) + '</h4>';
+            if (f[0] === 'pieces') return '<h4>🔪 조각 크기 (고를 수 있는 것 · 기본)</h4><div class="ct-pieces">' + Object.keys(PIECE_NAMES).map(function (k) {
+                return '<label><input type="checkbox" data-piece="' + k + '"' + (pieces.indexOf(k) >= 0 ? ' checked' : '') + '> ' + PIECE_NAMES[k] + '</label>';
+            }).join('') + '<label>기본 <select data-piecebase>' + Object.keys(PIECE_NAMES).map(function (k) { return '<option value="' + k + '"' + (k === base ? ' selected' : '') + '>' + PIECE_NAMES[k] + '</option>'; }).join('') + '</select></label></div>';
+            return '<label class="ct-field">' + esc(f[1]) + ' <input type="number" step="any" inputmode="decimal" data-setup="' + f[0] + '" id="' + prefix + f[0] + '" value="' + esc(v[f[0]] != null ? v[f[0]] : f[2]) + '"></label>';
+        }).join('') + '</div>';
+    }
+    function readSetup(box) {
+        var o = {};
+        box.querySelectorAll('[data-setup]').forEach(function (i) { if (i.value !== '') o[i.dataset.setup] = Number(i.value); });
+        var ps = []; box.querySelectorAll('[data-piece]').forEach(function (c) { if (c.checked) ps.push(c.dataset.piece); });
+        o.pieces = (ps.length ? ps : ['whole']).join(',');
+        var pb = box.querySelector('[data-piecebase]'); o.pieceBase = pb && ps.indexOf(pb.value) >= 0 ? pb.value : ps[0] || 'whole';
+        return o;
+    }
+    $('teamSetup').innerHTML = teamSetupHtml('ts-', null);
+    function isTeamExp(exp) { var e = CC.expInfo(exp); return !!(e && e.team); }
+    function inputs() {
+        var team = isTeamExp(chosenExp());
+        var o = { ban: Number($('inBan').value), nStudents: Number($('inN').value), groupSize: Number($('inSize').value), exp: chosenExp(), aiLimit: $('inAiLimit').value === '' ? 20 : Number($('inAiLimit').value) };
+        if (team) { o.mode = 'team'; o.nTeams = Number($('inTeams').value); o.nStudents = o.nTeams; o.groupSize = 1; o.aiLimit = 0; o.setup = readSetup($('teamSetup')); }
+        return o;
+    }
     function renderPreview() {
-        var o = inputs(), g = CC.splitGroups(o.nStudents, o.groupSize);
+        var o = inputs(), team = o.mode === 'team', g = team ? (o.nTeams >= 1 && o.nTeams <= 40 && o.nTeams % 1 === 0 ? [o.nTeams] : []) : CC.splitGroups(o.nStudents, o.groupSize);
         var ok = g.length && o.ban >= 1 && o.ban <= 99 && o.ban % 1 === 0 && !!o.exp && o.aiLimit >= 0 && o.aiLimit <= 200 && o.aiLimit % 1 === 0;
         $('btnCreate').disabled = !ok;
         $('customRow').hidden = $('inExp').value !== 'custom';
+        $('rowN').hidden = $('rowSize').hidden = $('rowAi').hidden = team; $('rowTeams').hidden = $('teamBox').hidden = !team;
+        if (team) {
+            $('expNote').innerHTML = '';
+            $('preview').innerHTML = ok ? '👨‍👩‍👧 <b>팀 이름으로 입장</b> · 최대 ' + o.nTeams + '팀 · 1차시 목표 ' + esc(o.setup.targetTime) + '초(±' + esc(o.setup.tolTime) + '초) · 2차시 아이 키의 ' + esc(o.setup.targetPct) + '%(±' + esc(o.setup.tolPct) + '%)'
+                : '반(1~99)과 팀 수(1~40)를 정수로 넣어 주세요.';
+            return;
+        }
         var e = o.exp && CC.expInfo(o.exp);
         $('expNote').innerHTML = $('inExp').value === 'custom' && !o.exp ? '선생님이 만든 실험의 번호(또는 학생 화면 주소)를 넣어 주세요.'
             : e && !e.ready ? '⚠️ 이 실험 페이지는 아직 수업 참여 띠를 붙이는 중이에요. 수업은 만들 수 있지만, 학생 화면에 조·번호 고르기가 아직 안 나올 수 있어요.' : '';
@@ -71,7 +114,8 @@
             ? '👥 ' + o.nStudents + '명 → <b>' + g.length + '개 조</b>: ' + g.map(function (k, i) { return (i + 1) + '조 ' + k + '명'; }).join(', ')
             + ' · 🤖 AI 질문 조마다 ' + o.aiLimit + '번' : '반(1~99), 학생 수(1~60), 조별 인원(1~10), AI 질문 한도(0~200)를 정수로 넣어 주세요.';
     }
-    ['inBan', 'inN', 'inSize', 'inExp', 'inCustom', 'inAiLimit'].forEach(function (id) { $(id).addEventListener('input', renderPreview); });
+    ['inBan', 'inN', 'inSize', 'inExp', 'inCustom', 'inAiLimit', 'inTeams'].forEach(function (id) { $(id).addEventListener('input', renderPreview); });
+    $('teamSetup').addEventListener('input', renderPreview); $('teamSetup').addEventListener('change', renderPreview);
     $('inExp').addEventListener('change', renderPreview);
     // 선생님이 만든 실험은 '공개'여야 학생이 열 수 있다 → 번호를 넣으면 확인해 알려 줌
     var customState = { id: '', state: '', timer: null };
@@ -117,7 +161,7 @@
     function showClass(c) {
         var link = studentLink(c), e = CC.expInfo(c.exp);
         $('classOut').hidden = false;
-        $('outTitle').textContent = '— ' + c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + c.nStudents + '명, ' + c.groups.length + '개 조 · AI 질문 조마다 ' + (c.aiLimit == null ? 20 : c.aiLimit) + '번';
+        $('outTitle').textContent = '— ' + c.ban + '반 · ' + (e ? e.name : c.exp) + ' · ' + (c.mode === 'team' ? '팀 이름으로 입장 (최대 ' + c.groups.length + '팀)' : c.nStudents + '명, ' + c.groups.length + '개 조 · AI 질문 조마다 ' + (c.aiLimit == null ? 20 : c.aiLimit) + '번');
         $('outCode').textContent = c.classCode;
         $('outLink').href = link; $('outLink').textContent = link;
         $('outExpire').textContent = expireNote(c);
@@ -158,7 +202,7 @@
         if (!state.classes.length) { el.innerHTML = '<p class="note">아직 만든 수업이 없어요.</p>'; return; }
         el.innerHTML = state.classes.map(function (c) {
             var e = CC.expInfo(c.exp);
-            return '<div class="ct-item"><span><b>' + esc(c.classCode) + '</b> ' + esc(c.ban) + '반 · ' + esc(e ? e.name : c.exp) + ' · ' + esc(c.nStudents) + '명/' + esc(c.groups.length) + '조' +
+            return '<div class="ct-item"><span><b>' + esc(c.classCode) + '</b> ' + esc(c.ban) + '반 · ' + esc(e ? e.name : c.exp) + ' · ' + (c.mode === 'team' ? '최대 ' + esc(c.groups.length) + '팀' : esc(c.nStudents) + '명/' + esc(c.groups.length) + '조') +
                 '<br><span class="note">' + esc(new Date(c.created).toLocaleString('ko-KR')) + ' 만듦 · ' + esc(CC.expireText(c.expireAt)) + ' 지워짐</span></span>' +
                 '<span class="ct-row" style="margin:0"><button class="secondary" data-show="' + esc(c.space) + '">QR 보기</button><button data-watch="' + esc(c.space) + '">진행·내려받기</button>' +
                 '<button class="secondary" data-reopen="' + esc(c.space) + '">🔓 코드 다시 열기</button><button class="danger" data-del="' + esc(c.space) + '">🗑 지우기</button></span></div>';
@@ -199,7 +243,55 @@
         $('dlGroup').innerHTML = '<option value="">전체 조</option>' + (c ? c.groups.map(function (g) { return '<option value="' + esc(g.code) + '">' + g.jo + '조 (' + esc(g.code) + ')</option>'; }).join('') : '');
         $('watchExpire').textContent = c ? expireNote(c) : '';
         $('dlCard').hidden = !c;
+        var team = !!(c && c.mode === 'team');
+        $('boardCard').hidden = !team;
+        if (team && state.setupFor !== c.space) { state.setupFor = c.space; $('teamSetupEdit').innerHTML = teamSetupHtml('te-', c.setup); $('setupMsg').textContent = ''; }
     }
+    $('btnSetupSave').addEventListener('click', async function () {
+        var c = watched(); if (!c) return;
+        var setup = readSetup($('teamSetupEdit'));
+        $('setupMsg').className = 'note'; $('setupMsg').textContent = '⏳ 저장하는 중…';
+        var r = await CC.classSetup(c.space, setup);
+        if (!r.ok) { $('setupMsg').className = 'note err'; $('setupMsg').textContent = '⚠️ ' + r.error; return; }
+        c.setup = r.setup; $('setupMsg').textContent = '✅ 저장했어요. 1차시 목표 ' + r.setup.targetTime + '초 · 2차시 ' + r.setup.targetPct + '%';
+    });
+    // ----- 팀 결과판 (가족 행사) -----
+    function boardRows(st) {
+        var subs = {}; (st.submissions || []).forEach(function (x) { subs[x.jo] = x; });
+        var prog = {}; (st.students || []).forEach(function (x) { prog[x.jo] = x; });
+        return (st.teams || []).map(function (t) {
+            var sub = subs[t.jo], sm = (sub && sub.summary) || {}, pg = prog[t.jo] || null;
+            return { jo: t.jo, name: t.name, score: Number(sm['팀 점수']) || 0, quiz: sm['퀴즈 맞힘'], tDiff: sm['시간 도전 차이(초)'], tOk: sm['시간 도전 성공'] === 1,
+                hMax: sm['높이 최고(%)'], hDiff: sm['높이 도전 차이(%)'], hOk: sm['높이 도전 성공'] === 1, spark: sm['생각 바뀜 ✨'],
+                step: pg ? CC.stepName(st.exp, pg.step) : '–', state: CC.studentState(pg, st.now) };
+        }).sort(function (a, b) { return b.score - a.score || a.jo - b.jo; });
+    }
+    function boardTable(rows, big) {
+        if (!rows.length) return '<p class="note">아직 들어온 팀이 없어요. 가족이 QR 로 들어와 팀 이름을 정하면 여기에 나와요.</p>';
+        var n = function (v, unit) { return v == null || v === '' ? '–' : esc(Math.abs(Number(v))) + unit; };
+        return '<div class="ct-board-wrap"><table class="ct-board"><thead><tr><th>팀</th><th>⭐ 점수</th><th>⏱ 시간 도전</th><th>🚀 최고 높이</th><th>🎯 높이 도전</th>' + (big ? '' : '<th>지금</th>') + '</tr></thead><tbody>' +
+            rows.map(function (r, i) {
+                return '<tr><td>' + (i < 3 && r.score ? ['🥇', '🥈', '🥉'][i] + ' ' : '') + '<b>' + esc(r.name) + '</b></td><td><b>' + r.score + '</b></td>' +
+                    '<td class="' + (r.tOk ? 'ok' : '') + '">' + (r.tDiff == null ? '–' : (r.tOk ? '🎉 ' : '') + n(r.tDiff, '초 차이')) + '</td>' +
+                    '<td>' + (r.hMax == null ? '–' : esc(r.hMax) + '%') + '</td>' +
+                    '<td class="' + (r.hOk ? 'ok' : '') + '">' + (r.hDiff == null ? '–' : (r.hOk ? '🎉 ' : '') + n(r.hDiff, '% 차이')) + '</td>' +
+                    (big ? '' : '<td class="note">' + esc(r.step) + (r.state.idle ? ' 💤' : '') + '</td>') + '</tr>';
+            }).join('') + '</tbody></table></div>';
+    }
+    function renderBoard(st) {
+        var rows = boardRows(st);
+        $('watchSum').innerHTML = '<div>들어온 팀<b>' + rows.length + ' / ' + (st.groups || []).length + '</b></div>' +
+            '<div>활동 중<b>' + rows.filter(function (r) { return r.state.joined && !r.state.idle; }).length + '</b></div>' +
+            '<div>시간 도전 성공<b>' + rows.filter(function (r) { return r.tOk; }).length + '</b></div>' +
+            '<div>높이 도전 성공<b>' + rows.filter(function (r) { return r.hOk; }).length + '</b></div>';
+        $('board').innerHTML = boardTable(rows, false);
+        $('boardBigBody').innerHTML = boardTable(rows, true);
+        var c = watched(); $('boardBigTitle').textContent = '🏆 팀 결과판' + (c && c.setup ? ' · 목표 ' + c.setup.targetTime + '초 · 아이 키 ' + (c.setup.targetPct || 100) + '%' : '');
+        $('groups').innerHTML = '';
+    }
+    $('btnBoardBig').addEventListener('click', function () { $('boardBig').hidden = false; $('btnBoardClose').focus(); });
+    $('btnBoardClose').addEventListener('click', function () { $('boardBig').hidden = true; });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('boardBig').hidden = true; });
     $('watchSel').addEventListener('change', function (e) { state.watching = e.target.value; state.last = null; state.detail = null; $('detail').hidden = true; renderWatchSel(); refresh(); });
     $('btnRefresh').addEventListener('click', function () { refresh(); });
     function watched() { return byId(state.watching); }
@@ -257,17 +349,19 @@
     }
     $('btnCsv').addEventListener('click', async function () {
         var x = await exportRows(); if (!x) return;
-        var out = LS.toCsv(x.c.exp, x.r.items, x.c.groups);
+        var names = {}; (x.r.teams || []).forEach(function (t) { names[t.jo] = t.name; });
+        var out = LS.toCsv(x.c.exp, x.r.items, x.c.groups.map(function (g) { return names[g.jo] ? Object.assign({}, g, { team: names[g.jo] }) : g; }));
         download(fileBase(x) + '.csv', out.csv, 'text/csv;charset=utf-8');
         $('dlMsg').textContent = '✅ ' + out.rows + '줄을 내려받았어요' + (out.rows ? '.' : ' (아직 보낸 자료가 없어요).');
     });
     $('btnJson').addEventListener('click', async function () {
         var x = await exportRows(); if (!x) return;
-        var o = { classCode: x.c.classCode, exp: x.c.exp, ban: x.c.ban, groups: x.c.groups, exportedAt: new Date().toISOString(), items: x.r.items };
+        var o = { classCode: x.c.classCode, exp: x.c.exp, ban: x.c.ban, groups: x.c.groups, teams: x.r.teams || undefined, setup: x.c.setup || undefined, exportedAt: new Date().toISOString(), items: x.r.items };
         download(fileBase(x) + '.json', JSON.stringify(o, null, 1), 'application/json');
         $('dlMsg').textContent = '✅ ' + x.r.items.length + '개 회차를 JSON 으로 내려받았어요 (자료 원본 포함).';
     });
     function render(st) {
+        if (st.mode === 'team') return renderBoard(st);
         var s = CC.summarize(st);
         $('watchSum').innerHTML =
             '<div>들어온 학생<b>' + s.joined + ' / ' + s.total + '</b></div>' +
