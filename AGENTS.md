@@ -41,7 +41,7 @@
 | `walk-run-detector/` | 걷기·뛰기 판정 머신러닝 수업 앱 (자체 README 참고) |
 | `pass/` | 예전 조퇴증·외출증 공유 링크를 새 주소(aks-sci-lab.github.io/teacher-desk/)로 넘기는 페이지만 남김 |
 | `firestore.rules` | Firestore 보안 규칙 |
-| `.claude/skills/` | Claude Code 대화가 이 저장소에서 쓰는 작업 방법(스킬). `phone-sensor-to-apps-script`: 스마트폰 센서 → 구글 Apps Script → 노트북(QR·조 코드) 방법 (진자 실험 기준) |
+| `.claude/skills/` | Claude Code 대화가 이 저장소에서 쓰는 작업 방법(스킬). `new-experiment-page`: 새 실험 페이지 점검표(7단계·이원화·ClassShare·ReportAI·노출 고정·개인정보·메인 카드·시험, 기준 구현 퀀텀닷), `pr-verify`: 머지 전 직접 확인(최신 main 과 합쳐 전체 시험·Firestore 규칙 에뮬레이터·보안·기기별 화면), `merge-deploy-check`: 머지·여러 PR 합치기·배포/규칙/색인/정리 작업 확인·자주 난 실패, `session-brief`: 하위 세션 작업 지시서 틀. `phone-sensor-to-apps-script`: 예전 Apps Script 방식(진자 기준, Apps Script 정리 PR 에서 Firestore 기준으로 고침) |
 
 새 실험을 추가하면 `index.html` 의 `프로젝트 목록` 에 링크를 넣는다. 표에 값을 넣고 그래프를 보는 단순한 실험은 코드 없이 메인 페이지의 "➕ 새 실험 만들기"(교사용 모드)로 만든다.
 
@@ -322,3 +322,4 @@
 - 2026-11-19: Firestore 규칙 자동 게시 성공(선생님이 서비스 계정에 'Firebase 관리자' 역할 추가). TTL 정책은 결제 계정(Blaze)이 있어야 해서 거절 → `firestore.indexes.json` 의 `ttl` 을 `false` 로(색인만 게시), 6개월 삭제는 매일 정리 작업(`firestore-cleanup.yml`)이 맡음. `docs/DEPLOY.md` 고침 — Claude Code
 - 2026-11-19: 보고서 AI 피드백(#122)을 통합 관리 세션이 최신 main 과 합쳐 올림 — 새 칸(aiAsk·reports·aiDesk)도 무료 요금제라 `ttl: false`(매일 정리 작업이 지움) — Claude Code
 - 2026-11-19: **작업 과정 표준**(사용자 지시 "모든 과정을 일관성 있게 유지해") — `AGENTS.md` 에 '작업 과정' 9단계(받기·만들기·공통 점검표·시험·PR·확인·승인·배포 확인·기록), 한국어로만 쓰기 규칙, 구조 표의 겹친 줄(진자·심박수) 정리 — Claude Code
+- 2026-11-19: 자주 쓰는 일을 스킬로(사용자 요청 "자주 사용하는 기능을 스킬로 만들어", 고른 것 네 가지) — `.claude/skills/` 에 `new-experiment-page`·`pr-verify`·`merge-deploy-check`·`session-brief`. '작업 과정' 3·6·7~9·1번을 실제 명령·기준 파일로 옮김 — Claude Code
