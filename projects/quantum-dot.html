@@ -29,15 +29,38 @@
 
     <!-- ===================== 1. 목적 ===================== -->
     <section class="step-panel" data-step="purpose" hidden>
-        <div class="card">
+        <!-- 먼저 보고 묻기: 현상 → 물음 → 우리 생각(보고서 항목 'problem', js/report-ai.js 가 아래 자리에 쓰기 칸을 넣음) → 그다음에 목적 글 -->
+        <div class="card qd-look">
+            <h2>👀 먼저 보기: 무엇이 다를까?</h2>
+            <figure class="qd-fig">
+                <svg viewBox="0 0 360 170" role="img" aria-label="어두운 곳에서 자외선을 비춘 시료 세 병. A 는 파랑, B 는 청록, C 는 연두 빛으로 빛난다.">
+                    <defs>
+                        <radialGradient id="qdg1"><stop offset="0" stop-color="#7fd3ff"/><stop offset="1" stop-color="#7fd3ff" stop-opacity="0"/></radialGradient>
+                        <radialGradient id="qdg2"><stop offset="0" stop-color="#5ff0c8"/><stop offset="1" stop-color="#5ff0c8" stop-opacity="0"/></radialGradient>
+                        <radialGradient id="qdg3"><stop offset="0" stop-color="#c8f560"/><stop offset="1" stop-color="#c8f560" stop-opacity="0"/></radialGradient>
+                    </defs>
+                    <rect width="360" height="170" rx="12" fill="#14121f"/>
+                    <text x="14" y="22" fill="#b39ddb" font-size="12">💡 자외선 손전등</text>
+                    <g><circle cx="70" cy="95" r="52" fill="url(#qdg1)"/><rect x="50" y="55" width="40" height="80" rx="6" fill="#4fc3f7" opacity=".85"/><text x="70" y="158" fill="#fff" font-size="14" text-anchor="middle">A</text></g>
+                    <g><circle cx="180" cy="95" r="52" fill="url(#qdg2)"/><rect x="160" y="55" width="40" height="80" rx="6" fill="#26d9a6" opacity=".85"/><text x="180" y="158" fill="#fff" font-size="14" text-anchor="middle">B</text></g>
+                    <g><circle cx="290" cy="95" r="52" fill="url(#qdg3)"/><rect x="270" y="55" width="40" height="80" rx="6" fill="#aee53f" opacity=".85"/><text x="290" y="158" fill="#fff" font-size="14" text-anchor="middle">C</text></g>
+                </svg>
+                <figcaption class="note">그림(예시): 재료는 같고 <b>가열 시간만 서로 다르게</b> 만든 시료 A·B·C 에 어두운 곳에서 자외선을 비췄어요. 실제 시료는 선생님이 보여 주세요.</figcaption>
+            </figure>
+            <p class="qd-ask">🤔 <b>무엇이 다른가요? 왜 그럴까요?</b><br><span class="note">정답이 아니어도 돼요. 조에서 떠오른 생각을 한두 줄로 써요.</span></p>
+            <div data-rai-slot="problem"></div>
+        </div>
+        <details class="qd-purpose-more">
+            <summary>🎯 실험 목적 · 하는 일 보기 <span class="note">(생각을 먼저 쓰고 펼쳐요)</span></summary>
+            <div class="card">
             <h2>1. 실험 목적</h2>
             <ol class="text-list">
                 <li>구연산과 요소로 <b>탄소 양자점</b> 용액을 만들고, 자외선을 비추면 파랑·초록 <b>형광</b>이 나오는 것을 확인한다.</li>
                 <li><b>가열 시간</b>과 <b>재료 비율(구연산 : 요소)</b>을 바꾸며 형광의 <b>봉우리 파장</b>과 밝기가 어떻게 변하는지 스마트폰 카메라·간이 분광기로 측정한다.</li>
                 <li>빛의 파장을 <b>E = hc/λ</b> 로 광자 에너지로 바꾸고, 양자점의 <b>크기 ↔ 에너지 띠 틈 ↔ 빛의 색</b> 관계로 결과를 설명한다. 그 설명이 탄소 양자점에 어디까지 맞는지도 따져 본다.</li>
             </ol>
-        </div>
-        <div class="card box">
+            </div>
+            <div class="card box">
             <h2>이 실험에서 하는 일</h2>
             <ol class="text-list">
                 <li><b>만들기</b> — 조마다 가열 시간 또는 재료 비율을 다르게 해서 시료를 만든다.</li>
@@ -45,7 +68,8 @@
                 <li><b>분석(노트북)</b> — 폰이 보낸 시료를 모아 가열 시간·비율에 따른 파장·에너지·밝기 그래프를 그린다.</li>
                 <li><b>결론</b> — 주장·증거·추론으로 결론을 쓰고, 측정의 한계를 검토한다.</li>
             </ol>
-        </div>
+            </div>
+        </details>
         <div class="step-next"><button data-go="theory">다음: 2. 이론 →</button></div>
     </section>
 
@@ -175,6 +199,8 @@
 
     <!-- ===================== 4. 과정 ===================== -->
     <section class="step-panel" data-step="procedure" hidden data-subtabs="과정 나눠 보기">
+        <!-- 변인 카드: 바꿀 것 하나 · 재는 것 · 같게 둘 것 · 예상 (보고서 항목 'design', js/report-ai.js) -->
+        <div data-rai-slot="design"></div>
         <div class="card" data-subtab="① 시료 만들기">
             <h2>4-1. 탄소 양자점 만들기</h2>
             <ol class="text-list">
@@ -250,6 +276,8 @@
                     </div>
                     <label class="wide">메모 (30자)<input type="text" id="in-memo" maxlength="30" placeholder="예: 2조 C 시료, 갈색"></label>
                     <p class="note">재료 비율: <b id="ratio-txt">–</b> (구연산 : 요소, 질량비)</p>
+                    <p class="note qd-var-now" id="var-now"></p>
+                    <div class="warn qd-var-warn" data-var-warn hidden></div>
                     <div class="row"><button type="button" data-tab-go="color">다음: ② 형광 색 →</button></div>
                 </div>
             </div>
@@ -259,6 +287,7 @@
                 <div class="card">
                     <h2>④ 지금 시료 저장</h2>
                     <div id="draft-sum" class="draft-sum"></div>
+                    <div class="warn qd-var-warn" data-var-warn hidden></div>
                     <div class="row"><button id="btn-save" class="good big" type="button">💾 시료 저장</button><span id="save-msg" class="note"></span></div>
                 </div>
                 <div class="card">
@@ -348,6 +377,7 @@
             <canvas id="xy-chart" class="chart" width="800" height="320"></canvas>
             <p class="note" id="xy-fit"></p>
         </div>
+        <div data-rai-compare="design"></div>
         <div class="card">
             <h2>6-3. 분광 곡선 겹쳐 보기</h2>
             <canvas id="spec-chart" class="chart" width="800" height="320"></canvas>
@@ -358,26 +388,24 @@
 
     <!-- ===================== 7. 결론 ===================== -->
     <section class="step-panel" data-step="conclusion" hidden>
-        <div class="card">
-            <h2>7-1. 분석 질문</h2>
-            <ol class="text-list qlist">
-                <li><label>가열 시간이 길어질수록 봉우리 파장(또는 E)은 어떻게 변했나요? 6-2 그래프의 기울기로 답하세요.<textarea data-q="q1" rows="3"></textarea></label></li>
-                <li><label>재료 비율(요소의 양)에 따라 파장·보정 밝기는 어떻게 달라졌나요?<textarea data-q="q2" rows="3"></textarea></label></li>
-                <li><label>비춘 자외선(365 nm, 3.40 eV)과 측정한 형광의 에너지 차이(스토크스 이동)를 계산하고, 차이가 생기는 까닭을 쓰세요.<textarea data-q="q3" rows="3"></textarea></label></li>
-                <li><label>"가열이 길수록 양자점이 커져서 띠 틈이 작아졌다"는 설명은 우리 결과로 어디까지 뒷받침되나요? 2-5 한계를 참고해 다른 설명도 들어 보세요.<textarea data-q="q4" rows="3"></textarea></label></li>
-                <li><label>색상으로 구한 파장(≈)과 분광기 봉우리 파장이 얼마나 달랐나요? 차이의 원인은?<textarea data-q="q5" rows="3"></textarea></label></li>
-                <li><label>노출이 고정되지 않았을 때 사진 밝기를 그대로 비교하면 어떤 문제가 생기나요? 보정 밝기로 해결되나요?<textarea data-q="q6" rows="3"></textarea></label></li>
-            </ol>
-            <p class="note">쓴 답은 이 브라우저에만 저장되고 서버로 보내지 않습니다. 보고서는 손으로 쓰거나 인쇄하세요.</p>
-        </div>
-        <div class="card">
-            <h2 class="cs-hide-solo">7-2. 선생님께 보내기 · 인쇄</h2><h2 class="cs-show-solo">7-2. 인쇄</h2>
-            <p class="note cs-show-solo">수업 QR 로 들어오지 않아 선생님께 보내기는 없어요. CSV 로 저장하거나 인쇄(PDF)해서 선생님이 정한 방법으로 내세요.</p>
+        <div data-rai-compare="design"></div>
+        <div class="card qd-hand">
+            <h2>📮 내는 곳은 하나예요</h2>
+            <ul class="text-list cs-hide-solo">
+                <li>📊 <b>측정값(시료)</b> — 5. 데이터에서 보낸 것이 선생님께 가요. <span id="sent-txt" class="note"></span></li>
+                <li>📝 <b>글</b> — 아래 <b>보고서</b>에 쓰면 선생님께 저절로 저장돼요. 다 쓰면 '제출·인쇄' 탭의 <b>📤 최종 제출</b> 하나만 누르면 끝.</li>
+            </ul>
+            <p class="cs-show-solo">수업 QR 로 들어오지 않아서 선생님께 보내지 않아요. 아래 보고서에 쓰면 <b>이 기기에 저장</b>되고, <b>🖨️ 인쇄(PDF)</b>로 내면 돼요.</p>
+            <p class="note">💭 생각해 볼 물음은 보고서의 '데이터 분석'·'결론' 칸 위에 있어요.</p>
             <div class="row">
-                <button id="btn-send2" type="button">📤 내 시료 선생님께 보내기</button>
-                <button id="btn-print" type="button" class="secondary">🖨️ 인쇄 (PDF)</button>
+                <button type="button" class="secondary cs-hide-solo" data-go="data">📤 측정값 보내러 5. 데이터로</button>
+                <button id="btn-print" type="button" class="secondary">🖨️ 이 페이지 인쇄 (표·그래프)</button>
             </div>
-            <p class="note" id="send2-status"></p>
+            <details id="old-notes" hidden>
+                <summary>📄 예전 '분석 질문' 칸에 쓴 글</summary>
+                <p class="note">이제 이 글은 아래 보고서 칸에 옮겨 두었어요(한 번만). 여기는 보기만 해요.</p>
+                <div id="old-notes-list"></div>
+            </details>
         </div>
         <!-- 📝 보고서 쓰기 · AI 피드백 (js/report-ai.js) -->
         <div id="report-ai"></div>
@@ -389,10 +417,9 @@
 <script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-share.js"></script>
-<script src="../js/quantum-dot-math.js"></script>
-<script src="../js/quantum-dot.js"></script>
 <link rel="stylesheet" href="../css/report-ai.css">
 <script src="../js/report-ai.js"></script>
-<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'qdot', mount: '#report-ai', contextFrom: '#tbl, #xy-fit' }); });</script>
+<script src="../js/quantum-dot-math.js"></script>
+<script src="../js/quantum-dot.js"></script>
 </body>
 </html>
