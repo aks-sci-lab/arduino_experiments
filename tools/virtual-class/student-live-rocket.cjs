@@ -30,6 +30,45 @@ const CODE = '1-5411', SP = 'labClasses/cixem6przhsi57h2j9suc5cc', PAGE = 'proje
             await W.stroll(B, 'B', 2, 0, /돌아가기/, quiet);                                                          // B: 느림(첫 문제 읽는 중)
             for (const [n, pg] of Object.entries(W.pages)) note(n, await top(pg));
             await W.shot(A, 'A 기다리는 화면'); await A.waitForTimeout(4000);
+        },
+        2: async () => {   // 9~35분: 1차시 열림 → A 끝까지, C 끊김, D 늦게, E 조건 고르기, B 초시계 앞
+            setStage(1);
+            const A = await live.student('A별빛', 'phone'), B = await live.student('B달님', 'phone'), C = await live.student('C로켓왕', 'Pixel 7'), E = await live.student('E코드', 'phone');
+            setStage(2); await A.waitForTimeout(6000);
+            for (const [n, pg] of Object.entries(W.pages)) note('1차시 열린 순간 ' + n, await top(pg));
+            await W.shot(B, 'B 하는 중에 1차시 열림');
+            const log = (k, v) => { if (/^A1 /.test(k)) note(k, typeof v === 'string' ? v : { 글: v.글.slice(0, 330), 단추: v.단추 }); };
+            const sw = async (pg, sec) => {   // 초시계 한 번: (방법 고르기가 나오면 초시계) → 시작 → sec 초 → 펑 → 기록
+                if (await pg.getByText('초시계로 재기').locator('visible=true').count()) await W.tap(pg, '초시계로 재기');
+                await W.tap(pg, '시작 (뚜껑'); await pg.waitForTimeout(sec * 1000); await W.tap(pg, /펑! \(멈춤\)|펑!/); await pg.waitForTimeout(400);
+                if (await pg.getByText('이 시간으로 기록').locator('visible=true').count()) await W.tap(pg, '이 시간으로 기록'); await pg.waitForTimeout(500);
+            };
+            // A: 첫 측정까지 걷고(기록 남김), 초시계 3번 → 조건 바꿔 3번 → 그래프 → 왜 → 도전
+            await W.stroll(A, 'A1', 16, 0, /초시계로 재기|시작 \(뚜껑/, log); await sw(A, 2.0);
+            note('A 첫 결과 화면', { 글: (await top(A)), 단추: (await W.buttons(A)).slice(4) });
+            for (let i = 0; i < 2; i++) { const t0 = Date.now(); await W.tap(A, /한 번 더/); const n0 = out.length; await W.stroll(A, 'A반복', 4, 0, /초시계로 재기|시작 \(뚜껑/, (k, v) => { if (!i) note('A 반복 때 지나는 화면 ' + k, typeof v === 'string' ? v : v.글.slice(0, 120)); }); await sw(A, 2.2 + i * 0.3); }
+            note('A 3번 잰 뒤', await top(A));
+            await W.tap(A, /바꿔서 재기/); await A.waitForTimeout(400); await W.tap(A, '+'); await A.waitForTimeout(300);
+            note('A 값 바꾼 뒤 횟수 글', (await W.text(A)).split('\n').find(l => /번 쟀어요|번째/.test(l)) || '');
+            await W.stroll(A, 'A조건2', 5, 0, /초시계로 재기|시작 \(뚜껑/, quiet); await sw(A, 3.2);
+            await W.tap(A, '그래프 보기'); await A.waitForTimeout(800); await W.shot(A, 'A 그래프'); note('A 그래프 화면 단추', (await W.buttons(A)).slice(4));
+            await W.tap(A, '왜 달랐을까'); await W.stroll(A, 'A왜', 10, 0, /도전하기/, quiet); await W.tap(A, '도전하기'); await W.stroll(A, 'A도전', 6, 0, /초시계로 재기|시작 \(뚜껑/, quiet); await sw(A, 3.0);
+            note('A 도전 결과', { 글: await top(A), 단추: (await W.buttons(A)).slice(4) });
+            await W.tap(A, /2차시로/).catch(() => {}); await A.waitForTimeout(600); note('A 2차시 눌러 봄(잠김)', { 글: await top(A), 단추: (await W.buttons(A)).slice(4) });
+            // A: 기다리다 '더 재기' — 1차시로 돌아가면 어디로?
+            await W.tap(A, /돌아가기|이어서|더 재기/).catch(e => note('A 돌아가기', e.message)); await A.waitForTimeout(600); note('A 1차시로 돌아간 화면', { 글: await top(A), 단추: (await W.buttons(A)).slice(4) });
+            // C: 두 번 잰 뒤 와이파이 끊김 → 한 번 더 → 새로고침
+            await W.stroll(C, 'C1', 16, 1, /초시계로 재기|시작 \(뚜껑/, quiet); await sw(C, 1.8); await W.tap(C, /한 번 더/); await W.stroll(C, 'C2', 4, 0, /초시계로 재기|시작 \(뚜껑/, quiet); await sw(C, 2.1);
+            W.offline['C로켓왕'] = true; await W.tap(C, /한 번 더/); await W.stroll(C, 'C3', 4, 0, /초시계로 재기|시작 \(뚜껑/, quiet); await sw(C, 2.4); await C.waitForTimeout(2500);
+            note('C 끊긴 채 기록', await top(C)); await C.reload(); await C.waitForTimeout(2500); note('C 끊긴 채 새로고침', (await W.text(C)).split('\n').slice(0, 12).join(' / '));
+            // D: 20분쯤 QR 로 입장
+            const D = await live.student('D번개', 'phone'); await D.goto(W.ROOT + PAGE); await D.waitForTimeout(1200); await enter(D, '늦은 번개팀'); note('D 늦게 입장한 첫 화면', { 글: await top(D), 단추: (await W.buttons(D)).slice(4) }); await W.shot(D, 'D 늦게 입장');
+            await W.stroll(D, 'D', 3, 0, /돌아가기/, quiet);
+            // E: 생각 열기 마저 하고 1차시 조건 고르기까지
+            await W.stroll(E, 'E', 12, 0, /물의 양 바꾸기/, quiet); note('E', await top(E));
+            // B: 생각 열기 마저 → 1차시 → 초시계 앞(다음 차례에 시작을 누른 채로 2차시가 열림)
+            await W.stroll(B, 'B', 24, 0, /초시계로 재기|시작 \(뚜껑/, quiet); note('B', { 글: await top(B), 단추: (await W.buttons(B)).slice(4) });
+            await A.waitForTimeout(3000);
         }
         // TURNS
     };
