@@ -122,6 +122,34 @@ const CODE = '1-5411', SP = 'labClasses/cixem6przhsi57h2j9suc5cc', PAGE = 'proje
             // E: 2차시 촬영 안내까지 와서 '눈으로 보고 고르기' 화면(발사를 기다리는 중)에 멈춤
             await toT2(E, 0); await W.tap(E, '눈으로 보고 고르기'); await E.waitForTimeout(500); note('E (85분, 발사 보고 고르려는 중)', (await top(E)).slice(0, 260));
             await A.waitForTimeout(3000);
+        },
+        5: async () => {   // 85~95분: E 가 고르려는 중에 정리 열림 → 마무리 → 수업 마친 뒤 폰 화면
+            setStage(3);
+            const A = await live.student('A별빛', 'phone'), B = await live.student('B달님', 'phone'), C = await live.student('C로켓왕', 'Pixel 7'), D = await live.student('D번개', 'phone'), E = await live.student('E코드', 'phone');
+            for (const [n, pg] of Object.entries(W.pages)) note('다시 연 화면 ' + n, (await top(pg)).slice(0, 150));
+            if (!(await E.getByText('아이 키와 비슷').locator('visible=true').count())) { await W.stroll(E, 'E', 8, 0, /눈으로 보고 고르기/, quiet); await W.tap(E, '눈으로 보고 고르기'); }
+            if (!/잠겨/.test(await top(A))) { await W.tap(A, /정리로|^🔒 정리$/, 0, true).catch(() => {}); await A.waitForTimeout(500); }
+            note('열기 직전 A', (await top(A)).slice(0, 160)); note('열기 직전 E', (await top(E)).slice(0, 160));
+            setStage(4); await A.waitForTimeout(8000);
+            for (const [n, pg] of Object.entries(W.pages)) note('정리 열림 ' + n, (await top(pg)).slice(0, 260));
+            await W.tap(E, '아이 키와 비슷'); await E.waitForTimeout(600); note('E 고른 뒤', { 글: (await top(E)).slice(0, 220), 단추: (await W.buttons(E)).slice(4) });
+            // A: 정리 끝까지(다시 풀기 → 비교 → 결과 카드 저장)
+            await W.stroll(A, 'A정리', 20, 2, /결과 카드 만들기/, quiet); note('A 처음 생각 → 지금 생각', (await W.text(A)).split('\n').filter(l => /처음|지금|✨/.test(l)).slice(0, 9));
+            await W.tap(A, '결과 카드 만들기'); await A.waitForTimeout(1200); await W.tap(A, '이미지로 저장').catch(() => {}); await A.waitForTimeout(800); note('A 결과 카드', (await top(A)).slice(0, 220)); await W.shot(A, 'A 결과 카드', true);
+            // B: 정리 탭 → 다시 풀기 한 문제만(시간 끝)
+            await W.tap(B, /^정리$/); await W.stroll(B, 'B정리', 3, 0, /결과 카드 만들기/, quiet); note('B 정리 도중', (await top(B)).slice(0, 200));
+            // E: 정리로
+            await W.tap(E, /^정리$/).catch(() => {}); await W.stroll(E, 'E정리', 12, 1, /결과 카드 만들기/, quiet); note('E 정리', (await top(E)).slice(0, 200));
+            // C·D: 정리 안 감
+            await A.waitForTimeout(4000);
+            // 수업 마친 뒤(교사 ✅ 수업 마치기 = done) 폰 화면: QR 주소로 다시 / 주소만으로 다시
+            const before = JSON.stringify(W.app.db.docs.get(SP)); Object.assign(W.app.db.docs.get(SP), { done: true, doneAt: new Date() }); await A.waitForTimeout(5000);
+            note('수업 마친 뒤 A(열어 둔 화면)', (await top(A)).slice(0, 220));
+            await A.goto(W.ROOT + PAGE); await A.waitForTimeout(2000); note('수업 마친 뒤 A(QR 주소로 다시)', (await top(A)).slice(0, 220));
+            await A.goto(W.ROOT + 'projects/film-rocket.html'); await A.waitForTimeout(2000); note('A 주소만으로 다시(지난 기록)', { 글: (await W.text(A)).split('\n').slice(0, 16).join(' / ').slice(0, 520), 단추: (await W.buttons(A)).slice(0, 12) }); await W.shot(A, 'A 주소만으로 다시', true);
+            const rec = A.locator('button, a').filter({ hasText: /지난 기록|별빛가족/ }).locator('visible=true'); if (await rec.count()) { await rec.first().click(); await A.waitForTimeout(1500); note('지난 기록 누른 뒤', { 글: (await top(A)).slice(0, 300), 단추: (await W.buttons(A)).slice(0, 10) }); }
+            await A.goto(W.ROOT + PAGE); await A.waitForTimeout(1500);
+            W.app.db.docs.set(SP, Object.assign(JSON.parse(before), { createdAt: W.app.db.docs.get(SP).createdAt, expireAt: W.app.db.docs.get(SP).expireAt }));   // done 은 교사가 보낼 것이라 되돌려 둠
         }
         // TURNS
     };
