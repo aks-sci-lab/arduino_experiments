@@ -69,23 +69,35 @@ test('📱 폰 측정 → 노트북 분석: 데이터 가공 실험실 · 숨 �
         assert.equal(ov, 0, n + ' 가로 스크롤'); assert.deepEqual(small, [], n + ' 44px');
     };
     try {
-        const G = '3-2-4821';
+        // 노트북 두 대가 같은 조를 쓰는 것은 수업(?c=)에서만 (2026-11-20). 수업 없이 연 데이터 가공 실험실은 짝 QR 만
+        {
+            const S0 = await ctx({ viewport: { width: 1280, height: 800 } }, 'S0');
+            await S0.goto(ROOT + 'projects/data-lab.html');
+            await S0.waitForSelector('#phone-card #cs-cardqr svg', { state: 'attached' });
+            assert.match(await S0.getAttribute('#phone-card a', 'href'), /role=phone&group=99-\d+-\d{4}&s=p[a-z0-9]{23}/);
+            assert.equal(await S0.locator('#cs-group').count(), 0, '수업 없이: 조 코드 칸 없음');
+            await S0.context().close();
+        }
+        const cls = await app.post({ action: 'createClass', ban: 3, nStudents: 4, groupSize: 2, exp: 'heartrate' });
+        const G = cls.groups[1].code, Q = '?c=' + cls.classCode + '&s=' + cls.space;
+        const join = async (pg, num) => {
+            await pg.waitForSelector('#cs-cpick:not([hidden])');
+            await pg.selectOption('#cs-cjo', '2'); await pg.selectOption('#cs-cnum', String(num)); await pg.click('#cs-cjoin');
+            await pg.waitForSelector('#cs-cjoined:not([hidden])');
+        };
         // ---- 노트북 1: 데이터 가공 실험실 → QR ----
         const L = await ctx({ viewport: { width: 1280, height: 800 } }, 'L');
-        await L.goto(ROOT + 'projects/data-lab.html');
+        await L.goto(ROOT + 'projects/data-lab.html' + Q);
+        await join(L, 1);
         await L.waitForFunction(() => /\d/.test(document.getElementById('final').textContent), null, { timeout: 20000 });
-        // 폰 카드가 바로 보이고 조 코드는 저절로 (99반) → 조 코드를 바꾸면 QR 도 바뀜
         await L.waitForSelector('#phone-card #cs-cardqr svg', { state: 'attached' });
-        assert.match(await L.getAttribute('#phone-card a', 'href'), /role=phone&group=99-/);
-        await L.click('#phone-box summary');
-        await L.fill('#cs-group', G); await L.press('#cs-group', 'Enter');
-        await L.waitForFunction(g => /group=/.test(document.querySelector('#phone-card a').href) && document.querySelector('#phone-card a').href.includes('group=' + g), G);
         const link = await L.getAttribute('#phone-card a', 'href');
         console.log('QR:', link);
-        assert.match(link, /projects\/heart-rate\.html\?role=phone&group=3-2-4821/);
+        assert.ok(link.includes('projects/heart-rate.html?role=phone&group=' + G), link);
         // ---- 노트북 2: 심박수 숨 참기 탐구 (같은 조 코드) ----
         const L2 = await ctx({ viewport: { width: 1280, height: 800 } }, 'L2');
-        await L2.goto(ROOT + 'projects/heart-rate.html#breath-scale=0.2');
+        await L2.goto(ROOT + 'projects/heart-rate.html' + Q + '#breath-scale=0.2');
+        await join(L2, 2);
         // 💻 노트북: 측정 기능 없음, '📱 폰으로 측정해 보내기' 카드
         assert.equal(await L2.evaluate(() => document.documentElement.dataset.device), 'laptop');
         assert.equal(await L2.isVisible('#cam'), false, '노트북은 카메라 단추 없음');
@@ -96,8 +108,7 @@ test('📱 폰 측정 → 노트북 분석: 데이터 가공 실험실 · 숨 �
         assert.equal(await L2.isVisible('#br-start'), false, '노트북은 숨 참기 시작 없음');
         assert.equal(await L2.isVisible('#br-runs-box'), true);
         await L2.evaluate(() => document.getElementById('cs-share').open = true);
-        await L2.fill('#cs-group', G); await L2.press('#cs-group', 'Enter');
-        await L2.waitForTimeout(400);
+        assert.equal(await L2.inputValue('#cs-group'), G, '수업 자리의 조 코드');
         assert.equal(await L2.isChecked('#cs-auto'), true, '자동 불러오기 켜짐');
 
         // ---- 폰: 한 번 재기(15초) 1회 + 숨 참기 1회 ----

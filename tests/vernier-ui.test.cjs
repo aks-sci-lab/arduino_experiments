@@ -163,18 +163,23 @@ test('선생님이 만든 실험: 버니어 연결 → 채널 → 값·그래프
         assert.deepEqual(await smallButtons(page), []);
         if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'vernier-2-custom.png'), fullPage: true });
 
-        // 조 공유: 반·조 → 새 조 코드 → 보내기 → 가짜 저장소에 센서 기록이 채널 이름으로
-        await page.evaluate(() => { document.getElementById('cs-share').open = true; });
-        await page.fill('#cs-ban', '2'); await page.fill('#cs-jo', '3');
-        await page.click('#cs-make');
+        // 조 공유: 수업 없이 연 화면이라 조 공유·선생님께 보내기 없음 (2026-11-20)
+        assert.equal(await page.locator('#cs-share').count(), 0);
+        assert.equal(await page.isVisible('#btnSubmit'), false);
         await page.fill('#dataTable input[data-r="0"][data-c="1"]', '4');
+        // 수업 QR 로 다시 들어오면 조 공유 → 보내기 → 가짜 저장소에 센서 기록이 채널 이름으로
+        const cls = await app.post({ action: 'createClass', ban: 2, nStudents: 4, groupSize: 2, exp: 'custom:gdx01' });
+        assert.equal(cls.ok, true, cls.error);
+        await page.goto(ORIGIN + '/projects/custom-lab.html?id=gdx01&c=' + cls.classCode + '&s=' + cls.space);
+        await page.waitForSelector('#cs-cpick:not([hidden])', { timeout: 15000 });
+        await page.selectOption('#cs-cjo', '1'); await page.selectOption('#cs-cnum', '1'); await page.click('#cs-cjoin');
+        await page.waitForSelector('#cs-cjoined:not([hidden])');
         await page.click('#btnSubmit');
         await page.waitForFunction(() => /보냈습니다/.test(document.getElementById('submitStatus').textContent), null, { timeout: 15000 });
         const items = app.items('custom:gdx01');
         const sensorItem = items.find(i => /sensor/.test(i.id));
         assert.ok(sensorItem, '센서 기록 줄');
         assert.match(JSON.stringify(sensorItem), /Force/);
-
         // 새로고침해도 채널 이름 기억
         await page.reload();
         await page.waitForSelector('#sensorCard:not([hidden])');

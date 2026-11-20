@@ -68,14 +68,17 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         await T.click('#btnRefresh').catch(() => {});   // (발표 화면에서는 숨겨진 단추 — 실시간으로 바뀜)
         await T.waitForFunction(() => /들어온 학생 1 \/ 4/.test(document.getElementById('pJoined').textContent), null, { timeout: 15000 });
 
-        // → : 1단계엔 작은 탭이 없음 → 다음 단계 열기 확인 → Enter
-        await T.keyboard.press('ArrowRight');
+        // → : 글자를 화면 높이에 맞춰 키워 1단계가 한 화면보다 길면 먼저 아래로 내려감 → 끝에 닿으면 다음 단계 열기 확인 → Enter
+        const press = async (key, until, max) => { for (let i = 0; i < (max || 25); i++) { if (await until()) return i; await T.keyboard.press(key); await T.waitForTimeout(80); } return await until() ? max : -1; };
+        const scrolls = await press('ArrowRight', () => T.isVisible('#pAsk'));
+        assert.ok(scrolls >= 1, '단계 끝에서 한 번 더 → 열기 확인');
         assert.equal(await T.isVisible('#pAsk'), true, '단계 끝에서 한 번 더 → 열기 확인');
         assert.match(await T.textContent('#pAskText'), /2 이론/);
         assert.equal(app.db.docs.get('labClasses/' + q.space).stage, 1, '확인 전에는 열지 않음');
         await T.keyboard.press('Escape');
         assert.equal(await T.isVisible('#pAsk'), false, 'Esc 로 취소');
-        await T.keyboard.press('PageDown');
+        await T.keyboard.press('PageDown');   // 이미 끝까지 내려가 있어 바로 열기 확인
+        assert.equal(await T.isVisible('#pAsk'), true);
         await T.keyboard.press('Enter');
         await T.waitForFunction(() => /2 이론.*\(2 \/ 7\)/.test(document.getElementById('pStage').textContent));
         await S.waitForFunction(() => document.querySelector('nav.steps button[aria-selected="true"]').dataset.step === 'theory', null, { timeout: 15000 });
@@ -85,15 +88,16 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         const subSel = pg => pg.evaluate(() => { const n = [...document.querySelectorAll('nav.subtabs')].find(x => x.getClientRects().length); const b = n && n.querySelector('button[aria-selected="true"]'); return b ? b.textContent.trim() : ''; });
         const first = await subSel(F());
         assert.equal(first, await subSel(S));
-        await T.keyboard.press('ArrowRight');
+        await press('ArrowRight', async () => (await subSel(F())) !== first);   // 먼저 내려가고 끝에서 다음 작은 탭
         const second = await subSel(F());
         assert.notEqual(second, first, '발표 화면은 다음 작은 탭');
+        assert.equal(await F().evaluate(() => Math.round(scrollY)), 0, '다음 작은 탭은 맨 위부터');
         assert.equal(await subSel(S), first, '학생 폰은 그대로');
         await T.keyboard.press('ArrowLeft');
-        assert.equal(await subSel(F()), first);
+        assert.equal(await subSel(F()), first, '맨 위에서 ← 는 앞 작은 탭');
         // iframe 안을 누른 뒤에도 같은 키
-        await F().click('h1').catch(() => F().click('body'));
-        await T.keyboard.press('ArrowRight');
+        await F().click('body');
+        await press('ArrowRight', async () => (await subSel(F())) === second);
         assert.equal(await subSel(F()), second, 'iframe 안에서도 → 로 넘김');
         await T.click('#btnPPrev');
         assert.equal(await subSel(F()), first, '◀ 이전 단추');
@@ -122,8 +126,9 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         await T.waitForSelector('#presentPane.phone:not([hidden])');
         assert.equal(await T.isVisible('#classOut'), false, '주소로 바로 연 발표 화면에 큰 QR 이 겹치지 않음');
         await T.waitForFunction(() => { const d = document.getElementById('presentFrame').contentDocument; return d && d.getElementById('ev-app') && d.getElementById('ev-app').getAttribute('data-screen') === 'think-intro'; }, null, { timeout: 15000 });
-        const pw = (await T.locator('#presentFrame').boundingBox()).width;
-        assert.ok(pw <= 400 && pw >= 360, '폰 틀 폭: ' + pw);
+        const pb = await T.locator('#presentFrame').boundingBox(), vh = T.viewportSize().height;   // 폰 틀은 화면 높이에 맞춰 (폰 비율 400 × 820)
+        assert.ok(pb.width / pb.height > 0.45 && pb.width / pb.height < 0.56, '폰 틀 비율: ' + Math.round(pb.width) + '×' + Math.round(pb.height));
+        assert.ok(pb.y + pb.height <= vh + 1 && pb.height >= vh * 0.75, '폰 틀이 화면 높이에 맞음');
         await T.keyboard.press('ArrowRight');
         assert.equal(await T.isVisible('#pAsk'), true);
         await T.click('#btnPAskYes');

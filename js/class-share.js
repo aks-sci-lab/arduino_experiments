@@ -33,6 +33,17 @@
         for (var i = 0; i < 6; i++) s += 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(R() * 32)];
         return s;
     }
+    // 📱 노트북·폰 짝 공간 번호 (p + 23자). 이 번호가 곧 자료를 지키는 열쇠라(아는 기기만 읽음) crypto.getRandomValues 를 먼저 쓴다
+    //  (js/lab-store.js 의 randomChars 와 같은 글자). random 을 주면(시험) 그것으로, crypto 가 없을 때만 Math.random
+    function newPairSpace(random) {
+        var A = 'abcdefghijkmnpqrstuvwxyz23456789', s = 'p', bytes = null;
+        if (typeof random !== 'function') {
+            try { if (typeof crypto !== 'undefined' && crypto.getRandomValues) { bytes = new Uint8Array(23); crypto.getRandomValues(bytes); } } catch (e) { bytes = null; }
+        }
+        var R = typeof random === 'function' ? random : Math.random;
+        for (var i = 0; i < 23; i++) s += A[bytes ? bytes[i] % 32 : Math.floor(R() * 32)];
+        return s;
+    }
     function isPhoneDevice(device) { return /^p/.test(String(device || '')); }
     function deviceLabel(device) { return (isPhoneDevice(device) ? '📱 폰 ' : '노트북 ') + String(device || '').slice(-4).toUpperCase(); }
     /* 📱 폰 연결: 폰 주소의 값 읽기 (?role=phone&group=조코드[&c=수업&jo=조&num=번호]) → { group, jo, num } 또는 null */
@@ -124,11 +135,20 @@
         var PRESENT = !PHONE && !!(window.LabUI && window.LabUI.present);
         var role = PHONE ? 'phone' : PRESENT ? 'present' : 'laptop';
         if (PHONE) KEY += ':phone';
+        var CLASS = CC.readClassParam(location.search);
+        // 🧍 수업 없이 연 화면 (2026-11-20 선생님 결정 "교사가 만든 큐알이나 사이트로 접속하지 않은 경우에는 조별 활동 필요없음"):
+        //  주소에 ?c=수업코드 가 없고 폰 화면도 아니면 '👥 조 공유' 칸·선생님께 보내기 단추를 숨긴다.
+        //  📱 폰 → 노트북 보내기(share.phoneCard 의 짝 QR)는 그대로. <html class="cs-solo"> 이 붙어
+        //  페이지는 .cs-hide-solo(숨김)·.cs-show-solo(이때만 보임)로 조·선생님 안내를 바꾼다. 개발 페이지는 opts.solo: false 로 예전처럼
+        var SOLO = !CLASS && !PHONE && !PRESENT && opts.solo !== false;
+        try { document.documentElement.classList.toggle('cs-solo', SOLO); } catch (e) { /* 무시 */ }
         var store = PRESENT ? { load: function () { return null; }, save: function () { /* 발표용은 저장 안 함 */ } } : (!PHONE && opts.store) || {
             load: function () { try { return JSON.parse((LS && LS.getItem(KEY)) || 'null'); } catch (e) { return null; } },
             save: function (o) { try { LS.setItem(KEY, JSON.stringify(o)); } catch (e) { /* 저장 불가 */ } }
         };
         var st = fixState(store.load());
+        // 예전에 수업 없이 조 코드를 만들어 기억해 둔 기기: 그 조 코드(남과 같이 쓰는 조 코드 공간)는 잊는다. 폰 짝 공간이면 그대로. 측정 자료는 페이지가 따로 저장하므로 지우지 않음
+        if (SOLO && st.group && !st.space) { st.group = ''; st.sent = []; st.auto = false; }
         if (!st.runs || typeof st.runs !== 'object') st.runs = {};   // 폰 회차 목록: { 실험 id: { sel, memo, at, sig } }
         var PICK = !!PHONE && !opts.autoSendOnSave && !opts.phoneAutoSend;   // phoneAutoSend: 폰만 바로 보내기                  // 폰은 기본으로 '회차를 골라 보내기'
         if (PHONE) {
@@ -156,6 +176,19 @@
 
         // ----- 조 공유 칸 -----
         var mount = opts.shareMount && !PRESENT ? $q(opts.shareMount) : null;
+        var soloBox = null;   // 수업 없이 연 화면: 조 공유 칸 대신 (있으면) CSV 불러오기·불러온 값 지우기만
+        if (mount && SOLO) {
+            if (opts.csvImport || opts.clearIncoming) {
+                mount.innerHTML = '<div class="cs-card cs-solo-box"><div class="cs-row">' +
+                    (opts.csvImport ? '<label class="cs-btn secondary cs-file">📂 CSV 불러오기<input type="file" id="cs-csv" accept=".csv,text/csv" multiple hidden></label>' : '') +
+                    (opts.clearIncoming ? '<button type="button" id="cs-clear" class="cs-btn danger">불러온 값 지우기</button>' : '') + '</div>' +
+                    '<div id="cs-status" class="cs-note" role="status" aria-live="polite"></div>' +
+                    '<p class="cs-note">다른 기기에서 저장한 ' + esc(opts.csvHint || '이 페이지의 CSV') + ' 파일을 불러와 함께 볼 수 있어요. 선생님 QR 로 들어오면 같은 조와 자동으로 나눠요.</p></div>';
+                soloBox = mount;
+                ['csv', 'clear', 'status'].forEach(function (k) { els[k] = document.getElementById('cs-' + k); });
+            } else { mount.hidden = true; mount.innerHTML = ''; }
+            mount = null;
+        }
         if (mount) {
             mount.innerHTML =
                 '<details class="cs-card cs-share" id="cs-share"><summary>👥 조 공유: 선생님께 보내기 · 다른 노트북에서 불러오기 <span class="cs-note" id="cs-sum"></span></summary>' +
@@ -184,14 +217,16 @@
         function incoming() { return typeof opts.incomingCount === 'function' ? opts.incomingCount() : 0; }
         function render() {
             if (cardEl && !PHONE) renderCard();
-            if (!mount) return;
+            if (SOLO) (opts.sendButtons || []).forEach(function (b) { b = $q(b); if (b) b.hidden = true; });
+            if (soloBox && els.clear) els.clear.disabled = !incoming();
+            if (!mount) { schedule(); return; }
             if (document.activeElement !== els.group) els.group.value = st.group;
             if (document.activeElement !== els.ban) els.ban.value = st.ban;
             if (document.activeElement !== els.jo) els.jo.value = st.jo;
             els.auto.checked = st.auto;
             var ok = groupOk();
             els.send.disabled = els.pull.disabled = !ok || run.busy;
-            (opts.sendButtons || []).forEach(function (b) { b = $q(b); if (b) b.disabled = run.busy; });
+            (opts.sendButtons || []).forEach(function (b) { b = $q(b); if (b) { b.disabled = run.busy; if (SOLO) b.hidden = true; } });
             var ext = incoming();
             if (els.clear) els.clear.disabled = !ext;
             els.sum.textContent = ok ? '— 조 ' + st.group + (ext ? ' · 불러온 값 ' + ext + '개' : '') : '— 조 코드 없음';
@@ -229,6 +264,8 @@
             els.auto.addEventListener('change', function (e) { st.auto = e.target.checked; saveSt(); render(); if (st.auto) pull(true); });
             els.send.addEventListener('click', function () { send(); });
             els.pull.addEventListener('click', function () { pull(false); });
+        }
+        if (mount || soloBox) {
             if (els.csv) els.csv.addEventListener('change', async function (e) {
                 var files = Array.prototype.slice.call(e.target.files || []);
                 e.target.value = '';
@@ -238,10 +275,11 @@
             });
             if (els.clear) els.clear.addEventListener('click', function () {
                 var n = incoming();
-                if (!n || !confirm('다른 노트북·CSV 에서 불러온 값 ' + n + '개를 이 노트북에서 지울까요? (이 노트북에서 잰 값과 보낸 기록은 그대로입니다)' + (st.auto ? '\n자동 불러오기는 끕니다.' : ''))) return;
+                if (!n || !confirm('다른 노트북·CSV 에서 불러온 값 ' + n + '개를 이 노트북에서 지울까요? (이 노트북에서 잰 값과 보낸 기록은 그대로입니다)' + (st.auto && !SOLO ? '\n자동 불러오기는 끕니다.' : ''))) return;
                 opts.clearIncoming();
-                st.auto = false; saveSt(); render();
-                setStatus('불러온 값을 지웠습니다. 다시 합치려면 📥 불러오기를 누르세요.');
+                if (!SOLO) st.auto = false;   // 수업 없이 연 화면은 폰에서 오는 측정을 계속 받음
+                saveSt(); render();
+                setStatus(SOLO ? '불러온 값을 지웠습니다.' : '불러온 값을 지웠습니다. 다시 합치려면 📥 불러오기를 누르세요.');
             });
         }
 
@@ -348,7 +386,7 @@
         }
         function schedule() {
             clearTimeout(run.timer); run.timer = null;
-            if (!mount || !st.auto || !groupOk()) return;
+            if ((!mount && !cardEl) || !st.auto || !groupOk()) return;
             run.timer = setTimeout(function () {
                 var when = typeof opts.pollWhen === 'function' ? opts.pollWhen() : true;
                 if (!document.hidden && when) pull(true); else schedule();
@@ -356,7 +394,6 @@
         }
 
         // ----- 수업 참여 띠 (?c=) -----
-        var CLASS = CC.readClassParam(location.search);
         var cls = { info: null, me: null, lastBeat: 0, timer: null, pending: null };
         var ME_KEY = 'class-share:me:' + CLASS;
         var bar = null;
@@ -718,6 +755,7 @@
             });
         }
         async function openPhone() {
+            if (SOLO) autoGroup();   // 수업 없이 연 화면: 이 노트북·폰 짝 공간을 저절로
             if (!groupOk()) { setStatus('먼저 조 코드를 정하세요. 그다음 📱 폰으로 측정하기를 누르면 폰용 QR 이 나와요.', true); if (els.share) els.share.open = true; return; }
             var link = phoneLink();
             if (!dlg) {
@@ -755,8 +793,7 @@
             if (groupOk() || CLASS) return groupOk();
             var code = PCF.makeGroupCode(st.ban, st.jo) || PCF.makeGroupCode(99, 1 + Math.floor(Math.random() * 99));
             // 이 노트북과 폰만 쓰는 짝 공간 (남이 조 코드를 맞혀도 못 봄). 폰 QR 에 담김
-            var sp = 'p'; for (var i = 0; i < 23; i++) sp += 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 32)];
-            setGroup(code, true, sp);
+            setGroup(code, true, newPairSpace(opts.random));
             return groupOk();
         }
         function renderCard() {
@@ -808,7 +845,7 @@
         if (groupOk() && typeof opts.onGroup === 'function' && !CLASS) opts.onGroup(st.group);
         var api = {
             send: send, pull: pull, render: render, beat: beat,
-            role: function () { return role; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
+            role: function () { return role; }, solo: function () { return SOLO; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
             openPhone: openPhone, phoneLink: phoneLink, phoneCard: phoneCard,
             // 실험이 측정 하나를 저장했을 때 부른다: 폰 화면(또는 autoSendOnSave)이면 바로 보내기
             // 폰은 기본으로 회차 목록에 쌓기만 하고(고른 회차 보내기), autoSendOnSave: true 면 바로 보낸다
@@ -840,6 +877,6 @@
     }
 
     var EXPORTS = { init: init, buildPayloads: buildPayloads, incomingFrom: incomingFrom, rowId: rowId, newDeviceId: newDeviceId, deviceLabel: deviceLabel, fixState: fixState,
-        isPhoneDevice: isPhoneDevice, readPhoneParams: readPhoneParams, phoneUrl: phoneUrl, current: null };
+        isPhoneDevice: isPhoneDevice, newPairSpace: newPairSpace, readPhoneParams: readPhoneParams, phoneUrl: phoneUrl, current: null };
     return EXPORTS;
 });

@@ -8,7 +8,11 @@
     // 저장 공간: 링크의 ?s=수업 공간 > 조 코드 공간 (js/pendulum-cloud.js resolveServer)
     var SERVER = PC.resolveServer(location.search);
     var $ = function (id) { return document.getElementById(id); };
-    var GROUP_KEY = 'pendulum-report:group', GREF_KEY = 'pendulum-report:gref';
+    var GROUP_KEY = 'pendulum-report:group', GREF_KEY = 'pendulum-report:gref', PAIR_KEY = 'pendulum-report:pair';
+    // 🧍 수업 없이 연 화면(주소에 ?c= 없음, 2026-11-20 선생님 결정 "교사가 만든 큐알이나 사이트로 접속하지 않은 경우에는 조별 활동 필요없음"):
+    //  조 코드를 만들거나 넣지 않고, 이 노트북과 폰만 쓰는 짝 공간(p…24자)으로 QR 만 보인다 (다른 이원화 실험의 share.phoneCard 와 같은 모양)
+    var SOLO = !(window.ClassCloud && ClassCloud.readClassParam(location.search));
+    try { document.documentElement.classList.toggle('cs-solo', SOLO); } catch (e) { /* 무시 */ }
 
     var state = {
         group: null, items: [], excluded: [], fresh: {},
@@ -34,6 +38,7 @@
         save(GROUP_KEY, code);
         $('groupCard').hidden = true;
         $('qrCard').hidden = false;
+        if (SOLO) { $('btnLeave').hidden = true; $('codeShow').hidden = true; $('codeLabel').hidden = true; }
         drawQr();
         render();
         startPolling();
@@ -55,7 +60,7 @@
         var el = $('serverInfo');
         if (!el) return;
         el.hidden = false;
-        el.innerHTML = '📒 저장할 곳: ' + (SERVER.from === 'link' ? '이 수업 공간' : '조 코드 공간 (같은 조 코드를 넣은 노트북·폰끼리)') + ' · 학기 끝(6개월 뒤)에 저절로 지워져요' +
+        el.innerHTML = '📒 저장할 곳: ' + (SERVER.from === 'link' ? '이 수업 공간' : SERVER.from === 'pair' ? '이 노트북·폰 짝 공간 (QR 을 찍은 폰만)' : '조 코드 공간 (같은 조 코드를 넣은 노트북·폰끼리)') + ' · 학기 끝(6개월 뒤)에 저절로 지워져요' +
             (SERVER.from === 'legacy' ? '<br>⚠ 예전 선생님 시트(Apps Script) 링크예요. 이제 사이트 저장소를 써요. 선생님께 새 링크를 받으세요.' : '');
     }
     function qrSvg(text) {
@@ -327,6 +332,24 @@
         });
     }
 
+    // 수업 없이: 이 노트북의 짝 공간·조 코드(화면에는 안 보임)를 한 번 만들어 기억 → QR 바로
+    function soloPair() {
+        var pair = load(PAIR_KEY, null);
+        if (!pair || !PC.isGroupCode(pair.group) || !/^p[a-z0-9]{23}$/.test(String(pair.space || ''))) {
+            // 짝 공간 번호는 공통 도우미(crypto 난수)로 — 이 번호가 자료를 지키는 열쇠
+            var sp = window.ClassShare && ClassShare.newPairSpace ? ClassShare.newPairSpace() : (window.LabStore && LabStore.newSpace ? LabStore.newSpace('p') : '');
+            if (!/^p[a-z0-9]{23}$/.test(sp)) { sp = 'p'; for (var i = 0; i < 23; i++) sp += 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 32)]; }
+            pair = { group: PC.makeGroupCode(99, 1 + Math.floor(Math.random() * 99)), space: sp };
+            // 예전에 수업 없이 조 코드로 쓰던 표가 있으면 새 짝으로 옮겨 그대로 보이게 (예전 자료는 지우지 않음)
+            var old = load(GROUP_KEY, null), oldData = old ? load('pendulum-report:data:' + old, null) : null;
+            if (oldData && Array.isArray(oldData.items) && oldData.items.length) save('pendulum-report:data:' + pair.group, oldData);
+            save(PAIR_KEY, pair);
+        }
+        SERVER = { url: 'lab:' + pair.space, id: pair.space, from: 'pair' };
+        showServer();
+        setGroup(pair.group);
+    }
+
     function init() {
         setupDevice();
         showServer();
@@ -370,6 +393,7 @@
             if (step === 'result') renderFit();
             if (classShare) classShare.stepChanged();
         } });
+        if (SOLO) { soloPair(); return; }
         var m = /[?&]group=([^&#]*)/.exec(location.search);
         var code = m ? PC.normalizeGroup(decodeURIComponent(m[1])) : load(GROUP_KEY, null);
         if (code && PC.isGroupCode(code)) setGroup(code); else render();

@@ -123,3 +123,5 @@
 /* 선생님이 여는 단계 */
 .ev-stage.locked { opacity: .55; background: var(--c-fill); color: var(--c-muted); }
 .ev-flash { max-width: 560px; margin: var(--sp-1) auto 0; font-weight: 700; border-radius: 8px; padding: var(--sp-1) var(--sp-2); background: var(--c-ok-bg); color: var(--c-ok-text); }
+/* 하는 중인 팀: 선생님이 다음 단계를 열었다는 띠 (끝내면 넘어감) */
+.ev-notice { max-width: 560px; margin: var(--sp-1) auto 0; font-weight: 700; border-radius: 8px; padding: var(--sp-1) var(--sp-2); background: var(--c-primary-soft); color: var(--c-primary); }

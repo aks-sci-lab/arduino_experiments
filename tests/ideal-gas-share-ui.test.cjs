@@ -154,7 +154,7 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
     }
 });
 
-test('수업 링크 없이 열면 예전처럼 (띠 없음, 조 공유 칸은 있음), ?report= 는 학생 화면 대신 보고서 보기', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
+test('수업 링크 없이 열면 띠·조 공유 칸·선생님께 보내기 없음(CSV 불러오기만, 2026-11-20), ?report= 는 학생 화면 대신 보고서 보기', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
     const app = loadLabStore({ scriptId: SCRIPT_ID });
     const srv = await startStatic();
     const base = 'http://127.0.0.1:' + srv.address().port;
@@ -164,7 +164,9 @@ test('수업 링크 없이 열면 예전처럼 (띠 없음, 조 공유 칸은 �
         await s.page.goto(base + '/projects/ideal-gas.html');
         assert.equal(await s.page.$('.cs-bar'), null);
         await s.page.click('nav.steps button[data-step="data"]');
-        assert.ok(await s.page.isVisible('#cs-share'));
+        assert.equal(await s.page.$('#cs-share'), null, '조 공유 칸 없음');
+        assert.ok(await s.page.isVisible('#cs-csv') || await s.page.locator('#share-mount .cs-file').isVisible(), 'CSV 불러오기는 남음');
+        assert.equal(await s.page.isVisible('#btn-send2'), false, '선생님께 보내기 단추 없음');
         assert.ok(await noSideScroll(s.page));
         assert.deepEqual(s.errors, []);
         const r = await newPage(browser, app, base, 375);

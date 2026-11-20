@@ -136,7 +136,11 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         assert.ok(st1.t1.trials[0].y > 0.8 && st1.t1.trials[0].y < 2.5, '시계 시작부터 펑까지 약 1.5초: ' + st1.t1.trials[0].y);
         assert.match(await A.textContent('.ev-screen'), /예측 8초/);
         // ⏱ 초시계로 한 번 더 (같은 조건 2/2)
-        await A.click('[data-go="t1-predict"]'); await go(A, 't1-predict'); await next(A); await go(A, 't1-measure');
+        // 같은 조건 반복은 예측·방법을 다시 묻지 않음 (지난 방법 = 녹화로 바로) → '다른 방법으로' 로 초시계
+        await A.click('#ev-again'); await go(A, 't1-measure');
+        assert.match(await A.textContent('.ev-screen'), /같은 조건 2번째[\s\S]*예측 8초/);
+        await A.waitForSelector('#ev-r1');
+        await A.click('#ev-m-other'); await A.waitForSelector('#ev-m-sw');
         await A.click('#ev-m-sw'); await A.click('#ev-sw1'); await A.waitForTimeout(700); await A.click('#ev-sw2');
         await A.click('#ev-sw-adj [data-pm="1"]');
         await A.click('#ev-sw3'); await go(A, 't1-result');
@@ -232,7 +236,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await A.waitForFunction(() => /선생님께 보냄/.test(document.getElementById('ev-sync').textContent), null, { timeout: 25000 });
         assert.equal(app.items('rocket').filter(d => d.title !== '달님 탐험대')[0].summary['열림 측정 수'], 5, '다시 연결되면 보냄');
         // 도전 화면을 다시 열면 선생님이 바꾼 목표(20초)
-        await A.click('[data-stage="t1"]'); await go(A, 't1-intro');
+        await A.click('[data-stage="t1"]'); await go(A, 't1-again');   // 이미 한 단계: 소개·안전·퀴즈 없이 '이어서 하기'
         await A.evaluate(() => window.__filmRocket.show('t1-challenge'));
         await A.waitForFunction(() => /20초/.test(document.querySelector('.ev-screen h2').textContent), null, { timeout: 15000 });
 
@@ -307,7 +311,7 @@ test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 설계 → �
         await P.waitForFunction(() => { const cv = document.getElementById('ev-cam'); return cv && cv.width > 0; }, null, { timeout: 15000 });
         await P.click('#ev-r1'); await P.waitForTimeout(1200); await P.click('#ev-r3');
         await P.waitForSelector('#ev-vid'); await P.waitForTimeout(800);
-        await P.click('.ev-frames [data-f="15"]'); await P.waitForTimeout(300);
+        await P.click('.ev-frames [data-f="1"]'); await P.waitForTimeout(300);
         await P.click('#ev-pick');
         await P.waitForSelector('#ev-mark');
         const box = await P.locator('#ev-mark').boundingBox();

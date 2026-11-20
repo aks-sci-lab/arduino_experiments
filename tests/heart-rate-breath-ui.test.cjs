@@ -60,7 +60,13 @@ test('숨 참기 탐구: 안전 확인 · 멈춤 · 지표 · 동의해야 보�
         const P = await c.newPage();
         P.on('pageerror', e => errors.push(e.message));
         P.on('dialog', d => d.accept());
-        await P.goto(ROOT + 'projects/heart-rate.html#breath-scale=0.2');
+        // 수업 QR 로 들어온 화면 (수업 없이 열면 조 공유·선생님께 보내기가 없음, 2026-11-20)
+        const cls = await app.post({ action: 'createClass', ban: 3, nStudents: 4, groupSize: 2, exp: 'heartrate' });
+        const GB = cls.groups[1].code;
+        await P.goto(ROOT + 'projects/heart-rate.html?c=' + cls.classCode + '&s=' + cls.space + '#breath-scale=0.2');
+        await P.waitForSelector('#cs-cpick:not([hidden])');
+        await P.selectOption('#cs-cjo', '2'); await P.selectOption('#cs-cnum', '1'); await P.click('#cs-cjoin');
+        await P.waitForSelector('#cs-cjoined:not([hidden])');
         await P.click('#mode-breath');
         assert.equal(await P.isVisible('#breath'), true);
         assert.equal(await P.isVisible('#start'), false, '한 번 재기 단추는 숨김');
@@ -102,19 +108,17 @@ test('숨 참기 탐구: 안전 확인 · 멈춤 · 지표 · 동의해야 보�
 
         // ---- 동의 안 함 → 보내기 막힘 ----
         assert.equal(await P.isDisabled('#br-send'), true);
-        await P.fill('#cs-group', '3-2-4821'); await P.press('#cs-group', 'Enter');
-        await P.waitForTimeout(500);
         await P.evaluate(() => document.getElementById('cs-share').open = true);
         await P.click('#cs-send');
         await P.waitForTimeout(1500);
-        assert.equal((await app.get({ action: 'list', exp: 'heartrate', group: '3-2-4821' })).items.length, 0, '동의 안 한 회차는 시트에 안 감');
+        assert.equal((await app.get({ action: 'list', exp: 'heartrate', group: GB })).items.length, 0, '동의 안 한 회차는 시트에 안 감');
         // ---- 동의 → 보냄 ----
         await P.check('[data-consent="b1"]');
         await P.waitForFunction(() => !document.getElementById('br-send').disabled);
         assert.match(await P.textContent('#br-send'), /1개/);
         await P.click('#br-send');
         await P.waitForFunction(() => /보냈|못했/.test(document.getElementById('br-send-st').textContent), null, { timeout: 15000 });
-        const rows = (await app.get({ action: 'list', exp: 'heartrate', group: '3-2-4821' })).items;
+        const rows = (await app.get({ action: 'list', exp: 'heartrate', group: GB })).items;
         console.log('시트:', rows.map(r => r.title + ' ' + JSON.stringify(r.summary)));
         assert.equal(rows.length, 1);
         assert.deepEqual(Object.keys(rows[0].summary), ['변화율(%)', '참은 초', '안정 평균', '회복 시간(초)']);

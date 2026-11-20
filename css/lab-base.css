@@ -304,6 +304,10 @@ html:not(.device-tablet) .show-on-tablet { display: none !important; }
 /* 🎬 발표용 (?present=1, 교사 화면 '발표 보기' 의 iframe): 수업 참여 띠·조 공유·폰 QR 카드·기기 고르기·측정 단추는 숨김 */
 html.lab-present .cs-bar, html.lab-present .cs-share, html.lab-present .cs-phonecard, html.lab-present .cs-phone,
 html.lab-present .device-switch, html.lab-present .hide-on-present { display: none !important; }
+/* 발표용은 페이지를 통째로 키움(js/lab-ui.js presentFit, zoom) → 내용이 틀을 가로로 채우게 폭 제한을 풀고, vh 로 정한 그래프 높이는 고정값으로 (zoom 이 vh 도 키움) */
+html.lab-present { --w-step: 100%; --w-dash: 100%; --chart-h: 300px; }
+html.lab-present.big-view body { zoom: 1; }
+html.lab-present body > .wrap, html.lab-present body > main { max-width: none; }   /* 크게 보기는 presentFit 이 배율로 */
 .device-switch { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--c-muted); }
 .device-switch select { min-height: 44px; font: inherit; }
 
