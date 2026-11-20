@@ -12,6 +12,48 @@
 
 ---
 
+## 지금 현황 (2026-11-20 저녁 기준, 가장 먼저 볼 곳)
+
+아래 A~C 는 11-14 까지의 기록이다. 그 뒤 바뀐 것은 이 칸에 모은다.
+
+### 진행 중인 세션
+
+| 세션 | 맡은 일 | 상태 |
+|---|---|---|
+| 탐구 유형 나누기 → **진행 방법 두 가지** | 선생님 결정(11-20): 보고서 실험 전부를 '7단계(보고서 순서)'와 '가설연역 6단계(문제 인식·가설 설정·탐구 설계·탐구 수행·자료 해석·결론 도출)' 두 방법으로. 선생님이 수업 만들 때 고름. 메인 목록은 지금 묶음 + 교과 배지. 첫 PR = 공통 틀 + 메인 화면 | 설계안(`docs/inquiry-types-design.md`) 고쳐 쓰고 PR 1 준비 |
+| 시판 블루투스 센서 해석 도구 | 버니어 Go Direct 연결(공개 방식·사용 조건 확인 먼저), **연결 10초 뒤 끊김 고치기**(선생님 실측), 아이폰 Bluefy 앱 안내, 페이지 떠날 때 블루투스 연결 끊기 | 브랜치 `claude/vernier-godirect`, 선생님 "진행" (11-20) |
+
+### 끝난 세션 (실제 기기 확인만 남음)
+
+| 세션 | 머지된 것 | 선생님이 확인할 것 |
+|---|---|---|
+| 발포비타민 필름통 로켓 | #127 행사 웹앱·팀 입장, #128 오류 안내, #129 교사 진행 화면·단계 열기, #134 수업 목록·QR·수업 마치기·메인 교사 탭, #135 🎬 발표 보기, (#130 메인 역할별 → #133) | 실제 폰 녹화·행사장 와이파이, 프로젝터 전체 화면·리모컨, 교실 뒤에서 QR 찍기 |
+| Firebase 전환 | #121 전환, #131 Apps Script 정리·플랑크 선생님 화면 (→ #133) | 실제 플랑크 수업 결과 화면 |
+| 보드 펌웨어 한 번에 올리기 | #132 (→ #133) | 실제 Pico 2 W 로 USB 올리기 (#132 설명 맨 위 순서) |
+| 보고서 AI 피드백 | #122 (→ #124) | 실제 API 키·학교 망 |
+| 퀀텀닷·데이터 가공·심박수·얼굴 심박·실험별 세션 | 11-16~11-18 머지 | 각 `AGENTS.md` 진행 기록의 '확인 필요' |
+
+### 2026-11-20 머지 기록 (모두 배포 성공)
+
+#127 필름통 로켓(규칙) → #128 → #129 교사 화면·단계 열기(규칙) → #133 (= #130 + #131 + #132 합침) → #134 수업 목록·QR(규칙) → #135 발표 보기. #82('내 서버 만들기')는 쓰지 않아 닫음.
+
+### 콘솔에서 한 일 (11-20)
+
+- 구글 로그인 오류(`client secret is invalid`): 구글 클라우드의 웹 클라이언트 보안 비밀번호를 새로 만들어 Firebase Authentication → Google 에 넣음. 같은 클라이언트를 Supabase 프로젝트도 쓰므로 그쪽에도 같은 비밀번호가 필요.
+- 익명 로그인이 꺼져 학생 입장이 막혔던 것: 다시 켬('자동 정리'는 한 달 넘는 수업이면 끄기 권장).
+
+### 지워도 되는 브랜치 (내용이 모두 main 에 있음 — 사용자가 GitHub → Branches 🗑)
+
+11-14 뒤로 머지된 것: `claude/accel-class-share`, `claude/apps-script-self-update`, `claude/ble-explorer`, `claude/class-connect`, `claude/class-list`, `claude/class-share`, `claude/class-share-fixes`, `claude/class-share-phone`, `claude/class-stage`, `claude/custom-lab-class-share`, `claude/data-lab`, `claude/dev-data-collect`, `claude/em-induction-class-share`, `claude/env-class-share`, `claude/face-hr-devcollect`, `claude/film-rocket`, `claude/film-rocket-errmsg`, `claude/firestore-class-share`, `claude/heart-rate`, `claude/heart-rate-breath`, `claude/heart-rate-dim`, `claude/heart-rate-full`, `claude/heart-rate-phone`, `claude/home-roles`, `claude/ideal-gas-class-share`, `claude/malus-class-share`, `claude/malus-phone`, `claude/nano-class-share`, `claude/pendulum-measure`, `claude/pendulum-report`, `claude/pendulum-teacher-login`, `claude/phone-accel-freefall-phone`, `claude/pico-usb-flash`, `claude/planck-apps-script`, `claude/planck-ble-iv-sensor`, `claude/planck-cloud-share`, `claude/present-mode`, `claude/quantum-dot-lab`, `claude/remove-apps-script`, `claude/report-ai-feedback`, `claude/server-v9-heartrate`, `claude/teacher-server-maker`, `claude/ui-foundation`, `claude/ui-scroll-tabs`, `claude/update-error-detail` (+ 아래 C 의 예전 목록).
+
+확인 뒤 지울 후보 (main 보다 커밋 1~2개 앞서 보이지만 내용은 다른 PR 로 들어갔거나 쓰지 않음): `claude/malus-device-split`·`claude/pendulum-device-split`·`claude/phone-laptop-split-accel-ff`(#118 로 합쳐 머지), `claude/stoic-archimedes-48nbsd`(#54 로 옮김), `claude/page-qr-button`(#63 과 겹쳐 안 씀), `claude/face-hr-lab`, `handoff/figure-maker-new-repo`.
+
+남기는 것: `main`, `dev-data`(개발 데이터), `claude/quirky-heisenberg-fdz1qp`(통합 관리 세션), `claude/vernier-godirect`(진행 중).
+
+저장소 Settings → General → "Automatically delete head branches" 를 켜면 앞으로는 머지 때 저절로 지워진다.
+
+---
+
 ## A. 세션 목록 (통합 관리 세션의 하위 세션)
 
 2026-11-04 사용자 지정으로 모든 세션을 **통합 관리 세션의 하위 세션**으로 분류했다.
