@@ -158,6 +158,11 @@
         .admin-box { margin: 0 0 var(--sp-3); }
         .admin-box .auth-bar { margin: var(--sp-2) 0; }
         .join-err { color: var(--c-danger); }
+        .role-pick .pick-card { align-items: center; text-align: center; justify-content: center; }
+        #homePick .role-pick .pick-card { min-height: 180px; }
+        #homePick .role-pick .pick-card .ic { font-size: 3rem; }
+        #homePick .role-pick .pick-card b { font-size: 1.4rem; }
+        .solo-btn { min-height: var(--tap); margin-bottom: var(--sp-3); }
     </style>
 </head>
 <body>
@@ -165,15 +170,22 @@
 
         <div class="home-head">
             <h1>센서 기반 실험실</h1>
-            <a class="auth-btn btn-mode" style="text-decoration:none;" href="qr.html">📱 QR 코드로 휴대폰에서 열기</a>
+            <button type="button" id="roleSwitch" class="auth-btn btn-mode" hidden>🔄 역할 바꾸기</button>
         </div>
-        <!-- 교사·학생 모두 구글 로그인 없이 시작 (수업 연결). 구글 로그인은 '사이트 관리' 안에 -->
-        <h2 class="group-title">어떻게 시작할까요? <small>로그인 없이</small></h2>
-        <div class="pick-grid role-pick">
-            <a class="pick-card" href="projects/class-teacher.html"><span class="ic" aria-hidden="true">👩‍🏫</span><b>교사로 시작</b><small>조 나누기 · 수업 QR · 진행 보기</small></a>
-            <button type="button" class="pick-card" id="roleStudent" aria-expanded="false" aria-controls="joinBox"><span class="ic" aria-hidden="true">🧑‍🎓</span><b>학생으로 시작</b><small>선생님이 알려 준 수업 코드 넣기</small></button>
-        </div>
-        <form id="joinBox" class="join-box" hidden>
+
+        <!-- 첫 화면: 역할만 고른다 (2026-11-20 선생님 결정 "메인 화면도 화면 표시가 비효율적" → 역할별로 나누기). 고른 역할은 이 브라우저에 기억 -->
+        <section id="homePick">
+            <h2 class="group-title">누가 쓰나요? <small>로그인 없이 시작</small></h2>
+            <div class="pick-grid role-pick">
+                <button type="button" class="pick-card" id="roleTeacher" data-role="teacher"><span class="ic" aria-hidden="true">👩‍🏫</span><b>교사</b><small>수업 진행 화면 · 실험 목록 · 사이트 관리</small></button>
+                <button type="button" class="pick-card" id="roleStudent" data-role="student"><span class="ic" aria-hidden="true">🧑‍🎓</span><b>학생</b><small>선생님이 알려 준 수업 코드 넣기</small></button>
+            </div>
+        </section>
+
+        <!-- 학생: 수업 코드 넣기 + 수업 없이 실험해 보기 -->
+        <section id="homeStudent" hidden>
+            <h2 class="group-title">🧑‍🎓 수업에 들어가기</h2>
+        <form id="joinBox" class="join-box">
             <label for="joinCode"><b>수업 코드</b> <span class="note">(예: 2-4821, 선생님 화면에 크게 보여요. QR 을 찍었다면 넣지 않아도 돼요)</span></label>
             <div class="join-row">
                 <input type="text" id="joinCode" inputmode="numeric" autocomplete="off" placeholder="2-4821">
@@ -182,6 +194,15 @@
             <p id="joinMsg" class="note" role="status" aria-live="polite"></p>
         </form>
 
+            <button type="button" id="soloBtn" class="auth-btn btn-mode solo-btn" aria-expanded="false" aria-controls="homeLabs">🧪 수업 없이 실험해 보기</button>
+        </section>
+
+        <!-- 교사: 수업 진행 화면 · QR · 사이트 관리 (+ 아래 실험 목록) -->
+        <section id="homeTeacher" hidden>
+            <div class="pick-grid role-pick">
+                <a class="pick-card" href="projects/class-teacher.html"><span class="ic" aria-hidden="true">🏫</span><b>수업 진행 화면</b><small>수업 만들기 · QR · 단계 열기 · 결과판</small></a>
+                <a class="pick-card" href="qr.html"><span class="ic" aria-hidden="true">📱</span><b>QR 코드로 휴대폰에서 열기</b><small>실험 페이지 QR</small></a>
+            </div>
         <!-- 구글 로그인 및 사용자 인증 상태 바: 사이트 관리(선생님)용. 새 실험 만들기·기록 보기에 쓴다 -->
         <details class="home-help admin-box" id="adminBox">
         <summary id="adminSum">🔐 사이트 관리 (선생님) · 구글 로그인</summary>
@@ -195,6 +216,9 @@
         </div>
         <p class="note dev-links">🛠 개발용 도구 (선생님 전용, 실험 목록에 없음): <a href="projects/ble-explorer.html">블루투스 센서 해석 도구</a> — 시판 무선 센서가 보내는 바이트를 기록해 해석 규칙을 찾아요 (PC 크롬·엣지, 안드로이드 크롬) · <a href="projects/face-hr-lab.html">🙂 얼굴 심박(rPPG) 개발</a></p>
         </details>
+        </section>
+
+        <div id="homeLabs" hidden>
         <p class="note">수행할 실험을 고르세요. 저장한 기록은 '📁 기록' 탭에서 봅니다.</p>
 
         <!-- 실험 목록과 기록을 탭으로 나눠 길게 스크롤하지 않게 (공통 부품 .subtabs) -->
@@ -267,6 +291,7 @@
             <div id="experimentsList" style="display:none;"></div>
         </div>
         </div>
+        </div><!-- /homeLabs -->
     </div>
     <script>LabUI.initTabs('#homeTabs', { key: 'home' });</script>
 
@@ -277,11 +302,31 @@
     <script src="js/class-cloud.js"></script>
     <script>
     (function () {
-        var btn = document.getElementById('roleStudent'), box = document.getElementById('joinBox'), msg = document.getElementById('joinMsg');
-        btn.addEventListener('click', function () {
-            box.hidden = !box.hidden; btn.setAttribute('aria-expanded', String(!box.hidden));
-            if (!box.hidden) document.getElementById('joinCode').focus();
+        var box = document.getElementById('joinBox'), msg = document.getElementById('joinMsg');
+        // ----- 역할 고르기 (이 브라우저에 기억, 주소 ?role=teacher|student 로도) -----
+        var ROLE_KEY = 'home-role:v1', $ = function (id) { return document.getElementById(id); };
+        function getRole() {
+            var m = /[?&]role=(teacher|student)\b/.exec(location.search);
+            if (m) return m[1];
+            try { var r = localStorage.getItem(ROLE_KEY); return r === 'teacher' || r === 'student' ? r : ''; } catch (e) { return ''; }
+        }
+        function setRole(r) { try { if (r) localStorage.setItem(ROLE_KEY, r); else localStorage.removeItem(ROLE_KEY); } catch (e) { /* 저장 불가 */ } applyRole(r); }
+        var solo = false;
+        function applyRole(r) {
+            $('homePick').hidden = !!r;
+            $('homeStudent').hidden = r !== 'student';
+            $('homeTeacher').hidden = r !== 'teacher';
+            $('roleSwitch').hidden = !r;
+            $('homeLabs').hidden = !(r === 'teacher' || (r === 'student' && solo));
+            $('soloBtn').setAttribute('aria-expanded', String(solo));
+            $('soloBtn').textContent = solo ? '▲ 실험 목록 접기' : '🧪 수업 없이 실험해 보기';
+        }
+        document.querySelectorAll('[data-role]').forEach(function (b) {
+            b.addEventListener('click', function () { setRole(b.dataset.role); if (b.dataset.role === 'student') $('joinCode').focus(); });
         });
+        $('roleSwitch').addEventListener('click', function () { solo = false; setRole(''); });
+        $('soloBtn').addEventListener('click', function () { solo = !solo; applyRole(getRole()); if (solo) $('homeLabs').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+        applyRole(getRole());
         box.addEventListener('submit', async function (e) {
             e.preventDefault();
             var CC = window.ClassCloud, PC = window.PendulumCloud;
