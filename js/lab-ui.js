@@ -246,6 +246,10 @@
          css/lab-base.css: .hide-on-laptop · .hide-on-phone · .show-on-laptop · .show-on-phone 로 페이지가 보이고 숨길 것을 정함
        - 바뀌면 window 에 'lab-device' 이벤트 (detail = LabUI.device()) */
     var DEV_KEY = 'lab-ui:device', DEV_KINDS = ['phone', 'tablet', 'laptop'];
+    /* 🎬 발표용 (교사 화면 '발표 보기'가 iframe 으로 여는 ?present=1): 학생으로 참여하지 않고 보여 주기만.
+       기기는 늘 노트북(측정 부분은 숨김, 기억하지 않음), <html class="lab-present"> 로 측정·조 공유·수업 참여 띠를 숨김 (css/lab-base.css) */
+    var PRESENT = /[?&]present=1(?:&|#|$)/.test(location.search || '');
+    if (PRESENT) root.classList.add('lab-present');
     function guessDevice() {
         var nav = window.navigator || {}, touch = (nav.maxTouchPoints || 0) > 0;
         var coarse = false;
@@ -265,6 +269,7 @@
         return null;
     }
     function device() {
+        if (PRESENT) return { kind: 'laptop', auto: 'laptop', manual: true };
         var auto = guessDevice(), m = readDevice();
         return { kind: m || auto, auto: auto, manual: !!m };
     }
@@ -312,5 +317,5 @@
     applyDevice();
 
     window.LabUI = { toggleBigView: toggle, initSteps: initSteps, initTabs: initTabs, autoSubtabs: autoSubtabs,
-        device: device, setDevice: setDevice, deviceSwitch: deviceSwitch, DEVICE_NAME: DEV_NAME };
+        device: device, setDevice: setDevice, deviceSwitch: deviceSwitch, DEVICE_NAME: DEV_NAME, present: PRESENT };
 })();
