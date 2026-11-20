@@ -21,6 +21,7 @@ const QR_LIB = readMod('qrcode-generator/qrcode.js');
 const CHART_LIB = readMod('chart.js/dist/chart.umd.js') || readMod('chart.js/dist/chart.umd.min.js');
 const QR_STUB = 'window.qrcode=function(){return{addData(){},make(){},createSvgTag(){return "<svg data-fake=1 viewBox=\\"0 0 10 10\\"><rect width=10 height=10 /></svg>"},createImgTag(){return ""},getModuleCount(){return 1},isDark(){return true}}};';
 const CHART_STUB = 'window.Chart = class Chart { constructor(c, cfg) { this.data = (cfg && cfg.data) || { datasets: [] }; } update() {} destroy() {} };';
+const FAKE_AI_KEY = 'vc-fake-key';   // 진짜 키가 아님 (가짜 AI 서버용)
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.csv': 'text/csv', '.wasm': 'application/wasm' };
 
 async function start(opts) {
@@ -42,11 +43,33 @@ async function start(opts) {
     const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
     const log = [], net = {};          // net[name] = true 면 그 화면의 저장소 요청을 끊음 (와이파이 끊김 흉내)
     const pages = {};
+    // 가짜 AI 서버 3곳 (tests/report-ai-ui.test.cjs 와 같은 모양): 키가 FAKE_AI_KEY 면 답, 아니면 401. aiCalls 에 받은 질문이 쌓인다. ai.fail = 상태 코드면 그 오류를 돌려줌
+    const aiCalls = [], ai = { fail: 0, n: 0 };
+    const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
+    const fakeAI = async route => {
+        const req = route.request(), u = new URL(req.url());
+        if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+        const h = req.headers(), body = req.postData() ? JSON.parse(req.postData()) : null;
+        const prov = /googleapis/.test(u.host) ? 'gemini' : /anthropic/.test(u.host) ? 'claude' : 'gpt';
+        const key = prov === 'gemini' ? u.searchParams.get('key') : prov === 'claude' ? h['x-api-key'] : String(h.authorization || '').replace(/^Bearer /, '');
+        const json = (status, o) => route.fulfill({ status, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(o) });
+        if (key !== FAKE_AI_KEY) return json(401, { error: { message: 'invalid api key', type: 'authentication_error' } });
+        if (ai.fail) return json(ai.fail, { error: { message: ai.fail === 429 ? 'rate limit exceeded' : 'server error', type: 'error' } });
+        if (req.method() === 'GET') return json(200, prov === 'gemini' ? { models: [{ name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] }] } : { data: [{ id: prov === 'claude' ? 'claude-sonnet-5-5' : 'gpt-6-luna' }] });
+        const system = prov === 'gemini' ? body.systemInstruction.parts[0].text : prov === 'claude' ? body.system : body.messages[0].content;
+        const user = prov === 'gemini' ? body.contents[0].parts[0].text : prov === 'claude' ? body.messages[0].content : body.messages[1].content;
+        aiCalls.push({ prov, system, user });
+        const text = /준비/.test(user) && /한 단어/.test(system) ? '준비' : '가짜 답 ' + (++ai.n) + ': 어느 측정값이 그 생각의 근거인가요? 다른 설명은 없을까요?';
+        if (prov === 'gemini') return json(200, { candidates: [{ content: { parts: [{ text }] } }] });
+        if (prov === 'claude') return json(200, { content: [{ type: 'text', text }] });
+        return json(200, { choices: [{ message: { role: 'assistant', content: text } }] });
+    };
     async function open(name, ctxOpt) {
         const c = await browser.newContext(Object.assign({ permissions: ['camera'], acceptDownloads: true, locale: 'ko-KR', timezoneId: 'Asia/Seoul' }, ctxOpt));
         await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API) }));
         await c.route(/cdn\.jsdelivr|cdnjs/, r => { const u = r.request().url(); r.fulfill({ contentType: 'text/javascript', body: /qrcode/.test(u) ? (QR_LIB || QR_STUB) : /chart/i.test(u) ? (CHART_LIB || CHART_STUB) : '' }); });
-        await c.route(/gstatic|googleapis|google\.com/, r => r.abort());
+        await c.route(/gstatic|accounts\.google|firestore\.googleapis|identitytoolkit|securetoken/, r => r.abort());
+        await c.route(/generativelanguage\.googleapis\.com|api\.anthropic\.com|api\.openai\.com/, fakeAI);
         await c.route(API + '**', r => (net[name] ? r.abort('internetdisconnected') : r.continue()));
         const pg = await c.newPage();
         pg.vcName = name;
@@ -59,7 +82,7 @@ async function start(opts) {
     }
     let n = 0;
     const S = {
-        app, API, ROOT, browser, log, net, pages, shots, devices,
+        app, API, ROOT, browser, log, net, pages, shots, devices, aiCalls, ai, FAKE_AI_KEY,
         local: href => String(href).replace(/^https?:\/\/[^/]+\//, ROOT),
         teacher: (vp, name) => open(name || 'T', { viewport: vp || { width: 1280, height: 720 } }),
         laptop: (name, vp) => open(name, { viewport: vp || { width: 1366, height: 768 } }),
