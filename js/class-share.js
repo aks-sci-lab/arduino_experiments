@@ -119,9 +119,12 @@
         var KEY = 'class-share:' + exp;
         // 📱 폰으로 연 화면이면(?role=phone) 조 코드·수업 자리를 주소에서 받고, 노트북 화면의 저장과 섞이지 않게 따로 저장한다
         var PHONE = readPhoneParams(location.search);
-        var role = PHONE ? 'phone' : 'laptop';
+        // 🎬 발표용 (교사 화면 '발표 보기' 의 iframe, ?present=1): 수업 문서만 읽어 단계 잠금을 학생과 같게.
+        //  익명 로그인으로 자리 잡기·하트비트·조 공유·폰 QR·이 기기 저장 없음 ('들어온 학생' 수가 늘지 않음)
+        var PRESENT = !PHONE && !!(window.LabUI && window.LabUI.present);
+        var role = PHONE ? 'phone' : PRESENT ? 'present' : 'laptop';
         if (PHONE) KEY += ':phone';
-        var store = (!PHONE && opts.store) || {
+        var store = PRESENT ? { load: function () { return null; }, save: function () { /* 발표용은 저장 안 함 */ } } : (!PHONE && opts.store) || {
             load: function () { try { return JSON.parse((LS && LS.getItem(KEY)) || 'null'); } catch (e) { return null; } },
             save: function (o) { try { LS.setItem(KEY, JSON.stringify(o)); } catch (e) { /* 저장 불가 */ } }
         };
@@ -152,7 +155,7 @@
         var els = {};
 
         // ----- 조 공유 칸 -----
-        var mount = opts.shareMount ? $q(opts.shareMount) : null;
+        var mount = opts.shareMount && !PRESENT ? $q(opts.shareMount) : null;
         if (mount) {
             mount.innerHTML =
                 '<details class="cs-card cs-share" id="cs-share"><summary>👥 조 공유: 선생님께 보내기 · 다른 노트북에서 불러오기 <span class="cs-note" id="cs-sum"></span></summary>' +
@@ -429,6 +432,7 @@
         }
         function tellClass() { if (typeof opts.onClass === 'function') { try { opts.onClass(cls.info, cls.me); } catch (e) { /* 실험 쪽 오류 */ } } }
         async function startClass() {
+            if (PRESENT) return cls.info ? Object.assign({ ok: true }, cls.info) : { ok: false, error: '발표용 화면' };
             if (cls.starting) return cls.starting;
             cls.starting = (async function () {
                 var r = await CC.joinInfo(srv().url, CLASS);
@@ -550,7 +554,13 @@
             els.cmsg.textContent = r.again ? '이 폰은 이미 \u2018' + r.name + '\u2019 팀이에요. 그 팀으로 이어서 해요.' : '';
             return r;
         }
-        if (CLASS) {
+        if (CLASS && PRESENT) {
+            // 발표용: 수업 정보만 (joinInfo 는 수업 문서 읽기 — 교사 화면과 같은 사이트라 교사 로그인 그대로)
+            CC.joinInfo(srv().url, CLASS).then(function (r) {
+                if (!r || !r.ok) { cls.failed = r; tellClass(); return; }
+                cls.info = r; cls.me = null; tellClass(); startGate();
+            });
+        } else if (CLASS) {
             bar = document.createElement('div');
             bar.className = 'cs-card cs-bar';
             bar.innerHTML = '<div id="cs-cinfo"><b>🏫 수업 참여</b> <span class="cs-note">불러오는 중…</span></div>' +
@@ -763,6 +773,7 @@
             });
         }
         function phoneCard(where) {
+            if (PRESENT) { var pe = typeof where === 'string' ? document.querySelector(where) : where; if (pe) pe.hidden = true; return null; }
             if (!cardEl) window.addEventListener('lab-device', function () { setTimeout(renderCard, 0); });
             cardEl = typeof where === 'string' ? document.querySelector(where) : where;
             // 단계 탭·접기 안에 있어 처음엔 안 보이다가 보이게 되면 그때 그림
@@ -782,7 +793,7 @@
         if (groupOk() && typeof opts.onGroup === 'function' && !CLASS) opts.onGroup(st.group);
         var api = {
             send: send, pull: pull, render: render, beat: beat,
-            role: function () { return role; }, isPhone: function () { return !!PHONE; },
+            role: function () { return role; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
             openPhone: openPhone, phoneLink: phoneLink, phoneCard: phoneCard,
             // 실험이 측정 하나를 저장했을 때 부른다: 폰 화면(또는 autoSendOnSave)이면 바로 보내기
             // 폰은 기본으로 회차 목록에 쌓기만 하고(고른 회차 보내기), autoSendOnSave: true 면 바로 보낸다

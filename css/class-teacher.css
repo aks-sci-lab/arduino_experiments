@@ -172,3 +172,17 @@ html.big-view button.ct-corner { zoom: calc(1 / 1.35); }
 .ct-boardqr b { font-size: 1.3rem; }
 .ct-boardbig { padding-right: 240px; }
 @media (max-width: 899px) { .ct-boardqr { display: none; } .ct-boardbig { padding-right: var(--sp-4); } }
+
+/* 🎬 발표 보기: 프로젝터용 — 머리말·수업 띠를 숨기고 학생 화면(iframe)을 크게. 오른쪽 위 QR 은 그대로 */
+body.ct-presenting .ct-head, body.ct-presenting .ct-bar { display: none; }
+body.ct-presenting .ct-wrap { max-width: none; padding-top: var(--sp-2); }
+.ct-pbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-2) var(--sp-3); }
+.ct-pstage { font-size: 1.05rem; }
+.ct-pjoined { color: var(--c-muted); }
+.ct-pbtns { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-left: auto; }
+.ct-pask { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 2px solid var(--c-success); border-radius: var(--r-card); background: var(--c-ok-bg); font-size: 1.1rem; }
+.ct-pask[hidden] { display: none; }
+.ct-pframe { margin-top: var(--sp-2); }
+.ct-pframe iframe { display: block; width: 100%; height: calc(100vh - 150px); min-height: 420px; border: 1px solid var(--c-line); border-radius: var(--r-card); background: #fff; }
+/* 행사형(필름통 로켓)은 폰 모양 틀 */
+.ct-present.phone .ct-pframe iframe { width: 400px; max-width: 100%; height: min(820px, calc(100vh - 150px)); margin: 0 auto; border: 12px solid #222; border-radius: 36px; }

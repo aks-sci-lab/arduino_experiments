@@ -53,6 +53,7 @@
             </div>
             <div class="ct-row">
                 <button id="btnRefresh" class="secondary">🔄 새로 보기</button>
+                <button id="btnPresent" class="good">🎬 발표 보기 (학생 화면)</button>
                 <button id="btnShowQr" class="secondary">📱 QR 화면</button>
                 <button id="btnDone" class="secondary">✅ 수업 마치기</button>
             </div>
@@ -111,6 +112,28 @@
             <div class="ct-row"><button id="btnCloseDetail" class="secondary">닫기</button></div>
         </section>
         </div><!-- /runPane -->
+
+        <!-- 🎬 발표 보기: 학생이 지금 보는 실험 페이지를 발표용(?present=1)으로 크게. 학생으로 참여하지 않음 -->
+        <section id="presentPane" class="ct-present" hidden>
+            <div class="ct-pbar">
+                <span id="pStage" class="ct-pstage"></span>
+                <span id="pJoined" class="ct-pjoined"></span>
+                <span class="ct-pbtns">
+                    <button id="btnPPrev" class="secondary" aria-label="이전 탭">◀ 이전</button>
+                    <button id="btnPNext" class="secondary" aria-label="다음 탭">다음 ▶</button>
+                    <button id="btnPOpen" class="good">▶ 다음 단계 열기</button>
+                    <button id="btnPFull" class="secondary">⛶ 전체 화면</button>
+                    <button id="btnPExit" class="secondary">✕ 진행 화면으로</button>
+                </span>
+            </div>
+            <div id="pAsk" class="ct-pask" role="alertdialog" aria-labelledby="pAskText" hidden>
+                <span id="pAskText"></span>
+                <button id="btnPAskYes" class="good">열기 (Enter)</button>
+                <button id="btnPAskNo" class="secondary">아니요 (Esc)</button>
+            </div>
+            <div class="ct-pframe"><iframe id="presentFrame" title="학생 화면 (발표용)" src="about:blank"></iframe></div>
+            <p id="pHint" class="note">→ · PageDown · Space = 다음 탭, ← · PageUp = 이전 (발표용 리모컨도 돼요). 이 화면에서 넘기는 탭은 학생 폰에 영향이 없어요. 단계 끝에서 한 번 더 누르면 다음 단계를 열지 물어요.</p>
+        </section>
       </div><!-- /viewClass -->
     </div>
 

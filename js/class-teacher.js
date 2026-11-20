@@ -30,10 +30,11 @@
     state.sub = 'list';
     function parseHash() {
         var m = /class=([a-z0-9]{24})/.exec(location.hash || '');
-        return m ? { space: m[1], sub: /view=run/.test(location.hash) ? 'run' : 'qr' } : { space: '', sub: 'list' };
+        var v = /view=(run|present)/.exec(location.hash || '');
+        return m ? { space: m[1], sub: v ? v[1] : 'qr' } : { space: '', sub: 'list' };
     }
     function go(space, sub) {
-        var h = space ? '#class=' + space + (sub === 'run' ? '&view=run' : '') : '';
+        var h = space ? '#class=' + space + (sub === 'run' || sub === 'present' ? '&view=' + sub : '') : '';
         if ((location.hash || '') !== h) {
             if (h) location.hash = h;   // hashchange → route
             else { history.pushState(null, '', location.pathname + location.search); route(); }
@@ -57,23 +58,30 @@
         $('viewList').hidden = sub !== 'list';
         $('viewClass').hidden = sub === 'list';
         $('classOut').hidden = sub !== 'qr';
+        var live = sub === 'run' || sub === 'present';
         $('runPane').hidden = sub !== 'run';
-        $('cornerQr').hidden = !(main && sub === 'run');
-        document.body.classList.toggle('ct-has-corner', main && sub === 'run');
+        $('presentPane').hidden = sub !== 'present';
+        $('cornerQr').hidden = !(main && live);
+        document.body.classList.toggle('ct-has-corner', main && live);
+        document.body.classList.toggle('ct-presenting', main && sub === 'present');
         if (c && sub !== 'list') {
             var e = CC.expInfo(c.exp);
             $('classTitle').innerHTML = (e ? e.icon + ' ' : '') + '<b>' + esc(e ? e.name : c.exp) + '</b> <span class="note">' + esc(c.ban) + '반 · 수업 코드 ' + esc(c.classCode) + (c.done ? ' · ✅ 마침' : '') + '</span>';
             $('btnDone').textContent = c.done ? '↩ 다시 진행 중으로' : '✅ 수업 마치기';
             $('btnShowQr').hidden = sub === 'qr';
             $('btnRefresh').hidden = sub !== 'run';
+            $('btnPresent').hidden = !CC.gateSteps(c.exp);
             if (!state.shown || state.shown.space !== c.space) showClass(c);
             renderWatchSel();
         }
-        if (main && sub === 'run') startWatch(); else stopWatch();
+        if (main && live) startWatch(); else stopWatch();
+        if (main && sub === 'present' && c) openPresent(c); else closePresent();
     }
+    function isLive() { return state.sub === 'run' || state.sub === 'present'; }
     $('btnToList').addEventListener('click', function () { $('doneMsg').textContent = ''; go('', 'list'); });
     $('btnShowQr').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'qr'); });
     $('btnToRun').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'run'); });
+    $('btnPresent').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'present'); });
     $('btnDone').addEventListener('click', async function () {
         var c = watched(); if (!c) return;
         var to = !c.done;
@@ -356,6 +364,7 @@
         $('btnStageNext').textContent = si.all ? '▶ 다음 단계 열기' : '▶ 다음 단계 열기: ' + name(si.gate[si.n]);
         $('btnStagePrev').disabled = si.n <= 1 || state.stageBusy;
         $('btnStageAll').disabled = si.all || state.stageBusy;
+        renderPresentBar();
     }
     async function setStage(to) {
         var c = watched(); if (!c) return;
@@ -434,7 +443,7 @@
         if (!c || state.liveSpace === c.space) return;
         if (state.liveOff) { try { state.liveOff(); } catch (e) { /* 무시 */ } state.liveOff = null; }
         state.liveSpace = c.space;
-        LS.watchClass('lab:' + c.space, c.classCode, function () { if (state.view === 'main' && state.sub === 'run' && !document.hidden) refresh(); })
+        LS.watchClass('lab:' + c.space, c.classCode, function () { if (state.view === 'main' && isLive() && !document.hidden) refresh(); })
             .then(function (off) { if (state.liveSpace === c.space) state.liveOff = off; else if (off) off(); });
     }
     async function refresh() {
@@ -458,8 +467,105 @@
             try { window.dispatchEvent(new CustomEvent('ct-watch', { detail: { cls: c } })); } catch (e) { /* 무시 */ }
         }
         if (state.again) { state.again = false; return refresh(); }
-        if (state.view === 'main' && state.sub === 'run') state.timer = setTimeout(refresh, POLL_MS);
+        if (state.view === 'main' && isLive()) state.timer = setTimeout(refresh, POLL_MS);
     }
+    // ---------- 🎬 발표 보기 (2026-11-20 선생님 "수업 진행하기에서는 학생의 화면이 보이도록", "웹앱만으로 프레젠테이션을 대신") ----------
+    // 그 수업의 실험 페이지를 발표용(?present=1)으로 iframe 에 띄움: 학생으로 참여하지 않고(자리·하트비트·조 공유 없음) 단계 잠금은 학생과 같게.
+    // 선생님은 → · PageDown · Space 로 그 단계 안의 작은 탭을 넘기고(학생 폰은 그대로), 단계 끝에서 한 번 더 누르면 '다음 단계를 열까요?'
+    var pres = { space: '', ask: false };
+    function frameDoc() { try { var f = $('presentFrame'); return f && f.contentDocument && f.contentDocument.body ? f.contentDocument : null; } catch (e) { return null; } }
+    function shown(el) { return !!(el && el.getClientRects().length); }
+    function isPhoneFrame(c) { return c.mode === 'team' || c.exp === 'rocket'; }
+    function openPresent(c) {
+        $('presentPane').classList.toggle('phone', isPhoneFrame(c));
+        if (pres.space !== c.space) {
+            pres.space = c.space; pres.ask = false;
+            var u = new URL(studentLink(c));
+            u.searchParams.set('present', '1');
+            $('presentFrame').src = u.href;
+        }
+        renderPresentBar();
+    }
+    function closePresent() {
+        if (!pres.space) return;
+        pres.space = ''; pres.ask = false; $('presentFrame').src = 'about:blank'; $('pAsk').hidden = true;
+        if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () { /* 무시 */ });
+    }
+    function stepNames(c) { var e = CC.expInfo(c.exp); return function (k) { return (e && e.steps && e.steps[k]) || k; }; }
+    function renderPresentBar() {
+        var c = watched(); if (!c || !pres.space) return;
+        var si = CC.stageInfo(c.exp, c.stage), name = stepNames(c);
+        $('pStage').innerHTML = si ? (si.all ? '✅ 모든 단계 열림' : '🔓 <b>' + esc(name(si.cur)) + '</b> 까지 열림 (' + si.n + ' / ' + si.gate.length + ')') : '';
+        var j = '';
+        try { if (state.last) { var s = CC.summarize(state.last); j = c.mode === 'team' ? '👨‍👩‍👧 팀 ' + ((state.last.teams || []).length || s.joined) : '🧑‍🎓 들어온 학생 ' + s.joined + ' / ' + s.total; } } catch (e) { j = ''; }
+        $('pJoined').textContent = j;
+        $('btnPOpen').disabled = !si || si.all || state.stageBusy;
+        $('btnPOpen').textContent = si && !si.all ? '▶ 다음 단계 열기: ' + name(si.gate[si.n]) : '▶ 다음 단계 열기';
+        if (pres.ask && (!si || si.all)) askOpen(false);
+    }
+    function askOpen(on) {
+        var c = watched(), si = c && CC.stageInfo(c.exp, c.stage);
+        pres.ask = !!(on && si && !si.all);
+        $('pAsk').hidden = !pres.ask;
+        if (pres.ask) { $('pAskText').innerHTML = '▶ <b>' + esc(stepNames(c)(si.gate[si.n])) + '</b> 단계를 열까요? 학생 폰도 함께 넘어가요.'; $('btnPAskYes').focus(); }
+    }
+    function openNext() { askOpen(false); $('btnStageNext').click(); }
+    // 그 단계 안의 작은 탭 → 다음 단계(열려 있으면) → 잠겨 있으면 열기 확인
+    function presentMove(dir) {
+        if (pres.ask) { if (dir > 0) openNext(); else askOpen(false); return; }
+        var d = frameDoc(), c = watched();
+        if (!d || !c) return;
+        var sub = Array.prototype.filter.call(d.querySelectorAll('nav.subtabs'), shown)[0];
+        if (sub) {
+            var bs = Array.prototype.filter.call(sub.querySelectorAll('button[data-tab]'), shown);
+            var i = bs.findIndex(function (b) { return b.getAttribute('aria-selected') === 'true'; });
+            if (i >= 0 && bs[i + dir]) { bs[i + dir].click(); return; }
+        }
+        var steps = Array.prototype.slice.call(d.querySelectorAll('nav.steps button[data-step], nav.tabs button[data-tab]'));
+        var k = steps.findIndex(function (b) { return b.getAttribute('aria-selected') === 'true'; });
+        var nb = k >= 0 ? steps[k + dir] : null;
+        if (nb && !nb.classList.contains('cs-locked')) {
+            nb.click();
+            if (dir < 0) {   // 앞 단계로 가면 그 단계의 마지막 작은 탭부터
+                var s2 = Array.prototype.filter.call(d.querySelectorAll('nav.subtabs'), shown)[0];
+                var b2 = s2 ? Array.prototype.filter.call(s2.querySelectorAll('button[data-tab]'), shown) : [];
+                if (b2.length) b2[b2.length - 1].click();
+            }
+            try { d.defaultView.scrollTo(0, 0); } catch (e) { /* 무시 */ }
+            return;
+        }
+        if (dir > 0 && (nb || !steps.length)) askOpen(true);   // 잠긴 다음 단계 (또는 단계 단추가 없는 행사형)
+    }
+    function presentKey(e) {
+        if (state.sub !== 'present' || e.altKey || e.ctrlKey || e.metaKey) return;
+        var t = e.target, tag = t && t.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+        var dir = { ArrowRight: 1, PageDown: 1, ' ': 1, ArrowLeft: -1, PageUp: -1 }[e.key];
+        if (e.key === 'Escape' && pres.ask) { e.preventDefault(); askOpen(false); return; }
+        if (e.key === 'Enter' && pres.ask) { e.preventDefault(); openNext(); return; }
+        if (!dir) return;
+        if (tag === 'BUTTON' && e.key === ' ' && !(t.closest && t.closest('nav'))) return;   // 단추 누르기는 그대로
+        e.preventDefault(); e.stopImmediatePropagation();
+        presentMove(dir);
+    }
+    document.addEventListener('keydown', presentKey, true);
+    $('presentFrame').addEventListener('load', function () {
+        var d = frameDoc(); if (!d) return;
+        d.addEventListener('keydown', presentKey, true);   // iframe 안을 누른 뒤에도 같은 키로
+    });
+    $('btnPNext').addEventListener('click', function () { presentMove(1); });
+    $('btnPPrev').addEventListener('click', function () { presentMove(-1); });
+    $('btnPOpen').addEventListener('click', function () { askOpen(true); });
+    $('btnPAskYes').addEventListener('click', openNext);
+    $('btnPAskNo').addEventListener('click', function () { askOpen(false); });
+    $('btnPExit').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'run'); });
+    $('btnPFull').addEventListener('click', function () {
+        if (document.fullscreenElement) { if (document.exitFullscreen) document.exitFullscreen(); return; }
+        var r = document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen() : null;
+        if (r && r.catch) r.catch(function () { $('pHint').textContent = '⚠️ 이 브라우저는 전체 화면을 막았어요. F11 키로도 돼요.'; });
+    });
+    document.addEventListener('fullscreenchange', function () { $('btnPFull').textContent = document.fullscreenElement ? '⛶ 전체 화면 끄기 (Esc)' : '⛶ 전체 화면'; });
+
     // ---------- 📥 자료 내려받기 ----------
     function download(name, text, type) {
         var blob = new Blob([text], { type: type }), a = document.createElement('a');
@@ -495,6 +601,7 @@
         $('dlMsg').textContent = '✅ ' + x.r.items.length + '개 회차를 JSON 으로 내려받았어요 (자료 원본 포함).';
     });
     function render(st) {
+        renderPresentBar();
         if (st.mode === 'team') return renderBoard(st);
         var s = CC.summarize(st);
         $('watchSum').innerHTML =
@@ -539,7 +646,7 @@
         $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
     $('btnCloseDetail').addEventListener('click', function () { state.detail = null; $('detail').hidden = true; });
-    document.addEventListener('visibilitychange', function () { if (!document.hidden && state.view === 'main' && state.sub === 'run') refresh(); });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && state.view === 'main' && isLive()) refresh(); });
     renderPreview(); renderList();
     LS.onUser(function (u) { state.user = u && u.google ? u : null; renderLogin(); loadClasses(); });
 })();

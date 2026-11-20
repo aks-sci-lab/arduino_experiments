@@ -10,6 +10,8 @@
     var $ = function (s, el) { return (el || document).querySelector(s); };
     var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
     var CLASS = CC ? CC.readClassParam(location.search) : '';
+    // 🎬 발표용 (교사 화면 '발표 보기', ?present=1): 팀으로 입장하지 않고 선생님이 연 단계의 첫 화면을 보여 줌. 이 브라우저에 저장 안 함
+    var PRESENT = !!(window.LabUI && window.LabUI.present);
     var KEY = 'film-rocket:v1:' + (CLASS || 'solo');
     var LS = null; try { LS = window.localStorage; } catch (e) { LS = null; }
 
@@ -22,7 +24,7 @@
     }
     function load() {
         var d = null;
-        try { d = JSON.parse((LS && LS.getItem(KEY)) || 'null'); } catch (e) { d = null; }
+        if (!PRESENT) { try { d = JSON.parse((LS && LS.getItem(KEY)) || 'null'); } catch (e) { d = null; } }
         var f = fresh();
         if (!d || d.v !== 1) return f;
         Object.keys(f).forEach(function (k) { if (d[k] === undefined) d[k] = f[k]; });
@@ -32,6 +34,7 @@
     var st = load();
     var saveOk = true;
     function save() {
+        if (PRESENT) return;
         try { LS.setItem(KEY, JSON.stringify(st)); saveOk = true; } catch (e) { saveOk = false; }
     }
     function changed() { st.dirty = true; st.rev = (st.rev || 0) + 1; save(); renderTop(); queueSend(); }
@@ -57,6 +60,11 @@
             gateDom: false,
             onStage: function (open, o) {
                 stageOpen = open;
+                if (PRESENT) {   // 발표용: 새로 열린 단계(처음엔 열린 마지막 단계)의 첫 화면
+                    var to = o && o.moved && o.moved.to ? o.moved.to : open && open.length ? open[open.length - 1] : null;
+                    if (to && STAGE_START[to] && stageOf(st.screen) !== to) show(STAGE_START[to]); else renderTop();
+                    return;
+                }
                 if (o && o.moved && o.moved.to && st.team) { show(STAGE_START[o.moved.to]); flash('▶ 선생님이 ‘' + stageName(o.moved.to) + '’ 단계를 열었어요'); }
                 else if (stageLocked(stageOf(st.screen))) show(st.screen, { back: true });
                 else renderTop();
@@ -907,11 +915,11 @@
 
     // ---------- 시작 ----------
     initShare();
-    var startScreen = st.team ? st.screen : 'enter';
+    var startScreen = PRESENT ? 'think-intro' : st.team ? st.screen : 'enter';
     if (startScreen !== 'enter' && /measure$/.test(startScreen)) startScreen = startScreen.replace(/measure$/, 'cond');   // 카메라 화면 가운데서 새로고침했으면 조건 화면부터
     st.lastScreen = st.screen;
     show(startScreen === 'enter' && st.team ? 'enter' : startScreen, { back: true });
-    if (share) retryLoop();
+    if (share && !PRESENT) retryLoop();
     if (st.dirty) queueSend();
     // 시험·디버그용 (화면에서 쓰지 않음)
     window.__filmRocket = { state: function () { return st; }, show: show, sendNow: sendNow, share: function () { return share; } };
