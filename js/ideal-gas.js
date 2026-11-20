@@ -358,6 +358,11 @@
                     },
                     prepare: async ([d, c]) => {
                         dataChar = d; cmdChar = c;
+                        // 펌웨어 판 확인 (예전 판이면 한 줄 안내, 측정은 막지 않음). 페이지 알림을 붙이기 전에 한 번.
+                        if (typeof PicoFirmware !== 'undefined') {
+                            PicoFirmware.showNotice(await PicoFirmware.probe(d, c), $('ble-status'));
+                            if (setupFailure) throw setupFailure;
+                        }
                         d.addEventListener('characteristicvaluechanged', onNotify);
                         await d.startNotifications();
                         // VOC 센서(히터)는 켜지 않고 온도·습도·기압만 1초마다 받는다

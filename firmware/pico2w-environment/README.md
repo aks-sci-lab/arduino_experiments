@@ -19,6 +19,28 @@ VOC Index는 환경 실험 페이지에 포함됩니다. 이전 VOC 회차 보�
 - Wi-Fi SSID, 비밀번호, Firebase 키를 Pico에 넣지 않습니다. BLE로 가까운 컴퓨터/Android에 전송하며, 인터넷은 웹페이지와 Google 로그인/기록 제출에만 필요합니다.
 - HTTPS 웹페이지에서 **PC/Android Chrome 또는 Edge**를 사용하세요. iPhone/iPad Safari, Firefox는 Web Bluetooth가 지원되지 않습니다. 컴퓨터에는 Bluetooth가 필요합니다.
 
+## 웹에서 USB 로 한 번에 올리기 (추천, PC 크롬·엣지)
+
+MicroPython 이 이미 깔린 보드라면 Thonny 없이 사이트에서 네 파일을 한 번에 올릴 수 있습니다.
+
+1. [보드 번호 정하기](../../projects/board-setup.html#usb) 화면을 PC 의 크롬이나 엣지로 엽니다 (Web Serial 이 필요해 아이폰·아이패드·안드로이드·사파리는 안 됩니다).
+2. Thonny 는 닫고, 보드를 **데이터용 USB 케이블**로 꽂습니다 (BOOTSEL 단추는 누르지 않음).
+3. **🔌 USB 연결하고 펌웨어 올리기** → 목록에서 보드를 고릅니다.
+4. 화면이 차례로 합니다: 돌던 `main.py` 를 Ctrl-C 로 멈춤 → 원시 REPL(Ctrl-A) → 블루투스가 있는 MicroPython 인지·저장 공간 확인 → 파일마다 `이름.new` 로 나눠 쓰고 **크기·SHA-256** 확인 → 네 개가 다 맞으면 원래 이름으로 바꿈(`main.py` 는 맨 끝) → Ctrl-B·Ctrl-D 로 다시 켜기 → 셸에 찍히는 `[BOOT] Firmware: 판` 으로 확인.
+5. **보드 번호 파일(`board.json`)은 건드리지 않습니다.** 쓰다가 USB 가 빠지면 예전 펌웨어가 그대로 남으므로 **다시 하기**를 누르면 됩니다.
+
+블루투스로 연결하는 실험 페이지는 연결할 때 `GET_BOARD` 로 판(`fw`)을 읽어, 사이트의 최신 판(`js/pico-firmware.js` 의 `LATEST`)보다 예전이면 "⚠ 보드 펌웨어가 예전 판이에요" 한 줄을 보여 줍니다(측정은 그대로 됨). `GET_BOARD` 를 모르는 아주 예전 펌웨어도 '예전 판'으로 봅니다.
+
+### 판 기록
+
+| 판 | 바뀐 것 |
+|---|---|
+| `2026.11-usb` | 켤 때 `[BOOT] Firmware: 2026.11-usb` 를 찍음(웹 USB 올리기가 다시 켠 뒤 확인) |
+| `2026.11-iv` | INA219/INA226 전류·전압 (`START:IV`) |
+| `2026.11-board` | 보드 번호(`board.json`)·`GET_BOARD` 의 `fw` |
+
+판을 올릴 때는 `main.py` 의 `FIRMWARE_VERSION` 과 `js/pico-firmware.js` 의 `LATEST` 를 함께 바꾸고, 예전 판을 `HISTORY` 맨 뒤에 더합니다(`tests/pico-firmware.test.cjs` 가 둘이 같은지 확인).
+
 ## Thonny에서 업로드
 
 1. 최신 Thonny를 설치합니다. 장치의 BOOTSEL 버튼을 누른 상태로 USB 데이터 케이블을 연결합니다.
@@ -60,7 +82,7 @@ VOC Index는 환경 실험 페이지에 포함됩니다. 이전 VOC 회차 보�
 | `IDENTIFY` | 아니오 | LED 를 몇 초 깜빡임 (답 없음) |
 
 ```json
-{"type":"board","ts":1,"seq":1,"data":{"name":"PicoEnv-07","board":7,"id":"E66141...","fw":"2026.11-iv","saved":true}}
+{"type":"board","ts":1,"seq":1,"data":{"name":"PicoEnv-07","board":7,"id":"E66141...","fw":"2026.11-usb","saved":true}}
 ```
 
 `board` 는 번호가 없으면 `null`, `ts`·`seq` 는 답마다 1씩 커지는 순번입니다. 예전 펌웨어는 이 명령에 `Unknown command` 오류를 돌려주며, 페이지는 "새 main.py 를 올리세요"라고 안내합니다.
