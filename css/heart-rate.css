@@ -86,3 +86,6 @@ body.hr-phone #br-result, body.hr-phone #br-profile-box, body.hr-phone #br-runs-
 body.hr-laptop .hr-laptop-only { display: block; }
 body.hr-laptop .hr-measure, body.hr-laptop #torch-warn { display: none !important; }
 .hr-devline { display: flex; justify-content: flex-end; margin: 0 0 var(--sp-2); }
+/* 📱 수업 폰: 원본을 선생님께도 보낼지 */
+.raw-consent { margin: var(--sp-2) 0; }
+.raw-consent .note { margin: 4px 0 0; }

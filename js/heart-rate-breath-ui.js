@@ -300,6 +300,114 @@
     core.hooks.onRunSaved = () => { if (PHONE && share) share.saved(); };
     core.hooks.onRunDeleted = () => { if (PHONE && share) share.saved(); };
 
+    // ---------- 📱 원본을 선생님께도 보낼지 (수업 ?c= 로 들어온 폰만, 2026-11-20 선생님 결정 "동의 먼저 받기") ----------
+    //  수업 공간에 들어간 원본(kind 'raw')은 교사 화면 조 카드·내려받기에도 보인다. 그래서 폰에서 먼저 묻는다.
+    //   - 동의함: 지금처럼 수업 공간으로 (요약에 '원본(동의함)' 표시 → 교사 화면에서 구분)
+    //   - 동의 안 함: 이 폰과 QR 을 만든 노트북만 읽는 짝 공간(주소의 pp=, 수업 없이 열 때의 폰 짝과 같은 방식)으로 → 노트북 분석은 그대로
+    //   - 끄면 이미 수업 공간에 보낸 원본도 빼고(지움 줄) 다음부터 짝 공간으로
+    const PCF = window.PendulumCloud, CC = window.ClassCloud;
+    const CLASS = CC && CC.readClassParam ? CC.readClassParam(location.search) : '';
+    const PAIR_RE = /^p[a-z0-9]{23}$/;
+    const newPair = () => { let sp = 'p'; for (let i = 0; i < 23; i++) sp += 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 32)]; return sp; };
+    if (!state.pair || typeof state.pair !== 'object') state.pair = {};          // 노트북: 수업마다 폰 짝 공간 { 수업 코드: 공간 id }
+    if (!state.rawOk || typeof state.rawOk !== 'object') state.rawOk = {};      // 폰: 수업마다 원본 동의 { 수업 코드: true }
+    if (!state.classSent || typeof state.classSent !== 'object') state.classSent = {};   // 폰: 수업 공간에 보낸 원본 id { 수업 코드: [줄 id] }
+    const PAIR = PHONE ? ((/[?&]pp=([a-z0-9]+)/.exec(location.search) || [])[1] || '') : (CLASS ? (state.pair[CLASS] = PAIR_RE.test(state.pair[CLASS] || '') ? state.pair[CLASS] : newPair()) : '');
+    if (!PHONE && CLASS) save();
+    const pairOk = PAIR_RE.test(PAIR);
+    const rawOn = () => !!(CLASS && state.rawOk[CLASS]);
+    const classUrl = () => (PCF ? PCF.resolveServer(location.search).url : 'lab:');
+    function myRawItems() {
+        const memo = share && share.runs ? share.runs() : {};
+        return R.rawItems(phoneRawRuns()).map(it => {
+            const m = memo[String(it.id)] && memo[String(it.id)].memo;
+            const out = m ? Object.assign({}, it, { title: String(it.title) + ' · ' + m }) : Object.assign({}, it);
+            if (CLASS && rawOn()) out.summary = Object.assign({}, it.summary, { '원본(동의함)': 1 });   // 교사 화면 조 카드에 보임
+            return out;
+        });
+    }
+    async function saveAll(url, payloads, ctx) {
+        let done = 0; const ids = [], cleared = [];
+        for (const pl of payloads) {
+            if (ctx) ctx.progress(done + 1, payloads.length);
+            const body = Object.assign({}, pl); delete body.tooBig;
+            const r = await PCF.save(url, body);
+            if (!r.ok) return { ok: false, error: r.error, network: !!r.network, done, ids, cleared };
+            done++; (pl.n > 0 ? ids : cleared).push(pl.id);
+        }
+        return { ok: true, done, ids, cleared };
+    }
+    // 수업 공간에서 이 폰이 보낸 원본 줄 빼기 (동의를 끌 때)
+    async function clearClass() {
+        const sent = state.classSent[CLASS] || [];
+        if (!sent.length || !share) return { ok: true, done: 0 };
+        const b = ClassShare.buildPayloads({ exp: 'heartrate', group: share.group(), device: share.device(), items: [], sent, isGroupCode: PCF.isGroupCode });
+        if (b.error) return { ok: true, done: 0 };
+        const r = await saveAll(classUrl(), b.payloads);
+        state.classSent[CLASS] = sent.filter(id => r.cleared.indexOf(id) < 0); save();
+        return r;
+    }
+    // 폰 보내기: 수업이면 동의에 따라 수업 공간 / 짝 공간, 수업이 아니면 지금처럼 (ctx.url = 짝 공간)
+    async function phoneSend(ctx) {
+        let url = ctx.url, note = '';
+        if (CLASS && !rawOn()) {
+            if (!pairOk) return { ok: false, error: "원본을 선생님께 보내는 데 동의하지 않았는데, 이 QR 에는 짝 노트북 자리가 없어요(예전 QR). 노트북 화면의 새 QR 을 찍거나, 위 '선생님께도 보내기'를 체크하세요" };
+            url = 'lab:' + PAIR; note = '🔒 원본은 선생님께는 가지 않고 짝 노트북만 받아요.';
+        }
+        const b = ClassShare.buildPayloads({ exp: 'heartrate', group: ctx.group, device: ctx.device, items: myRawItems(), sent: url === ctx.url ? ctx.sent : [], only: ctx.only, isGroupCode: PCF.isGroupCode });
+        if (b.error) return { ok: false, error: b.error };
+        const r = await saveAll(url, b.payloads, ctx);
+        if (CLASS && url === ctx.url) {
+            const list = state.classSent[CLASS] || [];
+            r.ids.forEach(id => { if (list.indexOf(id) < 0) list.push(id); });
+            state.classSent[CLASS] = list.filter(id => r.cleared.indexOf(id) < 0); save();
+            note = '🔓 원본은 같은 조 노트북과 선생님께도 갔어요(동의함).';
+        }
+        if (CLASS && url !== ctx.url && r.ok) await clearClass();   // 예전에 동의해서 보낸 것이 남아 있으면 이번에 뺌
+        return Object.assign(r, { note });
+    }
+    // 노트북(수업): 수업 공간 + 폰 짝 공간을 함께 불러와 합침 (같은 폰·같은 회차는 나중에 보낸 것)
+    const seenRows = {};
+    async function laptopPull(ctx) {
+        const q = u => u + (u.indexOf('?') >= 0 ? '&' : '?') + 'exp=heartrate';
+        const lists = await Promise.all([PCF.list(q(ctx.url), ctx.group), pairOk ? PCF.list(q('lab:' + PAIR), ctx.group) : Promise.resolve({ ok: true, items: [] })]);
+        if (!lists[0].ok) return lists[0];
+        const byId = {};
+        lists.forEach(l => (l.ok ? l.items || [] : []).forEach(x => { const k = String(x.id), o = byId[k]; if (!o || String(x.sentAt || '') >= String(o.sentAt || '')) byId[k] = x; }));
+        const items = ClassShare.incomingFrom(Object.values(byId), ctx.device);
+        const changed = onIncoming(items);
+        let phoneNew = 0; const first = !Object.keys(seenRows).length && !laptopPull.ran;
+        items.forEach(x => { if (ClassShare.isPhoneDevice(x.device) && !seenRows[x.rowId] && !first) phoneNew++; seenRows[x.rowId] = 1; });
+        laptopPull.ran = true;
+        const others = {}; items.forEach(x => { others[x.device] = 1; });
+        return { ok: true, changed, others: Object.keys(others).length, points: items.reduce((n, x) => n + x.n, 0), phoneNew };
+    }
+    function onIncoming(items) {
+        const ext = B.breathIncoming(items), changed = JSON.stringify(ext) !== JSON.stringify(state.ext);
+        if (changed) { state.ext = ext; save(); }
+        const got = PHONE ? 0 : takeRaw(R.rawIncoming(items));
+        return changed || got > 0;
+    }
+    // 폰 화면의 동의 칸
+    function renderRawConsent() {
+        const box = $('raw-consent-box');
+        if (!box) return;
+        box.hidden = !(PHONE && CLASS);
+        if (box.hidden) return;
+        $('raw-consent').checked = rawOn();
+        $('raw-consent-st').innerHTML = rawOn()
+            ? '🔓 보내는 원본이 <b>선생님 화면에도</b> 보여요(선생님이 원본으로 다시 분석할 수 있어요). 언제든 체크를 끄면 이미 보낸 원본도 선생님 쪽에서 빼요.'
+            : (pairOk ? '🔒 체크하지 않으면 원본은 <b>이 폰과 QR 을 찍은 노트북만</b> 읽는 곳으로 가요. 노트북에서 분석은 그대로 돼요.'
+                : '⚠ 체크하지 않으면 보낼 수 없어요: 이 QR 은 예전 것이라 짝 노트북 자리가 없어요. 노트북 화면의 새 QR 을 찍으세요.');
+    }
+    if ($('raw-consent')) $('raw-consent').addEventListener('change', async e => {
+        state.rawOk[CLASS] = e.target.checked; save(); renderRawConsent();
+        if (!e.target.checked) {
+            const n = (state.classSent[CLASS] || []).length;
+            if (n) { $('raw-consent-st').innerHTML += '<br>⏳ 선생님 쪽에서 이미 보낸 원본 ' + n + '개를 빼는 중…'; const r = await clearClass(); renderRawConsent(); $('raw-consent-st').innerHTML += r.ok ? '<br>✅ 이미 보낸 원본을 선생님 쪽에서 뺐어요. 짝 노트북에 다시 보내려면 회차를 골라 📤 다시 보내세요.' : '<br>⚠ 빼지 못했어요: ' + esc(r.error || '') + ' — 다시 체크했다 끄거나 선생님께 말씀하세요.'; }
+        }
+    });
+
     // ---------- 조 공유 · 수업 참여 (동의한 회차만, exp heartrate 의 kind 'breath') ----------
     let share = null;
     if (window.ClassShare) {
@@ -310,16 +418,14 @@
                 sendButtons: ['#br-send'],
                 store: { load: () => state.share, save: o => { state.share = o; save(); } },
                 // 폰: 잰 원본(한 번 재기 + 숨 참기)을 kind 'raw' 로 / 노트북: 동의한 숨 참기 결과를 kind 'breath' 로
-                getItems: () => (PHONE ? R.rawItems(phoneRawRuns()) : B.breathItems(state.runs)),
-                onIncoming: items => {
-                    const ext = B.breathIncoming(items), changed = JSON.stringify(ext) !== JSON.stringify(state.ext);
-                    if (changed) { state.ext = ext; save(); }
-                    const got = PHONE ? 0 : takeRaw(R.rawIncoming(items));
-                    return changed || got > 0;
-                },
+                getItems: () => (PHONE ? myRawItems() : B.breathItems(state.runs)),
+                onIncoming,
+                send: PHONE && PCF ? phoneSend : undefined,
+                pull: !PHONE && CLASS && PCF ? laptopPull : undefined,
                 getStep: () => state.mode,
                 getPoints: () => (PHONE ? phoneRawRuns().length : state.runs.length),
-                phone: true,
+                // 수업이면 폰 QR 에 짝 공간(pp=)을 넣음 — 원본 동의를 안 한 폰도 이 노트북으로는 보낼 수 있게
+                phone: !PHONE && CLASS && pairOk ? { page: 'projects/heart-rate.html?pp=' + PAIR } : true,
                 onRole: role => { document.body.classList.toggle('hr-phone', role === 'phone'); },
                 onPhoneData: n => { phoneNote(n); },
                 deleteItem: id => {
@@ -329,6 +435,7 @@
             });
         } catch (e) { share = null; }
     }
+    renderRawConsent();
     $('br-send').addEventListener('click', () => {
         if (!state.runs.some(r => r.consent)) { $('br-send-st').textContent = "'수업 분석 동의'를 체크한 회차가 없어 보내지 않아요."; return; }
         if (!share) { $('br-send-st').textContent = '조 공유를 불러오지 못했어요. CSV 로 내세요.'; return; }
