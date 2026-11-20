@@ -12,7 +12,10 @@
     var CLASS = CC ? CC.readClassParam(location.search) : '';
     // 🎬 발표용 (교사 화면 '발표 보기', ?present=1): 팀으로 입장하지 않고 선생님이 연 단계의 첫 화면을 보여 줌. 이 브라우저에 저장 안 함
     var PRESENT = !!(window.LabUI && window.LabUI.present);
-    var KEY = 'film-rocket:v1:' + (CLASS || 'solo');
+    // 📂 지난 기록 (?past=수업코드): 수업 주소 없이 열었을 때 이 폰에 남은 우리 팀 기록을 보기만 (선생님께 보내지 않음)
+    var PAST = '';
+    if (!CLASS && !PRESENT && CC) { var pm = /[?&]past=([^&#]*)/.exec(location.search); var pc = pm ? CC.normalizeClass(decodeURIComponent(pm[1])) : ''; if (CC.isClassCode(pc)) PAST = pc; }
+    var KEY = 'film-rocket:v1:' + (CLASS || PAST || 'solo');
     var LS = null; try { LS = window.localStorage; } catch (e) { LS = null; }
 
     // ---------- 저장 (이 폰) ----------
@@ -35,6 +38,7 @@
     var saveOk = true;
     function save() {
         if (PRESENT) return;
+        st.savedAt = new Date().toISOString();
         try { LS.setItem(KEY, JSON.stringify(st)); saveOk = true; } catch (e) { saveOk = false; }
     }
     function changed() { st.dirty = true; st.rev = (st.rev || 0) + 1; save(); renderTop(); queueSend(); }
@@ -68,6 +72,7 @@
                 // 2026-11-20 선생님 결정 "기다리는 팀만 옮기기": 앞 단계를 끝내고 잠김 화면에서 기다리던 팀만 저절로 옮김.
                 //  하는 중인 팀은 그대로 두고 위 띠 '선생님이 ○○ 단계를 열었어요 · 끝나면 넘어가요'(renderTop) → 그 단계를 마치면 잠김 화면 없이 바로.
                 //  되돌리기(◀): 그 단계에 들어가 있던 팀은 잠김 안내(측정 중이면 측정을 마칠 때까지 그대로), '돌아가기'는 마지막으로 하던 화면으로
+                st.gate = { open: open ? open.slice() : null }; save();
                 var n = open ? open.length : STAGES.length, shrank = lastOpenN != null && n < lastOpenN;
                 lastOpenN = n;
                 if (shrank) { var fl = $('#ev-flash'); if (fl) fl.hidden = true; }
@@ -161,6 +166,7 @@
     }
     var STAGE_START = { think: 'think-intro', t1: 't1-intro', t2: 't2-intro', end: 'end-intro' };
     function syncText() {
+        if (PAST) return { cls: 'solo', t: '📂 지난 기록 · 이 폰에만 있어요' };
         if (!CLASS) return { cls: 'solo', t: '📱 이 폰에만 저장' };
         if (!st.team) return { cls: 'wait', t: '' };
         if (st.team.problem) return { cls: 'warn', t: '⚠ 팀 이름 확인' };
@@ -186,15 +192,22 @@
     }
     $('#ev-stages').addEventListener('click', function (e) {
         var b = e.target.closest('[data-stage]'); if (!b || !st.team) return;
-        show(STAGE_START[b.dataset.stage]);
+        show(entryFor(b.dataset.stage));
     });
 
     // ---------- 화면 틀 ----------
     var app = $('#ev-app'), cleanup = [];
     function stageOf(id) { return /^t1|^q-pressure|^q-control|^q-gas/.test(id) ? 't1' : /^t2|^q-action|^q-mass/.test(id) ? 't2' : /^end/.test(id) ? 'end' : /^think/.test(id) ? 'think' : 'enter'; }
     // ----- 선생님이 연 단계 -----
-    var stageOpen = null;   // null = 모두 열림 (수업 없이·예전 수업)
+    // null = 모두 열림 (수업 없이·예전 수업). 수업이면 마지막으로 받은 값을 폰에 기억해 두고 처음부터 씀 (인터넷이 끊긴 채 새로고침해도 잠금 유지)
+    var stageOpen = CLASS && !PRESENT && st.gate && Array.isArray(st.gate.open) ? st.gate.open.slice() : null;
     function stageLocked(stage) { return !!(stageOpen && STAGE_START[stage] && stageOpen.indexOf(stage) < 0); }
+    // 위 탭으로 단계에 들어갈 때: 이미 해 본 단계면 소개·안전·퀴즈를 다시 지나지 않고 '이어서 하기' (안전은 한 화면으로 짧게)
+    function entryFor(stage) {
+        if (stage === 't1' && st.t1.changed && st.t1.safe && st.t1.safe.goggle && st.t1.safe.face && st.t1.safe.away && st.t1.safe.wait) return 't1-again';
+        if (stage === 't2' && st.t2.changed) return 't2-again';
+        return STAGE_START[stage];
+    }
     function stageName(k) { var x = STAGES.filter(function (y) { return y[0] === k; })[0]; return x ? x[1] : k; }
     var flashT = null;
     function flash(t) {
@@ -275,8 +288,9 @@
         var already = st.team && (me || st.team.pending || !CLASS);
         var html = '<div class="ev-hero"><div class="ev-hero-ic" aria-hidden="true">🚀</div><h1>발포비타민 필름통 로켓</h1><p class="ev-lead">가족과 함께하는 과학실험교실</p></div>';
         if (already && !st.team.problem) {
-            html += card('<p>👨‍👩‍👧 우리 팀: <b>' + esc(st.team.name) + '</b></p><p class="ev-small">이 폰에 저장된 곳부터 이어서 해요.</p>') +
-                '<div class="ev-nav"><button type="button" class="ev-next good" id="ev-continue">이어서 하기 →</button></div>';
+            html += card('<p>👨‍👩‍👧 우리 팀: <b>' + esc(st.team.name) + '</b></p><p class="ev-small">' + (PAST ? '📂 수업이 끝난 뒤 이 폰에 남은 기록이에요. 선생님께는 보내지 않아요.' : '이 폰에 저장된 곳부터 이어서 해요.') + '</p>') +
+                '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-continue">' + (PAST ? '📋 기록 보기 →' : '이어서 하기 →') + '</button>' +
+                (PAST ? '<button type="button" class="ev-next secondary" data-go="end-card">🖼 결과 카드</button><button type="button" class="ev-next secondary" data-go="t1-graph">📈 1차시 그래프</button>' : '') + '</div>' + (PAST ? '' : pastBox());
             return { html: html, mount: function () { $('#ev-continue').addEventListener('click', function () { show(st.lastScreen && st.lastScreen !== 'enter' ? st.lastScreen : 'think-intro'); }); } };
         }
         html += '<h2>팀 이름을 정해요</h2>' +
@@ -284,7 +298,7 @@
             '<label class="ev-field">팀 이름 (12글자까지)<input type="text" id="ev-name" maxlength="12" autocomplete="off" placeholder="예: 별빛 가족" value="' + esc(st.team ? st.team.name : '') + '"></label>' +
             '<div class="ev-chips">' + ['별빛 가족', '로켓 탐험대', '무지개 팀', '번개 가족'].map(function (n) { return '<button type="button" class="ev-chip" data-name="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') + '</div>' +
             '<p id="ev-enter-msg" class="ev-msg" role="status" aria-live="polite">' + (st.team && st.team.problem ? '⚠ ' + esc(st.team.problem) : share && share.classFailed() && !isNetErr(share.classFailed()) ? '⚠ ' + esc(share.classFailed().error) : waiting ? '⏳ 선생님 수업에 연결하는 중…' : !CLASS ? 'ℹ️ 선생님 QR 로 들어오지 않았어요. 결과는 이 폰에만 저장돼요.' : '') + '</p>' +
-            '<div class="ev-nav"><button type="button" class="ev-next good" id="ev-start">시작하기 →</button></div>';
+            '<div class="ev-nav"><button type="button" class="ev-next good" id="ev-start">시작하기 →</button></div>' + pastBox();
         return { html: html, mount: function () {
             var inp = $('#ev-name'), msg = $('#ev-enter-msg');
             app.querySelectorAll('[data-name]').forEach(function (b) { b.addEventListener('click', function () { inp.value = b.dataset.name; inp.focus(); }); });
@@ -308,6 +322,35 @@
             });
         } };
     };
+
+    // 이 폰에 남은 지난 수업 기록 (팀 이름이 있는 것만, 최근 것 먼저)
+    function pastRecords() {
+        var out = [];
+        try {
+            for (var i = 0; LS && i < LS.length; i++) {
+                var k = LS.key(i), m = /^film-rocket:v1:(\d{1,2}-\d{4})$/.exec(k || '');
+                if (!m || m[1] === PAST) continue;
+                var d = null; try { d = JSON.parse(LS.getItem(k)); } catch (e) { d = null; }
+                if (!d || !d.team || !d.team.name) continue;
+                var n = (d.t1 && d.t1.trials ? d.t1.trials.length : 0) + (d.t2 && d.t2.trials ? d.t2.trials.length : 0);
+                out.push({ code: m[1], name: String(d.team.name), at: String(d.savedAt || d.sentAt || ''), n: n });
+            }
+        } catch (e) { /* 저장소를 못 읽음 */ }
+        return out.sort(function (a, b) { return a.at < b.at ? 1 : -1; }).slice(0, 5);
+    }
+    function pastBox() {
+        if (CLASS || PRESENT) return '';
+        var list = pastRecords();
+        if (!list.length) return '';
+        return '<h3>📂 이 폰의 지난 기록</h3><div class="ev-nav col">' + list.map(function (r) {
+            var d = r.at ? new Date(r.at) : null, day = d && !isNaN(d) ? ' (' + (d.getMonth() + 1) + '/' + d.getDate() + ')' : '';
+            return '<button type="button" class="ev-next secondary" data-past="' + esc(r.code) + '">👨‍👩‍👧 ' + esc(r.name) + day + ' · 잰 값 ' + r.n + '개 보기</button>';
+        }).join('') + '</div>';
+    }
+    app.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-past]'); if (!b) return;
+        location.href = location.pathname + '?past=' + encodeURIComponent(b.dataset.past);
+    });
 
     // ===== 1 생각 열기 =====
     SCREENS['think-intro'] = function () {
@@ -406,6 +449,23 @@
             } };
         };
     }
+    // 다시 들어온 팀: 안전 수칙은 한 화면으로 다시 확인 → 바로 조건 고르기·측정 (처음 하는 팀은 소개부터 전부)
+    function againScreen(part) {
+        return function () {
+            var p = st[part], defs = ensureBase(part), d = defs[p.changed], n = p.trials.length;
+            var t1 = part === 't1';
+            var html = '<p class="ev-kicker">' + (t1 ? '1차시' : '2차시') + ' · 이어서</p><h2>🔁 이어서 해요</h2>' +
+                card('<p>바꾸는 조건: <b>' + esc(d ? d.short || d.name : '–') + '</b> · 지금까지 <b>' + n + '번</b> 쟀어요.</p>') +
+                '<div class="ev-def"><p class="ev-def-w">🦺 안전 다시 확인</p><p>' + (t1 ? '🥽 보안경 · 🙅 얼굴 멀리 · 🏃 닫고 바로 물러나기 · ✋ 안 열리면 들여다보지 않고 선생님 부르기'
+                    : '🥽 보안경 · 🏃 발사대에서 물러나기 · 🙅 로켓 위로 얼굴 내밀지 않기 · ✋ 안 날아가면 선생님 부르기') + '</p></div>' +
+                '<div class="ev-nav col"><button type="button" class="ev-next good" data-go="' + part + '-cond">✅ 안전 확인 · 조건 고르고 ' + (t1 ? '재기' : '발사하기') + ' →</button>' +
+                (n ? '<button type="button" class="ev-next secondary" data-go="' + part + '-graph">📈 그래프 보기</button><button type="button" class="ev-next secondary" data-go="' + part + '-challenge">🎯 목표 도전</button>' : '') +
+                '<button type="button" class="ev-next secondary" data-go="' + part + '-intro">처음부터 보기</button></div>';
+            return { html: html };
+        };
+    }
+    SCREENS['t1-again'] = againScreen('t1');
+    SCREENS['t2-again'] = againScreen('t2');
     SCREENS['t1-safe'] = safetyScreen('t1', [
         { k: 'goggle', t: '🥽 <b>보안경</b>을 썼어요' },
         { k: 'face', t: '🙅 필름통에서 <b>얼굴을 멀리</b> 해요' },
@@ -455,13 +515,14 @@
             if (!d) return { html: '<p>먼저 바꿀 조건을 골라요.</p>' + nav(part + '-var', '고르러 가기 →') };
             if (part === 't2' && p.ch !== !!challenge) { p.ch = !!challenge; save(); }
             var s = setup();
-            var count = p.trials.filter(function (t) { return t.value === p.value; }).length;
+            p.quick = false;
+            var countOf = function () { return p.trials.filter(function (t) { return t.value === p.value; }).length; }, count = countOf();
             var html = '<p class="ev-kicker">' + (challenge ? '🎯 도전' : (part === 't1' ? '1차시' : '2차시') + ' · 이번 조건') + '</p>' +
                 '<h2>' + esc(d.short || d.name) + '을(를) 얼마로 할까요?</h2>' +
                 (challenge ? '<p class="ev-target">목표: <b>' + (part === 't1' ? esc(s.targetTime) + '초' : '아이 키만큼 (' + esc(s.targetPct) + '%)') + '</b> · 그래프를 보고 정해요</p>' : '') +
                 stepper(p.changed, d.short || d.name, d.label(p.value), {}) +
                 '<h3>같게 할 조건 🔒</h3>' + Object.keys(defs).filter(function (k) { return k !== p.changed; }).map(function (k) { return stepper(k, defs[k].short || defs[k].name, defs[k].label(p.base[k]), { locked: true }); }).join('') +
-                (!challenge && part === 't1' ? '<p class="ev-small">같은 조건으로 <b>' + s.repeats + '번</b> 재서 평균을 내요. 이 조건은 지금까지 ' + count + '번 쟀어요.</p>' : '') +
+                (!challenge && part === 't1' ? '<p class="ev-small">같은 조건으로 <b>' + s.repeats + '번</b> 재서 평균을 내요. 이 조건은 지금까지 <b id="ev-count">' + count + '</b>번 쟀어요.</p>' : '') +
                 (challenge && part === 't1' ? '<div id="ev-mini"></div>' : '') +
                 nav(next, '이 조건으로 →');
             return { html: html, mount: function (el) {
@@ -469,6 +530,7 @@
                     var b = e.target.closest('[data-pm]'); if (!b) return;
                     p.value = M.stepIn(d.values, p.value, Number(b.dataset.pm)); save();
                     el.querySelector('.ev-stepper:not(.locked) .ev-sval').textContent = d.label(p.value);
+                    var ce = el.querySelector('#ev-count'); if (ce) ce.textContent = String(countOf());
                 });
                 if (challenge && part === 't1') miniTable(el.querySelector('#ev-mini'), 't1');
             } };
@@ -489,6 +551,7 @@
         return function () {
             var p = st.t1, K = challenge ? 'chPredict' : 'predict';   // 도전 예측은 따로 (처음엔 목표 시간)
             if (p[K] == null) p[K] = challenge ? setup().targetTime : 10;
+            p.quick = false;
             var html = '<p class="ev-kicker">예측' + (challenge ? ' · 🎯 도전' : '') + '</p><h2>몇 초 뒤에 ‘펑’ 할까요?</h2><p>가족과 이야기해서 정해요.</p>' +
                 '<div class="ev-big-step"><button type="button" class="ev-pm big" data-pm="-1" aria-label="1초 줄이기">−</button><b id="ev-pv" aria-live="polite">' + p[K] + '초</b><button type="button" class="ev-pm big" data-pm="1" aria-label="1초 늘리기">+</button></div>' +
                 nav(next, '예측했어요! 재러 가기 →');
@@ -507,7 +570,19 @@
     // 측정: 🎥 녹화(시계 겹침) → 장면 고르기 / ⏱ 초시계
     function measureTimeScreen(challenge) {
         return function () {
-            var canRec = V && V.supported();
+            var canRec = V && V.supported(), p = st.t1;
+            var quick = !challenge && p.quick && (p.lastMethod === 'stopwatch' || (p.lastMethod === 'video' && canRec));
+            if (quick) {   // 같은 조건 2·3번째: 예측·방법은 지난 것 그대로 (바꾸기 단추)
+                var nth = p.trials.filter(function (t) { return t.value === p.value; }).length + 1;
+                return { html: '<p class="ev-kicker">측정 · 같은 조건 ' + nth + '번째</p><h2>‘펑’까지 시간 재기</h2>' +
+                    '<p class="ev-small">예측 <b>' + esc(p.predict) + '초</b> (처음 예측 그대로) · <button type="button" class="ev-link" data-go="t1-predict">예측 바꾸기</button> · <button type="button" class="ev-link" id="ev-m-other">다른 방법으로</button></p>' +
+                    '<div id="ev-m-box"></div><p id="ev-m-msg" class="ev-msg" role="status" aria-live="polite"></p>' + nav(null),
+                    mount: function (el) {
+                        var box = el.querySelector('#ev-m-box');
+                        el.querySelector('#ev-m-other').addEventListener('click', function () { p.quick = false; save(); show(st.screen, { back: true }); });
+                        if (p.lastMethod === 'video') recordTime(box, challenge); else stopwatch(box, challenge);
+                    } };
+            }
             var html = '<p class="ev-kicker">측정' + (challenge ? ' · 🎯 도전' : '') + '</p><h2>‘펑’까지 시간 재기</h2>' +
                 '<div class="ev-choices two">' + (canRec ? '<button type="button" class="ev-choice big" id="ev-m-rec">🎥 녹화로 재기<small>큰 시계가 영상에 찍혀요 · 더 정확</small></button>' : '') +
                 '<button type="button" class="ev-choice big" id="ev-m-sw">⏱ 초시계로 재기<small>단추를 눌러 재요</small></button></div>' +
@@ -555,8 +630,9 @@
         box.innerHTML = '<video id="ev-vid" class="ev-cam" playsinline muted></video>' +
             '<div class="ev-clock" id="ev-clock" aria-live="polite"></div>' +
             '<input type="range" id="ev-scrub" class="ev-scrub" min="0" max="1000" value="0" aria-label="영상 위치">' +
-            '<div class="ev-frames"><button type="button" class="ev-pm" data-f="-15" aria-label="0.5초 앞으로">⏪</button><button type="button" class="ev-pm" data-f="-1" aria-label="한 장면 앞으로">◀</button>' +
-            '<button type="button" class="ev-pm" data-f="1" aria-label="한 장면 뒤로">▶</button><button type="button" class="ev-pm" data-f="15" aria-label="0.5초 뒤로">⏩</button></div>' +
+            '<div class="ev-frames"><button type="button" class="ev-pm" data-f="-60" aria-label="2초 앞으로">⏪</button><button type="button" class="ev-pm" data-f="-1" aria-label="한 장면 앞으로">◀</button>' +
+            '<button type="button" class="ev-pm" data-f="1" aria-label="한 장면 뒤로">▶</button><button type="button" class="ev-pm" data-f="60" aria-label="2초 뒤로">⏩</button></div>' +
+            '<p class="ev-small">⏪ ⏩ 2초씩 · ◀ ▶ 한 장면씩</p>' +
             '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-pick"></button></div>';
         var vid = $('#ev-vid'), pl = V.player(vid, clip), scrub = $('#ev-scrub'), pick = $('#ev-pick');
         cleanup.push(function () { try { URL.revokeObjectURL(clip.url); } catch (e) { /* 무시 */ } });
@@ -569,7 +645,12 @@
             $('#ev-clock').textContent = mode === 'time' ? (needStart && startAt == null ? '영상 ' + pl.time().toFixed(2) + '초' : '⏱ ' + Math.max(0, t).toFixed(2) + '초') : '영상 ' + pl.time().toFixed(2) + '초';
             scrub.value = String(Math.round(pl.time() / Math.max(0.01, pl.duration()) * 1000));
         }
-        pl.ready.then(function () { label(); show2(); });
+        // ‘펑’ 은 녹화를 멈추기 바로 앞이라, 시계를 켠 녹화는 끝에서 2초 앞에서 열어요 (0초부터 30번 넘기지 않게)
+        pl.ready.then(function () {
+            label();
+            if (mode === 'time' && !needStart && pl.duration() > 2.5) return pl.seek(Math.max(clip.clockOffset || 0, pl.duration() - 2)).then(show2);
+            show2();
+        });
         vid.addEventListener('timeupdate', show2); vid.addEventListener('seeked', show2);
         scrub.addEventListener('input', function () { pl.seek(Number(scrub.value) / 1000 * pl.duration()).then(show2); });
         box.querySelector('.ev-frames').addEventListener('click', function (e) { var b = e.target.closest('[data-f]'); if (b) pl.step(Number(b.dataset.f)).then(show2); });
@@ -607,6 +688,7 @@
         var p = st.t1, s = setup(), rec = { value: p.value, predict: challenge ? p.chPredict : p.predict, y: sec, method: method, at: new Date().toISOString() };
         if (challenge) { var d = M.targetDiff(sec, s.targetTime, s.tolTime); rec.diff = M.round(d.diff, 2); rec.ok = d.ok; p.challenge.push(rec); }
         else p.trials.push(rec);
+        p.lastMethod = method; p.quick = false;
         st.last = rec; changed();
         show(challenge ? 't1-ch-result' : 't1-result');
     }
@@ -621,11 +703,13 @@
         var html = '<p class="ev-kicker">결과 · ' + esc(d ? d.label(r.value) : '') + '</p><h2>💥 ' + fmtS(r.y) + ' 만에 ‘펑’!</h2>' +
             card('<p>예측 <b>' + r.predict + '초</b> → 실제 <b>' + fmtS(r.y) + '</b></p><p>' + (Math.abs(diff) < 1 ? '🎉 거의 맞았어요!' : '예측보다 ' + fmtS(Math.abs(diff)) + ' ' + (diff > 0 ? '늦었어요' : '빨랐어요')) + '</p>' +
                 '<p>이 조건: <b>' + same.length + '번째</b> · 평균 <b>' + fmtS(avg) + '</b></p>') +
-            '<div class="ev-nav col">' + (same.length < s.repeats ? '<button type="button" class="ev-next good" data-go="t1-predict">🔁 같은 조건으로 한 번 더 (' + same.length + '/' + s.repeats + ')</button>' : '<p class="ev-ok">✅ 같은 조건으로 ' + s.repeats + '번 쟀어요!</p>') +
+            '<div class="ev-nav col">' + (same.length < s.repeats ? '<button type="button" class="ev-next good" id="ev-again">🔁 같은 조건으로 한 번 더 (' + same.length + '/' + s.repeats + ')</button>' : '<p class="ev-ok">✅ 같은 조건으로 ' + s.repeats + '번 쟀어요!</p>') +
             '<button type="button" class="ev-next ' + (same.length < s.repeats ? 'secondary' : 'good') + '" data-go="t1-cond">🔧 ' + esc(d ? d.short || d.name : '조건') + '을(를) 바꿔서 재기</button>' +
             '<button type="button" class="ev-next secondary" data-go="t1-graph">📈 그래프 보기</button></div>' +
             '<p class="ev-small">잘못 잰 값이면 <button type="button" class="ev-link" id="ev-undo">이 기록 지우기</button></p>';
         return { html: html, mount: function () {
+            var ag = $('#ev-again');
+            if (ag) ag.addEventListener('click', function () { p.value = r.value; p.quick = true; save(); show('t1-measure'); });
             $('#ev-undo').addEventListener('click', function () {
                 if (!confirm('방금 잰 값을 지울까요?')) return;
                 var i = p.trials.indexOf(r); if (i < 0) i = p.trials.length - 1;
@@ -960,7 +1044,7 @@
 
     // ---------- 시작 ----------
     initShare();
-    var startScreen = PRESENT ? 'think-intro' : st.team ? st.screen : 'enter';
+    var startScreen = PRESENT ? 'think-intro' : PAST ? 'enter' : st.team ? st.screen : 'enter';   // 지난 기록은 먼저 요약(우리 팀·결과 카드·그래프)
     if (startScreen !== 'enter' && /measure$/.test(startScreen)) startScreen = startScreen.replace(/measure$/, 'cond');   // 카메라 화면 가운데서 새로고침했으면 조건 화면부터
     st.lastScreen = st.screen;
     show(startScreen === 'enter' && st.team ? 'enter' : startScreen, { back: true });
