@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <script src="../js/ble-help.js"></script>
     <link rel="stylesheet" href="../css/class-share.css">
     <title>가속도계 데이터 분석</title>
     
@@ -69,7 +70,7 @@
         <!-- 연결·상태 띠 (위에 붙어 있음) -->
         <div class="dash-bar">
             <span class="dash-status">상태: <span id="status" role="status">연결 대기</span></span>
-            <button id="connectBleButton" class="ble-button">Bluetooth 연결</button>
+            <button id="connectBleButton" class="ble-button" data-ble-connect>Bluetooth 연결</button>
             <button id="disconnectBleButton" class="ble-button" style="display: none; background-color: var(--c-secondary);">연결 해제</button>
             <button id="recordButton" disabled>측정 시작</button>
             <select id="samplingRateSelect" aria-label="측정 속도">

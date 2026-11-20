@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <script src="../js/ble-help.js"></script>
     <title>이상기체 상태 방정식 검증</title>
     <link rel="stylesheet" href="../css/ideal-gas.css">
     <link rel="stylesheet" href="../css/class-share.css">
@@ -271,7 +272,7 @@
     <div class="card">
         <h2>5. 데이터 수집</h2>
         <div class="row">
-            <button id="btn-connect">🔵 센서 연결</button>
+            <button id="btn-connect" data-ble-connect>🔵 센서 연결</button>
             <button id="btn-disconnect" class="secondary" hidden>연결 해제</button>
             <span id="ble-status" class="note">연결 안 됨</span>
         </div>

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/lab-base.css">
     <script src="../js/lab-ui.js"></script>
+    <script src="../js/ble-help.js"></script>
     <meta name="robots" content="noindex, nofollow">
     <title>🛠 얼굴 심박(rPPG) 개발</title>
     <link rel="stylesheet" href="../css/class-share.css">
@@ -109,7 +110,7 @@
                 <div class="path-panel" data-path="ble" hidden>
                     <h3>③ 블루투스 심박계 (가슴 띠·손목 밴드)</h3>
                     <p class="note">표준 심박 서비스(Heart Rate 0x180D)를 내보내는 기기만 됩니다. 안드로이드 크롬·PC 크롬/엣지에서 되고, 아이폰 사파리는 안 됩니다.</p>
-                    <div class="row"><button id="ble-btn" class="secondary">🔗 심박계 연결</button><span class="pill" id="ble-st">연결 안 됨</span></div>
+                    <div class="row"><button id="ble-btn" class="secondary" data-ble-connect>🔗 심박계 연결</button><span class="pill" id="ble-st">연결 안 됨</span></div>
                 </div>
                 <div class="path-panel" data-path="wrist" hidden>
                     <h3>④ 손목 맥박 15초 × 4번</h3>

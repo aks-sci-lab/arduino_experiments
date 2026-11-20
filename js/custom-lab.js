@@ -195,6 +195,14 @@
                 if (sensor.fields.length) {
                     sensor.series = M.normalizeSeries(s.series, sensor.fields);
                     if (typeof s.rate === 'string' && M.SENSORS[d.sensor.mode].rates.some(r => r[0] === s.rate)) sensor.rate = s.rate;
+                    // 버니어: 지난번 연결 때 센서가 알려 준 채널 이름·단위
+                    if (sensor.isVernier && Array.isArray(s.chNames)) s.chNames.forEach(c => {
+                        const f = c && sensor.fields.find(x => x.key === c.key);
+                        if (f && typeof c.name === 'string' && c.name.trim()) {
+                            f.name = c.name.slice(0, 40); f.unit = String(c.unit || '').slice(0, 20);
+                            if (Number.isInteger(c.ch)) f.ch = c.ch;
+                        }
+                    });
                 }
             }
         } catch (e) { /* 깨진 저장값은 무시하고 빈 표로 시작 */ }
@@ -212,6 +220,7 @@
             localStorage.setItem(dataKey(), JSON.stringify({
                 v: 1, rows: view.rows, answers: view.answers, student: view.student, sel: view.sel, submitted: view.submitted,
                 series: sensor.fields.length ? sensor.series : undefined, rate: sensor.rate || undefined,
+                chNames: sensor.isVernier ? sensor.fields.map(f => ({ key: f.key, name: f.name, unit: f.unit, ch: f.ch })) : undefined,
                 ext: Object.keys(view.ext).length ? view.ext : undefined
             }));
             $('saveStatus').textContent = '';
@@ -234,6 +243,8 @@
             $(k + 'Card').hidden = !useSteps && !text.trim();
         });
         sensor.fields = M.sensorFields(def.sensor);
+        sensor.fields.forEach(f => { f.slotName = f.name; });   // 선생님이 고른 칸 이름 (예: 채널 1)
+        sensor.isVernier = def.sensor.mode !== 'none' && M.SENSORS[def.sensor.mode].vendor === 'vernier';
         if (sensor.fields.length) sensor.rate = M.SENSORS[def.sensor.mode].rates[0][0];
         if (!view.readOnly) {
             restoreData();
@@ -394,6 +405,10 @@
         const config = M.SENSORS[mode];
         $('sensorCard').hidden = false;
         $('sensorName').textContent = '— ' + config.label;
+        if (sensor.isVernier && !$('vernierCredit')) {
+            // 버니어 공개 도구 출처 (BSD 3-Clause, vendor/godirect/LICENSE)
+            $('sensorCharts').before(el('p', { id: 'vernierCredit', className: 'muted credit', textContent: '버니어가 공개한 연결 도구 godirect-js (BSD 3-Clause, © Vernier Software & Technology)로 연결합니다. Vernier·Go Direct 는 버니어의 상표입니다.' }));
+        }
         const readouts = $('sensorReadouts'), charts = $('sensorCharts');
         readouts.textContent = ''; charts.textContent = '';
         sensor.charts = [];
@@ -401,9 +416,9 @@
         sensor.fields.forEach(f => {
             const value = el('div', { className: 'v', textContent: '--' });
             value.dataset.key = f.key;
-            readouts.appendChild(el('div', { className: 'readout' }, [
-                el('div', { className: 'k', textContent: f.name }), value, el('div', { className: 'k', textContent: f.unit })
-            ]));
+            const nameEl = el('div', { className: 'k', textContent: f.name }), unitEl = el('div', { className: 'k', textContent: f.unit });
+            nameEl.dataset.name = f.key; unitEl.dataset.unit = f.key;
+            readouts.appendChild(el('div', { className: 'readout' }, [nameEl, value, unitEl]));
             const canvas = el('canvas');
             canvas.setAttribute('aria-label', f.name + ' 시간 그래프');
             charts.appendChild(el('div', { className: 'sensor-chart' }, [canvas]));
@@ -432,11 +447,16 @@
             sel.disabled = config.rates.length < 2;
             // 표에 같은 이름의 열이 있을 때만 "표에 넣기"를 쓴다
             $('btnToTable').hidden = !sensor.fields.some(f => columnIndexFor(f) >= 0);
-            const reason = CustomLabSensor.unsupportedReason();
+            const Conn = sensor.isVernier ? VernierSensor : CustomLabSensor;
+            const reason = Conn.unsupportedReason();
             $('btnSensorConnect').disabled = !!reason;
-            $('sensorStatus').textContent = reason ? '⚠ ' + reason : '센서 보드의 전원을 켜고 "센서 연결"을 누르세요.';
-            sensor.conn = CustomLabSensor.create({
-                mode, rate: sensor.rate,
+            $('sensorStatus').textContent = reason ? '⚠ ' + reason
+                : sensor.isVernier ? 'Vernier Go Direct 센서의 전원 단추를 눌러 켜고 "센서 연결"을 누르세요.' : '센서 보드의 전원을 켜고 "센서 연결"을 누르세요.';
+            const pre = {};
+            sensor.fields.forEach(f => { if (Number.isInteger(f.ch)) pre[f.key] = f.ch; });
+            sensor.conn = Conn.create({
+                mode, rate: sensor.rate, slots: sensor.fields.map(f => f.key),
+                onChannels: showVernierChannels,
                 onSample: handleSensorSample,
                 onStatus: text => { $('sensorStatus').textContent = text; },
                 onFirmware: result => { window.PicoFirmware?.showNotice(result, $('sensorStatus')); },
@@ -444,6 +464,7 @@
                     $('btnSensorConnect').hidden = connected;
                     $('btnSensorDisconnect').hidden = !connected;
                     if (!connected) {
+                        $('vernierMap').hidden = true;
                         if (sensor.recording) stopRecording('연결이 끊어져 기록을 멈췄습니다.');
                         sensor.latest = null;
                         $('sensorReadouts').querySelectorAll('.v').forEach(v => { v.textContent = '--'; });
@@ -451,12 +472,50 @@
                     updateSensorButtons();
                 }
             });
+            if (sensor.isVernier && Object.keys(pre).length) sensor.conn.setMapping(pre);
         }
         updateSensorButtons();
         drawSensor();
     }
+    // 버니어: 센서가 알려 준 채널 목록으로 칸마다 고르기 상자를 만들고, 칸 이름·단위를 채널 이름으로
+    function showVernierChannels(channels, mapping) {
+        const box = $('vernierMap');
+        box.textContent = '';
+        box.hidden = false;
+        box.appendChild(el('p', { className: 'muted', textContent: '센서가 알려 준 측정 채널 ' + channels.length + '개 — 칸마다 볼 채널을 고르세요.' }));
+        sensor.fields.forEach(f => {
+            const sel = el('select');
+            sel.setAttribute('aria-label', f.slotName + '에 쓸 채널');
+            channels.forEach(c => sel.appendChild(el('option', { value: String(c.number), textContent: c.name + (c.unit ? ' (' + c.unit + ')' : '') })));
+            if (mapping[f.key] !== undefined) sel.value = String(mapping[f.key]);
+            sel.addEventListener('change', () => {
+                if (sensor.recording) stopRecording('채널을 바꿔 기록을 멈췄습니다.');
+                sensor.conn.setMapping({ [f.key]: Number(sel.value) });
+            });
+            box.appendChild(el('label', { className: 'map-row' }, [el('span', { textContent: f.slotName }), sel]));
+            const c = channels.find(x => x.number === mapping[f.key]);
+            if (c) { f.name = c.name; f.unit = c.unit || ''; f.ch = c.number; }
+        });
+        sensor.live = M.emptySeries(sensor.fields);
+        sensor.fields.forEach((f, i) => {
+            const n = $('sensorReadouts').querySelector('[data-name="' + f.key + '"]');
+            const u = $('sensorReadouts').querySelector('[data-unit="' + f.key + '"]');
+            if (n) n.textContent = f.name;
+            if (u) u.textContent = f.unit;
+            const chart = sensor.charts[i];
+            if (chart) {
+                const label = f.name + (f.unit ? ' (' + f.unit + ')' : '');
+                chart.data.datasets[0].label = label;
+                chart.options.scales.y.title.text = label;
+                chart.update('none');
+            }
+        });
+        $('btnToTable').hidden = !sensor.fields.some(f => columnIndexFor(f) >= 0);
+        saveSoon();
+    }
+    // 표에서 센서 값을 넣을 열: 이름이 같은 열 (버니어는 칸 이름 '채널 1' 이나 센서가 알려 준 이름 둘 다)
     function columnIndexFor(field) {
-        return view.def.columns.findIndex(c => c.name === field.name);
+        return view.def.columns.findIndex(c => c.name.trim() === field.name || (field.slotName && c.name.trim() === field.slotName));
     }
     function updateSensorButtons() {
         const has = sensor.series.t.length > 0;
@@ -851,6 +910,10 @@
             });
             box.appendChild(el('label', {}, [cb, ' ' + f[1] + ' (' + f[2] + ')']));
         });
+        if (M.SENSORS[mode].vendor === 'vernier') {
+            $('edSensorHelp').textContent = '버니어 센서는 종류마다 채널(힘·온도·전압 등)이 달라, 여기서는 볼 칸 수만 고릅니다. 학생이 센서를 연결하면 센서가 알려 준 채널 목록에서 칸마다 채널을 고르고, 칸 이름은 그 채널 이름으로 바뀝니다. 표의 열 이름을 "채널 1" 그대로 두거나 센서가 쓰는 이름(예: Force)으로 바꾸면 "지금 값을 표에 넣기"를 쓸 수 있습니다. PC·안드로이드의 크롬·엣지에서만 됩니다 (아이폰 안 됨).';
+            return;
+        }
         $('edSensorHelp').textContent = '값을 고르면 같은 이름의 열이 표에 생깁니다. 학생은 "지금 값을 표에 넣기"로 센서 값을 그 열에 넣고, 나머지 열(예: 거리)은 직접 적습니다. 필요 없으면 그 열을 지워도 됩니다. 센서 연결은 PC·안드로이드의 크롬·엣지에서만 됩니다.';
     }
 
