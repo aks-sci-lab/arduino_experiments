@@ -140,9 +140,8 @@ test('회차 요약: 가속도는 평균·최대 |a|, 환경은 평균 온도·�
     const env = [{ time: 0, temp: 24, humidity: 40, pressure: 101 }, { time: 10, temp: 25, humidity: 42, pressure: 101.2 }];
     assert.deepEqual(N.runSummary('env', env), { '온도(C)': 24.5, '습도(퍼센트)': 41, '기압(kPa)': 101.1, '시간(s)': 10 });
     assert.equal(N.runTitle('imu', 3), '가속도 3회');
-    // 서버(apps-script/Code.gs cleanSummary)가 받는 이름만 쓴다
-    const gs = fs.readFileSync(path.join(root, 'apps-script', 'Code.gs'), 'utf8');
-    const rule = new RegExp(gs.match(/if \(!(\/\^\[[^\n]+?\$\/)\.test\(k\)/)[1].slice(1, -1));
+    // 저장소(js/lab-store.js cleanSummary)가 받는 이름만 쓴다: 1~30자, | ·제어 문자 없음
+    const rule = /^[^|\u0000-\u001f]{1,30}$/;
     for (const k of [...Object.keys(N.runSummary('imu', imu)), ...Object.keys(N.runSummary('env', env))]) assert.match(k, rule, k);
 });
 

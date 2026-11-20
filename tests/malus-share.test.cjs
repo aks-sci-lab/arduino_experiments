@@ -1,5 +1,5 @@
-// 말루스 법칙 조 공유 시험: 보낼 자료·받은 자료 합치기(Node) + 노트북 두 대 화면 시험(Playwright, 가짜 Apps Script)
-// 가짜 서버: tests/fake-apps-script.cjs 가 apps-script/Code.gs 를 그대로 돌림 (진짜 시트처럼 '2-3-5376' → 날짜 변환 흉내)
+// 말루스 법칙 조 공유 시험: 보낼 자료·받은 자료 합치기(Node) + 노트북 두 대 화면 시험(Playwright, 가짜 저장소)
+// 가짜 서버: tests/fake-lab-store.cjs (js/lab-store.js 를 메모리 DB 로)
 // Playwright 가 없는 컴퓨터에서는 화면 시험을 건너뛴다.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -37,7 +37,7 @@ test('보낼 자료: 회차마다 한 줄, 배경 뺀 밝기·결측, 요약 이
     assert.equal(items[0].summary['결측'], 1);
     assert.ok(items[0].summary['cos2 R2'] > 0.9999);
     assert.ok(Math.abs(items[0].summary.theta0 - 20) < 0.2);
-    // 서버(Code.gs cleanSummary)의 이름 규칙
+    // 예전 서버 이름 규칙(지금 저장소는 더 넓게 받음)
     items.forEach(it => Object.keys(it.summary).forEach(k => assert.match(k, /^[A-Za-z0-9_가-힣 .()-]{1,30}$/)));
     // 같은 회차 번호는 ClassShare 의 시트 id 로 (노트북 번호 + run1)
     const b = CS.buildPayloads({ exp: 'malus', group: '2-3-5376', device: 'nab12cd', items, sent: [], isGroupCode: () => true });
@@ -90,7 +90,7 @@ async function openLaptop(browser, base, app, query, width, seed) {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('dialog', d => d.accept());
-    // 가짜 Apps Script (GET ?action=… / POST 본문 JSON)
+    // 가짜 저장소
     await page.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; });   // 가짜 저장소 (js/lab-store.js)
     await page.route('https://script.google.com/**', async route => {
         const req = route.request(), u = new URL(req.url());

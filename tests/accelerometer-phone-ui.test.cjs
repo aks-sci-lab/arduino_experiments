@@ -1,5 +1,5 @@
 // 📱 폰 연결 시험: 스마트폰 가속도·자유낙하 — 노트북(1280) QR → 폰(Pixel 7)에서 여러 회 측정 → 보낼 회차 골라 📤 → 노트북에 📱 폰 회차로 들어와 그래프·분석
-// 가짜 Apps Script(tests/fake-apps-script.cjs)를 작은 HTTP 서버로 띄우고 js/pendulum-config.js 요청을 가로채 그 주소로 보낸다.
+// 가짜 저장소(tests/fake-lab-store.cjs)를 작은 HTTP 서버로 띄우고 js/pendulum-config.js 요청을 가로채 그 주소로 보낸다.
 // CDN(Chart.js)은 시험 환경에서 막혀 있어 대역을 쓴다. 폰 센서는 devicemotion 이벤트를 직접 만들어 넣고, 자유낙하는 영상 대신 프레임 그림을 넣어 손가락 누르기를 시험한다.
 // Playwright 가 없는 컴퓨터에서는 건너뛴다.
 const test = require('node:test');

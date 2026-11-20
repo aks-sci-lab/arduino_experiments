@@ -1,6 +1,6 @@
 // 환경 센서 페이지(환경·조도·자외선)의 조 공유 시험
 // - 계산 부분: js/environment-share.js (자료 줄이기·풀기, 요약, 받은 것 합치기, CSV 읽기)
-// - 화면: Playwright 로 가짜 선생님 시트(tests/fake-apps-script.cjs, 진짜 시트처럼 '2-3-5376' → 날짜) +
+// - 화면: Playwright 로 가짜 저장소(tests/fake-lab-store.cjs) +
 //   교사 수업 만들기 → 학생 2명이 같은 조(보내기 → 다른 학생이 자동으로 불러옴) → 교사 진행 보기에 단계·점 수, 375px
 //   Playwright 가 없으면 화면 시험은 건너뛴다. 스크린숏: ENV_SHARE_SHOTS=폴더
 const test = require('node:test');
