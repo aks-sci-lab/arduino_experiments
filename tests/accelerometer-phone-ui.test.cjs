@@ -13,7 +13,8 @@ test('📱 스마트폰 가속도: 폰에서 3회 → 1·3회만 보내기 → �
         const { page: L } = await open(browser, S, { viewport: { width: 1280, height: 800 } }, 'L', errors);
         await L.goto(S.BASE + '/projects/phone-accelerometer.html');
         const link = await phoneLink(L, '2-3-5376');
-        assert.match(link, /phone-accelerometer\.html\?.*role=phone&group=2-3-5376/);
+        assert.match(link, /phone-accelerometer\.html\?.*role=phone&group=99-\d+-\d{4}&s=p[a-z0-9]{23}/, '수업 없이: 이 노트북·폰 짝');
+        const GROUP = /group=([\d-]+)/.exec(link)[1];
 
         const { page: P } = await open(browser, S, devices['Pixel 7'], 'P', errors);
         await P.goto(link);
@@ -51,7 +52,7 @@ test('📱 스마트폰 가속도: 폰에서 3회 → 1·3회만 보내기 → �
         assert.match(await L.textContent('#record-status'), /📈 보는 중: 📱 폰 \w{4} · 3회 \(샘플 6개\)/);
         assert.equal(await L.evaluate(() => window.__charts[0].data.datasets[1].data.length), 6, '그래프에 Ay 6점');
         assert.equal(await overflow(L), 0);
-        assert.equal((await app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' })).items.length, 2);
+        assert.equal((await app.get({ action: 'list', exp: 'phoneaccel', group: GROUP })).items.length, 2);
         // 폰에서 회차를 지우면 노트북에서도 빠짐
         P.once('dialog', d => d.accept());
         await P.click('[data-del]');
@@ -66,6 +67,7 @@ test('📱 자유낙하: 폰에서 프레임에 손가락으로 점 찍기 → �
         const { page: L } = await open(browser, S, { viewport: { width: 1280, height: 800 } }, 'L', errors);
         await L.goto(S.BASE + '/projects/free-fall.html#step-5');
         const link = await phoneLink(L, '2-4-1111');
+        const GROUP2 = /group=([\d-]+)/.exec(link)[1];
 
         const { page: P } = await open(browser, S, devices['Pixel 7'], 'P', errors);
         await P.goto(link);
@@ -84,6 +86,7 @@ test('📱 자유낙하: 폰에서 프레임에 손가락으로 점 찍기 → �
         // 공이 자유낙하하는 자리(캔버스 좌표)를 화면 좌표로 바꿔 손가락으로 톡 누름: y = 20 + ½·g·t² (2 mm/px, g = 9.8 m/s²)
         const want = [0, 1, 2, 3, 4, 5].map(i => ({ x: 200, y: 20 + 0.5 * 9800 * (i / 30) ** 2 / 2 }));
         for (let i = 0; i < want.length; i++) {
+            await P.locator('#canvas').scrollIntoViewIfNeeded();
             const box = await P.locator('#canvas').boundingBox();
             await P.touchscreen.tap(box.x + want[i].x * box.width / 400, box.y + want[i].y * box.height / 300);
             await P.waitForTimeout(450);   // 누르면 0.3초 뒤 다음 프레임
@@ -106,7 +109,7 @@ test('📱 자유낙하: 폰에서 프레임에 손가락으로 점 찍기 → �
         assert.equal(await overflow(P), 0, '폰 가로 스크롤 (회차 목록)');
         await P.click('#cs-rsend');
         await P.waitForFunction(() => /보냈/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 15000 });
-        const rows = (await app.get({ action: 'list', exp: 'freefall', group: '2-4-1111' })).items;
+        const rows = (await app.get({ action: 'list', exp: 'freefall', group: GROUP2 })).items;
         assert.equal(rows.length, 1);
         const data = JSON.parse(rows[0].data);
         assert.equal(data.fps, 30); assert.equal(data.mmPerPx, 2); assert.equal(data.rows.length, 6);

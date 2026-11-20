@@ -90,8 +90,9 @@
         <div class="pd-card">
             <h2>4. 과정</h2>
             <ol>
-                <li>5. 데이터에서 반·조를 넣고 <b>조 코드</b>를 만들어요. 화면에 QR 코드가 떠요.</li>
-                <li>측정할 폰으로 QR 을 찍어 측정 화면을 열어요 (조 코드가 자동으로 들어가요).</li>
+                <li class="cs-hide-solo">5. 데이터에서 반·조를 넣고 <b>조 코드</b>를 만들어요. 화면에 QR 코드가 떠요.</li>
+                <li class="cs-hide-solo">측정할 폰으로 QR 을 찍어 측정 화면을 열어요 (조 코드가 자동으로 들어가요).</li>
+                <li class="cs-show-solo">5. 데이터의 <b>📱 QR</b> 을 측정할 폰으로 찍어 측정 화면을 열어요.</li>
                 <li>폰에 줄 길이 L 을 적고 측정해요. 끝나면 폰에서 <b>💻 노트북으로 보내기</b>.</li>
                 <li>노트북 표에 측정이 자동으로 들어와요. L 을 바꿔(예: 0.5·0.7·0.9·1.1 m) 여러 번 재요.</li>
                 <li>6. 결과에서 T²–L 그래프와 g 를 확인해요.</li>
@@ -124,13 +125,13 @@
         </section>
 
         <section class="pd-card" id="qrCard" hidden>
-            <h2>② 측정할 폰으로 QR 찍기</h2>
+            <h2><span class="cs-hide-solo">② </span>📱 측정할 폰으로 QR 찍기</h2>
             <div class="pd-qr-wrap">
                 <div id="qr" class="pd-qr" aria-label="측정 화면 QR 코드"></div>
                 <div class="pd-qr-info">
-                    <div>조 코드</div>
+                    <div id="codeLabel">조 코드</div>
                     <div id="codeShow" class="pd-code num"></div>
-                    <p class="note">폰 카메라로 QR 을 비추면 측정 화면이 이 조 코드로 열려요.</p>
+                    <p class="note">폰 카메라로 QR 을 비추면 측정 화면이 <span class="cs-hide-solo">이 조 코드로</span><span class="cs-show-solo">이 노트북과 짝지어</span> 열려요.</p>
                     <p class="note pd-url"><a id="qrUrl" target="_blank" rel="noopener"></a></p>
                     <div class="pd-row">
                         <button id="btnCopy">🔗 주소 복사</button>

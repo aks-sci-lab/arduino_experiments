@@ -15,7 +15,7 @@ const api = http.createServer((req, res) => {
 // 시험용 실험 페이지 (exp phoneaccel): 폰이면 '측정 저장' → share.saved()
 const HARNESS = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="../css/lab-base.css"><script src="../js/lab-ui.js"></script><link rel="stylesheet" href="../css/class-share.css"></head>
-<body style="padding:12px"><h1>시험 폰 실험</h1><div id="bar"></div><div id="sh"></div>
+<body style="padding:12px"><h1>시험 폰 실험</h1><div id="bar"></div><div id="pc"></div><div id="sh"></div>
 <button id="save" class="cs-btn good">💾 측정 저장</button><p id="role"></p><pre id="got"></pre>
 <script src="../js/pendulum-config.js"></script><script src="../js/pendulum-cloud.js"></script><script src="../js/class-cloud.js"></script><script src="../js/class-share.js"></script>
 <script>
@@ -26,6 +26,7 @@ window.share = ClassShare.init({ exp: 'phoneaccel', barMount: '#bar', shareMount
   onRole: r => { document.getElementById('role').textContent = 'role=' + r; },
   onPhoneData: n => { phoneNotes += n; },
   onIncoming: items => { const b = JSON.stringify(got); items.forEach(it => { got[it.from + '/' + it.id] = it.data; }); document.getElementById('got').textContent = JSON.stringify(got); return JSON.stringify(got) !== b; } });
+if (!share.isPhone()) share.phoneCard('#pc');
 document.getElementById('save').onclick = () => { const k = mine.reduce((m, x) => Math.max(m, +x.id.slice(3)), 0) + 1; mine.push({ id: 'run' + k, title: k + '회', n: 50, summary: { '최대 a (m/s²)': 12.3 }, data: { t: [0, 1], a: [9.8, 12.3] } }); localStorage.setItem('mine' + location.search.includes('role=phone'), JSON.stringify(mine)); share.saved(); };
 </script></body></html>`;
 const stat = http.createServer((req, res) => {
@@ -49,14 +50,14 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   }
   const check = async (pg, n) => { const ov = await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth); assert.equal(ov, 0, n + ' 가로 스크롤'); console.log(n, 'overflow', await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth),
     'small', await pg.evaluate(() => [...document.querySelectorAll('button, select, .cs-btn')].filter(e => e.offsetParent && e.getBoundingClientRect().height < 43.5).map(e => e.id || e.textContent.trim()))); };
-  // ---- 1) 수업 없이 ----
+  // ---- 1) 수업 없이: 조 공유 칸 없이 '📱 폰으로 측정해 보내기' 카드의 짝 QR (2026-11-20) ----
   const L = await ctx({ viewport: { width: 1280, height: 800 } }, 'L');
   await L.goto(ROOT + 'projects/_phone.html');
-  await L.fill('#cs-group', '2-3-5376');
-  await L.waitForTimeout(400);
-  await L.click('#cs-phone');
-  await L.waitForSelector('.cs-dlg:not([hidden]) #cs-qr svg', { state: 'attached' });
-  const link = await L.getAttribute('#cs-plink', 'href');
+  await L.waitForSelector('#pc #cs-cardqr svg', { state: 'attached' });
+  assert.equal(await L.locator('#cs-share').count(), 0, '수업 없이: 조 공유 칸 없음');
+  const link = await L.getAttribute('#pc a', 'href');
+  assert.match(link, /role=phone&group=99-\d+-\d{4}&s=p[a-z0-9]{23}/);
+  const GROUP = /group=([\d-]+)/.exec(link)[1];
   console.log('L role:', await L.textContent('#role'), '| link:', link);
   const P = await ctx(devices['Pixel 7'], 'P');
   await P.goto(link);
@@ -84,25 +85,24 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   const g1 = JSON.parse(await L.textContent('#got'));
   assert.deepEqual(Object.keys(g1).map(k => k.split('/')[1]).sort(), ['run1', 'run3']);
   assert.ok(Object.keys(g1).every(k => /^📱 폰 /.test(k)));
-  const rows = (await app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' })).items;
+  const rows = (await app.get({ action: 'list', exp: 'phoneaccel', group: GROUP })).items;
   assert.equal(rows.length, 2); assert.ok(rows.some(r => /3회 · 손에 들고/.test(r.title)));
-  console.log('L got 2 rows:', Object.keys(g1), '| titles', rows.map(r => r.title), '| dialog note:', await L.textContent('.cs-dlg .cs-note'));
+  console.log('L got 2 rows:', Object.keys(g1), '| titles', rows.map(r => r.title));
   // 2회를 마저 보내면 '새 측정 1개' (이미 보낸 것은 세지 않음)
   await P.locator('.cs-run input[type=checkbox][data-id=run2]').check();
   await P.click('#cs-rsend');
   await L.waitForFunction(() => phoneNotes >= 1 && document.getElementById('got').textContent.includes('run2'), null, { timeout: 15000 });
-  assert.match(await L.textContent('#cs-status'), /폰에서 새 측정 1개/);
-  console.log('L status after run2:', await L.textContent('#cs-status'));
+  await L.waitForFunction(() => /폰에서 새 측정 1개/.test(document.getElementById('cs-cardst').textContent));
   // 전부 다시 보내도 줄 수 그대로 (같은 id 로 고쳐 씀)
   await P.click('#cs-rall'); await P.click('#cs-rsend');
   await P.waitForFunction(() => /측정 3개/.test(document.getElementById('cs-pmsg').textContent), null, { timeout: 15000 });
-  assert.equal((await app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' })).items.length, 3);
+  assert.equal((await app.get({ action: 'list', exp: 'phoneaccel', group: GROUP })).items.length, 3);
   // 보낸 회차 지우기 → 시트에서도 빠짐
   P.once('dialog', d => d.accept());
   await P.click('[data-del=run1]');
   await P.waitForFunction(() => document.querySelectorAll('.cs-run').length === 2);
   await new Promise(r => setTimeout(r, 1500));
-  const after = (await app.get({ action: 'list', exp: 'phoneaccel', group: '2-3-5376' })).items.filter(r => Number(r.n) > 0);
+  const after = (await app.get({ action: 'list', exp: 'phoneaccel', group: GROUP })).items.filter(r => Number(r.n) > 0);
   assert.deepEqual(after.map(r => r.id.split('-').pop()).sort(), ['run2', 'run3']);
   console.log('after delete run1, sheet rows with data:', after.map(r => r.id));
   // 못 보낸 회차는 체크가 남아 그대로 다시 보내면 됨

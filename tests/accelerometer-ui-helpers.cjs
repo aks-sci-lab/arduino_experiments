@@ -55,7 +55,10 @@ const overflow = page => page.evaluate(() => document.documentElement.scrollWidt
 const smallButtons = page => page.evaluate(() => [...document.querySelectorAll('button, select, .cs-btn')]
     .filter(e => e.offsetParent && !e.closest('table, .steps') && e.getBoundingClientRect().height < 43.5).map(e => e.id || e.textContent.trim()));
 async function phoneLink(L, group) {
-    // 노트북 화면은 조 공유 칸이 접혀 있음 (QR 카드가 먼저) → 펼쳐서 조 코드를 넣음
+    // 수업 없이 연 노트북 화면(2026-11-20~)은 조 공유 칸이 없고 '📱 폰으로 측정해 보내기' 카드의 짝 QR 만 → 그 주소
+    await L.waitForSelector('.cs-pcard a, #cs-group', { state: 'attached', timeout: 15000 });
+    if (!(await L.locator('#cs-group').count())) return L.getAttribute('.cs-pcard a', 'href');
+    // 수업(?c=) 화면은 조 공유 칸이 접혀 있음 (QR 카드가 먼저) → 펼쳐서 조 코드를 넣음
     await L.evaluate(() => { const d = document.getElementById('cs-share'); if (d) d.open = true; });
     await L.fill('#cs-group', group);
     await L.waitForTimeout(300);
@@ -80,6 +83,7 @@ async function fakeFrames(P, n) {
 async function tapFall(P, count) {
     const want = Array.from({ length: count }, (_, i) => ({ x: 200, y: 20 + 0.5 * 9800 * (i / 30) ** 2 / 2 }));
     for (const w of want) {
+        await P.locator('#canvas').scrollIntoViewIfNeeded();   // 손가락은 화면 안만 누를 수 있음
         const box = await P.locator('#canvas').boundingBox();
         await P.touchscreen.tap(box.x + w.x * box.width / 400, box.y + w.y * box.height / 300);
         await P.waitForTimeout(450);   // 누르면 0.3초 뒤 다음 프레임

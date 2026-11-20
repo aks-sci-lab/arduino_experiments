@@ -106,23 +106,25 @@ test('진자 분석 화면: 폰은 측정 화면 안내(그래도 여기서 보�
             await p.click('#btnForce');
             assert.equal(await shown(p, 'nav.steps'), true, '그래도 여기서 보기 → 보임');
             assert.equal(await shown(p, '#phoneNotice'), false);
-            assert.equal(await shown(p, '#groupCard'), true, '5. 데이터 조 코드 칸');
+            assert.equal(await shown(p, '#groupCard'), false, '수업 없이(올바른 ?c= 아님): 조 코드 칸 없음');
+            assert.equal(await shown(p, '#qrCard'), true, '5. 데이터 폰 짝 QR');
             await p.reload(); await p.waitForFunction(() => document.readyState === 'complete');
             assert.equal(await shown(p, 'nav.steps'), true, '같은 탭에서는 새로고침해도 기억');
             assert.equal(await noHScroll(p), true);
             assert.deepEqual(errors, []);
             await c.close();
         }
-        // 노트북·태블릿: 안내 없이 분석, 조 코드를 만들면 5. 데이터 맨 위 카드가 측정 화면 QR
+        // 노트북·태블릿: 안내 없이 분석, 수업 없이 열면 조 코드 없이 5. 데이터 맨 위 카드가 측정 화면 QR (이 노트북·폰 짝)
         for (const opts of [{ viewport: { width: 1280, height: 800 } }, { ...devices['Galaxy Tab S4'] }]) {
             const { c, p, errors } = await open(browser, opts, base + '#step-5');
             assert.equal(await shown(p, '#phoneNotice'), false);
             assert.equal(await shown(p, 'nav.steps'), true);
-            await p.fill('#gBan', '2'); await p.fill('#gJo', '3'); await p.click('#btnMake');
+            await p.waitForSelector('#qrCard:not([hidden])');
+            assert.equal(await shown(p, '#groupCard'), false);
             const first = await p.evaluate(() => [...document.querySelectorAll('.step-panel[data-step="data"] > .pd-card')]
                 .find(e => getComputedStyle(e).display !== 'none' && !e.hidden).id);
             assert.equal(first, 'qrCard', '5. 데이터에서 처음 보이는 카드 = 측정 화면 QR');
-            assert.match(await p.getAttribute('#qrUrl', 'href'), /pendulum-measure\.html\?group=2-3-\d{4}/);
+            assert.match(await p.getAttribute('#qrUrl', 'href'), /pendulum-measure\.html\?group=99-\d+-\d{4}&s=p[a-z0-9]{23}$/);
             assert.deepEqual(errors, []);
             await c.close();
         }

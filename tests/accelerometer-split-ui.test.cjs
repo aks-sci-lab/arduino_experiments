@@ -60,7 +60,8 @@ test('스마트폰 가속도: 노트북은 분석만(QR 카드), 폰은 측정·
         assert.equal(await T.getAttribute('html', 'data-device'), 'tablet');
         assert.equal(await visible(T, '#btn-start'), true);
         assert.equal(await visible(T, '#phone-card'), false);
-        assert.equal(await T.inputValue('#cs-group'), '', '태블릿: 조 코드를 저절로 만들지 않음');
+        assert.equal(await T.locator('#cs-group').count(), 0, '태블릿(수업 없이): 조 코드 칸 없음');
+        assert.equal(await T.evaluate(() => ClassShare.current && ClassShare.current.group()), '', '태블릿: 조 코드를 저절로 만들지 않음');
         await shake(T, 2);
         assert.equal(await visible(T, '#runs-box'), true, '태블릿: 내 회차 목록·📈 보기');
         assert.equal(await overflow(T), 0);
