@@ -61,10 +61,16 @@
         await LS.signOut(); state.user = null; state.classes = []; renderLogin(); renderList(); renderWatchSel();
     });
     // 개발 데이터 수집: 선생님 폰으로 이 화면을 열어 같은 계정으로 로그인 (js/dev-collect.js)
+    // 개발 메뉴는 사이트 관리 교사 계정(firestore.rules 의 isTeacher 와 같은 기준 — LabStore.isTeacher)으로 로그인했을 때만 (2026-11-20 선생님 결정)
     function renderDev() {
-        var on = CONFIG.devCollect === true && state.user && state.user.google;
-        $('devBox').hidden = !on;
-        if (on) $('devQr').innerHTML = qrSvg(location.href.split('#')[0].split('?')[0]) || '';
+        var u = state.user;
+        $('devBox').hidden = true;
+        if (CONFIG.devCollect !== true || !u || !u.google) return;
+        LS.isTeacher().then(function (yes) {
+            if (!yes || state.user !== u) return;
+            $('devBox').hidden = false;
+            $('devQr').innerHTML = qrSvg(location.href.split('#')[0].split('?')[0]) || '';
+        }, function () { /* 확인 못 하면 숨김 */ });
     }
 
     // ---------- ① 수업 만들기 ----------

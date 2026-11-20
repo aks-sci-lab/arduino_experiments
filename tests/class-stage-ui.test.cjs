@@ -26,7 +26,7 @@ test('선생님이 여는 단계: 교사 진행 화면 → 학생 폰 둘 저절
     const errors = [];
     const ctx = async (opt, name) => {
         const c = await browser.newContext(Object.assign({ permissions: ['camera'] }, opt));
-        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API) }));
+        await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API, { devCollect: true }) }));
         await c.route(/cdn\.jsdelivr|cdnjs/, r => { const u = r.request().url(); r.fulfill({ contentType: 'text/javascript', body: /qrcode/.test(u) ? QR : /chart/i.test(u) ? CHART_STUB : '' }); });
         await c.route(/gstatic/, r => r.abort());
         const pg = await c.newPage();
@@ -49,6 +49,10 @@ test('선생님이 여는 단계: 교사 진행 화면 → 학생 폰 둘 저절
         assert.equal(await T.isVisible('#viewMain'), true, '첫 화면은 진행 화면');
         assert.equal(await T.isVisible('#inExp'), false, '수업 만들기는 첫 화면에 없음');
         assert.equal(await T.isVisible('#acctNow'), false, '계정(이메일)은 첫 화면에 없음');
+        // 개발 메뉴: 사이트 관리 교사(가짜 로그인 teacher: true)면 ⚙ 설정 → 계정 안에 보임
+        await T.click('#btnSettings'); await T.click('#ctTabs button[data-tab="account"]');
+        await T.waitForSelector('#devBox:not([hidden])');
+        await T.click('#btnMain');
         assert.equal(await T.isVisible('#noClass'), true, '수업이 없으면 만들기 안내');
         await T.click('#btnGoMake');
         assert.equal(await T.isVisible('#inExp'), true);
@@ -137,6 +141,16 @@ test('선생님이 여는 단계: 교사 진행 화면 → 학생 폰 둘 저절
         assert.equal(await F.isVisible('.ev-stage.locked[data-stage="t2"]'), true);
         // 결과판은 그대로 진행 화면에
         await T.waitForSelector('#boardCard:not([hidden])');
+
+        // ---- 다른 선생님(일반 구글 계정): 개발 메뉴 없음 ----
+        const O2 = await ctx({ viewport: { width: 1280, height: 800 } }, 'O2');
+        await O2.addInitScript(() => { localStorage.setItem('lab-store:fake-user', JSON.stringify({ uid: 'teacher-2', google: true, email: 'other@example.com', name: '다른 선생님' })); });
+        await O2.goto(ROOT + 'projects/class-teacher.html');
+        await O2.waitForSelector('#btnSettings:not([hidden])');
+        await O2.click('#btnSettings'); await O2.click('#ctTabs button[data-tab="account"]');
+        await O2.waitForTimeout(800);
+        assert.equal(await O2.isVisible('#devBox'), false, '다른 교사에게는 개발 메뉴 없음');
+        assert.equal(await O2.locator('#devBox:not([hidden])').count(), 0);
 
         // ---- 교사 375px ----
         const T3 = await ctx({ viewport: { width: 375, height: 800 } }, 'T3');
