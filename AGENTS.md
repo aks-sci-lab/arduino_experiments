@@ -16,7 +16,7 @@
 
 | 경로 | 내용 |
 |---|---|
-| `index.html` | 메인 페이지 (2026-11-20 역할별): 첫 화면은 교사/학생 고르기 카드만(이 브라우저에 기억, `?role=`, 🔄 역할 바꾸기). 학생 = 수업 코드 넣기 + '수업 없이 실험해 보기'(실험 목록), 교사 = 수업 진행 화면·QR 열기·🔐 사이트 관리(구글 로그인·새 실험 만들기)·실험 목록·기록. 시험 `tests/home-roles-ui.test.cjs` |
+| `index.html` | 메인 페이지 (2026-11-20 역할별): 첫 화면은 교사/학생 고르기 카드만(이 브라우저에 기억, `?role=`, 🔄 역할 바꾸기). 학생 = 수업 코드 넣기 + '수업 없이 실험해 보기'(실험 목록), 교사 = 수업 진행 화면·QR 열기·🔐 사이트 관리(구글 로그인·새 실험 만들기, 🛠 개발 도구 링크는 사이트 관리 교사 계정일 때만)·실험 목록·🧰 보드별 준비 안내(탭)·예전 기록. 카드마다 필요 기기 표시(`data-needs`: pico·nano·serial·camera·phone·pc)와 이 브라우저에서 안 되는 것 ⚠(블루투스·시리얼·카메라 확인, 막지는 않음), header·main·footer. 시험 `tests/home-roles-ui.test.cjs` |
 | `projects/*.html` | 실험 페이지 (가속도계, 환경 센서, 자유낙하, 스마트폰 가속도, 말루스 법칙, LED 플랑크 상수, 이상기체 상태 방정식, 전자기 유도) |
 | `projects/custom-lab.html` | 선생님이 만든 실험 한 페이지로 세 가지 화면: `?id=` 학생 화면(안내·측정값 표·그래프·질문·제출), `?edit=new\|id` 선생님 만들기·고치기, `?record=` 제출 내용 보기. `js/custom-lab.js` 화면, `js/custom-lab-math.js` 계산·검사·센서 기능 목록(시험 있음), `js/custom-lab-sensor.js` Pico 센서 보드 블루투스 연결(기존 `pico-ble.js`·`environment-protocol.js`·`sensor-definitions.js`·`accelerometer-protocol.js`·`voc-index.js` 를 그대로 씀). 설정은 Firestore `customExperiments`, 제출은 `experiments`(`tab: 'custom-lab'`) |
 | `projects/pendulum-report.html`, `projects/pendulum-setup.html`, `apps-script/Code.gs` | 스마트폰 진자 2·3단계: 노트북 분석 화면(7단계 탭, 조 코드 → QR → 구글 시트에서 몇 초마다 새 측정 가져와 표 자동 추가, CSV 불러오기·직접 넣기, T²–L 최소제곱으로 g·d·오차율). 서버는 선생님 구글 시트의 Apps Script(`apps-script/Code.gs`, 시트 `measurements`), 주소는 `js/pendulum-config.js`(비면 CSV 방법만), 조 코드·원본 줄이기·요청은 `js/pendulum-cloud.js`(시험 `tests/pendulum-cloud.test.cjs`, 가짜 Apps Script `tests/fake-apps-script.cjs`), 선생님 1회 설정 `projects/pendulum-setup.html`(`js/pendulum-setup.js`, 구글 로그인 → 주소 저장 Firestore `pendulumTeachers/{uid}` → 우리 반 링크 `pendulum-report.html?s=스크립트ID`)·`docs/pendulum-teacher-setup.md`. 선생님마다 자기 시트: 링크의 `?s=` > 노트북에 기억한 것 > `pendulum-config.js` 기본, 폰은 QR 의 `&s=` 만 따름 |
@@ -329,3 +329,4 @@
   - 확인 필요: 실제 필름통·발포비타민 예비 실험 값(선생님이 교사 화면에 넣음), 실제 폰(아이폰 사파리·갤럭시)에서 녹화·시계 겹치기·영상 앞뒤로 넘기기, 행사장 와이파이
 - 2026-11-20: 필름통 로켓 행사 시험 버그 고침(통합 관리 세션 전달: 익명 로그인이 꺼졌는데 '인터넷이 연결되지 않았어요' 로 보임) — `js/lab-store.js` `isNetworkError` 로 진짜 연결 문제(시간 초과·오프라인·fetch 실패·도구 못 불러옴)일 때만 `network: true`, 익명 로그인 꺼짐·권한·한도는 그 이유를 그대로, `js/class-share.js` 보내기 결과에 network 를 넘김, `js/film-rocket.js` 는 `r.network` 만 믿고 다른 오류는 알림·상태 띠에 진짜 이유 — Claude Code
 - 2026-11-20: 메인 화면 역할별로 나누기(선생님 "이것도 화면 표시가 비효율적이야" → 역할별) — 첫 화면은 교사/학생 카드만, 학생은 수업 코드·수업 없이 실험, 교사는 수업 진행 화면·QR·사이트 관리·실험 목록·기록(기존 기능은 옮기기만), 역할 기억·바꾸기 — Claude Code
+  - 이어서(선생님이 고른 제미나이 제안 네 가지·개발 메뉴): 카드 필요 기기 배지 + 자동 감지, 접근성(랜드마크·제목 순서·진자 카드 하나로·선생님이 만든 실험 불러오는 중/없음 안내), 보드별 준비 안내 탭, 예전 '기록'은 교사 화면으로·학생은 CSV 안내, 개발 도구 링크는 사이트 관리 교사만

@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const { loadLabStore, labServer, configJs } = require('./fake-lab-store.cjs');
-let chromium = null; try { ({ chromium } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
+let chromium = null, devices = null; try { ({ chromium, devices } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
 const REPO = path.join(__dirname, '..');
 
 test('메인 화면: 역할 고르기 → 학생(코드·수업 없이) / 교사(진행 화면·실험 목록·사이트 관리), 기억·바꾸기', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
@@ -40,6 +40,11 @@ test('메인 화면: 역할 고르기 → 학생(코드·수업 없이) / 교사
         assert.equal(await vis('#joinBox'), true); assert.equal(await vis('#homeLabs'), false); assert.equal(await vis('#adminBox'), false);
         assert.equal(await P.evaluate(() => document.activeElement.id), 'joinCode');
         await P.click('#soloBtn'); assert.equal(await vis('#homeLabs'), true, '수업 없이 실험 목록');
+        assert.equal(await vis('#studentRecordsSection'), false, '학생 화면에는 예전 기록 없음');
+        assert.equal(await vis('#boardTabs'), false);
+        assert.match(await P.textContent('#homeStudent'), /CSV 저장/);
+        assert.equal(await P.locator('#pendulumCard.pick-card').count(), 1, '진자도 다른 카드와 같은 모양');
+        assert.match(await P.textContent('#customNotice'), /불러오지 못했어요|공개된 실험이 없어요|불러오는 중/);
         assert.equal(await vis('a.pick-card[href="projects/malus-law.html"]'), true);
         await layout('학생');
         await P.reload();
@@ -59,9 +64,63 @@ test('메인 화면: 역할 고르기 → 학생(코드·수업 없이) / 교사
         assert.equal(await vis('#adminBox'), true, '사이트 관리는 교사 화면에');
         assert.equal(await vis('#homeLabs'), true, '교사는 실험 목록 바로');
         assert.equal(await vis('#joinBox'), false);
-        await P.click('#homeTabs button[data-tab="records"]'); assert.equal(await vis('#studentRecordsSection'), true, '기록 탭 그대로');
+        assert.equal(await vis('#studentRecordsSection'), true, '예전 기록은 교사 화면에');
+        assert.equal(await vis('#boardTabs'), true, '보드별 준비 안내는 교사 화면에');
+        // 보드 탭: 누르기·좌우 화살표
+        await P.click('#boardTabs button[data-tab="pico"]');
+        await P.keyboard.press('ArrowRight');
+        assert.equal(await P.getAttribute('#boardTabs button[data-tab="nano"]', 'aria-selected'), 'true');
+        assert.equal(await P.evaluate(() => document.activeElement.dataset.tab), 'nano');
+        assert.equal(await vis('#boardTabs ~ .tab-panel[data-tab="nano"]'), true);
+        assert.equal(await vis('#devLinks'), false, '개발 도구 링크는 사이트 관리 교사가 아니면 안 보임');
         await layout('교사');
         await P.reload(); assert.equal(await vis('#homeTeacher'), true, '새로고침해도 교사');
+        // 랜드마크·제목 순서
+        assert.deepEqual(await P.evaluate(() => ['header', 'main', 'footer'].map(t => document.querySelectorAll(t).length)), [1, 1, 1]);
+        const heads = await P.evaluate(() => [...document.querySelectorAll('h1,h2,h3,h4')].map(h => Number(h.tagName[1])));
+        assert.equal(heads[0], 1); assert.equal(heads.filter(h => h === 1).length, 1);
+        for (let i = 1; i < heads.length; i++) assert.ok(heads[i] - heads[i - 1] <= 1, '제목 단계를 건너뛰지 않음: ' + heads.join(','));
         assert.deepEqual(errors, []);
+
+        // ---- 아이폰 흉내(블루투스 없음): Pico·Nano 카드에 ⚠, 진자 카드는 측정 화면으로 ----
+        const I = await browser.newContext(devices['iPhone 13']);
+        await I.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API) }));
+        await I.route(/gstatic|jsdelivr/, r => r.abort());
+        await I.addInitScript(() => { Object.defineProperty(Navigator.prototype, 'bluetooth', { get: () => undefined, configurable: true }); Object.defineProperty(Navigator.prototype, 'serial', { get: () => undefined, configurable: true }); localStorage.setItem('home-role:v1', 'teacher'); });
+        const IP = await I.newPage();
+        await IP.goto(ROOT + 'index.html');
+        assert.match(await IP.textContent('a.pick-card[href="projects/environment-lab.html"]'), /⚠ 아이폰은 블루투스 안 됨/);
+        assert.match(await IP.textContent('a.pick-card[href="projects/arduino-nano-lab.html"]'), /⚠ 아이폰은 블루투스 안 됨/);
+        assert.match(await IP.textContent('a.pick-card[href="projects/em-induction.html"]'), /⚠ USB 연결은 PC 크롬/);
+        assert.doesNotMatch(await IP.textContent('a.pick-card[href="projects/malus-law.html"]'), /⚠/);
+        assert.equal(await IP.getAttribute('#pendulumCard', 'href'), 'projects/pendulum-measure.html');
+        assert.equal(await IP.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0);
+
+        // ---- PC 크롬 흉내(블루투스·시리얼 있음) + 사이트 관리 교사 계정: ⚠ 없음, 개발 도구 링크 보임 ----
+        const C = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+        await C.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API) }));
+        await C.route(/gstatic|jsdelivr/, r => r.abort());
+        await C.addInitScript(() => {
+            Object.defineProperty(Navigator.prototype, 'bluetooth', { get: () => ({ requestDevice() {} }), configurable: true });
+            Object.defineProperty(Navigator.prototype, 'serial', { get: () => ({ requestPort() {} }), configurable: true });
+            localStorage.setItem('home-role:v1', 'teacher');
+            localStorage.setItem('lab-store:fake-user', JSON.stringify({ uid: 'teacher-1', google: true, teacher: true }));
+        });
+        const CP = await C.newPage();
+        await CP.goto(ROOT + 'index.html');
+        for (const h of ['environment-lab', 'arduino-nano-lab', 'em-induction', 'ideal-gas']) assert.doesNotMatch(await CP.textContent('a.pick-card[href="projects/' + h + '.html"]'), /⚠/, h);
+        assert.match(await CP.textContent('a.pick-card[href="projects/malus-law.html"]'), /측정은 폰으로/);
+        assert.equal(await CP.getAttribute('#pendulumCard', 'href'), 'projects/pendulum-report.html');
+        await CP.click('#adminBox summary');
+        await CP.waitForSelector('#devLinks:not([hidden])');
+        // 일반 구글 계정: 개발 도구 링크 없음
+        const G = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+        await G.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API) }));
+        await G.route(/gstatic|jsdelivr/, r => r.abort());
+        await G.addInitScript(() => { localStorage.setItem('home-role:v1', 'teacher'); localStorage.setItem('lab-store:fake-user', JSON.stringify({ uid: 'teacher-2', google: true })); });
+        const GP = await G.newPage();
+        await GP.goto(ROOT + 'index.html');
+        await GP.click('#adminBox summary'); await GP.waitForTimeout(500);
+        assert.equal(await GP.isVisible('#devLinks'), false);
     } finally { await browser.close(); api.close(); stat.close(); }
 });
