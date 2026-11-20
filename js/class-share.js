@@ -465,15 +465,29 @@
         // 7단계 실험: nav.steps / nav.tabs 의 열리지 않은 단계 단추를 🔒 로 잠그고, 열린 단계가 늘면 그 단계로 저절로 옮김
         // 다른 모양의 페이지(필름통 로켓)는 opts.onStage(열린 단계 목록 또는 null(모두), { moved, info }) 로 스스로 처리 (gateDom: false)
         // 잠그지 않는 경우: 📱 폰 측정 화면, 수업 없이 연 화면, 예전 수업(stage 없음), 한 화면 실험
-        var GATE = CC.gateSteps ? CC.gateSteps(exp) : null;
+        // 수업의 진행 방법(flow: 'hd' 가설연역 / 없음 7단계)에 따라 단계 목록이 달라짐 → 그때그때 계산
+        function flowNow() { return cls.info && cls.info.exp === exp ? cls.info.flow : ''; }
+        function gate() { return CC.gateSteps ? CC.gateSteps(exp, flowNow()) : null; }
+        var GATE = gate();
+        // 학생 화면의 단계 부품(LabUI.initSteps({ flows: true }))을 수업 방법으로 고정 (수업 없이 연 화면은 학생이 고름)
+        function applyFlow() {
+            if (!cls.info || cls.info.exp !== exp || !window.LabUI || !LabUI.setFlow) return;
+            LabUI.setFlow(cls.info.flow === 'hd' ? 'hd' : 'report', { lock: true });
+            GATE = gate();
+        }
         var gateSt = { on: false, prev: undefined, bypass: false, toast: null, timer: null, off: null };
         function openSteps() {
             if (!GATE || PHONE || !cls.info || cls.info.exp !== exp) return null;
-            var si = CC.stageInfo(exp, cls.info.stage);
+            var si = CC.stageInfo(exp, cls.info.stage, flowNow());
             return si && !si.all ? si.keys : null;
         }
         function stepButtons() { return Array.prototype.slice.call(document.querySelectorAll('nav.steps button[data-step], nav.tabs button[data-tab]')); }
-        function stepKey(el) { return el.getAttribute('data-step') || el.getAttribute('data-tab') || el.getAttribute('data-go') || ''; }
+        function stepKey(el) {
+            var k = el.getAttribute('data-step') || el.getAttribute('data-tab') || el.getAttribute('data-go') || '';
+            // 가설연역이면 패널 안 단추의 7단계 키(data-go="data")를 그 단계 키(perform)로
+            var sp = window.LabUI && LabUI.steps && LabUI.steps();
+            return sp && sp.stepOf && sp.stepOf(k) || k;
+        }
         function isLocked(key) { var o = openSteps(); return !!(o && GATE.indexOf(key) >= 0 && o.indexOf(key) < 0); }
         function currentStep() { var b = stepButtons().filter(function (x) { return x.getAttribute('aria-selected') === 'true'; })[0]; return b ? stepKey(b) : ''; }
         function goStep(key) {
@@ -522,12 +536,13 @@
             gateSt.prev = stage;
             var moved = null;
             if (before !== undefined && GATE) {
-                var a = CC.stageInfo(exp, before), b = CC.stageInfo(exp, stage);
+                var a = CC.stageInfo(exp, before, flowNow()), b = CC.stageInfo(exp, stage, flowNow());
                 if (a && b && b.n > a.n) moved = { to: b.keys[a.n], from: a.cur };   // 새로 열린 첫 단계로
             }
             applyGate(moved);
         }
         function startGate() {
+            applyFlow();
             if (gateSt.on || PHONE || !cls.info || cls.info.exp !== exp || (!GATE && typeof opts.onStage !== 'function')) return;
             gateSt.on = true;
             gateSt.prev = cls.info.stage; applyGate(null);

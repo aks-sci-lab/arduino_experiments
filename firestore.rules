@@ -158,8 +158,10 @@ service cloud.firestore {
       allow get: if signedIn() && space.matches('^c[a-z0-9]{23}$');
       allow list: if signedIn() && resource.data.owner == request.auth.uid;
       allow create: if isGoogle() && space.matches('^c[a-z0-9]{23}$') && request.resource.data.owner == request.auth.uid &&
-                    request.resource.data.keys().hasOnly(['owner', 'classCode', 'ban', 'nStudents', 'groupSize', 'exp', 'groups', 'aiLimit', 'mode', 'setup', 'stage', 'createdAt', 'expireAt']) &&
+                    request.resource.data.keys().hasOnly(['owner', 'classCode', 'ban', 'nStudents', 'groupSize', 'exp', 'groups', 'aiLimit', 'mode', 'setup', 'stage', 'flow', 'createdAt', 'expireAt']) &&
                     okStage(request.resource.data) &&
+                    // 진행 방법: 7단계('report' 또는 칸 없음) / 가설연역('hd'). 만든 뒤에는 바꿀 수 없음(아래 update 허용 칸에 없음)
+                    (!('flow' in request.resource.data) || request.resource.data.flow in ['report', 'hd']) &&
                     (!('mode' in request.resource.data) || request.resource.data.mode == 'team') &&
                     (!('setup' in request.resource.data) || (request.resource.data.setup is map && request.resource.data.setup.size() <= 24)) &&
                     (!('aiLimit' in request.resource.data) || (request.resource.data.aiLimit is int && request.resource.data.aiLimit >= 0 && request.resource.data.aiLimit <= 200)) &&

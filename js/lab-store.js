@@ -304,6 +304,7 @@
         function publicClass(c) {
             return { ok: true, classCode: c.classCode, space: c.space, ban: c.ban, nStudents: c.nStudents, groupSize: c.groupSize, exp: c.exp,
                 groups: c.groups || [], aiLimit: aiLimitOf(c), created: iso(c.createdAt), expireAt: iso(c.expireAt), mode: c.mode === 'team' ? 'team' : '', setup: c.setup || null,
+                flow: c.flow === 'hd' ? 'hd' : '',   // 진행 방법: 'hd' = 가설연역 6단계, '' = 7단계(예전 수업 포함)
                 stage: c.stage == null || !isFinite(Number(c.stage)) ? null : Number(c.stage),
                 done: c.done === true, doneAt: c.done === true && c.doneAt ? iso(c.doneAt) : '' };
         }
@@ -394,6 +395,8 @@
             var rec = { owner: auth.uid, classCode: code, ban: ban, nStudents: n, groupSize: size, exp: exp, groups: groups, aiLimit: aiLimit, createdAt: now, expireAt: exp2 };
             if (team) rec.mode = 'team';
             if (setup) rec.setup = setup;
+            if (b.flow != null && b.flow !== '' && b.flow !== 'report' && b.flow !== 'hd') fail('진행 방법은 7단계 또는 가설연역만 고를 수 있어요.');
+            if (b.flow === 'hd') { if (team) fail('팀 이름 수업은 가설연역으로 만들 수 없어요.'); rec.flow = 'hd'; }   // 만든 뒤에는 바꾸지 않음 (규칙)
             rec.stage = b.stage == null || b.stage === '' ? 1 : numIn(b.stage, 1, STAGE_ALL, '열 단계');   // 학생이 볼 수 있는 단계 수 (교사 화면 '▶ 다음 단계 열기'). 예전 수업은 칸이 없음 = 모두 열림
             await db.set('labClasses/' + space, rec);
             await db.set('labClassCodes/' + code, { space: space, owner: auth.uid, joinUntil: new Date(now.getTime() + JOIN_DAYS * 86400000), expireAt: exp2 });

@@ -160,6 +160,12 @@
             <label class="ct-field">실험
                 <select id="inExp"></select>
             </label>
+            <!-- 진행 방법 (보고서 실험 중 가설연역을 붙인 실험만, ClassCloud.canFlow). 만든 뒤에는 바꿀 수 없음 (docs/inquiry-types-design.md) -->
+            <fieldset class="ct-field ct-flow" id="rowFlow" hidden>
+                <legend>진행 방법 <span class="note">(만든 뒤에는 바꿀 수 없어요)</span></legend>
+                <label><input type="radio" name="inFlow" value="report" checked> 📋 7단계 <span class="note">목적 → 이론 → 준비물 → 과정 → 데이터 → 결과 → 결론</span></label>
+                <label><input type="radio" name="inFlow" value="hd"> 🔍 가설연역 6단계 <span class="note">문제 인식 → 가설 설정 → 탐구 설계 → 탐구 수행 → 자료 해석 → 결론 도출</span></label>
+            </fieldset>
             <!-- 가족 행사(팀 이름으로 입장): 조를 미리 나누지 않음. 예비 실험으로 정한 값 (js/class-teacher.js 의 teamSetupHtml) -->
             <div id="teamBox" class="ct-team" hidden>
                 <p class="note">👨‍👩‍👧 <b>팀 이름으로 입장</b>: 조를 미리 나누지 않아요. 가족이 QR 로 들어와 팀 이름(별명)을 정하면 빈 자리 하나를 차지해요. 이름·학번은 받지 않아요.</p>

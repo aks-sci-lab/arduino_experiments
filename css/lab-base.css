@@ -172,6 +172,17 @@ a.pick-card:hover, .pick-card:has(a:hover) { border-color: var(--c-primary); box
 .steps button.done:not([aria-selected="true"]) b::before { content: "✓"; font-size: .75rem; }
 .steps button[aria-selected="true"] { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
 .steps button[aria-selected="true"] b { background: #fff; color: var(--c-primary); }
+/* 가설연역 6단계 (LabUI.initSteps({ flows: true }), 휴대폰 3+3, 넓은 화면 6칸) + 진행 방법 고르기 */
+.steps.steps-hd { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 640px) { .steps.steps-hd { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.steps.steps-hd button b { width: auto; min-width: 18px; background: none; font-size: .95rem; }
+.steps.steps-hd button[aria-selected="true"] b { background: none; color: #fff; }
+.flow-pick { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); margin: 0 0 var(--sp-1); }
+.flow-pick[hidden] { display: none; }
+.flow-pick-label { font-size: var(--fs-sm); color: var(--c-muted); margin-right: var(--sp-1); }
+.flow-pick button { min-height: var(--tap); padding: 0 var(--sp-3); margin: 0; background: var(--c-card); color: var(--c-text); border: 1px solid var(--c-line); border-radius: var(--r-ctl); font-size: var(--fs-sm); }
+.flow-pick button[aria-pressed="true"] { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+.flow-tag { color: var(--c-primary); }
 .step-next { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-2); margin-top: var(--sp-4); }
 .step-next [data-go]:last-child { margin-left: auto; }
 
@@ -299,4 +310,10 @@ html.lab-present .device-switch, html.lab-present .hide-on-present { display: no
 @media print {
     html.big-view body { zoom: 1; }
     .lab-toast { display: none; }
+}
+/* 고르기 카드의 교과 배지 (메인 화면: 물리·화학·생명·보건·정보·가족 행사) — 카드 오른쪽 위 */
+.pick-card .subj {
+    position: absolute; top: var(--sp-2); right: var(--sp-2);
+    padding: 1px 7px; border-radius: 999px; background: var(--c-ok-bg, #e8f5e9); color: var(--c-text);
+    font-size: .72rem; font-weight: 600; line-height: 1.5; border: 1px solid var(--c-line);
 }

@@ -54,48 +54,136 @@
     });
 
     /* 단계형 실험의 7단계 탭 (모양: css/lab-base.css 의 .steps)
-       LabUI.initSteps({ key: '페이지별 저장 이름', onShow: function (step) { 그래프 다시 그리기 등 } })
+       LabUI.initSteps({ key: '페이지별 저장 이름', onShow: function (step) { 그래프 다시 그리기 등 }, flows: true })
        - nav.steps button[data-step] 을 누르거나 [data-go="단계"] 단추를 누르면 그 단계만 보인다
        - 본 단계는 ✓ 표시, 마지막으로 본 단계와 본 단계 목록은 이 브라우저에 기억
-       - 주소 끝 #step-5 처럼 쓰면 그 단계로 바로 연다
-       돌려주는 값: { show(step), current() } */
+       - 주소 끝 #step-5 처럼 쓰면 그 단계로 바로 연다 (지금 진행 방법의 5번째 단계)
+       - flows: true 면 '진행 방법' 두 가지(📋 7단계 보고서 순서 / 🔍 가설연역 6단계)로 같은 패널을 보여 준다 (설계 docs/inquiry-types-design.md)
+         · 패널(section.step-panel)은 한 벌. 가설연역은 LabUI.FLOWS.hd 처럼 패널을 묶어 다른 단계 이름·순서로
+         · 수업 없이 열면 단계 탭 위 '진행 방법' 고르기(이 브라우저 'lab-flow' 에 기억), 수업이면 LabUI.setFlow(flow, { lock: true }) (js/class-share.js)
+         · onShow(패널 키, { flow, step }) — 묶인 단계(③ 탐구 설계 = 준비물 + 과정)는 패널마다 한 번씩 부름. 그래서 페이지 코드는 7단계 키만 알면 됨
+         · show() 에는 패널 키('data')도 단계 키('perform')도 넣을 수 있음
+       돌려주는 값: { show(step), current()(패널 키), flow(), flowStep()(지금 방법의 단계 키) } */
+    var FLOWS = {
+        report: { name: '7단계', icon: '📋', hint: '목적 → 결론 보고서 순서' },
+        hd: { name: '가설연역', icon: '🔍', hint: '문제 → 가설 → 설계 → 수행 → 해석 → 결론', steps: [
+            { key: 'problem', no: '①', label: '문제 인식', panels: ['purpose'] },
+            { key: 'hypothesis', no: '②', label: '가설 설정', panels: ['theory'] },
+            { key: 'design', no: '③', label: '탐구 설계', panels: ['materials', 'procedure'] },
+            { key: 'perform', no: '④', label: '탐구 수행', panels: ['data'] },
+            { key: 'interpret', no: '⑤', label: '자료 해석', panels: ['result'] },
+            { key: 'conclude', no: '⑥', label: '결론 도출', panels: ['conclusion'] }
+        ] }
+    };
+    var FLOW_KEY = 'lab-flow';
+    function flowPref() { try { var f = localStorage.getItem(FLOW_KEY); return FLOWS[f] ? f : 'report'; } catch (e) { return 'report'; } }
+    var activeSteps = null, pendingFlow = null;
+    // 수업(js/class-share.js)이 진행 방법을 정함. 단계 부품이 아직 없으면 기억했다가 initSteps 때 씀
+    function setFlow(flow, o) {
+        flow = FLOWS[flow] ? flow : 'report';
+        if (activeSteps) return activeSteps.setFlow(flow, o);
+        pendingFlow = { flow: flow, o: o || {} };
+        return false;
+    }
     function initSteps(opts) {
         opts = opts || {};
         var nav = document.querySelector('nav.steps');
         if (!nav) return null;
-        var buttons = Array.prototype.slice.call(nav.querySelectorAll('button[data-step]'));
-        var order = buttons.map(function (b) { return b.dataset.step; });
+        var origButtons = Array.prototype.slice.call(nav.querySelectorAll('button[data-step]'));
+        var panelOrder = origButtons.map(function (b) { return b.dataset.step; });
         var panels = Array.prototype.slice.call(document.querySelectorAll('.step-panel[data-step]'));
-        var key = 'lab-steps:' + (opts.key || location.pathname);
-        var saved = {};
-        try { saved = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { saved = {}; }
-        var seen = Array.isArray(saved.seen) ? saved.seen.filter(function (s) { return order.indexOf(s) >= 0; }) : [];
-        var cur = null;
-
+        var baseKey = 'lab-steps:' + (opts.key || location.pathname);
+        var canFlow = !!opts.flows && panelOrder.join() === 'purpose,theory,materials,procedure,data,result,conclusion';
+        var flow = 'report', locked = false;
+        if (canFlow) {
+            flow = flowPref();
+            var fh = /[?&]flow=(hd|report)\b/.exec(location.search);
+            if (fh) flow = fh[1];
+            if (pendingFlow) { flow = pendingFlow.flow; locked = !!pendingFlow.o.lock; pendingFlow = null; }
+        }
+        var origNext = panels.map(function (p) { var n = p.querySelector(':scope > .step-next'); return n ? n.innerHTML : null; });
+        var steps, order, buttons, saved, seen, cur = null, key;
+        // 단계 목록: [{ key, no, label, panels }]
+        function makeSteps() {
+            if (flow === 'hd') return FLOWS.hd.steps;
+            return origButtons.map(function (b) { return { key: b.dataset.step, panels: [b.dataset.step], button: b }; });
+        }
+        function stepOf(k) {
+            if (order.indexOf(k) >= 0) return k;
+            for (var i = 0; i < steps.length; i++) if (steps[i].panels.indexOf(k) >= 0) return steps[i].key;
+            return null;
+        }
+        function load() {
+            key = baseKey + (flow === 'hd' ? ':hd' : '');
+            try { saved = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { saved = {}; }
+            seen = Array.isArray(saved.seen) ? saved.seen.filter(function (s) { return order.indexOf(s) >= 0; }) : [];
+        }
         function persist() {
             try { localStorage.setItem(key, JSON.stringify({ step: cur, seen: seen })); } catch (e) { /* 저장 불가: 무시 */ }
         }
-        function show(step, scroll) {
-            if (order.indexOf(step) < 0) step = order[0];
-            cur = step;
-            if (seen.indexOf(step) < 0) seen.push(step);
-            panels.forEach(function (p) { p.hidden = p.dataset.step !== step; });
+        // 가설연역이면 탭 단추·패널 제목 앞 이름·이전/다음 단추를 그 방법에 맞게 (7단계면 원래대로)
+        function build() {
+            steps = makeSteps();
+            order = steps.map(function (s) { return s.key; });
+            if (flow === 'hd') {
+                nav.innerHTML = '';
+                steps.forEach(function (s) {
+                    var b = document.createElement('button');
+                    b.type = 'button'; b.dataset.step = s.key; b.innerHTML = '<b>' + s.no + '</b><span>' + s.label + '</span>';
+                    nav.appendChild(b);
+                });
+            } else if (nav.firstElementChild !== origButtons[0] || nav.children.length !== origButtons.length) {
+                nav.innerHTML = ''; origButtons.forEach(function (b) { nav.appendChild(b); });
+            }
+            nav.classList.toggle('steps-hd', flow === 'hd');
+            document.documentElement.classList.toggle('flow-hd', flow === 'hd');
+            buttons = Array.prototype.slice.call(nav.querySelectorAll('button[data-step]'));
             buttons.forEach(function (b) {
-                var on = b.dataset.step === step;
+                b.setAttribute('role', 'tab');
+                if (!b._stepBound) { b._stepBound = true; b.addEventListener('click', function () { show(b.dataset.step, true); }); }
+            });
+            panels.forEach(function (p, i) {
+                var h = p.querySelector('h2'), tag = h && h.querySelector('.flow-tag');
+                var si = steps.map(function (s) { return s.panels.indexOf(p.dataset.step) >= 0; }).indexOf(true), s = steps[si];
+                if (flow === 'hd' && h && s) {
+                    if (!tag) { tag = document.createElement('span'); tag.className = 'flow-tag'; h.insertBefore(tag, h.firstChild); }
+                    tag.textContent = s.no + ' ' + s.label + ' · ';
+                } else if (tag) tag.remove();
+                var nx = p.querySelector(':scope > .step-next');
+                if (!nx || origNext[i] == null) return;
+                if (flow !== 'hd' || !s) { nx.innerHTML = origNext[i]; nx.hidden = false; return; }
+                // 묶인 단계의 앞 패널(준비물)은 이전·다음 단추를 숨김, 마지막 패널에 단계 순서대로 다시 씀
+                var last = s.panels[s.panels.length - 1] === p.dataset.step;
+                nx.hidden = !last;
+                if (!last) return;
+                var pv = steps[si - 1], nt = steps[si + 1];
+                nx.innerHTML = (pv ? '<button type="button" class="secondary" data-go="' + pv.key + '">← 이전: ' + pv.no + ' ' + pv.label + '</button>' : '') +
+                    (nt ? '<button type="button" data-go="' + nt.key + '">다음: ' + nt.no + ' ' + nt.label + ' →</button>' : '');
+            });
+            load();
+        }
+        function show(step, scroll) {
+            var target = step, st = stepOf(step);
+            if (!st) { st = order[0]; target = null; }
+            cur = st;
+            if (seen.indexOf(st) < 0) seen.push(st);
+            var group = steps[order.indexOf(st)].panels;
+            panels.forEach(function (p) { p.hidden = group.indexOf(p.dataset.step) < 0; });
+            buttons.forEach(function (b) {
+                var on = b.dataset.step === st;
                 b.setAttribute('aria-selected', on ? 'true' : 'false');
                 b.tabIndex = on ? 0 : -1;
                 b.classList.toggle('done', seen.indexOf(b.dataset.step) >= 0);
             });
             persist();
-            if (scroll) window.scrollTo(0, 0);
-            if (typeof opts.onShow === 'function') opts.onShow(step);
+            // 같은 단계 안의 다른 패널을 가리키면(③ 안의 '4. 과정') 그 패널로 스크롤
+            var tp = target && target !== st && group.length > 1 ? panels.filter(function (p) { return p.dataset.step === target; })[0] : null;
+            if (tp && tp !== panels.filter(function (p) { return p.dataset.step === group[0]; })[0]) { if (tp.scrollIntoView) tp.scrollIntoView(); }
+            else if (scroll) window.scrollTo(0, 0);
+            if (typeof opts.onShow === 'function') group.forEach(function (pk) { opts.onShow(pk, { flow: flow, step: st }); });
             // 숨어 있던 그래프가 보일 때 크기를 다시 잡도록
             window.dispatchEvent(new Event('resize'));
         }
-        buttons.forEach(function (b) {
-            b.setAttribute('role', 'tab');
-            b.addEventListener('click', function () { show(b.dataset.step, true); });
-        });
         // 왼쪽·오른쪽 화살표로 단계 옮기기
         nav.addEventListener('keydown', function (e) {
             var i = order.indexOf(cur);
@@ -104,11 +192,52 @@
         });
         document.addEventListener('click', function (e) {
             var go = e.target.closest && e.target.closest('[data-go]');
-            if (go && order.indexOf(go.dataset.go) >= 0) show(go.dataset.go, true);
+            if (go && stepOf(go.dataset.go)) show(go.dataset.go, true);
         });
+        // 진행 방법 고르기 (수업 없이 연 화면만, 📱 폰 측정 화면은 숨김)
+        var pick = null;
+        function renderPick() {
+            if (!canFlow) return;
+            var hide = locked || /[?&]c=/.test(location.search) || /[?&]role=phone\b/.test(location.search) || /[?&]present=1\b/.test(location.search);
+            if (!pick) {
+                pick = document.createElement('div');
+                pick.className = 'seg flow-pick'; pick.setAttribute('role', 'group'); pick.setAttribute('aria-label', '진행 방법');
+                pick.innerHTML = '<span class="flow-pick-label">진행 방법</span>' + Object.keys(FLOWS).map(function (k) {
+                    return '<button type="button" data-flow="' + k + '" title="' + FLOWS[k].hint + '">' + FLOWS[k].icon + ' ' + FLOWS[k].name + '</button>';
+                }).join('');
+                pick.addEventListener('click', function (e) {
+                    var b = e.target.closest('button[data-flow]');
+                    if (!b || locked) return;
+                    try { localStorage.setItem(FLOW_KEY, b.dataset.flow); } catch (er) { /* 무시 */ }
+                    api.setFlow(b.dataset.flow);
+                });
+                nav.parentNode.insertBefore(pick, nav);
+            }
+            pick.hidden = hide;
+            pick.querySelectorAll('button[data-flow]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.flow === flow ? 'true' : 'false'); });
+        }
+        var api = {
+            show: show,
+            current: function () { var g = steps[order.indexOf(cur)]; return g ? g.panels[g.panels.length - 1] : cur; },
+            flow: function () { return flow; },
+            flowStep: function () { return cur; },
+            stepOf: function (k) { return stepOf(k); },
+            setFlow: function (f, o) {
+                f = canFlow && FLOWS[f] ? f : 'report';
+                if (o && o.lock) locked = true;
+                if (f === flow) { renderPick(); return false; }
+                var here = api.current();   // 지금 보던 패널을 새 방법에서도 이어서
+                flow = f; build(); renderPick();
+                show(here);
+                try { document.dispatchEvent(new CustomEvent('lab-flow', { detail: { flow: flow } })); } catch (e) { /* 무시 */ }
+                return true;
+            }
+        };
+        build(); renderPick();
         var fromHash = /^#step-(\d)$/.exec(location.hash);
-        show(fromHash ? order[Number(fromHash[1]) - 1] : (opts.start || saved.step || order[0]));
-        return { show: show, current: function () { return cur; } };
+        show(fromHash && order[Number(fromHash[1]) - 1] ? order[Number(fromHash[1]) - 1] : (opts.start || saved.step || order[0]));
+        activeSteps = api;
+        return api;
     }
 
     /* 페이지 안 작은 탭 (모양: css/lab-base.css 의 .subtabs) — 길게 스크롤하는 대신 내용을 나눠 보여 준다
@@ -316,6 +445,6 @@
     }
     applyDevice();
 
-    window.LabUI = { toggleBigView: toggle, initSteps: initSteps, initTabs: initTabs, autoSubtabs: autoSubtabs,
+    window.LabUI = { toggleBigView: toggle, initSteps: initSteps, FLOWS: FLOWS, setFlow: setFlow, flowPref: flowPref, steps: function () { return activeSteps; }, initTabs: initTabs, autoSubtabs: autoSubtabs,
         device: device, setDevice: setDevice, deviceSwitch: deviceSwitch, DEVICE_NAME: DEV_NAME, present: PRESENT };
 })();
