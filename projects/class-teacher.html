@@ -12,35 +12,145 @@
 </head>
 <body>
 <main class="ct-wrap">
-    <a class="back" href="../index.html">← 메인 페이지</a>
-    <h1>👩‍🏫 수업 연결 (교사)</h1>
-    <p class="note">선생님은 <b>구글 로그인 한 번</b>으로 씁니다. 수업을 만들면 조가 나뉘고, 학생은 QR 로 들어와 조·번호(이름 없음)를 고릅니다 — 학생은 로그인하지 않아요. 측정값은 조원과 선생님께 실시간으로 공유되고, 여기서 진행 상황을 보고 자료를 내려받습니다. 학생 자료는 <b>학기 끝(만든 날부터 6개월)</b>에 저절로 지워져요.</p>
+    <header class="ct-head">
+        <a class="back" href="../index.html">← 메인</a>
+        <h1>👩‍🏫 수업 진행</h1>
+        <span class="ct-head-r">
+            <button id="btnSettings" class="secondary" hidden>⚙ 설정</button>
+            <button id="btnMain" class="secondary" hidden>← 돌아가기</button>
+        </span>
+    </header>
 
-    <!-- 구글 로그인 (사이트 Firebase, 수업 주인 = 이 계정) -->
+    <!-- 로그인 전: 이것만 -->
     <section class="ct-card ct-login" id="loginCard">
         <p id="loginNow" class="ct-status">⏳ 로그인 상태를 확인하는 중…</p>
-        <div class="ct-row">
-            <button id="btnLogin" class="good" hidden>🔐 구글 계정으로 로그인</button>
-            <button id="btnLogout" class="secondary" hidden>로그아웃</button>
-        </div>
+        <p class="note">선생님은 <b>구글 로그인 한 번</b>으로 씁니다. 학생은 로그인하지 않고 QR 로 들어와요. 학생 자료는 만든 날부터 6개월 뒤 저절로 지워져요.</p>
+        <div class="ct-row"><button id="btnLogin" class="good" hidden>🔐 구글 계정으로 로그인</button></div>
         <p id="loginMsg" class="note" role="status" aria-live="polite"></p>
-        <details class="ct-key" id="devBox" hidden>
-            <summary>🧪 개발 데이터 수집 (선생님 폰)</summary>
-            <p class="note">심박수를 잴 <b>선생님 폰</b>으로 아래 QR 을 찍어 이 교사 화면을 열고, 같은 구글 계정으로 로그인하면 그 폰에서 잰 측정이 개발 데이터로 모여요(맨 위에 🧪 띠). 사이트 관리 교사 계정만 됩니다. <a href="../docs/dev-data.md">설명</a></p>
-            <div id="devQr" class="ct-qr"></div>
-        </details>
     </section>
 
-    <nav class="subtabs sticky" id="ctTabs" aria-label="수업 연결">
-        <button data-tab="make">① 수업 만들기</button>
-        <button data-tab="watch">② 진행 보기·내려받기</button>
-        <button data-tab="ai">③ 🤖 보고서 AI</button>
-    </nav>
-
-    <!-- ① 수업 만들기 -->
-    <div class="tab-panel" data-tab="make">
+    <!-- 첫 화면 = 내 수업 목록 → 수업을 누르면 그 수업: 큰 QR → 진행 보기 (주소 #class=…, 뒤로 가기로 목록) -->
+    <div id="viewMain" hidden>
+      <div id="viewList">
         <section class="ct-card">
-            <h2>① 수업 만들기</h2>
+            <div class="ct-row ct-listhead">
+                <h2 style="margin:0">📚 내 수업</h2>
+                <button id="btnGoMake" class="good ct-big">➕ 새 수업 만들기</button>
+            </div>
+            <p id="noClass" class="ct-status" hidden>아직 만든 수업이 없어요. <b>➕ 새 수업 만들기</b>를 눌러 주세요.</p>
+            <div id="classList" class="ct-classes"></div>
+            <details id="doneBox" class="ct-key" hidden><summary id="doneSum">✅ 마친 수업</summary><div id="doneList" class="ct-classes"></div></details>
+            <p id="listMsg" class="note" role="status" aria-live="polite"></p>
+            <p class="note">수업을 누르면 학생 연결 QR 이 크게 나오고, <b>다음 → 진행 보기</b>로 단계 열기·결과판으로 가요. 학생 자료는 만든 날부터 6개월 뒤 저절로 지워져요.</p>
+        </section>
+      </div>
+
+      <div id="viewClass" hidden>
+        <section class="ct-card ct-bar">
+            <div class="ct-row">
+                <button id="btnToList" class="secondary">← 수업 목록</button>
+                <span id="classTitle" class="ct-classtitle"></span>
+            </div>
+            <div class="ct-row">
+                <button id="btnRefresh" class="secondary">🔄 새로 보기</button>
+                <button id="btnPresent" class="good">🎬 발표 보기 (학생 화면)</button>
+                <button id="btnShowQr" class="secondary">📱 QR 화면</button>
+                <button id="btnDone" class="secondary">✅ 수업 마치기</button>
+            </div>
+            <p id="watchMsg" class="note" role="status" aria-live="polite"></p>
+            <p id="doneMsg" class="note" role="status" aria-live="polite"></p>
+        </section>
+
+        <!-- 수업 첫 화면: 교실 앞 화면에서 찍을 큰 QR -->
+        <section class="ct-card ct-qrpage" id="classOut" hidden>
+            <p class="ct-qrlead">📱 폰 카메라로 QR 을 찍어 들어오세요</p>
+            <div id="qr" class="ct-qr ct-qr-xl" aria-label="학생 연결 QR 코드"></div>
+            <p class="note">또는 메인 페이지 → <b>학생</b> → 수업 코드</p>
+            <p class="ct-code ct-code-xl" id="outCode"></p>
+            <p class="note" id="outTitle"></p>
+            <div class="ct-row ct-center">
+                <button id="btnToRun" class="good ct-big">다음 → 진행 보기</button>
+                <button id="btnBig" class="secondary">🔍 QR 화면 가득</button>
+                <button id="btnCopy" class="secondary">📋 주소 복사</button>
+            </div>
+            <p><a id="outLink" class="ct-link" target="_blank" rel="noopener"></a></p>
+            <p id="copyMsg" class="note"></p>
+            <p class="note"><b>수업 코드로 찾기는 만든 뒤 2일까지</b>예요(그 뒤에는 QR·주소로, 필요하면 목록의 🔓 코드 다시 열기).</p>
+            <p class="ct-status warn" id="outExpire"></p>
+        </section>
+
+        <div id="runPane" hidden>
+        <!-- 학생에게 여는 단계 -->
+        <section class="ct-card ct-stage" id="stageCard" hidden>
+            <p class="note">학생 화면에서 지금 열린 단계</p>
+            <p class="ct-stage-now" id="stageNow"></p>
+            <ol class="ct-stage-steps" id="stageSteps"></ol>
+            <div class="ct-row">
+                <button id="btnStageNext" class="good ct-big">▶ 다음 단계 열기</button>
+                <button id="btnStagePrev" class="secondary">◀ 하나 되돌리기</button>
+                <button id="btnStageAll" class="secondary">모두 열기</button>
+            </div>
+            <p id="stageMsg" class="note" role="status" aria-live="polite"></p>
+        </section>
+
+
+        <div id="watchSum" class="ct-sum"></div>
+        <!-- 가족 행사(팀 이름 수업): 결과판 -->
+        <section class="ct-card" id="boardCard" hidden>
+            <div class="ct-row"><h2 style="margin:0">🏆 팀 결과판</h2><button id="btnBoardBig" class="good">🖥 크게 보기 (프로젝터)</button></div>
+            <div id="board"></div>
+            <details class="ct-key"><summary>🧪 예비 실험 값·목표 고치기</summary><div id="teamSetupEdit"></div>
+                <div class="ct-row"><button id="btnSetupSave" class="good">💾 설정 저장</button></div><p id="setupMsg" class="note" role="status" aria-live="polite"></p>
+                <p class="note">가족 화면은 도전 화면을 열 때 새 목표를 받아요.</p></details>
+        </section>
+        <!-- 💡 플랑크 상수 수업이면 조별 V₀–f·h (예전 Apps Script 웹앱의 선생님 화면, js/class-teacher-planck.js) -->
+        <section class="ct-card" id="planckCard" hidden></section>
+        <div id="groups" class="ct-groups"></div>
+        <section class="ct-card" id="detail" hidden>
+            <h2 id="detailTitle"></h2>
+            <div id="detailBody"></div>
+            <div class="ct-row"><button id="btnCloseDetail" class="secondary">닫기</button></div>
+        </section>
+        </div><!-- /runPane -->
+
+        <!-- 🎬 발표 보기: 학생이 지금 보는 실험 페이지를 발표용(?present=1)으로 크게. 학생으로 참여하지 않음 -->
+        <section id="presentPane" class="ct-present" hidden>
+            <div class="ct-pbar">
+                <span id="pStage" class="ct-pstage"></span>
+                <span id="pJoined" class="ct-pjoined"></span>
+                <span class="ct-pbtns">
+                    <button id="btnPPrev" class="secondary" aria-label="이전 탭">◀ 이전</button>
+                    <button id="btnPNext" class="secondary" aria-label="다음 탭">다음 ▶</button>
+                    <button id="btnPOpen" class="good">▶ 다음 단계 열기</button>
+                    <button id="btnPFull" class="secondary">⛶ 전체 화면</button>
+                    <button id="btnPExit" class="secondary">✕ 진행 화면으로</button>
+                </span>
+            </div>
+            <div id="pAsk" class="ct-pask" role="alertdialog" aria-labelledby="pAskText" hidden>
+                <span id="pAskText"></span>
+                <button id="btnPAskYes" class="good">열기 (Enter)</button>
+                <button id="btnPAskNo" class="secondary">아니요 (Esc)</button>
+            </div>
+            <div class="ct-pframe"><iframe id="presentFrame" title="학생 화면 (발표용)" src="about:blank"></iframe></div>
+            <p id="pHint" class="note">→ · PageDown · Space = 다음 탭, ← · PageUp = 이전 (발표용 리모컨도 돼요). 이 화면에서 넘기는 탭은 학생 폰에 영향이 없어요. 단계 끝에서 한 번 더 누르면 다음 단계를 열지 물어요.</p>
+        </section>
+      </div><!-- /viewClass -->
+    </div>
+
+    <!-- 진행 보기 오른쪽 위 QR (교실 뒤에서 폰 카메라로 확대해 찍을 수 있는 크기, 누르면 크게) -->
+    <button type="button" id="cornerQr" class="ct-corner" hidden aria-label="학생 연결 QR 크게 보기"><span id="cornerQrImg" class="ct-corner-img"></span><b id="cornerCode"></b><span class="ct-corner-mini">📱 QR</span></button>
+
+    <!-- ⚙ 설정 (첫 화면에 안 보임) -->
+    <div id="viewSettings" hidden>
+        <nav class="subtabs sticky" id="ctTabs" aria-label="설정">
+            <button data-tab="make">➕ 수업 만들기·내 수업</button>
+            <button data-tab="dl">📥 자료 내려받기</button>
+            <button data-tab="ai">🤖 보고서 AI</button>
+            <button data-tab="account">👤 계정</button>
+        </nav>
+        <div class="tab-panel" data-tab="make">
+        <section class="ct-card">
+            <h2>➕ 새 수업 만들기</h2>
             <div class="ct-grid3">
                 <label class="ct-field">반 <input type="number" id="inBan" min="1" max="99" inputmode="numeric" value="1"></label>
                 <label class="ct-field" id="rowN">학생 수 <input type="number" id="inN" min="1" max="60" inputmode="numeric" value="24"></label>
@@ -68,43 +178,9 @@
             <p id="createMsg" class="note" role="status" aria-live="polite"></p>
         </section>
 
-        <section class="ct-card" id="classOut" hidden>
-            <h2>학생 연결 <span id="outTitle" class="note"></span></h2>
-            <div class="ct-join">
-                <div id="qr" class="ct-qr" aria-label="학생 연결 QR 코드"></div>
-                <div>
-                    <p class="note">학생은 QR 을 찍거나, 메인 페이지 → <b>학생으로 시작</b>에서 아래 수업 코드를 넣어요. <b>수업 코드로 찾기는 만든 뒤 2일까지</b>예요(그 뒤에는 QR·주소로, 필요하면 '내 수업'의 🔓 코드 다시 열기).</p>
-                    <p class="ct-code" id="outCode"></p>
-                    <p><a id="outLink" class="ct-link" target="_blank" rel="noopener"></a></p>
-                    <div class="ct-row">
-                        <button id="btnCopy" class="secondary">📋 주소 복사</button>
-                        <button id="btnBig" class="secondary">🔍 QR 크게</button>
-                        <button class="good" data-tab-go="watch">② 진행 보기 →</button>
-                    </div>
-                    <p id="copyMsg" class="note"></p>
-                </div>
-            </div>
-            <p class="ct-status warn" id="outExpire"></p>
-        </section>
-
-        <section class="ct-card">
-            <h2>내 수업 <span class="note">(이 구글 계정으로 만든 수업 — 어느 컴퓨터에서나 보여요)</span></h2>
-            <div id="classList" class="ct-list"></div>
-            <p id="listMsg" class="note" role="status" aria-live="polite"></p>
-        </section>
     </div>
-
-    <!-- ② 진행 보기·내려받기 -->
-    <div class="tab-panel" data-tab="watch">
-        <section class="ct-card">
-            <div class="ct-row">
-                <label class="ct-field ct-inline">수업 <select id="watchSel"></select></label>
-                <button id="btnRefresh" class="secondary">🔄 지금 새로 보기</button>
-            </div>
-            <p id="watchMsg" class="note" role="status" aria-live="polite"></p>
-            <p id="watchExpire" class="note"></p>
-            <div id="watchSum" class="ct-sum"></div>
-        </section>
+        <div class="tab-panel" data-tab="dl">
+            <p class="note" id="dlFor"></p>
         <section class="ct-card" id="dlCard">
             <h2>📥 자료 내려받기</h2>
             <p class="note">한 줄 = 한 회차(측정). 엑셀에서 바로 열려요(한글 안 깨짐). 열 이름에 단위가 들어 있고, 실험마다 정한 요약 값은 <b>요약: …</b> 열로 나와요. 이름·학번은 없어요.</p>
@@ -115,23 +191,9 @@
             </div>
             <p id="dlMsg" class="note" role="status" aria-live="polite"></p>
         </section>
-        <!-- 가족 행사(팀 이름 수업): 결과판·예비 실험 값 고치기 -->
-        <section class="ct-card" id="boardCard" hidden>
-            <div class="ct-row"><h2 style="margin:0">🏆 팀 결과판</h2><button id="btnBoardBig" class="good">🖥 크게 보기 (프로젝터)</button></div>
-            <div id="board"></div>
-            <details class="ct-key"><summary>🧪 예비 실험 값·목표 고치기</summary><div id="teamSetupEdit"></div>
-                <div class="ct-row"><button id="btnSetupSave" class="good">💾 설정 저장</button></div><p id="setupMsg" class="note" role="status" aria-live="polite"></p>
-                <p class="note">가족 화면은 도전 화면을 열 때 새 목표를 받아요.</p></details>
-        </section>
-        <div id="groups" class="ct-groups"></div>
-        <section class="ct-card" id="detail" hidden>
-            <h2 id="detailTitle"></h2>
-            <div id="detailBody"></div>
-            <div class="ct-row"><button id="btnCloseDetail" class="secondary">닫기</button></div>
-        </section>
-    </div>
-
-    <!-- ③ 🤖 보고서 AI (js/class-teacher-ai.js) -->
+            <p id="watchExpire" class="note"></p>
+        </div>
+        <!-- 🤖 보고서 AI (js/class-teacher-ai.js) -->
     <div class="tab-panel" data-tab="ai">
         <section class="ct-card">
             <h2>🤖 보고서 AI — 선생님 키로 학생 질문에 답하기</h2>
@@ -174,11 +236,25 @@
             <div class="ct-row"><button id="aiCloseGroup" class="secondary">닫기 (전체 조로)</button></div>
         </section>
     </div>
+        <div class="tab-panel" data-tab="account">
+            <section class="ct-card">
+                <h2>👤 계정</h2>
+                <p id="acctNow" class="ct-status"></p>
+                <div class="ct-row"><button id="btnLogout" class="secondary" hidden>로그아웃</button></div>
+                <details class="ct-key" id="devBox" hidden>
+                    <summary>🧪 개발 데이터 수집 (선생님 폰)</summary>
+                    <p class="note">심박수를 잴 <b>선생님 폰</b>으로 아래 QR 을 찍어 이 교사 화면을 열고, 같은 구글 계정으로 로그인하면 그 폰에서 잰 측정이 개발 데이터로 모여요(맨 위에 🧪 띠). 사이트 관리 교사 계정만 됩니다. <a href="../docs/dev-data.md">설명</a></p>
+                    <div id="devQr" class="ct-qr"></div>
+                </details>
+            </section>
+        </div>
+    </div>
 </main>
 
 <!-- 팀 결과판 크게 보기 (프로젝터) -->
 <div id="boardBig" class="ct-boardbig" hidden role="dialog" aria-label="팀 결과판 크게 보기">
     <div class="ct-row"><h2 id="boardBigTitle">🏆 팀 결과판</h2><button id="btnBoardClose">닫기</button></div>
+    <div id="boardBigQr" class="ct-boardqr" aria-label="학생 연결 QR"></div>
     <div id="boardBigBody"></div>
 </div>
 
@@ -193,6 +269,9 @@
 <script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/class-cloud.js"></script>
 <script src="../js/class-teacher.js"></script>
+<script src="../js/planck-math.js"></script>
+<script src="../js/planck-cloud.js"></script>
+<script src="../js/class-teacher-planck.js"></script>
 <script src="../js/report-ai.js"></script>
 <script src="../js/class-teacher-ai.js"></script>
 </body>

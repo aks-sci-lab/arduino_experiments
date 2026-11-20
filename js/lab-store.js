@@ -1,5 +1,5 @@
 /* 실험실 저장소 — Firebase(Firestore) 로 수업 연결·조 공유·폰→노트북 전송 (2026-11-18, Apps Script 대신)
-   브라우저·Node 공용. 예전 서버(apps-script/Code.gs)가 하던 요청을 같은 모양으로 받아 Firestore 에 저장한다.
+   브라우저·Node 공용. 예전 서버(Apps Script, 2026-11-20 지움)가 하던 요청을 같은 모양으로 받아 Firestore 에 저장한다.
    그래서 실험 페이지(js/class-share.js·pendulum-*·planck-*)는 거의 고치지 않고, 요청이 가는 곳만 바뀐다.
 
    주소 대신 '공간(space)': 'lab:<공간 id>'
@@ -52,6 +52,7 @@
     var ASK_ID_RE = /^a[a-z0-9]{19}$/;
     // '팀 이름으로 입장' (가족 행사): 팀 이름 1~12글자, 같은 수업에서 겹치지 않게. 이 실험의 줄은 그 팀 폰만 쓴다
     var TEAM = { NAME: 12, MAX: 40 };
+    var STAGE_ALL = 99;   // 수업 stage 의 '모두 열림'
     var TEAM_EXPS = { rocket: 1 };
     function cleanTeamName(v) {
         var s = String(v == null ? '' : v);
@@ -302,7 +303,9 @@
         function aiLimitOf(c) { var n = Number(c && c.aiLimit); return c && c.aiLimit != null && isFinite(n) ? n : AI.LIMIT_DEFAULT; }   // 예전 수업(칸 없음)은 기본 20
         function publicClass(c) {
             return { ok: true, classCode: c.classCode, space: c.space, ban: c.ban, nStudents: c.nStudents, groupSize: c.groupSize, exp: c.exp,
-                groups: c.groups || [], aiLimit: aiLimitOf(c), created: iso(c.createdAt), expireAt: iso(c.expireAt), mode: c.mode === 'team' ? 'team' : '', setup: c.setup || null };
+                groups: c.groups || [], aiLimit: aiLimitOf(c), created: iso(c.createdAt), expireAt: iso(c.expireAt), mode: c.mode === 'team' ? 'team' : '', setup: c.setup || null,
+                stage: c.stage == null || !isFinite(Number(c.stage)) ? null : Number(c.stage),
+                done: c.done === true, doneAt: c.done === true && c.doneAt ? iso(c.doneAt) : '' };
         }
         // ----- 팀 이름으로 입장 (mode 'team') -----
         async function teamList(c) {
@@ -343,6 +346,21 @@
             if (!c) return { ok: false, error: '그 수업을 찾지 못했습니다.' };
             return publicClass(c);
         }
+        // 교사: 학생에게 열 단계 수 (1 = 첫 단계만, 99 = 모두). 학생 화면은 수업 문서를 실시간으로 듣고 잠금·이동 (js/class-share.js)
+        async function classStage(b, auth) {
+            var c = await ownedClass(b, auth);
+            var st = numIn(b.stage, 1, STAGE_ALL, '열 단계');
+            if (st % 1) fail('열 단계는 정수로 넣어 주세요.');
+            await db.update('labClasses/' + c.space, { stage: st });
+            return { ok: true, stage: st };
+        }
+        // 교사: '✅ 수업 마치기' 표시 (저절로 판단하지 않음, 되돌릴 수 있음). 학생 화면은 그대로 둠
+        async function classDone(b, auth) {
+            var c = await ownedClass(b, auth);
+            var done = b.done === true || b.done === 'true';
+            await db.update('labClasses/' + c.space, { done: done, doneAt: done ? db.stamp() : null });
+            return { ok: true, done: done };
+        }
         // 교사: 행사 설정만 고치기 (예비 실험 값·목표)
         async function classSetup(b, auth) {
             var c = await ownedClass(b, auth);
@@ -376,6 +394,7 @@
             var rec = { owner: auth.uid, classCode: code, ban: ban, nStudents: n, groupSize: size, exp: exp, groups: groups, aiLimit: aiLimit, createdAt: now, expireAt: exp2 };
             if (team) rec.mode = 'team';
             if (setup) rec.setup = setup;
+            rec.stage = b.stage == null || b.stage === '' ? 1 : numIn(b.stage, 1, STAGE_ALL, '열 단계');   // 학생이 볼 수 있는 단계 수 (교사 화면 '▶ 다음 단계 열기'). 예전 수업은 칸이 없음 = 모두 열림
             await db.set('labClasses/' + space, rec);
             await db.set('labClassCodes/' + code, { space: space, owner: auth.uid, joinUntil: new Date(now.getTime() + JOIN_DAYS * 86400000), expireAt: exp2 });
             return publicClass(Object.assign({ space: space }, rec));
@@ -706,6 +725,8 @@
                 if (a === 'teamJoin') return await teamJoin(body, auth);
                 if (a === 'classInfo') return await classInfo(body);
                 if (a === 'classSetup') return await classSetup(body, auth);
+                if (a === 'classStage') return await classStage(body, auth);
+                if (a === 'classDone') return await classDone(body, auth);
                 if (a === 'classStatus') return await classStatus(body, auth);
                 if (a === 'classExport') return await classExport(body, auth);
                 if (a === 'myClasses') return await myClasses(body, auth);
@@ -909,6 +930,9 @@
             update: function (path, data) { return fs.doc(path).update(data); },
             del: function (path) { return fs.doc(path).delete(); },
             query: function (coll, filters, opt) { return opt && opt.live ? liveQuery(coll, filters) : q(coll, filters).get().then(rows); },
+            subscribeDoc: function (path, cb) {
+                return fs.doc(path).onSnapshot(function (d) { cb(d.exists ? conv(d.data()) : null); }, function () { /* 끊기면 다음에 다시 */ });
+            },
             subscribe: function (coll, filters, cb) {
                 var key = coll + '|' + JSON.stringify(filters || []);
                 return liveQuery(coll, filters).then(function () { var L = live[key]; if (!L) return function () {}; L.cbs.push(cb); return function () { L.cbs = L.cbs.filter(function (x) { return x !== cb; }); }; });
@@ -963,6 +987,17 @@
             var space = spaceOf(url) || groupSpace(group);
             await getCore();
             return await browserDb.subscribe('labSpaces/' + space + '/items', [['exp', exp && exp !== 'pendulum' ? exp : 'pendulum'], ['group', group]], cb);
+        } catch (e) { return null; }
+    }
+    /* 수업 문서(열린 단계·행사 설정)를 실시간으로: cb({ stage, setup }) — 가짜 서버면 null (부르는 쪽이 몇 초마다 classInfo) */
+    async function watchClassDoc(url, cb) {
+        if (fakeUrl()) return null;
+        try {
+            var space = spaceOf(url); if (!space) return null;
+            await getCore();
+            return browserDb.subscribeDoc ? browserDb.subscribeDoc('labClasses/' + space, function (d) {
+                if (d) cb({ stage: d.stage == null ? null : Number(d.stage), setup: d.setup || null });
+            }) : null;
         } catch (e) { return null; }
     }
     async function watchClass(url, classCode, cb) {
@@ -1059,7 +1094,7 @@
     return {
         AI: AI, aiCsv: aiCsv, reportCsv: reportCsv,
         VERSION: VERSION, TTL_DAYS: TTL_DAYS, SPACE_RE: SPACE_RE, JOIN_DAYS: JOIN_DAYS,
-        core: core, memoryDb: memoryDb, firestoreDb: firestoreDb, call: call, watch: watch, watchClass: watchClass,
+        core: core, memoryDb: memoryDb, firestoreDb: firestoreDb, call: call, watch: watch, watchClass: watchClass, watchClassDoc: watchClassDoc, STAGE_ALL: STAGE_ALL,
         newSpace: newSpace, isSpace: isSpace, isLabUrl: isLabUrl, urlOf: urlOf, spaceOf: spaceOf, groupSpace: groupSpace, parseUrl: parseUrl, docKey: docKey,
         ensureUser: ensureUser, currentUser: currentUser, signInGoogle: signInGoogle, signOut: signOut, onUser: onUser, isTeacher: isTeacher,
         cleanTeamName: cleanTeamName, teamKey: teamKey, cleanSetup: cleanSetup, TEAM: TEAM,

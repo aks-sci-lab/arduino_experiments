@@ -56,7 +56,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         const T = await ctx({ viewport: { width: 1280, height: 900 } }, 'T');
         await T.goto(ROOT + 'projects/class-teacher.html');
         await T.click('#btnLogin');
-        await T.waitForSelector('#btnLogout:not([hidden])');
+        await T.waitForSelector('#btnSettings:not([hidden])'); await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="make"]');
         await T.selectOption('#inExp', 'rocket');
         assert.equal(await T.isVisible('#teamBox'), true, '팀 이름 입장 칸');
         assert.equal(await T.isVisible('#rowN'), false, '학생 수 칸은 숨김');
@@ -69,6 +69,8 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         assert.match(link, /film-rocket\.html\?c=1-\d{4}&s=c[a-z0-9]{23}$/);
         assert.match(await T.textContent('#outTitle'), /팀 이름으로 입장 \(최대 6팀\)/);
         const famUrl = link.replace(/^https?:\/\/[^/]+\//, ROOT);
+        // 이 시험은 단계 잠금 없이 끝까지 (단계 열기는 tests/class-stage-ui.test.cjs)
+        assert.equal((await app.post({ action: 'classStage', space: /s=(c[a-z0-9]{23})/.exec(link)[1], stage: 99 })).ok, true);
 
         // ---- 가족 A (iPhone 13) ----
         const A = await ctx(devices['iPhone 13'], 'A');
@@ -191,7 +193,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await B.waitForFunction(() => /선생님께 보냄/.test(document.getElementById('ev-sync').textContent), null, { timeout: 15000 });
 
         // ---- 교사 결과판 ----
-        await T.click('[data-tab="watch"]');
+        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); });
         await T.waitForSelector('#boardCard:not([hidden])');
         await T.waitForFunction(() => /달님 탐험대5/.test(document.getElementById('board').textContent), null, { timeout: 20000 });
         const rows = await T.$$eval('#board tbody tr', trs => trs.map(t => t.textContent));
@@ -209,7 +211,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await T.click('#btnSetupSave');
         await T.waitForFunction(() => /저장했어요/.test(document.getElementById('setupMsg').textContent));
         // CSV 에 팀 이름 열
-        const [dl] = await Promise.all([T.waitForEvent('download'), T.click('#btnCsv')]);
+        const [dl] = await (async () => { await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="dl"]'); return Promise.all([T.waitForEvent('download'), T.click('#btnCsv')]); })();
         const csv = fs.readFileSync(await dl.path(), 'utf8');
         assert.match(csv.split('\r\n')[0], /팀 이름/);
         assert.match(csv, /달님 탐험대/);

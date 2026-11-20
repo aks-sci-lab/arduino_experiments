@@ -135,6 +135,14 @@
             boardPanel.hidden = false;
             currentName.textContent = board.name;
             chipId.textContent = board.id;
+            const fwBox = $('fwVersion');
+            if (fwBox) {
+                const fw = typeof board.fw === 'string' && board.fw ? board.fw : '';
+                const state = env.PicoFirmware ? env.PicoFirmware.compare(fw) : 'unknown';
+                fwBox.textContent = (fw || '판 정보 없음')
+                    + (state === 'latest' ? ' (최신)' : state === 'old' || state === 'none'
+                        ? ` — 예전 판이에요. 아래 🔌 USB 로 ${env.PicoFirmware.LATEST} 을(를) 올리세요.` : '');
+            }
             if (suggest) {
                 const known = registry.find(entry => entry.id === board.id);
                 const number = board.board ?? (known ? known.board : nextFree(registry));

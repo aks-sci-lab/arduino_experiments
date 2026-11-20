@@ -1,4 +1,4 @@
-// 이상기체 실험 조 공유 자료 바꾸기 (js/ideal-gas-share.js) + 공통 부품·가짜 서버(apps-script/Code.gs)와 맞물리는지
+// 이상기체 실험 조 공유 자료 바꾸기 (js/ideal-gas-share.js) + 공통 부품·가짜 저장소(tests/fake-lab-store.cjs)와 맞물리는지
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const G = require('../js/ideal-gas-math.js');

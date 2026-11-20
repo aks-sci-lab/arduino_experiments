@@ -129,6 +129,8 @@ service cloud.firestore {
              (!('glowData' in d) || shortStr(d.glowData, 45000)) &&
              d.keys().size() <= 40 && okExpire(d);
     }
+    // 학생에게 열 단계 수: 1 = 첫 단계만 … 99 = 모두 (없으면 예전 수업 = 모두 열림)
+    function okStage(d) { return !('stage' in d) || (d.stage is int && d.stage >= 1 && d.stage <= 99); }
     function classOwner(space) { return get(/databases/$(database)/documents/labClasses/$(space)).data.owner; }
     // 팀 이름 수업(필름통 로켓, mode 'team'): 이 실험의 줄은 그 팀 자리(teams/{조 번호})를 잡은 폰(익명 uid)만 만들고 고친다
     function teamUid(space, group) { return get(/databases/$(database)/documents/labClasses/$(space)/teams/$(group.split('-')[1])).data.uid; }
@@ -156,16 +158,20 @@ service cloud.firestore {
       allow get: if signedIn() && space.matches('^c[a-z0-9]{23}$');
       allow list: if signedIn() && resource.data.owner == request.auth.uid;
       allow create: if isGoogle() && space.matches('^c[a-z0-9]{23}$') && request.resource.data.owner == request.auth.uid &&
-                    request.resource.data.keys().hasOnly(['owner', 'classCode', 'ban', 'nStudents', 'groupSize', 'exp', 'groups', 'aiLimit', 'mode', 'setup', 'createdAt', 'expireAt']) &&
+                    request.resource.data.keys().hasOnly(['owner', 'classCode', 'ban', 'nStudents', 'groupSize', 'exp', 'groups', 'aiLimit', 'mode', 'setup', 'stage', 'createdAt', 'expireAt']) &&
+                    okStage(request.resource.data) &&
                     (!('mode' in request.resource.data) || request.resource.data.mode == 'team') &&
                     (!('setup' in request.resource.data) || (request.resource.data.setup is map && request.resource.data.setup.size() <= 24)) &&
                     (!('aiLimit' in request.resource.data) || (request.resource.data.aiLimit is int && request.resource.data.aiLimit >= 0 && request.resource.data.aiLimit <= 200)) &&
                     request.resource.data.classCode is string && request.resource.data.classCode.matches('^[0-9]{1,2}-[0-9]{4}$') &&
                     request.resource.data.groups is list && request.resource.data.groups.size() <= 60 && okExpire(request.resource.data);
-      // 주인 교사: 행사 설정(예비 실험 값·목표)만 고칠 수 있음
+      // 주인 교사: 행사 설정(예비 실험 값·목표)·학생에게 열 단계(stage)·'수업 마침' 표시(done·doneAt)만 고칠 수 있음
       allow update: if isGoogle() && resource.data.owner == request.auth.uid &&
-                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['setup']) &&
-                    request.resource.data.setup is map && request.resource.data.setup.size() <= 24;
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['setup', 'stage', 'done', 'doneAt']) &&
+                    (!('done' in request.resource.data) || request.resource.data.done is bool) &&
+                    (!('doneAt' in request.resource.data) || request.resource.data.doneAt == null || request.resource.data.doneAt == request.time) &&
+                    (!('setup' in request.resource.data) || (request.resource.data.setup is map && request.resource.data.setup.size() <= 24)) &&
+                    okStage(request.resource.data);
       allow delete: if signedIn() && resource.data.owner == request.auth.uid;
     }
     // 팀 이름으로 입장: 팀 하나 = 조 자리 하나. 공간 id 를 아는 가족(익명)은 팀 이름을 보고(같은 이름 막기), 빈 자리만 자기 uid 로 잡음.

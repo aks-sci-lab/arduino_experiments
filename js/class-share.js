@@ -119,9 +119,12 @@
         var KEY = 'class-share:' + exp;
         // 📱 폰으로 연 화면이면(?role=phone) 조 코드·수업 자리를 주소에서 받고, 노트북 화면의 저장과 섞이지 않게 따로 저장한다
         var PHONE = readPhoneParams(location.search);
-        var role = PHONE ? 'phone' : 'laptop';
+        // 🎬 발표용 (교사 화면 '발표 보기' 의 iframe, ?present=1): 수업 문서만 읽어 단계 잠금을 학생과 같게.
+        //  익명 로그인으로 자리 잡기·하트비트·조 공유·폰 QR·이 기기 저장 없음 ('들어온 학생' 수가 늘지 않음)
+        var PRESENT = !PHONE && !!(window.LabUI && window.LabUI.present);
+        var role = PHONE ? 'phone' : PRESENT ? 'present' : 'laptop';
         if (PHONE) KEY += ':phone';
-        var store = (!PHONE && opts.store) || {
+        var store = PRESENT ? { load: function () { return null; }, save: function () { /* 발표용은 저장 안 함 */ } } : (!PHONE && opts.store) || {
             load: function () { try { return JSON.parse((LS && LS.getItem(KEY)) || 'null'); } catch (e) { return null; } },
             save: function (o) { try { LS.setItem(KEY, JSON.stringify(o)); } catch (e) { /* 저장 불가 */ } }
         };
@@ -152,7 +155,7 @@
         var els = {};
 
         // ----- 조 공유 칸 -----
-        var mount = opts.shareMount ? $q(opts.shareMount) : null;
+        var mount = opts.shareMount && !PRESENT ? $q(opts.shareMount) : null;
         if (mount) {
             mount.innerHTML =
                 '<details class="cs-card cs-share" id="cs-share"><summary>👥 조 공유: 선생님께 보내기 · 다른 노트북에서 불러오기 <span class="cs-note" id="cs-sum"></span></summary>' +
@@ -429,6 +432,7 @@
         }
         function tellClass() { if (typeof opts.onClass === 'function') { try { opts.onClass(cls.info, cls.me); } catch (e) { /* 실험 쪽 오류 */ } } }
         async function startClass() {
+            if (PRESENT) return cls.info ? Object.assign({ ok: true }, cls.info) : { ok: false, error: '발표용 화면' };
             if (cls.starting) return cls.starting;
             cls.starting = (async function () {
                 var r = await CC.joinInfo(srv().url, CLASS);
@@ -454,6 +458,89 @@
             renderBar();
             if (cls.me) applyMe();
             tellClass();
+            startGate();
+        }
+
+        // ----- 선생님이 여는 단계 (교사 화면 '▶ 다음 단계 열기') -----
+        // 7단계 실험: nav.steps / nav.tabs 의 열리지 않은 단계 단추를 🔒 로 잠그고, 열린 단계가 늘면 그 단계로 저절로 옮김
+        // 다른 모양의 페이지(필름통 로켓)는 opts.onStage(열린 단계 목록 또는 null(모두), { moved, info }) 로 스스로 처리 (gateDom: false)
+        // 잠그지 않는 경우: 📱 폰 측정 화면, 수업 없이 연 화면, 예전 수업(stage 없음), 한 화면 실험
+        var GATE = CC.gateSteps ? CC.gateSteps(exp) : null;
+        var gateSt = { on: false, prev: undefined, bypass: false, toast: null, timer: null, off: null };
+        function openSteps() {
+            if (!GATE || PHONE || !cls.info || cls.info.exp !== exp) return null;
+            var si = CC.stageInfo(exp, cls.info.stage);
+            return si && !si.all ? si.keys : null;
+        }
+        function stepButtons() { return Array.prototype.slice.call(document.querySelectorAll('nav.steps button[data-step], nav.tabs button[data-tab]')); }
+        function stepKey(el) { return el.getAttribute('data-step') || el.getAttribute('data-tab') || el.getAttribute('data-go') || ''; }
+        function isLocked(key) { var o = openSteps(); return !!(o && GATE.indexOf(key) >= 0 && o.indexOf(key) < 0); }
+        function currentStep() { var b = stepButtons().filter(function (x) { return x.getAttribute('aria-selected') === 'true'; })[0]; return b ? stepKey(b) : ''; }
+        function goStep(key) {
+            var b = stepButtons().filter(function (x) { return stepKey(x) === key; })[0];
+            if (!b) return;
+            gateSt.bypass = true; try { b.click(); } finally { gateSt.bypass = false; }
+        }
+        function gateToast(text) {
+            if (!gateSt.toast) { gateSt.toast = document.createElement('div'); gateSt.toast.className = 'cs-toast'; gateSt.toast.setAttribute('role', 'status'); document.body.appendChild(gateSt.toast); }
+            gateSt.toast.textContent = text; gateSt.toast.hidden = false;
+            clearTimeout(gateSt.timer); gateSt.timer = setTimeout(function () { gateSt.toast.hidden = true; }, 2500);
+        }
+        function applyGate(moved) {
+            var open = openSteps();
+            if (typeof opts.onStage === 'function') { try { opts.onStage(open, { moved: moved, info: cls.info }); } catch (e) { /* 실험 쪽 오류 */ } }
+            if (opts.gateDom === false) return;
+            stepButtons().forEach(function (b) {
+                var lock = isLocked(stepKey(b));
+                b.classList.toggle('cs-locked', lock);
+                if (lock) { b.setAttribute('aria-disabled', 'true'); b.title = '🔒 선생님이 열면 넘어가요'; } else { b.removeAttribute('aria-disabled'); if (b.title === '🔒 선생님이 열면 넘어가요') b.removeAttribute('title'); }
+            });
+            var cur = currentStep();
+            if (moved && moved.to) { goStep(moved.to); gateToast('▶ 선생님이 다음 단계를 열었어요'); }
+            else if (cur && isLocked(cur) && open) goStep(open[open.length - 1]);   // 잠긴 단계에 있으면(주소 #step-5 등) 열린 마지막 단계로
+        }
+        // 잠긴 단계로 가는 누름·화살표를 막음 (페이지의 단추 처리보다 먼저)
+        document.addEventListener('click', function (e) {
+            if (gateSt.bypass || !GATE) return;
+            var t = e.target.closest && e.target.closest('nav.steps button[data-step], nav.tabs button[data-tab], [data-go]');
+            if (!t || !isLocked(stepKey(t))) return;
+            e.preventDefault(); e.stopImmediatePropagation();
+            gateToast('🔒 아직 잠겨 있어요 — 선생님이 열면 저절로 넘어가요');
+        }, true);
+        document.addEventListener('keydown', function (e) {
+            if (!GATE || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return;
+            if (!e.target.closest || !e.target.closest('nav.steps, nav.tabs')) return;
+            var keys = stepButtons().map(stepKey), i = keys.indexOf(currentStep()), j = i + (e.key === 'ArrowRight' ? 1 : -1);
+            if (j >= 0 && j < keys.length && isLocked(keys[j])) { e.preventDefault(); e.stopImmediatePropagation(); gateToast('🔒 아직 잠겨 있어요 — 선생님이 열면 저절로 넘어가요'); }
+        }, true);
+        function stageChanged(stage, setup) {
+            if (!cls.info) return;
+            if (setup && JSON.stringify(setup) !== JSON.stringify(cls.info.setup || null)) { cls.info.setup = setup; tellClass(); }
+            var before = gateSt.prev;
+            cls.info.stage = stage;
+            if (stage === before) return;
+            gateSt.prev = stage;
+            var moved = null;
+            if (before !== undefined && GATE) {
+                var a = CC.stageInfo(exp, before), b = CC.stageInfo(exp, stage);
+                if (a && b && b.n > a.n) moved = { to: b.keys[a.n], from: a.cur };   // 새로 열린 첫 단계로
+            }
+            applyGate(moved);
+        }
+        function startGate() {
+            if (gateSt.on || PHONE || !cls.info || cls.info.exp !== exp || (!GATE && typeof opts.onStage !== 'function')) return;
+            gateSt.on = true;
+            gateSt.prev = cls.info.stage; applyGate(null);
+            var poll = function () {
+                clearTimeout(gateSt.poll);
+                gateSt.poll = setTimeout(function () {
+                    if (document.hidden) return poll();
+                    CC.classInfo(srv().url, CLASS).then(function (r) { if (r && r.ok) stageChanged(r.stage, r.setup); poll(); });
+                }, (gateSt.off ? 120 : Math.max(3, Number(CFG.pollSeconds) || 5)) * 1000);
+            };
+            // Firestore 는 수업 문서를 실시간으로 (읽기 한 번). 못 들으면(가짜 서버 등) 몇 초마다 확인
+            PCF.labStore().then(function (L) { return L.watchClassDoc ? L.watchClassDoc(srv().url, function (d) { stageChanged(d.stage, d.setup); }) : null; })
+                .then(function (off) { gateSt.off = off || null; if (!off) poll(); }, function () { poll(); });
         }
         // 팀 이름으로 입장: 빈 조 자리 하나를 이 이름으로 잡는다 (이 폰은 한 팀만. 이미 팀이 있으면 그 팀으로)
         async function joinTeam(name) {
@@ -467,7 +554,13 @@
             els.cmsg.textContent = r.again ? '이 폰은 이미 \u2018' + r.name + '\u2019 팀이에요. 그 팀으로 이어서 해요.' : '';
             return r;
         }
-        if (CLASS) {
+        if (CLASS && PRESENT) {
+            // 발표용: 수업 정보만 (joinInfo 는 수업 문서 읽기 — 교사 화면과 같은 사이트라 교사 로그인 그대로)
+            CC.joinInfo(srv().url, CLASS).then(function (r) {
+                if (!r || !r.ok) { cls.failed = r; tellClass(); return; }
+                cls.info = r; cls.me = null; tellClass(); startGate();
+            });
+        } else if (CLASS) {
             bar = document.createElement('div');
             bar.className = 'cs-card cs-bar';
             bar.innerHTML = '<div id="cs-cinfo"><b>🏫 수업 참여</b> <span class="cs-note">불러오는 중…</span></div>' +
@@ -680,6 +773,7 @@
             });
         }
         function phoneCard(where) {
+            if (PRESENT) { var pe = typeof where === 'string' ? document.querySelector(where) : where; if (pe) pe.hidden = true; return null; }
             if (!cardEl) window.addEventListener('lab-device', function () { setTimeout(renderCard, 0); });
             cardEl = typeof where === 'string' ? document.querySelector(where) : where;
             // 단계 탭·접기 안에 있어 처음엔 안 보이다가 보이게 되면 그때 그림
@@ -699,7 +793,7 @@
         if (groupOk() && typeof opts.onGroup === 'function' && !CLASS) opts.onGroup(st.group);
         var api = {
             send: send, pull: pull, render: render, beat: beat,
-            role: function () { return role; }, isPhone: function () { return !!PHONE; },
+            role: function () { return role; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
             openPhone: openPhone, phoneLink: phoneLink, phoneCard: phoneCard,
             // 실험이 측정 하나를 저장했을 때 부른다: 폰 화면(또는 autoSendOnSave)이면 바로 보내기
             // 폰은 기본으로 회차 목록에 쌓기만 하고(고른 회차 보내기), autoSendOnSave: true 면 바로 보낸다
@@ -715,6 +809,7 @@
             classCode: function () { return CLASS; }, me: function () { return cls.me; },
             // 팀 이름 수업: 수업 정보(행사 설정 포함)·입장·다시 연결(인터넷이 끊겼다가 돌아왔을 때)·선생님 설정 새로 받기
             classInfo: function () { return cls.info; }, classFailed: function () { return cls.failed || null; },
+            openSteps: openSteps,   // 선생님이 연 단계 목록 (null = 모두 열림·잠금 없음)
             joinTeam: joinTeam,
             reconnect: function () { return CLASS && !cls.info ? startClass() : Promise.resolve(cls.info ? Object.assign({ ok: true }, cls.info) : { ok: false }); },
             refreshClass: async function () {

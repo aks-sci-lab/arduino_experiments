@@ -1,5 +1,5 @@
 // 가속도계·스마트폰 가속도·자유낙하 페이지의 수업 참여·조 공유 화면 시험 (Playwright, 375px 휴대폰 폭)
-// 선생님 시트는 tests/fake-apps-script.cjs 의 가짜 Apps Script(진짜 시트처럼 '2-3-5376' 을 날짜로 바꾸려 함)가 맡고,
+// 선생님 시트는 tests/fake-lab-store.cjs 의 가짜 저장소가 맡고,
 // 페이지의 script.google.com 요청을 가로채 그것으로 보낸다. CDN(Chart.js 등)은 시험 환경에서 막혀 있어 작은 대역으로 바꾼다.
 // 흐름: 교사가 수업 만들기 → 학생 2명 같은 조로 참여 → A 가 📤 보내기 → B 가 자동으로 📥 불러옴 → 교사 진행 보기에 단계·점 수
 // Playwright 가 없는 컴퓨터에서는 건너뛴다.
@@ -135,7 +135,8 @@ test('수업 참여 → 조 공유 보내기·자동 불러오기 → 교사 진
             const T = await openPage(browser, app, site.base + '/projects/class-teacher.html', {
                 'lab-store:fake-user': JSON.stringify({ uid: 'teacher-1', google: true, teacher: true })   // 가짜 구글 로그인 (수업 주인)
             });
-            await T.page.click('#ctTabs button[data-tab="watch"]');
+            await T.page.click('#classList button[data-open]');   // 수업 목록에서 그 수업 → 큰 QR → 진행 보기
+            await T.page.click('#btnToRun');
             await T.page.waitForSelector('.ct-group');
             const g1 = await T.page.textContent('.ct-group');
             assert.match(g1, /📤 제출: 1개/, C.exp + ': 조 제출');

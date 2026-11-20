@@ -4,6 +4,7 @@
 //   const s = CustomLabSensor.create({ mode: 'light', rate: '1000',
 //       onSample(sample) {},    // sample = { t: 초(첫 값부터), values: { 값 이름: 숫자 또는 null } }
 //       onStatus(text) {},      // 화면에 보일 상태 글
+//       onFirmware(result) {},  // (선택) 보드 펌웨어 판 확인 결과 — PicoFirmware.showNotice 에 넘기면 됨
 //       onState(connected) {}   // 연결됨/해제됨
 //   });
 //   s.connect(); s.disconnect(); s.setRate('2000'); s.isConnected();
@@ -152,6 +153,12 @@
                         },
                         prepare: async characteristics => {
                             tx = characteristics[0]; cmd = characteristics[1]; accel = characteristics[2] || null;
+                            // 펌웨어 판 확인 (예전 판이면 한 줄 안내, 측정은 막지 않음). 페이지 알림을 붙이기 전에 한 번.
+                            if (root.PicoFirmware && options.onFirmware) {
+                                stage = '펌웨어 판 확인';
+                                options.onFirmware(await root.PicoFirmware.probe(tx, cmd));
+                                ensure();
+                            }
                             stage = '알림 등록';
                             tx.addEventListener('characteristicvaluechanged', textNotification);
                             await tx.startNotifications();
