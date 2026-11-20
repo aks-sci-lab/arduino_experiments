@@ -8,7 +8,10 @@ const CODE = '2-5512', PAGE = 'projects/quantum-dot.html?c=2-5512&s=cyuk7hbdrs76
     const [dir, turnArg, bundleFile] = process.argv.slice(2), turn = +turnArg;
     const live = await openLive(dir), W = live.W, out = [];
     const note = (k, v) => out.push([k, v]);
-    if (bundleFile) live.apply(JSON.parse(fs.readFileSync(bundleFile, 'utf8')));
+    // 교사 묶음은 기본으로 먼저 넣지만, LATE 에 든 차례는 학생 화면을 연 뒤에 넣는다(수업 중에 단계가 열리는 것을 그대로 보려고)
+    const LATE = { 3: 1, 4: 1, 5: 1 };
+    const teacher = () => { if (bundleFile) live.apply(JSON.parse(fs.readFileSync(bundleFile, 'utf8'))); };
+    if (!LATE[turn]) teacher();
     const cur = pg => pg.evaluate(() => { const b = document.querySelector('nav.steps button[aria-selected="true"]'); return b ? b.textContent.trim() : ''; });
     const band = async pg => ((await W.text(pg)).split('\n').find(l => /^나: /.test(l)) || '(아직 참여 안 함)');
     const join = async (pg, jo, num) => { await pg.locator('#cs-cjo').selectOption({ index: jo }); await pg.locator('#cs-cnum').selectOption({ index: num - 1 }); await W.tap(pg, '참여하기'); await pg.waitForTimeout(1200); };
@@ -37,6 +40,18 @@ const CODE = '2-5512', PAGE = 'projects/quantum-dot.html?c=2-5512&s=cyuk7hbdrs76
             await W.shot(P4, '4조 폰 1 목적'); note('4조 폰 화면 길이', (await W.check(P4)).pages);
             for (const pg of [L1, L2, P3, P4, L6]) note(pg.vcName, { 띠: await band(pg), 단계: await cur(pg) });
             await L1.waitForTimeout(4000);
+        },
+        3: async () => {   // 7~17분: 2 이론이 열림 → 저절로 넘어가나, 작은 탭 넘겨 읽기
+            W.app.db.docs.get('labClasses/cyuk7hbdrs768zt8ndurn3au').stage = 1;   // (다시 돌릴 때) 교사가 열기 전 상태에서 학생 화면을 엶
+            const pgs = {}; for (const [n, d] of [['1조노트북', 'laptop'], ['2조노트북', 'laptop'], ['3조폰', 'phone'], ['4조폰', 'phone'], ['6조노트북', 'laptop']]) pgs[n] = await live.student(n, d);
+            teacher(); await pgs['1조노트북'].waitForTimeout(6000);
+            const sub = pg => pg.evaluate(() => { const b = [...document.querySelectorAll('.subtabs [aria-selected="true"]')].find(e => e.offsetParent); return b ? b.textContent.trim() : ''; });
+            for (const [n, pg] of Object.entries(pgs)) note(n, { 단계: await cur(pg), 작은탭: await sub(pg), 화면장: (await W.check(pg)).pages });
+            const P4 = pgs['4조폰']; await W.shot(P4, '4조 폰 2 이론'); note('4조 폰 이론 첫 화면 글', (await W.text(P4)).split('\n').slice(8, 22).join(' / ').slice(0, 600));
+            await W.tap(pgs['1조노트북'], '띠 틈과 색'); await W.tap(pgs['2조노트북'], '띠 틈과 색'); await W.tap(pgs['3조폰'], '띠 틈과 색');   // 4조·6조는 안 넘김
+            await W.tap(pgs['6조노트북'], '준비물', 0, true); await pgs['6조노트북'].waitForTimeout(400);   // 6조: 잠긴 3 을 눌러 봄
+            note('1조 띠 틈과 색 글', (await pgs['1조노트북'].locator('.step-panel').locator('visible=true').first().innerText()).replace(/\n+/g, ' / ').slice(0, 700));
+            await pgs['1조노트북'].waitForTimeout(4000);
         }
         // TURNS
     };
