@@ -255,7 +255,7 @@
                     return PCF.save(ctx.url, body).then(function (r) { if (r.ok) { done++; if (pl.n > 0) ids.push(pl.id); else cleared.push(pl.id); } return r; });
                 });
             }, Promise.resolve(null)).then(function (last) {
-                return last && !last.ok ? { ok: false, error: last.error, done: done, ids: ids, cleared: cleared } : { ok: true, done: done, ids: ids, cleared: cleared, note: big ? '자료가 너무 커서 ' + big + '개는 요약만 보냈습니다 (CSV 로 내세요).' : '' };
+                return last && !last.ok ? { ok: false, error: last.error, network: !!last.network, done: done, ids: ids, cleared: cleared } : { ok: true, done: done, ids: ids, cleared: cleared, note: big ? '자료가 너무 커서 ' + big + '개는 요약만 보냈습니다 (CSV 로 내세요).' : '' };
             });
         }
         // 이 기기가 잰 것 (폰 회차 메모는 제목 뒤에 붙여 보냄)
@@ -458,7 +458,7 @@
         // 팀 이름으로 입장: 빈 조 자리 하나를 이 이름으로 잡는다 (이 폰은 한 팀만. 이미 팀이 있으면 그 팀으로)
         async function joinTeam(name) {
             if (!CLASS) return { ok: false, error: '선생님 QR 로 들어온 화면이 아니에요.' };
-            if (!cls.info) { var s0 = await startClass(); if (!s0.ok) return Object.assign({ network: true }, s0); }
+            if (!cls.info) { var s0 = await startClass(); if (!s0.ok) return s0; }   // network 는 저장소가 진짜 연결 문제일 때만 붙임
             if (cls.info.mode !== 'team') return { ok: false, error: '이 수업은 팀 이름으로 들어가는 수업이 아니에요.' };
             var r = await CC.joinTeam(srv().url, { classCode: CLASS, name: name, device: st.device });
             if (!r.ok) return r;

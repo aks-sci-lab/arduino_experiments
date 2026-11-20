@@ -239,6 +239,21 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         const bad = await app.post({ action: 'save', space: g._space, exp: 'rocket', group: g.group, id: 'nxxxx1-team', device: 'nxxxx1', n: 1, summary: { '팀 점수': 999 }, data: '' }, { uid: 'stranger' });
         assert.equal(bad.ok, false);
 
+        // ---- 익명 로그인이 꺼진 Firebase: '인터넷' 이 아니라 진짜 이유를 보여 주고, 폰에서만 진행하지 않음 ----
+        const Z = await ctx(devices['iPhone 13'], 'Z');
+        const zDialogs = [];
+        Z.removeAllListeners('dialog'); Z.on('dialog', d => { zDialogs.push(d.message()); d.accept(); });
+        await Z.addInitScript(() => { window.LAB_STORE_FAKE_AUTH_ERROR = 'auth/admin-restricted-operation'; });
+        await Z.goto(famUrl);
+        await go(Z, 'enter');
+        await Z.waitForFunction(() => /익명 로그인이 꺼져 있어요/.test(document.getElementById('ev-enter-msg').textContent), null, { timeout: 15000 });
+        await Z.fill('#ev-name', '로그인 꺼짐 팀'); await Z.click('#ev-start');
+        await Z.waitForFunction(() => /익명 로그인이 꺼져 있어요/.test(document.getElementById('ev-enter-msg').textContent));
+        await Z.waitForTimeout(300);
+        assert.equal(await screen(Z), 'enter', '입장하지 않은 채 다음으로 가지 않음');
+        assert.equal(zDialogs.some(m => /인터넷/.test(m)), false, '인터넷 안내가 아님: ' + zDialogs.join(' / '));
+        assert.equal(zDialogs.some(m => /익명 로그인이 꺼져 있어요/.test(m)), true, '진짜 이유를 알림');
+
         // ---- 375px ----
         const N = await ctx({ viewport: { width: 375, height: 740 }, hasTouch: true, isMobile: true }, 'N');
         await N.goto(ROOT + 'projects/film-rocket.html');

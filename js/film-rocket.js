@@ -70,7 +70,8 @@
             }
         });
     }
-    function isNetErr(r) { return !!(r && (r.network || /인터넷|시간 초과|network|offline|연결하지/i.test(String(r.error || '')))); }
+    // 진짜 인터넷 문제만 (js/lab-store.js 가 network: true 를 붙임). 익명 로그인 꺼짐·권한·한도 같은 오류는 그 문구를 그대로 보여 줌
+    function isNetErr(r) { return !!(r && r.network); }
     function queueSend() {
         if (!share) return;
         clearTimeout(net.sendTimer);
@@ -86,11 +87,11 @@
         var rev = st.rev || 0;
         var r = await share.send();
         if (r && r.ok) {
-            st.sentAt = new Date().toISOString(); net.lastErr = '';
+            st.sentAt = new Date().toISOString(); net.lastErr = ''; net.lastNet = false;
             st.dirty = (st.rev || 0) !== rev;   // 보내는 동안 또 바뀌었으면 한 번 더
             if (st.dirty) queueSend();
         } else if (r && r.busy) queueSend();
-        else if (r) net.lastErr = String(r.error || '');
+        else if (r) { net.lastErr = String(r.error || ''); net.lastNet = isNetErr(r); }
         save(); renderTop();
     }
     function retryLoop() {
@@ -114,7 +115,10 @@
         if (!CLASS) return { cls: 'solo', t: '📱 이 폰에만 저장' };
         if (!st.team) return { cls: 'wait', t: '' };
         if (st.team.problem) return { cls: 'warn', t: '⚠ 팀 이름 확인' };
+        var cf = share && share.classFailed();
+        if (cf && !isNetErr(cf)) return { cls: 'warn', t: '⚠ ' + String(cf.error || '').slice(0, 80) + ' (이 폰에는 저장돼요)' };
         if (!share || !share.me()) return { cls: 'warn', t: '📶 폰에 저장됨 · 연결되면 보내요' };
+        if (st.dirty && net.lastErr && !net.lastNet) return { cls: 'warn', t: '⚠ ' + net.lastErr.slice(0, 80) + ' (이 폰에는 저장돼요)' };
         if (st.dirty) return { cls: net.lastErr ? 'warn' : 'wait', t: net.lastErr ? '📶 폰에 저장됨 · 다시 보낼게요' : '⏳ 보내는 중' };
         return { cls: 'ok', t: '✅ 선생님께 보냄' };
     }
@@ -196,7 +200,7 @@
             '<p>가족이 함께 정한 <b>별명</b>이나 <b>가족 이름</b>으로 해요. <span class="ev-small">(실명·학번은 쓰지 않아요)</span></p>' +
             '<label class="ev-field">팀 이름 (12글자까지)<input type="text" id="ev-name" maxlength="12" autocomplete="off" placeholder="예: 별빛 가족" value="' + esc(st.team ? st.team.name : '') + '"></label>' +
             '<div class="ev-chips">' + ['별빛 가족', '로켓 탐험대', '무지개 팀', '번개 가족'].map(function (n) { return '<button type="button" class="ev-chip" data-name="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') + '</div>' +
-            '<p id="ev-enter-msg" class="ev-msg" role="status" aria-live="polite">' + (st.team && st.team.problem ? '⚠ ' + esc(st.team.problem) : waiting ? '⏳ 선생님 수업에 연결하는 중…' : !CLASS ? 'ℹ️ 선생님 QR 로 들어오지 않았어요. 결과는 이 폰에만 저장돼요.' : '') + '</p>' +
+            '<p id="ev-enter-msg" class="ev-msg" role="status" aria-live="polite">' + (st.team && st.team.problem ? '⚠ ' + esc(st.team.problem) : share && share.classFailed() && !isNetErr(share.classFailed()) ? '⚠ ' + esc(share.classFailed().error) : waiting ? '⏳ 선생님 수업에 연결하는 중…' : !CLASS ? 'ℹ️ 선생님 QR 로 들어오지 않았어요. 결과는 이 폰에만 저장돼요.' : '') + '</p>' +
             '<div class="ev-nav"><button type="button" class="ev-next good" id="ev-start">시작하기 →</button></div>';
         return { html: html, mount: function () {
             var inp = $('#ev-name'), msg = $('#ev-enter-msg');
@@ -215,7 +219,9 @@
                     alert('인터넷이 연결되지 않았어요. 이 폰에 저장하고 계속해요. 연결되면 저절로 선생님께 보내요.');
                     show('think-intro'); retryLoop(); return;
                 }
+                // 인터넷 문제가 아님 (예: 익명 로그인 꺼짐·권한) → 진짜 이유를 그대로. 선생님이 고친 뒤 다시 누르면 됨
                 msg.textContent = '⚠ ' + r.error;
+                if (!/같은 이름|자리가 다 찼|팀 이름을 넣어/.test(String(r.error || ''))) alert('입장하지 못했어요: ' + r.error + '\n선생님께 이 화면을 보여 주세요.');
             });
         } };
     };

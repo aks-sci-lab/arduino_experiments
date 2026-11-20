@@ -149,3 +149,26 @@ test('팀 이름 수업 (가짜 저장소): 입장·같은 이름 막기·자리
     assert.equal(g.ok, true); assert.equal(g.mode, '');
     assert.match((await core.handle({ action: 'teamJoin', space: g.space, name: '팀' }, { uid: 'a' })).error, /팀 이름으로 들어가는 수업이 아니/);
 });
+
+test('인터넷 문제와 다른 오류 나누기 (js/lab-store.js): 익명 로그인 꺼짐·권한·한도는 network 아님', async () => {
+    const E = (code, message) => Object.assign(new Error(message || code), { code });
+    assert.equal(LabStore.isNetworkError(E('auth/admin-restricted-operation', 'Firebase: Error (auth/admin-restricted-operation).')), false);
+    assert.match(LabStore.friendlyError(E('auth/admin-restricted-operation')), /익명 로그인이 꺼져 있어요/);
+    assert.equal(LabStore.isNetworkError(E('auth/operation-not-allowed')), false);
+    assert.equal(LabStore.isNetworkError(E('permission-denied', 'Missing or insufficient permissions.')), false);
+    assert.equal(LabStore.isNetworkError(E('resource-exhausted', 'Quota exceeded.')), false);
+    assert.equal(LabStore.isNetworkError(E('auth/network-request-failed')), true);
+    assert.equal(LabStore.isNetworkError(E('unavailable', 'Failed to get document because the client is offline.')), true);
+    assert.equal(LabStore.isNetworkError(new TypeError('Failed to fetch')), true);
+    assert.equal(LabStore.isNetworkError(new TypeError('Load failed')), true, '아이폰 사파리');
+    assert.equal(LabStore.isNetworkError(new Error('시간 초과 — 인터넷 연결을 확인하세요')), true);
+    assert.equal(LabStore.isNetworkError(new Error('불러오지 못함: https://www.gstatic.com/…')), true);
+    // core 안에서 난 오프라인 오류도 network 표시
+    const db = LabStore.memoryDb();
+    db.get = () => Promise.reject(E('unavailable', 'client is offline'));
+    const r = await LabStore.core(db).handle({ action: 'joinInfo', space: 'c' + 'a'.repeat(23) }, { uid: 'x' });
+    assert.equal(r.ok, false); assert.equal(r.network, true);
+    db.get = () => Promise.reject(E('permission-denied', 'Missing or insufficient permissions.'));
+    const r2 = await LabStore.core(db).handle({ action: 'joinInfo', space: 'c' + 'a'.repeat(23) }, { uid: 'x' });
+    assert.equal(r2.network, undefined); assert.match(r2.error, /권한 없음/);
+});
