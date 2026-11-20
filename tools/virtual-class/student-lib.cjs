@@ -134,6 +134,20 @@ async function startWorld(opts) {
         desk.off = () => T.uncheck('#aiOn'); desk.on = () => T.check('#aiOn');
         return desk;
     };
+    // 떨어지는 공 가짜 영상(webm) 파일 만들기: 자(세로 막대 0.3 m)와 공이 g 로 떨어짐. 돌려주는 값 = 파일 경로
+    W.fallVideo = async (file, secs) => {
+        const c = await browser.newContext({ viewport: { width: 400, height: 700 } }); const pg = await c.newPage();
+        const b64 = await pg.evaluate(async secs => {
+            const cv = document.createElement('canvas'); cv.width = 360; cv.height = 640; document.body.appendChild(cv); const g = cv.getContext('2d');
+            const rec = new MediaRecorder(cv.captureStream(30), { mimeType: 'video/webm' }); const chunks = []; rec.ondataavailable = e => chunks.push(e.data);
+            const pxPerM = 600, t0 = performance.now();
+            const draw = () => { const t = (performance.now() - t0) / 1000; g.fillStyle = '#fff'; g.fillRect(0, 0, 360, 640); g.fillStyle = '#333'; g.fillRect(40, 100, 8, 0.3 * pxPerM); g.fillStyle = '#d00'; g.beginPath(); g.arc(200, 40 + Math.min(580, 0.5 * 9.8 * Math.max(0, t - 0.3) ** 2 * pxPerM), 12, 0, 7); g.fill(); if (t < secs) requestAnimationFrame(draw); else rec.stop(); };
+            rec.start(); draw();
+            await new Promise(r => { rec.onstop = r; });
+            const buf = await new Blob(chunks, { type: 'video/webm' }).arrayBuffer(); let s = ''; new Uint8Array(buf).forEach(x => { s += String.fromCharCode(x); }); return btoa(s);
+        }, secs || 1.2);
+        fs.writeFileSync(file, Buffer.from(b64, 'base64')); await c.close(); return file;
+    };
     W.close = async () => { await browser.close(); api.close(); stat.close(); };
     return W;
 }
