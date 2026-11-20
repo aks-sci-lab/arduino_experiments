@@ -234,3 +234,17 @@ test('📱 폰 연결: 주소 읽기·만들기, 폰 기기 이름, 교사 화�
     assert.equal(CC.stepName('malus', 'phone-data'), '📱 5 데이터');
     assert.equal(CC.stepName('malus', 'data'), '5 데이터');
 });
+
+test('폰 짝 공간 번호: crypto 난수로 p + 23자, 저장소 공간 모양, 시험은 난수를 넣을 수 있음', () => {
+    const CS = require('../js/class-share.js');
+    const LS = require('../js/lab-store.js');
+    const seen = new Set();
+    for (let i = 0; i < 200; i++) { const sp = CS.newPairSpace(); assert.ok(LS.isSpace(sp) && /^p[a-z0-9]{23}$/.test(sp), sp); seen.add(sp); }
+    assert.equal(seen.size, 200, '겹치지 않음');
+    let k = 0;
+    assert.equal(CS.newPairSpace(() => ((k++) % 32) / 32), 'pabcdefghijkmnpqrstuvwxy', '넣어 준 난수를 그대로');
+    // Math.random 을 쓰지 않음 (crypto 가 있으면)
+    const orig = Math.random; let used = 0; Math.random = () => { used++; return orig(); };
+    try { CS.newPairSpace(); } finally { Math.random = orig; }
+    assert.equal(used, 0);
+});
