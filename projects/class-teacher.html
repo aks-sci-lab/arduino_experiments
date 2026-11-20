@@ -63,20 +63,34 @@
 
         <!-- 수업 첫 화면: 교실 앞 화면에서 찍을 큰 QR -->
         <section class="ct-card ct-qrpage" id="classOut" hidden>
-            <p class="ct-qrlead">📱 폰 카메라로 QR 을 찍어 들어오세요</p>
-            <div id="qr" class="ct-qr ct-qr-xl" aria-label="학생 연결 QR 코드"></div>
-            <p class="note">또는 메인 페이지 → <b>학생</b> → 수업 코드</p>
-            <p class="ct-code ct-code-xl" id="outCode"></p>
-            <p class="note" id="outTitle"></p>
-            <div class="ct-row ct-center">
-                <button id="btnToRun" class="good ct-big">다음 → 진행 보기</button>
-                <button id="btnBig" class="secondary">🔍 QR 화면 가득</button>
-                <button id="btnCopy" class="secondary">📋 주소 복사</button>
+            <!-- 학생과 함께 보는 화면: 왼쪽 QR, 오른쪽 수업 코드·노트북 접속 방법 (넓은 화면, 4K 프로젝터 기준). 교사용 글은 아래 '🔧 선생님용' 접기 -->
+            <div class="ct-qrgrid">
+                <div class="ct-qrcol">
+                    <p class="ct-qrlead">📱 폰 카메라로 QR 을 찍어요</p>
+                    <div id="qr" class="ct-qr ct-qr-xl" aria-label="학생 연결 QR 코드"></div>
+                </div>
+                <div class="ct-joincol">
+                    <p class="ct-joinlbl">수업 코드</p>
+                    <p class="ct-code ct-code-xl" id="outCode"></p>
+                    <ol class="ct-joinsteps" aria-label="노트북으로 들어오기">
+                        <li><span aria-hidden="true">💻</span> 주소창에 <b class="ct-host" id="joinHost">aks-sci-lab.web.app</b></li>
+                        <li><b>🧑‍🎓 학생</b> 누르기</li>
+                        <li><b>수업 코드</b> 넣기</li>
+                    </ol>
+                    <p class="note" id="outTitle"></p>
+                    <div class="ct-row ct-center">
+                        <button id="btnToRun" class="good ct-big">다음 → 진행 보기</button>
+                        <button id="btnBig" class="secondary">🔍 QR 화면 가득</button>
+                    </div>
+                    <details class="ct-teach"><summary>🔧 선생님용: 학생 주소·코드 기한</summary>
+                        <div class="ct-row"><button id="btnCopy" class="secondary">📋 주소 복사</button></div>
+                        <p><a id="outLink" class="ct-link" target="_blank" rel="noopener"></a></p>
+                        <p id="copyMsg" class="note"></p>
+                        <p class="note"><b>수업 코드로 찾기는 만든 뒤 2일까지</b>예요(그 뒤에는 QR·주소로, 필요하면 목록의 🔓 코드 다시 열기).</p>
+                        <p class="ct-status warn" id="outExpire"></p>
+                    </details>
+                </div>
             </div>
-            <p><a id="outLink" class="ct-link" target="_blank" rel="noopener"></a></p>
-            <p id="copyMsg" class="note"></p>
-            <p class="note"><b>수업 코드로 찾기는 만든 뒤 2일까지</b>예요(그 뒤에는 QR·주소로, 필요하면 목록의 🔓 코드 다시 열기).</p>
-            <p class="ct-status warn" id="outExpire"></p>
         </section>
 
         <div id="runPane" hidden>
@@ -99,7 +113,7 @@
         <section class="ct-card" id="boardCard" hidden>
             <div class="ct-row"><h2 style="margin:0">🏆 팀 결과판</h2><button id="btnBoardBig" class="good">🖥 크게 보기 (프로젝터)</button></div>
             <div id="board"></div>
-            <details class="ct-key"><summary>🧪 예비 실험 값·목표 고치기</summary><div id="teamSetupEdit"></div>
+            <details class="ct-key ct-teach"><summary>🔧 선생님용: 🧪 예비 실험 값·목표 고치기</summary><div id="teamSetupEdit"></div>
                 <div class="ct-row"><button id="btnSetupSave" class="good">💾 설정 저장</button></div><p id="setupMsg" class="note" role="status" aria-live="polite"></p>
                 <p class="note">가족 화면은 도전 화면을 열 때 새 목표를 받아요.</p></details>
         </section>
@@ -132,7 +146,7 @@
                 <button id="btnPAskNo" class="secondary">아니요 (Esc)</button>
             </div>
             <div class="ct-pframe"><iframe id="presentFrame" title="학생 화면 (발표용)" src="about:blank"></iframe></div>
-            <p id="pHint" class="note">→ · PageDown · Space = 다음 탭, ← · PageUp = 이전 (발표용 리모컨도 돼요). 이 화면에서 넘기는 탭은 학생 폰에 영향이 없어요. 단계 끝에서 한 번 더 누르면 다음 단계를 열지 물어요.</p>
+            <details class="ct-teach ct-phint"><summary>⌨ 넘기는 키</summary><p id="pHint" class="note">→ · PageDown · Space = 아래로 한 화면, 끝이면 다음 탭 · ← · PageUp = 반대로 (발표용 리모컨도 돼요). 이 화면에서 넘기는 탭은 학생 폰에 영향이 없어요. 단계 끝에서 한 번 더 누르면 다음 단계를 열지 물어요.</p></details>
         </section>
       </div><!-- /viewClass -->
     </div>
@@ -280,5 +294,9 @@
 <script src="../js/class-teacher-planck.js"></script>
 <script src="../js/report-ai.js"></script>
 <script src="../js/class-teacher-ai.js"></script>
+<script>
+    // 노트북 접속 방법의 사이트 주소: 실제 사이트(…web.app·firebaseapp.com)면 그 주소, 시험·내 PC 에서는 기본 aks-sci-lab.web.app
+    (function () { var h = document.getElementById('joinHost'); if (h && /\.(web\.app|firebaseapp\.com)$/.test(location.hostname)) h.textContent = location.hostname; })();
+</script>
 </body>
 </html>

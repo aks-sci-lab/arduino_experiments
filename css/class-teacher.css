@@ -11,7 +11,7 @@
 .ct-field.ct-inline { flex-direction: row; align-items: center; margin: 0; }
 .ct-field input, .ct-field select { min-height: var(--tap); padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); font-size: 1rem; font-weight: 400; width: 100%; max-width: 100%; background: #fff; }
 .ct-field.ct-inline select { width: auto; max-width: 70vw; }
-.ct-grid3 { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+.ct-grid3 { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); }
 .ct-wrap button { min-height: var(--tap); padding: var(--sp-2) var(--sp-4); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: .95rem; font-weight: 600; cursor: pointer; }
 .ct-wrap button:hover { background: var(--c-primary-dark); }
 .ct-wrap button.secondary { background: var(--c-secondary); }
@@ -46,10 +46,10 @@ html.big-view .ct-bigqr { zoom: calc(1 / 1.35); }
 .ct-bigqr button { min-height: var(--tap); padding: var(--sp-2) var(--sp-5); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: 1rem; }
 
 /* 진행 보기 */
-.ct-sum { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.ct-sum { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); }
 .ct-sum div { background: var(--c-fill); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); }
 .ct-sum b { display: block; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
-.ct-groups { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); margin-bottom: var(--sp-3); }
+.ct-groups { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); margin-bottom: var(--sp-3); }
 .ct-group { background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-3); box-shadow: var(--shadow); }
 .ct-group h3 { font-size: 1rem; margin: 0 0 var(--sp-1); display: flex; justify-content: space-between; gap: var(--sp-2); }
 .ct-group .ct-sub { font-size: var(--fs-sm); color: var(--c-muted); margin: 0 0 var(--sp-2); }
@@ -105,9 +105,9 @@ html.big-view .ct-bigqr { zoom: calc(1 / 1.35); }
 .ct-board .ok { color: var(--c-ok-text); font-weight: 700; }
 .ct-board-wrap { overflow-x: auto; }
 .ct-boardbig { position: fixed; inset: 0; z-index: 1000; background: var(--c-card); padding: var(--sp-4); overflow: auto; }
-.ct-boardbig .ct-board { font-size: clamp(1.2rem, 2.4vw, 2.2rem); }
-.ct-boardbig h2 { font-size: clamp(1.4rem, 3vw, 2.6rem); margin: 0; }
-.ct-boardbig button { min-height: var(--tap); padding: var(--sp-2) var(--sp-5); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: 1rem; }
+.ct-boardbig .ct-board { font-size: clamp(1.2rem, 3.4vh, 8rem); }
+.ct-boardbig h2 { font-size: clamp(1.4rem, 4.6vh, 10rem); margin: 0; }
+.ct-boardbig button { min-height: var(--tap); padding: var(--sp-2) var(--sp-5); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: max(1rem, 2vh); }
 html.big-view .ct-boardbig { zoom: calc(1 / 1.35); }
 
 /* 진행 화면 (첫 화면): 머리줄·학생에게 여는 단계 */
@@ -121,13 +121,13 @@ html.big-view .ct-boardbig { zoom: calc(1 / 1.35); }
 .ct-stage-steps li { padding: var(--sp-1) var(--sp-3); border-radius: 999px; font-size: var(--fs-sm); background: var(--c-fill); color: var(--c-muted); }
 .ct-stage-steps li.open { background: var(--c-ok-bg); color: var(--c-ok-text); }
 .ct-stage-steps li.cur { outline: 2px solid var(--c-success); font-weight: 700; }
-.ct-wrap button.ct-big { font-size: 1.15rem; min-height: 56px; padding: 0 var(--sp-5); }
+.ct-wrap button.ct-big { font-size: 1.15rem; min-height: max(56px, 3.2rem); padding: 0 var(--sp-5); }
 
 /* 플랑크 상수 결과 (js/class-teacher-planck.js) */
 .ctp-scroll { overflow-x: auto; max-width: 100%; }
 .ctp-row { cursor: pointer; }
 .ctp-row:hover, .ctp-row:focus { background: var(--c-primary-soft); }
-.ctp-chart { width: 100%; max-width: 560px; height: auto; display: block; margin: var(--sp-2) 0; }
+.ctp-chart { width: 100%; max-width: max(560px, 36rem); height: auto; display: block; margin: var(--sp-2) 0; }
 .ctp-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid #333; vertical-align: middle; }
 
 /* 내 수업 목록 (첫 화면) */
@@ -135,7 +135,7 @@ html.big-view .ct-boardbig { zoom: calc(1 / 1.35); }
 .ct-classes { display: grid; gap: var(--sp-2); margin: var(--sp-2) 0; }
 .ct-cls { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: stretch; border: 1px solid var(--c-line); border-radius: var(--r-card); background: var(--c-card); padding: var(--sp-2); }
 .ct-cls.done { background: var(--c-fill); }
-.ct-wrap button.ct-cls-main { flex: 1 1 320px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center; text-align: left; background: transparent; color: var(--c-text); font-weight: 400; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); }
+.ct-wrap button.ct-cls-main { flex: 1 1 20rem; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center; text-align: left; background: transparent; color: var(--c-text); font-weight: 400; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); }
 .ct-wrap button.ct-cls-main:hover { background: var(--c-primary-soft); }
 .ct-cls-ic { font-size: 2rem; line-height: 1; }
 .ct-cls-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -154,28 +154,28 @@ html.big-view .ct-boardbig { zoom: calc(1 / 1.35); }
 .ct-center { justify-content: center; }
 
 /* 진행 보기 오른쪽 위 QR: 교실 뒤에서 폰 카메라로 확대해 찍을 크기 (한 변 약 190px, 흰 여백 넉넉히) */
-.ct-wrap ~ button.ct-corner, button.ct-corner { position: fixed; top: 12px; right: 12px; z-index: 50; width: 214px; padding: 12px; border: 1px solid var(--c-line); border-radius: var(--r-card); background: #fff; box-shadow: var(--shadow); cursor: zoom-in; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--c-text); }
+.ct-wrap ~ button.ct-corner, button.ct-corner { position: fixed; top: 12px; right: 12px; z-index: 50; width: calc(var(--corner) + 24px); padding: 12px; border: 1px solid var(--c-line); border-radius: var(--r-card); background: #fff; box-shadow: var(--shadow); cursor: zoom-in; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--c-text); }
 button.ct-corner[hidden] { display: none; }
-.ct-corner-img { display: block; width: 190px; height: 190px; }
+.ct-corner-img { display: block; width: var(--corner); height: var(--corner); }
 .ct-corner-img svg { width: 100%; height: 100%; display: block; }
 .ct-corner b { font-size: 1.3rem; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
 .ct-corner-mini { display: none; }
-@media (min-width: 900px) { body.ct-has-corner .ct-wrap { padding-right: 240px; } }
+@media (min-width: 900px) { body.ct-has-corner .ct-wrap { padding-right: calc(var(--corner) + 50px); } }
 @media (max-width: 899px) {
     button.ct-corner { width: auto; min-height: var(--tap); padding: var(--sp-1) var(--sp-3); top: auto; bottom: 12px; }
     .ct-corner-img, .ct-corner b { display: none; }
     .ct-corner-mini { display: inline; font-weight: 700; }
 }
 html.big-view button.ct-corner { zoom: calc(1 / 1.35); }
-.ct-boardqr { position: absolute; top: var(--sp-3); right: var(--sp-3); width: 210px; text-align: center; background: #fff; }
-.ct-boardqr svg { width: 190px; height: 190px; display: block; margin: 0 auto; }
+.ct-boardqr { position: absolute; top: var(--sp-3); right: var(--sp-3); width: calc(var(--corner) + 20px); text-align: center; background: #fff; }
+.ct-boardqr svg { width: var(--corner); height: var(--corner); display: block; margin: 0 auto; }
 .ct-boardqr b { font-size: 1.3rem; }
-.ct-boardbig { padding-right: 240px; }
+.ct-boardbig { padding-right: calc(var(--corner) + 50px); }
 @media (max-width: 899px) { .ct-boardqr { display: none; } .ct-boardbig { padding-right: var(--sp-4); } }
 
 /* 🎬 발표 보기: 프로젝터용 — 머리말·수업 띠를 숨기고 학생 화면(iframe)을 크게. 오른쪽 위 QR 은 그대로 */
 body.ct-presenting .ct-head, body.ct-presenting .ct-bar { display: none; }
-body.ct-presenting .ct-wrap { max-width: none; padding-top: var(--sp-2); }
+body.ct-presenting .ct-wrap { max-width: none; padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
 .ct-pbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-2) var(--sp-3); }
 .ct-pstage { font-size: 1.05rem; }
 .ct-pjoined { color: var(--c-muted); }
@@ -184,8 +184,13 @@ body.ct-presenting .ct-wrap { max-width: none; padding-top: var(--sp-2); }
 .ct-pask[hidden] { display: none; }
 .ct-pframe { margin-top: var(--sp-2); }
 .ct-pframe iframe { display: block; width: 100%; height: calc(100vh - 150px); min-height: 420px; border: 1px solid var(--c-line); border-radius: var(--r-card); background: #fff; }
+body.ct-presenting #presentPane:not([hidden]) { display: flex; flex-direction: column; height: calc(100vh - 2 * var(--sp-2)); }
+body.ct-presenting .ct-pframe { flex: 1 1 auto; min-height: 0; }
+body.ct-presenting .ct-pframe iframe { height: 100%; min-height: 0; }
 /* 행사형(필름통 로켓)은 폰 모양 틀 */
 .ct-present.phone .ct-pframe iframe { width: 400px; max-width: 100%; height: min(820px, calc(100vh - 150px)); margin: 0 auto; border: 12px solid #222; border-radius: 36px; }
+/* 폰 틀은 화면 높이에 맞춰 (안의 로켓 화면은 js/lab-ui.js presentFit 이 400 × 820 을 틀에 맞춰 키움) */
+body.ct-presenting .ct-present.phone .ct-pframe iframe { height: 100%; width: auto; aspect-ratio: 400 / 820; box-sizing: content-box; border-width: clamp(8px, 1.1vh, 28px); border-radius: clamp(24px, 3.4vh, 80px); }
 /* 진행 방법 (7단계 / 가설연역) 고르기 */
 .ct-flow { border: 1px solid var(--c-line); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3); }
 .ct-flow[hidden] { display: none; }
@@ -193,3 +198,39 @@ body.ct-presenting .ct-wrap { max-width: none; padding-top: var(--sp-2); }
 .ct-flow label { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); min-height: var(--tap); font-weight: 600; }
 .ct-flow label .note { font-weight: 400; flex-basis: 100%; margin-left: 28px; margin-top: -6px; }
 .ct-flow input[type=radio] { width: 20px; height: 20px; min-height: 0; margin: 0; }
+
+/* ===== 학생과 함께 보는 화면(수업 하나를 연 화면: 큰 QR·진행 화면·🎬 발표 보기·🏆 결과판) — 4K 프로젝터 기준 (2026-11-20 선생님 "프로젝터는 4k야") =====
+   글자 기준(rem)을 화면 높이에 맞춤: 720 → 16px, 1080 → 22px, 1440 → 29px, 2160 → 43px (화면 높이의 2 %). 카드·표·단추가 rem 이라 함께 커짐.
+   (zoom 은 vh 까지 키워 화면을 넘기므로 쓰지 않음. 크게 보기 Alt+B 는 body zoom 대신 기준 글자를 한 단계 더 키움) */
+:root { --corner: 190px; }
+html:has(#viewClass:not([hidden])) { font-size: clamp(16px, 2vh, 52px); --corner: clamp(190px, 17vh, 440px); }
+html.big-view:has(#viewClass:not([hidden])) { font-size: clamp(20px, 2.5vh, 64px); }
+html.big-view:has(#viewClass:not([hidden])) body,
+html.big-view:has(#viewClass:not([hidden])) button.ct-corner,
+html.big-view:has(#viewClass:not([hidden])) .ct-bigqr,
+html.big-view:has(#viewClass:not([hidden])) .ct-boardbig { zoom: 1; }
+html:has(#viewClass:not([hidden])) .ct-wrap { max-width: max(var(--w-dash), 96vw); }
+html:has(#viewClass:not([hidden])) .ct-wrap button:not(.ct-big):not(.ct-mem):not(.ct-cls-main) { font-size: .95rem; min-height: max(var(--tap), 2.6rem); }
+
+/* 큰 QR 화면: 넓은 화면은 왼쪽 QR | 오른쪽 수업 코드·노트북 접속 방법, 좁으면 위아래. QR·코드·'다음' 단추가 한 화면에 (1280×720 ~ 4K) */
+.ct-qrgrid { display: grid; gap: var(--sp-3); justify-items: center; }
+.ct-qrcol, .ct-joincol { min-width: 0; }
+.ct-qrpage .ct-qr.ct-qr-xl { width: min(92vw, 60vh); max-width: 100%; }
+.ct-joinlbl { margin: var(--sp-2) 0 0; font-size: clamp(1rem, 2.6vh, 4rem); font-weight: 700; color: var(--c-muted); }
+.ct-qrpage .ct-code.ct-code-xl { font-size: clamp(2.6rem, 11vh, 16rem); line-height: 1.05; margin: 0 0 var(--sp-2); }
+.ct-joinsteps { margin: 0 0 var(--sp-2); padding-left: 1.6em; font-size: clamp(1.05rem, 3.2vh, 5rem); line-height: 1.45; text-align: left; }
+.ct-joinsteps li::marker { font-weight: 800; color: var(--c-primary); }
+.ct-host { font-family: var(--font-mono); letter-spacing: .02em; color: var(--c-primary); word-break: break-all; }
+.ct-qrlead { font-size: clamp(1.1rem, 3vh, 4.5rem); }
+@media (min-aspect-ratio: 5/4) and (min-width: 720px) {
+    .ct-qrgrid { grid-template-columns: auto minmax(0, 1fr); align-items: center; justify-items: start; gap: var(--sp-3) clamp(16px, 3vw, 160px); text-align: left; }
+    .ct-qrcol { text-align: center; }
+    .ct-qrpage .ct-qr.ct-qr-xl { width: min(calc(100vh - 17rem), 46vw); }
+    .ct-qrpage .ct-center { justify-content: flex-start; }
+}
+/* 교사용 글(긴 주소·지워지는 날·CSV·예비 실험 값·넘기는 키): 학생과 함께 보는 화면에서는 접어 둠 */
+details.ct-teach { margin-top: var(--sp-2); font-size: var(--fs-sm); color: var(--c-muted); }
+details.ct-teach > summary { font-size: var(--fs-sm); color: var(--c-muted); font-weight: 600; }
+details.ct-teach[open] { color: var(--c-text); }
+details.ct-phint { margin: var(--sp-1) 0 0; }
+details.ct-phint:not([open]) > summary { min-height: 0; padding: 2px 0; }

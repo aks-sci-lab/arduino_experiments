@@ -519,11 +519,18 @@
         if (pres.ask) { if (dir > 0) openNext(); else askOpen(false); return; }
         var d = frameDoc(), c = watched();
         if (!d || !c) return;
+        // 글자를 크게 키우면 한 화면에 다 안 들어옴 → 먼저 남은 내용을 한 화면씩 내리고(←는 올리고), 끝에 닿은 뒤에 다음(이전) 탭
+        var win = d.defaultView;
+        if (win && !d.getElementById('ev-app')) {
+            var before = win.scrollY;
+            win.scrollTo({ top: before + dir * Math.round(win.innerHeight * 0.8), behavior: 'instant' });
+            if (Math.abs(win.scrollY - before) > 2) return;
+        }
         var sub = Array.prototype.filter.call(d.querySelectorAll('nav.subtabs'), shown)[0];
         if (sub) {
             var bs = Array.prototype.filter.call(sub.querySelectorAll('button[data-tab]'), shown);
             var i = bs.findIndex(function (b) { return b.getAttribute('aria-selected') === 'true'; });
-            if (i >= 0 && bs[i + dir]) { bs[i + dir].click(); return; }
+            if (i >= 0 && bs[i + dir]) { bs[i + dir].click(); try { win.scrollTo({ top: 0, behavior: 'instant' }); } catch (e) { /* 무시 */ } return; }
         }
         var steps = Array.prototype.slice.call(d.querySelectorAll('nav.steps button[data-step], nav.tabs button[data-tab]'));
         var k = steps.findIndex(function (b) { return b.getAttribute('aria-selected') === 'true'; });
