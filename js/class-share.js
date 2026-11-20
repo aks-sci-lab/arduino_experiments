@@ -33,6 +33,17 @@
         for (var i = 0; i < 6; i++) s += 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(R() * 32)];
         return s;
     }
+    // 📱 노트북·폰 짝 공간 번호 (p + 23자). 이 번호가 곧 자료를 지키는 열쇠라(아는 기기만 읽음) crypto.getRandomValues 를 먼저 쓴다
+    //  (js/lab-store.js 의 randomChars 와 같은 글자). random 을 주면(시험) 그것으로, crypto 가 없을 때만 Math.random
+    function newPairSpace(random) {
+        var A = 'abcdefghijkmnpqrstuvwxyz23456789', s = 'p', bytes = null;
+        if (typeof random !== 'function') {
+            try { if (typeof crypto !== 'undefined' && crypto.getRandomValues) { bytes = new Uint8Array(23); crypto.getRandomValues(bytes); } } catch (e) { bytes = null; }
+        }
+        var R = typeof random === 'function' ? random : Math.random;
+        for (var i = 0; i < 23; i++) s += A[bytes ? bytes[i] % 32 : Math.floor(R() * 32)];
+        return s;
+    }
     function isPhoneDevice(device) { return /^p/.test(String(device || '')); }
     function deviceLabel(device) { return (isPhoneDevice(device) ? '📱 폰 ' : '노트북 ') + String(device || '').slice(-4).toUpperCase(); }
     /* 📱 폰 연결: 폰 주소의 값 읽기 (?role=phone&group=조코드[&c=수업&jo=조&num=번호]) → { group, jo, num } 또는 null */
@@ -782,8 +793,7 @@
             if (groupOk() || CLASS) return groupOk();
             var code = PCF.makeGroupCode(st.ban, st.jo) || PCF.makeGroupCode(99, 1 + Math.floor(Math.random() * 99));
             // 이 노트북과 폰만 쓰는 짝 공간 (남이 조 코드를 맞혀도 못 봄). 폰 QR 에 담김
-            var sp = 'p'; for (var i = 0; i < 23; i++) sp += 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 32)];
-            setGroup(code, true, sp);
+            setGroup(code, true, newPairSpace(opts.random));
             return groupOk();
         }
         function renderCard() {
@@ -867,6 +877,6 @@
     }
 
     var EXPORTS = { init: init, buildPayloads: buildPayloads, incomingFrom: incomingFrom, rowId: rowId, newDeviceId: newDeviceId, deviceLabel: deviceLabel, fixState: fixState,
-        isPhoneDevice: isPhoneDevice, readPhoneParams: readPhoneParams, phoneUrl: phoneUrl, current: null };
+        isPhoneDevice: isPhoneDevice, newPairSpace: newPairSpace, readPhoneParams: readPhoneParams, phoneUrl: phoneUrl, current: null };
     return EXPORTS;
 });

@@ -336,7 +336,9 @@
     function soloPair() {
         var pair = load(PAIR_KEY, null);
         if (!pair || !PC.isGroupCode(pair.group) || !/^p[a-z0-9]{23}$/.test(String(pair.space || ''))) {
-            var sp = 'p'; for (var i = 0; i < 23; i++) sp += 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 32)];
+            // 짝 공간 번호는 공통 도우미(crypto 난수)로 — 이 번호가 자료를 지키는 열쇠
+            var sp = window.ClassShare && ClassShare.newPairSpace ? ClassShare.newPairSpace() : (window.LabStore && LabStore.newSpace ? LabStore.newSpace('p') : '');
+            if (!/^p[a-z0-9]{23}$/.test(sp)) { sp = 'p'; for (var i = 0; i < 23; i++) sp += 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 32)]; }
             pair = { group: PC.makeGroupCode(99, 1 + Math.floor(Math.random() * 99)), space: sp };
             // 예전에 수업 없이 조 코드로 쓰던 표가 있으면 새 짝으로 옮겨 그대로 보이게 (예전 자료는 지우지 않음)
             var old = load(GROUP_KEY, null), oldData = old ? load('pendulum-report:data:' + old, null) : null;
