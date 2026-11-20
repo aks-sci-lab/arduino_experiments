@@ -69,6 +69,27 @@ const CODE = '1-5411', SP = 'labClasses/cixem6przhsi57h2j9suc5cc', PAGE = 'proje
             // B: 생각 열기 마저 → 1차시 → 초시계 앞(다음 차례에 시작을 누른 채로 2차시가 열림)
             await W.stroll(B, 'B', 24, 0, /초시계로 재기|시작 \(뚜껑/, quiet); note('B', { 글: await top(B), 단추: (await W.buttons(B)).slice(4) });
             await A.waitForTimeout(3000);
+        },
+        3: async () => {   // 35분: B 가 초시계를 재는 중에 2차시 열림 → 20초 뒤 되돌림 → 50분까지
+            setStage(2); W.offline['C로켓왕'] = true;
+            const A = await live.student('A별빛', 'phone'), B = await live.student('B달님', 'phone'), C = await live.student('C로켓왕', 'Pixel 7'), D = await live.student('D번개', 'phone'), E = await live.student('E코드', 'phone');
+            const all = async tag => { for (const [n, pg] of Object.entries(W.pages)) note(tag + ' ' + n, (await top(pg)).slice(0, 300)); };
+            await all('다시 연 화면');
+            await W.stroll(B, 'B', 5, 0, /초시계로 재기|시작 \(뚜껑/, quiet);   // (다시 연 화면은 조건 화면이라 초시계까지 다시 감)
+            if (await B.getByText('초시계로 재기').locator('visible=true').count()) await W.tap(B, '초시계로 재기'); await W.tap(B, '시작 (뚜껑'); await B.waitForTimeout(3000);
+            setStage(3); await A.waitForTimeout(9000); await all('(가) 2차시 열림 9초 뒤'); await W.shot(B, 'B 초시계 중 2차시 열림'); await W.shot(A, 'A 2차시 열림');
+            await A.waitForTimeout(11000); setStage(2); await A.waitForTimeout(9000); await all('(나) 되돌림 9초 뒤'); await W.shot(A, 'A 되돌린 뒤');
+            note('A 되돌린 뒤 단추', (await W.buttons(A)).slice(0, 12));
+            // B: 펑 → 기록
+            await W.tap(B, /펑/); await B.waitForTimeout(400); if (await B.getByText('이 시간으로 기록').locator('visible=true').count()) await W.tap(B, '이 시간으로 기록'); await B.waitForTimeout(800); note('B 측정 마무리', await top(B));
+            const sw = async (pg, sec) => { if (await pg.getByText('초시계로 재기').locator('visible=true').count()) await W.tap(pg, '초시계로 재기'); await W.tap(pg, '시작 (뚜껑'); await pg.waitForTimeout(sec * 1000); await W.tap(pg, /펑/); await pg.waitForTimeout(400); if (await pg.getByText('이 시간으로 기록').locator('visible=true').count()) await W.tap(pg, '이 시간으로 기록'); await pg.waitForTimeout(500); };
+            // 50분까지
+            await W.stroll(D, 'D', 14, 0, /안전 확인/, quiet); note('D', await top(D));
+            await W.stroll(E, 'E', 8, 0, /초시계로 재기|시작 \(뚜껑/, quiet); await sw(E, 2.5); note('E 첫 측정', await top(E));
+            try { if (!(await A.getByText('다시 도전').locator('visible=true').count())) { await W.tap(A, '1차시'); await A.waitForTimeout(500); note('A 1차시 탭 누른 화면', await top(A)); }
+                await W.tap(A, '다시 도전'); await W.stroll(A, 'A', 6, 0, /초시계로 재기|시작 \(뚜껑/, quiet); await sw(A, 4); note('A 다시 도전', await top(A)); } catch (e) { note('A 다시 도전에서 막힘', String(e.message).split('\n')[0]); note('A 화면', { 글: await top(A), 단추: (await W.buttons(A)).slice(0, 12) }); }
+            note('C 끊긴 채', await top(C));
+            await A.waitForTimeout(3000);
         }
         // TURNS
     };
