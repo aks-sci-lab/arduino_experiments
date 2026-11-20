@@ -86,7 +86,9 @@ test('교사 화면: 플랑크 수업이면 조별 h 표·그래프·CSV 가 나
         const T = await c.newPage(); T.on('pageerror', e => errors.push(e.message)); T.on('dialog', d => d.accept());
         await T.goto(ROOT + 'projects/class-teacher.html');
         await T.click('#btnLogin');
-        await T.waitForSelector('#btnLogout:not([hidden])');
+        await T.waitForSelector('#btnSettings:not([hidden])');
+        await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); });
+        await T.click('#ctTabs button[data-tab="make"]');
         await T.fill('#inBan', '2'); await T.fill('#inN', '4'); await T.fill('#inSize', '2');
         await T.selectOption('#inExp', 'planck');
         await T.click('#btnCreate');
@@ -102,7 +104,7 @@ test('교사 화면: 플랑크 수업이면 조별 h 표·그래프·CSV 가 나
         const { payloads } = PC.buildPayloads({ group: info.groups[0].code, device: 'nab12cd', leds, sent: [], v0: led => P.thresholdOf(led, 'extrapolate', { iMin: 1 }).v0,
             summary: { hCurrent: 6.6 }, curMode: 'extrapolate', iMin: 1, now: new Date().toISOString() }, C.isGroupCode);
         for (const p of payloads) { const r = await app.post(Object.assign({ space: String(space).replace(/^lab:/, '') }, p), { uid: 'stu-1', anonymous: true }); assert.equal(r.ok, true, r.error); }
-        await T.click('#classList [data-watch]');
+        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });   // 진행 화면 (만든 수업을 봄)
         await T.waitForSelector('#planckCard:not([hidden])', { timeout: 10000 });
         await T.click('#ctpReload');
         await T.waitForFunction(() => /6\.\d\d/.test(document.getElementById('ctpTable').textContent), null, { timeout: 10000 });
