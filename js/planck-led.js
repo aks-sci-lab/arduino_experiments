@@ -373,6 +373,7 @@
                 if (collecting) collecting.push(sample.values);
             },
             onStatus(text) { $('sensor-status').textContent = text; },
+            onFirmware(result) { window.PicoFirmware?.showNotice(result, $('sensor-status')); },
             onState(connected) {
                 sensorConnected = connected;
                 if (!connected) { showLive({}); collecting = null; }

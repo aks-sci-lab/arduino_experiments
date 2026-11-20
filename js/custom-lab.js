@@ -437,6 +437,7 @@
                 mode, rate: sensor.rate,
                 onSample: handleSensorSample,
                 onStatus: text => { $('sensorStatus').textContent = text; },
+                onFirmware: result => { window.PicoFirmware?.showNotice(result, $('sensorStatus')); },
                 onState: connected => {
                     $('btnSensorConnect').hidden = connected;
                     $('btnSensorDisconnect').hidden = !connected;

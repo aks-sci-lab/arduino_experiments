@@ -24,6 +24,13 @@
         .setup-card .table-container { height: auto; max-height: 320px; }
         h1 small { display: inline-block; font-size: 0.6em; font-weight: 500; }
         body { overflow-wrap: anywhere; }
+        .setup-result.warn { background: var(--c-warn-bg); border-color: var(--c-warn-text); color: var(--c-warn-text); }
+        .setup-result.fail { background: var(--c-err-bg); border-color: var(--c-danger); color: var(--c-err-text); }
+        #flashSteps { list-style: none; padding-left: 0; line-height: 1.8; }
+        #flashSteps li.now { font-weight: 700; }
+        #flashSteps li.fail { color: var(--c-danger); }
+        #flashProgress { width: 100%; height: 14px; }
+        .flash-button { min-height: 52px; font-size: 1.05em; }
     </style>
 </head>
 <body>
@@ -45,8 +52,7 @@
                 <li>다음 보드로 1번부터 되풀이합니다.</li>
             </ol>
             <p>PC 나 안드로이드의 크롬·엣지에서만 됩니다 (아이폰·아이패드는 안 됩니다).
-                예전 펌웨어가 든 보드는 먼저 새 <a href="../firmware/pico2w-environment/main.py?v=board-v1" download="main.py">main.py</a> 를 올려야 합니다
-                (<a href="../firmware/pico2w-environment/README.md">설치 안내</a>).</p>
+                예전 펌웨어가 든 보드는 먼저 아래 <a href="#usb">🔌 USB 로 펌웨어 올리기</a>로 새 펌웨어를 올리세요.</p>
         </details>
 
         <p>상태: <span id="status" class="setup-status" role="status">연결 대기</span></p>
@@ -59,6 +65,7 @@
             <h2>연결된 보드</h2>
             <p>지금 이름: <span id="currentName" class="setup-name"></span></p>
             <p>칩 고유 번호: <span id="chipId" class="setup-chip"></span></p>
+            <p>펌웨어 판: <span id="fwVersion" class="setup-chip"></span></p>
             <div class="lab-controls">
                 <button id="identifyButton">LED 다시 깜빡이기</button>
             </div>
@@ -71,6 +78,39 @@
                 <button id="clearButton">번호 지우기</button>
             </div>
             <p id="result" class="setup-result" role="status" hidden></p>
+        </section>
+
+        <section id="usb" class="setup-card">
+            <h2>🔌 USB 로 펌웨어 올리기 <small>(PC 크롬·엣지)</small></h2>
+            <div id="usbFlash">
+                <p>보드를 USB 케이블로 PC 에 꽂고 단추 하나만 누르면, 사이트의 최신 펌웨어(<b id="flashLatest"></b>) 파일 네 개
+                    (<code>bme280.py</code>·<code>imu.py</code>·<code>extra_sensors.py</code>·<code>main.py</code>)를 한 번에 올리고 확인합니다.
+                    <strong>보드 번호(<code>board.json</code>)는 그대로 남습니다.</strong></p>
+                <ol class="setup-steps">
+                    <li>위의 블루투스 연결은 끊고, <strong>Thonny 는 닫습니다</strong> (보드를 같이 쓰면 안 됩니다).</li>
+                    <li>보드를 <strong>데이터용 USB 케이블</strong>로 PC 에 꽂습니다 (BOOTSEL 단추는 누르지 않습니다).</li>
+                    <li>아래 단추를 누르고 목록에서 보드(「Board CDC」 또는 「Pico」 같은 이름)를 고릅니다.</li>
+                    <li>「✅ 다 됐어요」가 보일 때까지 USB 를 뽑지 않습니다 (1분쯤).</li>
+                </ol>
+                <div class="lab-controls">
+                    <button id="flashButton" class="ble-button flash-button">🔌 USB 연결하고 펌웨어 올리기</button>
+                </div>
+                <p id="flashStatus" class="setup-status" role="status"></p>
+                <progress id="flashProgress" max="100" value="0"></progress>
+                <ol id="flashSteps"></ol>
+                <p id="flashResult" class="setup-result" role="status" hidden></p>
+                <details class="firmware-guide">
+                    <summary>MicroPython 이 없는 보드 (처음 쓰는 보드)</summary>
+                    <ol class="setup-steps">
+                        <li><a href="https://micropython.org/download/RPI_PICO2_W/" target="_blank" rel="noopener">Pico 2 W 용 MicroPython</a>
+                            페이지에서 안정 버전 <code>.uf2</code> 파일을 받습니다 (다른 보드용을 받지 마세요).</li>
+                        <li>보드의 <strong>BOOTSEL 단추를 누른 채로</strong> USB 를 꽂으면 PC 에 <code>RP2350</code> 같은 이름의 드라이브가 생깁니다.</li>
+                        <li>받은 <code>.uf2</code> 파일을 그 드라이브에 끌어다 놓습니다. 드라이브가 사라지면 끝입니다.</li>
+                        <li>USB 를 뽑았다가 (단추 누르지 않고) 다시 꽂은 뒤 위의 단추를 누릅니다.</li>
+                    </ol>
+                    <p>이 화면을 쓸 수 없으면 <a href="../firmware/pico2w-environment/README.md">Thonny 설치 안내</a>대로 파일을 하나씩 올려도 됩니다.</p>
+                </details>
+            </div>
         </section>
 
         <section class="setup-card">
@@ -92,6 +132,8 @@
     </main>
     <script src="../js/environment-protocol.js?v=multi-sensor-v2"></script>
     <script src="../js/pico-ble.js?v=setup-v3"></script>
-    <script src="../js/board-setup.js?v=board-v1"></script>
+    <script src="../js/pico-firmware.js?v=fw-v1"></script>
+    <script src="../js/board-setup.js?v=board-v2"></script>
+    <script src="../js/pico-flash.js?v=flash-v1"></script>
 </body>
 </html>

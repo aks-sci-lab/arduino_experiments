@@ -31,7 +31,10 @@ SERVICE = bluetooth.UUID("19b10000-e8f2-537e-4f6c-d104768a1214")
 TX = bluetooth.UUID("19b10001-e8f2-537e-4f6c-d104768a1214")
 CMD = bluetooth.UUID("19b10002-e8f2-537e-4f6c-d104768a1214")
 ACCEL = bluetooth.UUID("19b10004-e8f2-537e-4f6c-d104768a1214")
-FIRMWARE_VERSION = "2026.11-iv"
+# 판 이름. 웹의 js/pico-firmware.js 의 LATEST 와 같게 맞춘다 (시험이 확인).
+FIRMWARE_VERSION = "2026.11-usb"
+# 웹의 USB 펌웨어 올리기가 다시 켠 뒤 이 줄로 판을 확인한다.
+print("[BOOT] Firmware:", FIRMWARE_VERSION)
 # 보드 번호를 적어 두는 작은 설정 파일. 없거나 깨졌으면 자동 이름(PicoEnv-XXXX)을 쓴다.
 BOARD_FILE = "board.json"
 MAX_CONSECUTIVE_FAILURES = 5
