@@ -11,7 +11,7 @@
     const MAX_DESC = 5000;
     const FITS = ['none', 'proportional', 'linear'];
     // 학생 화면 방식: 'single' 한 화면에 모두 / 'steps' 보고서 순서 7단계 탭 (목적·이론·준비물·과정·데이터·결과·결론)
-    const LAYOUTS = ['single', 'steps'];
+    const LAYOUTS = ['single', 'steps', 'hd'];   // hd = 가설연역 6단계 (같은 7단계 칸을 묶어 보임, docs/inquiry-types-design.md)
     const STEP_TEXTS = ['theory', 'materials', 'procedure'];   // 선생님이 따로 쓰는 단계 글 (목적은 실험 안내 글)
     const MAX_STEP_TEXT = 3000;
     const MAX_SERIES = 3000;        // 센서로 한 번에 기록하는 점 수 한도

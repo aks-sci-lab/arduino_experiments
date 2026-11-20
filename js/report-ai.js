@@ -43,7 +43,20 @@
         conclusion: { name: '결론 및 검토', hint: '목적에 대한 답, 오차의 원인과 근거(데이터), 개선 방법.', placeholder: '예: 내가 쓴 오차 원인이 측정 데이터와 맞는지 검토해 줘. 내 생각은 ~이야.',
             guide: '결론 및 검토: 학생이 쓴 오차 원인이 데이터와 맞는지 검토한다. "공기저항", "측정 실수"처럼 일반론이면 표·그래프의 어느 값이 근거인지 물어 데이터 근거를 요구한다. 결론 문장을 대신 써 주지 않는다.' }
     };
+    // 가설연역 6단계 항목 (docs/inquiry-types-design.md). 7단계와 같이 써도 sections 칸은 12개까지(규칙 okReport)
+    Object.assign(SECTIONS, {
+        problem: { name: '탐구 문제', hint: '관찰한 것·궁금한 점에서, 실험으로 답할 수 있는 질문 한 줄.', placeholder: '예: 내 탐구 문제가 실험으로 답할 수 있는 질문인지 봐 줘.',
+            guide: '탐구 문제: 학생이 쓴 질문이 이 실험에서 실제로 재는 양으로 답할 수 있는지, 무엇과 무엇의 관계를 묻는지 분명한지 질문으로 짚는다. 질문을 대신 고쳐 써 주지 않는다.', step: 'purpose' },
+        hypothesis: { name: '가설', hint: '"만약 ~하면 ~할 것이다. 왜냐하면 ~" 꼴로, 이론을 근거로 쓰세요.', placeholder: '예: 내 가설이 실험으로 확인할 수 있는 모양인지 검토해 줘.',
+            guide: '가설: 가설이 측정으로 맞고 틀림을 가릴 수 있는 꼴인지(무엇을 바꾸면 무엇이 어떻게 변하는지), 근거가 이론과 이어지는지 질문으로 짚는다. 가설을 대신 써 주거나 맞다·틀리다를 미리 알려 주지 않는다.', step: 'theory' },
+        design: { name: '탐구 설계', hint: '바꾸는 것(독립 변인)·재는 것(종속 변인)·같게 할 것(통제 변인)과 실험 순서.', placeholder: '예: 내가 정한 통제 변인이 충분한지 검토해 줘.',
+            guide: '탐구 설계: 독립·종속·통제 변인이 분명한지, 그 순서로 가설을 확인할 수 있는지 검토한다. 변인을 아직 안 적었으면 먼저 적어 보라고 한다. 실험 절차를 대신 짜 주지 않는다.', step: 'procedure' },
+        verdict: { name: '결론·가설 판정', hint: '가설이 지지되었는지 기각되었는지, 근거가 되는 데이터(숫자), 오차의 원인과 개선 방법.', placeholder: '예: 내 판정의 근거가 데이터와 맞는지 검토해 줘.',
+            guide: '결론·가설 판정: 학생의 판정(지지·기각)이 표·그래프의 어느 값에 근거하는지 묻고, 근거 없이 판정했으면 데이터를 들라고 한다. 오차 원인이 일반론이면 데이터 근거를 요구한다. 판정이나 결론 문장을 대신 써 주지 않는다.', step: 'conclusion' }
+    });
     var DEFAULT_SECTIONS = ['theory', 'method', 'analysis', 'conclusion'];
+    var HD_SECTIONS = ['problem', 'hypothesis', 'design', { key: 'analysis', name: '자료 해석', hint: '그래프·맞춤 결과에서 무엇을 읽었는지, 숫자를 들어 쓰세요. 가설과 맞는지 함께.' }, 'verdict'];
+    var VERDICTS = ['지지', '기각', '판단하기 어려움'];
     var BASE_RULES = [
         '너는 고등학교 과학 실험 보고서를 함께 검토하는 선생님의 조수다. 학생이 스스로 보고서를 고치도록 돕는다.',
         '규칙:',
@@ -60,7 +73,7 @@
     function sectionInfo(s) {
         if (s && typeof s === 'object') {
             var base = SECTIONS[s.key] || {};
-            return { key: String(s.key), name: s.name || base.name || s.key, hint: s.hint != null ? s.hint : base.hint || '', placeholder: s.placeholder || base.placeholder || '예: 내가 쓴 내용에서 부족한 점을 질문으로 알려 줘.', guide: s.guide || base.guide || '' };
+            return { key: String(s.key), name: s.name || base.name || s.key, hint: s.hint != null ? s.hint : base.hint || '', placeholder: s.placeholder || base.placeholder || '예: 내가 쓴 내용에서 부족한 점을 질문으로 알려 줘.', guide: s.guide || base.guide || '', step: s.step || base.step };
         }
         var b = SECTIONS[s];
         return b ? Object.assign({ key: s }, b) : null;
@@ -208,7 +221,13 @@
         var LSt = window.LabStore, CC = window.ClassCloud;
         var exp = String(opts.exp || '');
         var expName = (CC && CC.expInfo && CC.expInfo(exp) ? CC.expInfo(exp).name : '') || opts.title || exp;
-        var secs = (opts.sections || DEFAULT_SECTIONS).map(sectionInfo).filter(Boolean);
+        // 진행 방법(📋 7단계 / 🔍 가설연역, LabUI.initSteps({ flows: true }))마다 항목이 다름. 화면에는 두 묶음을 다 만들어 두고 지금 방법 것만 보임
+        var repSecs = (opts.sections || DEFAULT_SECTIONS).map(sectionInfo).filter(Boolean);
+        var hdSecs = (opts.hdSections || HD_SECTIONS).map(sectionInfo).filter(Boolean);
+        var all = repSecs.slice();
+        hdSecs.forEach(function (s) { if (!all.some(function (x) { return x.key === s.key; })) all.push(s); });
+        var flow = 'report', secs = repSecs;
+        function nameIn(key, f) { var l = f === 'hd' ? hdSecs : repSecs, x = l.filter(function (s) { return s.key === key; })[0]; return x ? x.name : (all.filter(function (s) { return s.key === key; })[0] || {}).name || key; }
         var esc = escHtml;
         var store = null; try { store = window.localStorage; } catch (e) { store = null; }
         function classCode() { var sh = shareObj(); return sh && sh.classCode ? sh.classCode() : (CC && CC.readClassParam ? CC.readClassParam(location.search) : ''); }
@@ -232,7 +251,7 @@
             if (!sv || !/^c[a-z0-9]{23}$/.test(String(sv.id || ''))) return { why: 'nospace' };
             return { space: sv.id, classCode: code, group: group, jo: me.jo, device: sh.device ? sh.device() : '' };
         }
-        var run = { asks: [], desk: null, limit: null, now: null, busy: {}, timer: null, saveTimer: null, lastSync: null, syncErr: '', loadedServer: false, tab: secs[0] ? secs[0].key : 'external' };
+        var run = { asks: [], desk: null, limit: null, now: null, busy: {}, timer: null, saveTimer: null, lastSync: null, syncErr: '', loadedServer: false, tab: all[0] ? all[0].key : 'external' };
 
         // --- 화면 만들기 ---
         mount.classList.add('rai');
@@ -243,12 +262,12 @@
             '<li>🤖 AI 는 대신 써 주지 않고 <b>피드백과 질문</b>만 줘요. 먼저 내가 쓰고, 묻고 싶은 것을 프롬프트 칸에 쓰세요. <b>계산은 이 페이지가 한 값</b>을 쓰세요(AI 에게 계산을 맡기지 않아요).</li></ul>' +
             '<p class="rai-status" id="rai-status" role="status" aria-live="polite"></p></div>' +
             '<nav class="subtabs wrap rai-tabs" id="rai-tabs" aria-label="보고서 항목">' +
-            secs.map(function (s) { return '<button data-tab="' + esc(s.key) + '">' + esc(s.name) + '</button>'; }).join('') +
+            all.map(function (s) { return '<button data-tab="' + esc(s.key) + '">' + esc(s.name) + '</button>'; }).join('') +
             '<button data-tab="external">외부 AI 기록</button><button data-tab="submit">제출·인쇄</button></nav>' +
-            secs.map(function (s) {
+            all.map(function (s) {
                 var k = esc(s.key);
                 return '<section class="tab-panel rai-sec" data-tab="' + k + '">' +
-                    '<label class="rai-label" for="rai-t-' + k + '"><b>' + esc(s.name) + '</b> <span class="rai-note">' + esc(s.hint) + '</span></label>' +
+                    '<label class="rai-label" for="rai-t-' + k + '"><b class="rai-sname">' + esc(s.name) + '</b> <span class="rai-note">' + esc(s.hint) + '</span></label>' +
                     '<textarea id="rai-t-' + k + '" class="rai-text" data-sec="' + k + '" rows="7"></textarea>' +
                     '<div class="rai-ask"><label class="rai-label" for="rai-p-' + k + '">🤖 AI 에게 묻기 <span class="rai-note">(프롬프트를 써야 단추가 켜져요)</span></label>' +
                     '<textarea id="rai-p-' + k + '" class="rai-prompt" data-sec="' + k + '" rows="3" maxlength="' + LIMITS.prompt + '" placeholder="' + esc(s.placeholder) + '"></textarea>' +
@@ -271,7 +290,7 @@
         var tabs = window.LabUI && LabUI.initTabs ? LabUI.initTabs($m('#rai-tabs'), { key: 'report-ai:' + exp, onShow: function (t) { run.tab = t; renderCalc(); } }) : null;
 
         // 글 채우기
-        secs.forEach(function (s) {
+        all.forEach(function (s) {
             $m('#rai-t-' + s.key).value = st.sections[s.key] || '';
             $m('#rai-p-' + s.key).value = st.prompts[s.key] || '';
             var a = st.attach[s.key] || { draft: true, calc: s.key === 'analysis' || s.key === 'conclusion' };
@@ -286,7 +305,7 @@
         }
         mount.addEventListener('input', function (e) {
             var t = e.target;
-            if (t.classList.contains('rai-text')) { st.sections[t.dataset.sec] = t.value; changed(); }
+            if (t.classList.contains('rai-text')) { st.sections[t.dataset.sec] = t.value; syncInline(t.dataset.sec); changed(); }
             else if (t.classList.contains('rai-ext')) { st.external[t.dataset.ext] = t.value; changed(); }
             else if (t.classList.contains('rai-prompt')) { st.prompts[t.dataset.sec] = t.value; saveLocal(); renderButtons(); }
         });
@@ -303,7 +322,7 @@
         });
 
         function context() { try { return String((opts.getContext ? opts.getContext() : textOf(opts.contextFrom)) || '').trim().slice(0, LIMITS.calc); } catch (e) { return ''; } }
-        function renderCalc() { secs.forEach(function (s) { var el = $m('#rai-c-' + s.key); if (el) el.textContent = context() || '(아직 계산 결과가 없어요 — 5. 데이터·6. 결과를 먼저 하세요)'; }); }
+        function renderCalc() { all.forEach(function (s) { var el = $m('#rai-c-' + s.key); if (el) el.textContent = context() || '(아직 계산 결과가 없어요 — 5. 데이터·6. 결과를 먼저 하세요)'; }); }
 
         // --- 상태 띠 ---
         function deskFresh() { return !!(run.desk && run.desk.fresh); }
@@ -327,12 +346,13 @@
         }
         function renderButtons() {
             var c = ctx(), locked = st.submitted;
-            secs.forEach(function (s) {
+            all.forEach(function (s) {
                 var b = $m('[data-askbtn="' + s.key + '"]'), p = $m('#rai-p-' + s.key).value.trim();
                 b.disabled = !p || !!c.why || !!run.busy[s.key] || locked || run.limit === 0;
                 b.title = !p ? '프롬프트 칸에 물을 내용을 먼저 쓰세요' : c.why ? '수업으로 들어와 조·번호를 고르면 켜져요' : '';
             });
             mount.querySelectorAll('.rai-text, .rai-ext').forEach(function (t) { t.readOnly = locked; });
+            inlineEls().forEach(function (box) { box.querySelectorAll('textarea, input').forEach(function (t) { if (t.tagName === 'TEXTAREA') t.readOnly = locked; else t.disabled = locked; }); });
             $m('#rai-submit').disabled = locked || !!c.why;
         }
         function renderSave() {
@@ -350,7 +370,7 @@
             return '<p class="rai-wait">⏳ ' + (q.status === 'busy' ? 'AI 가 답을 쓰는 중…' : deskFresh() ? '선생님 화면이 답을 만드는 중…' : '기다리는 중 — 선생님 화면이 켜져 있어야 AI 답이 와요.') + '</p>';
         }
         function renderLog() {
-            secs.forEach(function (s) {
+            all.forEach(function (s) {
                 var el = $m('#rai-l-' + s.key), list = run.asks.filter(function (q) { return q.section === s.key; });
                 var open = {}; el.querySelectorAll('textarea[data-vid]').forEach(function (t) { if (document.activeElement === t || t.dataset.dirty) open[t.dataset.vid] = t.value; });
                 el.innerHTML = list.length ? list.slice().reverse().map(function (q) {
@@ -371,7 +391,7 @@
         function call(c, body) { return LSt.call('lab:' + c.space, Object.assign({ 'class': c.classCode }, body)); }
         async function ask(key) {
             var c = ctx(); if (c.why || run.busy[key]) return;
-            var sec = secs.filter(function (s) { return s.key === key; })[0], prompt = $m('#rai-p-' + key).value.trim(), msg = $m('#rai-am-' + key);
+            var sec = { name: nameIn(key, flow) }, prompt = $m('#rai-p-' + key).value.trim(), msg = $m('#rai-am-' + key);
             if (!prompt) return;
             var att = []; mount.querySelectorAll('input[data-sec="' + key + '"]').forEach(function (cb) { if (cb.checked) att.push(cb.dataset.att); });
             run.busy[key] = true; renderButtons(); msg.textContent = '📤 보내는 중…';
@@ -414,7 +434,7 @@
             var rep = r.report;
             if (!rep) { if (st.submitted) { st.submitted = false; saveLocal(); } return; }
             var fill = false;
-            secs.forEach(function (s) { if (!String(st.sections[s.key] || '').trim() && rep.sections[s.key]) { st.sections[s.key] = rep.sections[s.key]; $m('#rai-t-' + s.key).value = rep.sections[s.key]; fill = true; } });
+            all.forEach(function (s) { if (!String(st.sections[s.key] || '').trim() && rep.sections[s.key]) { st.sections[s.key] = rep.sections[s.key]; $m('#rai-t-' + s.key).value = rep.sections[s.key]; syncInline(s.key); fill = true; } });
             ['prompt', 'adopted', 'verify'].forEach(function (k) { if (!String(st.external[k] || '').trim() && rep.external[k]) { st.external[k] = rep.external[k]; $m('#rai-x-' + k).value = rep.external[k]; fill = true; } });
             st.submitted = !!rep.submitted;
             if (rep.updatedAt) run.lastSync = new Date(rep.updatedAt);
@@ -452,15 +472,78 @@
             setTimeout(function () { try { w.focus(); w.print(); } catch (e) { /* 무시 */ } }, 300);
         }
 
+        // --- 가설연역: 단계 안의 쓰기 칸 (① 탐구 문제·② 가설·③ 탐구 설계·⑥ 가설 판정). 글은 위 항목과 같은 것(어느 쪽에 써도 같이 바뀜) ---
+        function inlineEls() { return Array.prototype.slice.call(document.querySelectorAll('.rai-inline[data-for="' + esc(exp) + '"]')); }
+        function verdictOf(text) { var m = /^\[판정\] *(\S[^\n]*)/.exec(String(text || '')); return m ? m[1].trim() : ''; }
+        function buildInline() {
+            if (opts.inline === false || inlineEls().length) return;
+            hdSecs.forEach(function (s) {
+                if (!s.step) return;
+                var panel = document.querySelector('.step-panel[data-step="' + s.step + '"]');
+                if (!panel) return;
+                var k = esc(s.key), box = document.createElement('div');
+                box.className = 'card rai-inline'; box.dataset.for = exp; box.dataset.sec = s.key; box.hidden = true;
+                box.innerHTML = '<label class="rai-label" for="rai-in-' + k + '"><b>✏️ ' + esc(s.name) + ' 쓰기</b> <span class="rai-note">' + esc(s.hint) + '</span></label>' +
+                    (s.key === 'verdict' ? '<div class="rai-row rai-verdict" role="radiogroup" aria-label="가설 판정">' + VERDICTS.map(function (v) {
+                        return '<label class="rai-check"><input type="radio" name="rai-vd-' + esc(exp) + '" value="' + esc(v) + '"> ' + esc(v) + '</label>'; }).join('') + '</div>' : '') +
+                    '<textarea id="rai-in-' + k + '" rows="' + (s.key === 'problem' ? 2 : 4) + '" data-sec="' + k + '"></textarea>' +
+                    '<p class="rai-note">💾 아래 ⑥ 결론 도출의 <b>📝 보고서</b>에 같이 저장돼요' + (s.key === 'verdict' ? '' : ' (AI 피드백도 거기서 물어요)') + '.</p>';
+                var at = s.step === 'conclusion' && panel.contains(mount) ? mount : (function () { var a = panel.querySelectorAll('.step-next, .row.next'); return a.length ? a[a.length - 1] : null; })();
+                if (at) at.parentNode.insertBefore(box, at); else panel.appendChild(box);
+                box.addEventListener('input', function (e) {
+                    var t = e.target;
+                    if (t.tagName !== 'TEXTAREA') return;
+                    st.sections[s.key] = t.value; $m('#rai-t-' + s.key).value = t.value; syncVerdict(box, t.value); changed();
+                });
+                box.addEventListener('change', function (e) {
+                    var r = e.target; if (r.type !== 'radio' || !r.checked) return;
+                    var t = box.querySelector('textarea'), body = String(t.value || '').replace(/^\[판정\][^\n]*\n?/, '');
+                    t.value = '[판정] ' + r.value + '\n' + body;
+                    st.sections[s.key] = t.value; $m('#rai-t-' + s.key).value = t.value; changed();
+                });
+                syncInline(s.key);
+            });
+        }
+        function syncVerdict(box, text) { var v = verdictOf(text); box.querySelectorAll('input[type=radio]').forEach(function (r) { r.checked = r.value === v; }); }
+        function syncInline(key) {
+            inlineEls().forEach(function (box) {
+                if (box.dataset.sec !== key) return;
+                var t = box.querySelector('textarea'), v = st.sections[key] || '';
+                if (t && t.value !== v && document.activeElement !== t) t.value = v;
+                syncVerdict(box, v);
+            });
+        }
+        function curFlow() { var sp = window.LabUI && LabUI.steps && LabUI.steps(); return sp && sp.flow ? sp.flow() : 'report'; }
+        function applyFlow() {
+            flow = curFlow() === 'hd' ? 'hd' : 'report';
+            secs = flow === 'hd' ? hdSecs : repSecs;
+            if (flow === 'hd') buildInline();
+            var keys = secs.map(function (s) { return s.key; });
+            mount.querySelectorAll('#rai-tabs button[data-tab]').forEach(function (b) {
+                var k = b.dataset.tab, sec = k !== 'external' && k !== 'submit';
+                b.hidden = sec && keys.indexOf(k) < 0;
+                if (sec) b.textContent = nameIn(k, flow);
+            });
+            mount.querySelectorAll('section.rai-sec[data-tab]').forEach(function (p) { var n = p.querySelector('.rai-sname'); if (n) n.textContent = nameIn(p.dataset.tab, flow); });
+            inlineEls().forEach(function (box) { box.hidden = flow !== 'hd'; });
+            var cur = tabs && tabs.current ? tabs.current() : run.tab;
+            if (tabs && cur !== 'external' && cur !== 'submit' && keys.indexOf(cur) < 0) tabs.show(keys[0]);
+            else if (tabs && cur) tabs.show(cur);
+            renderButtons();
+        }
+        document.addEventListener('lab-flow', applyFlow);
+        applyFlow();
+        setTimeout(applyFlow, 0);   // 단계 부품이 이 뒤에 만들어지는 페이지
+
         renderCalc(); render();
         poll(false);
         document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(true); });
-        var api = { render: render, poll: poll, sync: sync, state: function () { return st; }, ctx: ctx, asks: function () { return run.asks; }, printHtml: function () { return printHtml(printData()); }, tabs: tabs };
+        var api = { render: render, poll: poll, sync: sync, state: function () { return st; }, ctx: ctx, asks: function () { return run.asks; }, printHtml: function () { return printHtml(printData()); }, tabs: tabs, flow: function () { return flow; }, sections: function () { return secs.slice(); } };
         window.ReportAI.current = api;
         return api;
     }
 
-    return { PROVIDERS: PROVIDERS, SECTIONS: SECTIONS, DEFAULT_SECTIONS: DEFAULT_SECTIONS, BASE_RULES: BASE_RULES, LIMITS: LIMITS,
+    return { PROVIDERS: PROVIDERS, SECTIONS: SECTIONS, DEFAULT_SECTIONS: DEFAULT_SECTIONS, HD_SECTIONS: HD_SECTIONS, VERDICTS: VERDICTS, BASE_RULES: BASE_RULES, LIMITS: LIMITS,
         sectionInfo: sectionInfo, buildPrompt: buildPrompt, chatRequest: chatRequest, modelsRequest: modelsRequest, parseAnswer: parseAnswer, parseModels: parseModels,
         friendlyHttp: friendlyHttp, callAI: callAI, textOf: textOf, listModels: listModels, printHtml: printHtml, init: init };
 });

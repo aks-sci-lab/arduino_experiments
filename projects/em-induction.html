@@ -896,7 +896,7 @@
 
     // ---------- 보고서 순서 7단계 ----------
     // 숨어 있던 그래프가 보이면 크기를 다시 맞춘다 (lab-ui 가 resize 도 보내지만 직접도 맞춤)
-    LabUI.initSteps({ key: 'em-induction', onShow: step => { currentStep = step; fit(); if (share) share.stepChanged(); } });
+    LabUI.initSteps({ key: 'em-induction', flows: true, onShow: step => { currentStep = step; fit(); if (share) share.stepChanged(); } });
 })();
 </script>
 <link rel="stylesheet" href="../css/report-ai.css">

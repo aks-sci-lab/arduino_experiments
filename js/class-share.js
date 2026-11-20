@@ -471,7 +471,7 @@
         var GATE = gate();
         // 학생 화면의 단계 부품(LabUI.initSteps({ flows: true }))을 수업 방법으로 고정 (수업 없이 연 화면은 학생이 고름)
         function applyFlow() {
-            if (!cls.info || cls.info.exp !== exp || !window.LabUI || !LabUI.setFlow) return;
+            if (!cls.info || cls.info.exp !== exp || !window.LabUI || !LabUI.setFlow || !(CC.canFlow && CC.canFlow(exp))) return;   // 선생님이 만든 실험은 만들 때 고른 방법 그대로
             LabUI.setFlow(cls.info.flow === 'hd' ? 'hd' : 'report', { lock: true });
             GATE = gate();
         }

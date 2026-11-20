@@ -50,7 +50,7 @@ async function smallButtons(page) {
     // 화면에 보이는 단추·고르기 칸 중 44px 보다 낮은 것 (표 안의 작은 단추는 예외)
     return page.evaluate(() => [...document.querySelectorAll('button, select, .cs-btn')].filter(el => {
         const r = el.getBoundingClientRect();
-        return r.width > 0 && r.height > 0 && r.height < 43.5 && !el.closest('table') && !el.closest('nav.tabs');
+        return r.width > 0 && r.height > 0 && r.height < 43.5 && !el.closest('table') && !el.closest("nav.tabs, nav.steps");
     }).map(el => (el.id || el.className || el.tagName) + ':' + Math.round(el.getBoundingClientRect().height)));
 }
 
@@ -86,7 +86,7 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
         await ap.selectOption('#cs-cjo', '1'); await ap.selectOption('#cs-cnum', '1');
         await ap.click('#cs-cjoin');
         await ap.waitForFunction(() => /1조 1번/.test(document.getElementById('cs-cme').textContent));
-        await ap.click('.tabs button[data-tab="data"]');
+        await ap.click('nav.steps button[data-step="data"]');
         // 센서 없이 직접 입력: 실험 1 네 점
         for (const [v, p] of [[20, 101.3], [24, 84.4], [29, 69.9], [34, 59.6]]) {
             await ap.fill('#in-p', String(p)); await ap.fill('#in-t', '20.5');
@@ -108,17 +108,17 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
         await bp.waitForSelector('#cs-cpick:not([hidden])');
         await bp.selectOption('#cs-cjo', '1'); await bp.selectOption('#cs-cnum', '2');
         await bp.click('#cs-cjoin');
-        await bp.click('.tabs button[data-tab="data"]');
+        await bp.click('nav.steps button[data-step="data"]');
         await bp.waitForFunction(() => document.querySelectorAll('#boyle-body tr.ext-row').length === 4, null, { timeout: 15000 });
         assert.match(await bp.textContent('#boyle-body'), /📥 노트북 /);
         // 결과 단계에도 합쳐진 값으로 계산
-        await bp.click('.tabs button[data-tab="result"]');
+        await bp.click('nav.steps button[data-step="result"]');
         assert.match(await bp.textContent('#res-boyle'), /PV 평균/);
         assert.match(await bp.textContent('#res-boyle-table'), /📥 노트북/);
         assert.ok(await noSideScroll(bp), '학생 B 결과 375px 가로 스크롤');
         await shot(bp, 'student-b-result-375.png');
         // 7단계: 구글 로그인·제출 단추가 없고 보내기·인쇄만
-        await bp.click('.tabs button[data-tab="conclusion"]');
+        await bp.click('nav.steps button[data-step="conclusion"]');
         assert.equal(await bp.$('#btn-login'), null);
         assert.equal(await bp.$('#btn-submit'), null);
         assert.ok(await bp.isVisible('#btn-send2'));
@@ -163,7 +163,7 @@ test('수업 링크 없이 열면 예전처럼 (띠 없음, 조 공유 칸은 �
         const s = await newPage(browser, app, base, 375);
         await s.page.goto(base + '/projects/ideal-gas.html');
         assert.equal(await s.page.$('.cs-bar'), null);
-        await s.page.click('.tabs button[data-tab="data"]');
+        await s.page.click('nav.steps button[data-step="data"]');
         assert.ok(await s.page.isVisible('#cs-share'));
         assert.ok(await noSideScroll(s.page));
         assert.deepEqual(s.errors, []);

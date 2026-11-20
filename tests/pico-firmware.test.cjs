@@ -246,7 +246,7 @@ test('센서 페이지 연결 때 예전 판이면 한 줄 안내 (환경·조�
         ['/projects/environment-lab.html', '#connectBleButton', '#status'],
         ['/projects/environment-lab.html?sensor=light', '#connectButton', '#status'],
         ['/projects/accelerometer-lab.html', '#connectBleButton', '#status'],
-        ['/projects/ideal-gas.html', '#btn-connect', '#ble-status', 'button[role="tab"][data-tab="data"]'],
+        ['/projects/ideal-gas.html', '#btn-connect', '#ble-status', 'nav.steps button[data-step="data"]'],
     ];
     const answers = [
         ['old', JSON.stringify({ type: 'board', ts: 1, seq: 1, data: { name: 'PicoEnv-07', board: 7, id: 'E661', fw: '2026.11-iv', saved: false } }) + '\n', /2026\.11-iv →/],

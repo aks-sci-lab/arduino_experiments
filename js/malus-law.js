@@ -1126,7 +1126,7 @@
     renderSettings();
     let hasStepRecord = false;
     try { hasStepRecord = localStorage.getItem('lab-steps:malus-law') != null; } catch (e) { /* 무시 */ }
-    steps = window.LabUI && LabUI.initSteps({
+    steps = window.LabUI && LabUI.initSteps({ flows: true,
         key: PHONE ? 'malus-law-phone' : 'malus-law',
         start: PHONE ? 'data' : !hasStepRecord && OLD_TAB[state.oldTab] && !location.hash ? OLD_TAB[state.oldTab] : undefined,
         onShow: onStep

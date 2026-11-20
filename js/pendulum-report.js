@@ -365,7 +365,7 @@
         $('btnManual').addEventListener('click', addManual);
         $('btnTableCsv').addEventListener('click', tableCsv);
 
-        window.LabUI && LabUI.initSteps({ key: 'pendulum-report', onShow: function (step) {
+        window.LabUI && LabUI.initSteps({ key: 'pendulum-report', flows: true, onShow: function (step) {
             state.step = step;
             if (step === 'result') renderFit();
             if (classShare) classShare.stepChanged();

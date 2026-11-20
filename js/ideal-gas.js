@@ -825,17 +825,19 @@
         renderLive();
         if (share) share.render();
     }
-    function showTab(t, scroll) {
+    // 단계 탭: 공통 부품 LabUI.initSteps (7단계 / 가설연역 6단계, docs/inquiry-types-design.md). 페이지 쪽은 7단계 패널 키만 안다
+    let steps = null;
+    function onStep(t) {
         if (!TABS.includes(t)) t = 'purpose';
         state.tab = t;
-        document.querySelectorAll('.panel').forEach(p => { p.hidden = p.dataset.tab !== t; });
-        document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t ? 'true' : 'false'));
         save();
         renderAll();   // 숨겨져 있던 그래프는 보일 때 크기에 맞춰 다시 그린다
-        if (scroll) window.scrollTo(0, 0);
         if (share) share.stepChanged();   // 수업 참여 중이면 선생님께 지금 단계를 알림
     }
-    document.querySelectorAll('.tabs button, [data-go]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab || b.dataset.go, true)));
+    function showTab(t, scroll) {
+        if (!steps) steps = window.LabUI && LabUI.initSteps({ key: 'ideal-gas', start: t, onShow: onStep, flows: true });
+        else steps.show(t, scroll);
+    }
 
     // 저장된 값을 화면 입력 칸에 넣기
     function applyControls() {

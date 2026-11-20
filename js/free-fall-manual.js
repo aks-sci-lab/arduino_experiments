@@ -1171,7 +1171,7 @@ btnReset.addEventListener('click', () => { location.reload(); });
     window.addEventListener('lab-device', syncDevice);
     syncDevice();
     if (window.LabUI && LabUI.initSteps) {
-        steps = LabUI.initSteps({
+        steps = LabUI.initSteps({ flows: true,
             key: 'free-fall',
             onShow: step => {
                 currentStep = step;

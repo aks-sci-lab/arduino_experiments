@@ -16,19 +16,19 @@
     <h1>🎈 이상기체 상태 방정식 검증 (감압 용기)</h1>
     <!-- 수업 참여 띠 (?c=수업코드 일 때만): js/class-share.js 가 채움 -->
     <div id="class-bar-mount"></div>
-    <nav class="tabs" role="tablist">
-        <button role="tab" data-tab="purpose"><b>1</b><span>목표</span></button>
-        <button role="tab" data-tab="theory"><b>2</b><span>이론</span></button>
-        <button role="tab" data-tab="materials"><b>3</b><span>준비물</span></button>
-        <button role="tab" data-tab="procedure"><b>4</b><span>과정</span></button>
-        <button role="tab" data-tab="data"><b>5</b><span>데이터</span></button>
-        <button role="tab" data-tab="result"><b>6</b><span>결과</span></button>
-        <button role="tab" data-tab="conclusion"><b>7</b><span>결론·검토</span></button>
+    <nav class="steps" role="tablist" aria-label="실험 단계">
+        <button role="tab" data-step="purpose"><b>1</b><span>목표</span></button>
+        <button role="tab" data-step="theory"><b>2</b><span>이론</span></button>
+        <button role="tab" data-step="materials"><b>3</b><span>준비물</span></button>
+        <button role="tab" data-step="procedure"><b>4</b><span>과정</span></button>
+        <button role="tab" data-step="data"><b>5</b><span>데이터</span></button>
+        <button role="tab" data-step="result"><b>6</b><span>결과</span></button>
+        <button role="tab" data-step="conclusion"><b>7</b><span>결론·검토</span></button>
     </nav>
     <div id="store-warn" class="warn" hidden>⚠️ 이 브라우저에서는 측정값과 글을 저장할 수 없습니다(사생활 보호 모드 등). 새로고침하거나 창을 닫으면 사라지므로, 측정이 끝나면 <b>👥 조 공유</b>로 선생님께 보내고 <b>6. 결과</b> 탭에서 CSV 로 받아 두세요.</div>
 
     <!-- 1. 실험 목표 -->
-    <section class="panel" data-tab="purpose">
+    <section class="panel step-panel" data-step="purpose">
     <div class="card">
         <h2>1. 실험 목표</h2>
         <ol class="big-list" id="goal-list">
@@ -54,7 +54,7 @@
     </section>
 
     <!-- 2. 실험 이론 -->
-    <section class="panel" data-tab="theory" hidden>
+    <section class="panel step-panel" data-step="theory" hidden>
     <div class="card" data-subtabs="이론 나눠 보기">
         <h2>2. 실험 이론</h2>
         <h3 data-subtab="보일 법칙">① 기체의 압력과 온도</h3>
@@ -116,7 +116,7 @@
     </section>
 
     <!-- 3. 실험 준비물 -->
-    <section class="panel" data-tab="materials" hidden>
+    <section class="panel step-panel" data-step="materials" hidden>
     <div class="card">
         <h2>3. 실험 준비물 <span class="note">(2인 1조 기준)</span></h2>
         <div class="tbl-wrap" style="max-height:none"><table class="mat-table" id="mat-table">
@@ -162,7 +162,7 @@
     </section>
 
     <!-- 4. 실험 과정 -->
-    <section class="panel" data-tab="procedure" hidden>
+    <section class="panel step-panel" data-step="procedure" hidden>
     <div class="card" data-subtabs="과정 나눠 보기">
         <h2>4. 실험 과정</h2>
 
@@ -266,7 +266,7 @@
     </section>
 
     <!-- 5. 데이터 수집 -->
-    <section class="panel" data-tab="data" hidden>
+    <section class="panel step-panel" data-step="data" hidden>
     <!-- 👥 조 공유: js/class-share.js 가 채움 -->
     <div id="share-mount"></div>
     <div class="card">
@@ -348,7 +348,7 @@
     </section>
 
     <!-- 6. 실험 결과 -->
-    <section class="panel" data-tab="result" hidden>
+    <section class="panel step-panel" data-step="result" hidden>
     <div class="card">
         <h2>6. 실험 결과</h2>
         <h3>실험 1: 압력과 부피 (보일 법칙)</h3>
@@ -394,7 +394,7 @@
     </section>
 
     <!-- 7. 결론 및 검토 -->
-    <section class="panel" data-tab="conclusion" hidden>
+    <section class="panel step-panel" data-step="conclusion" hidden>
     <div class="card">
         <h2>7. 결론 및 검토</h2>
         <h3>우리 모둠 결과 요약</h3>
