@@ -142,7 +142,7 @@ test('Nano 페이지: 수업 참여 → 같은 조 보내기·자동 불러오�
         }
 
         // ---------- 교사: 진행 보기에 단계·점 수·제출 요약 ----------
-        await tp.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });
+        await tp.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); });
         await tp.click('#btnRefresh').catch(() => {});
         await tp.waitForFunction(() => /가속도 1회/.test(document.getElementById('groups').textContent), null, { timeout: 30000 });
         const groups = await tp.textContent('#groups');

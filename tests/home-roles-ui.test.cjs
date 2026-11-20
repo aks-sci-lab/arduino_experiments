@@ -41,7 +41,7 @@ test('메인 화면: 역할 고르기 → 학생(코드·수업 없이) / 교사
         assert.equal(await P.evaluate(() => document.activeElement.id), 'joinCode');
         await P.click('#soloBtn'); assert.equal(await vis('#homeLabs'), true, '수업 없이 실험 목록');
         assert.equal(await vis('#studentRecordsSection'), false, '학생 화면에는 예전 기록 없음');
-        assert.equal(await vis('#boardTabs'), false);
+        assert.equal(await vis('#boardTabs'), false); assert.equal(await vis('#homeTabs'), false, '학생은 작은 탭 없이 실험 목록만'); assert.equal(await vis('#labsList'), true);
         assert.match(await P.textContent('#homeStudent'), /CSV 저장/);
         assert.equal(await P.locator('#pendulumCard.pick-card').count(), 1, '진자도 다른 카드와 같은 모양');
         assert.match(await P.textContent('#customNotice'), /불러오지 못했어요|공개된 실험이 없어요|불러오는 중/);
@@ -64,8 +64,17 @@ test('메인 화면: 역할 고르기 → 학생(코드·수업 없이) / 교사
         assert.equal(await vis('#adminBox'), true, '사이트 관리는 교사 화면에');
         assert.equal(await vis('#homeLabs'), true, '교사는 실험 목록 바로');
         assert.equal(await vis('#joinBox'), false);
-        assert.equal(await vis('#studentRecordsSection'), true, '예전 기록은 교사 화면에');
-        assert.equal(await vis('#boardTabs'), true, '보드별 준비 안내는 교사 화면에');
+        // 교사 화면 작은 탭: 실험 목록 / 보드 준비 / 예전 기록 (한 페이지에 길게 잇지 않음)
+        assert.equal(await vis('#homeTabs'), true);
+        assert.equal(await vis('#labsList'), true, '처음은 실험 목록');
+        assert.equal(await vis('#studentRecordsSection'), false); assert.equal(await vis('#boardTabs'), false);
+        // 필름통 로켓은 '행사' 묶음에, 폰 한 대 배지 (노트북 분석 표시 없음)
+        const rocket = await P.evaluate(() => { const a = document.querySelector('a.pick-card[href="projects/film-rocket.html"]'); let h = a.parentElement.previousElementSibling; return { group: h && h.textContent, text: a.textContent }; });
+        assert.match(rocket.group, /행사/); assert.match(rocket.text, /폰 한 대로/); assert.doesNotMatch(rocket.text, /이 기기는 분석/);
+        await P.click('#homeTabs button[data-tab="records"]');
+        assert.equal(await vis('#studentRecordsSection'), true, '예전 기록은 교사 화면의 탭에'); assert.equal(await vis('#labsList'), false);
+        await P.click('#homeTabs button[data-tab="board"]');
+        assert.equal(await vis('#boardTabs'), true, '보드별 준비 안내는 교사 화면의 탭에');
         // 보드 탭: 누르기·좌우 화살표
         await P.click('#boardTabs button[data-tab="pico"]');
         await P.keyboard.press('ArrowRight');

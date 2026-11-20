@@ -193,7 +193,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await B.waitForFunction(() => /선생님께 보냄/.test(document.getElementById('ev-sync').textContent), null, { timeout: 15000 });
 
         // ---- 교사 결과판 ----
-        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });
+        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); });
         await T.waitForSelector('#boardCard:not([hidden])');
         await T.waitForFunction(() => /달님 탐험대5/.test(document.getElementById('board').textContent), null, { timeout: 20000 });
         const rows = await T.$$eval('#board tbody tr', trs => trs.map(t => t.textContent));

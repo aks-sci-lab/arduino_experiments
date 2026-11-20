@@ -96,7 +96,7 @@ test('교사 화면: 플랑크 수업이면 조별 h 표·그래프·CSV 가 나
         const code = (await T.textContent('#outCode')).trim();
         const info = await app.post({ action: 'joinInfo', class: code }, {});
         assert.equal(info.ok, true, info.error);
-        const space = await T.getAttribute('#classList [data-watch]', 'data-watch');
+        const space = decodeURIComponent((T.url().match(/#class=([^&]+)/) || [])[1] || '');   // 만든 수업은 주소 #class= 에
         assert.match(space, /^c[a-z0-9]{23}$/);
         // 1조 노트북이 LED 3개를 수업 공간으로 보냄
         const leds = [['red', '<img src=x onerror=alert(1)>', 625], ['green', '초록', 525], ['blue', '파랑', 470]]
@@ -104,7 +104,8 @@ test('교사 화면: 플랑크 수업이면 조별 h 표·그래프·CSV 가 나
         const { payloads } = PC.buildPayloads({ group: info.groups[0].code, device: 'nab12cd', leds, sent: [], v0: led => P.thresholdOf(led, 'extrapolate', { iMin: 1 }).v0,
             summary: { hCurrent: 6.6 }, curMode: 'extrapolate', iMin: 1, now: new Date().toISOString() }, C.isGroupCode);
         for (const p of payloads) { const r = await app.post(Object.assign({ space: String(space).replace(/^lab:/, '') }, p), { uid: 'stu-1', anonymous: true }); assert.equal(r.ok, true, r.error); }
-        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });   // 진행 화면 (만든 수업을 봄)
+        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });   // 만든 수업의 큰 QR 화면
+        await T.click('#btnToRun');   // 다음 → 진행 보기
         await T.waitForSelector('#planckCard:not([hidden])', { timeout: 10000 });
         await T.click('#ctpReload');
         await T.waitForFunction(() => /6\.\d\d/.test(document.getElementById('ctpTable').textContent), null, { timeout: 10000 });

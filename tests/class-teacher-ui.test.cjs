@@ -90,7 +90,7 @@ test('교사 화면: 로그인 → 수업 → 학생·폰 → 진행 보기 → 
         await A.waitForFunction(() => /📱 폰/.test(document.body.textContent), null, { timeout: 15000 });
 
         // ---- 교사 진행 보기 ----
-        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });
+        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); });
         await T.waitForFunction(() => /제출: 1개/.test(document.getElementById('groups').textContent), null, { timeout: 15000 });
         const groupsText = await T.textContent('#groups');
         assert.match(groupsText, /1조/); assert.match(groupsText, /2회 · 손에 들고/);
@@ -116,7 +116,8 @@ test('교사 화면: 로그인 → 수업 → 학생·폰 → 진행 보기 → 
         assert.equal(js.items.length, 1); assert.equal(js.items[0].data, '{"t":[0,1],"a":[9.8,12.3]}');
 
         // ---- 지우기 ----
-        await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="make"]');
+        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });
+        await T.click('#btnToList');   // 지우기는 수업 목록에서
         await T.click('#classList button.danger');
         await T.waitForFunction(() => /지웠어요/.test(document.getElementById('listMsg').textContent));
         assert.equal(app.items('phoneaccel').length, 0, '학생 자료도 지움');

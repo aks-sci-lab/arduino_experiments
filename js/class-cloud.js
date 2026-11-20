@@ -207,6 +207,7 @@
     function joinTeam(url, o, fetchImpl) { return post(url, { action: 'teamJoin', 'class': o.classCode, name: String(o.name || ''), device: o.device || '' }, fetchImpl, 20000); }
     // 수업 정보 새로 읽기 (선생님이 행사 설정을 고친 뒤)
     function classInfo(url, classCode, fetchImpl) { return post(url, { action: 'classInfo', 'class': classCode }, fetchImpl, 15000); }
+    function classDone(space, done, fetchImpl) { return post('lab:' + space, { action: 'classDone', done: !!done }, fetchImpl, 20000); }
     function classStage(space, stage, fetchImpl) { return post('lab:' + space, { action: 'classStage', stage: Number(stage) }, fetchImpl, 20000); }
     function classSetup(space, setup, fetchImpl) { return post('lab:' + space, { action: 'classSetup', setup: setup }, fetchImpl, 20000); }
     function joinInfo(url, classCode, fetchImpl) { return getQ(url, { action: 'joinInfo', 'class': classCode, _: Date.now() }, fetchImpl); }
@@ -231,7 +232,7 @@
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
         studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
-        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, classStage: classStage, gateSteps: gateSteps, stageInfo: stageInfo, STAGE_ALL: STAGE_ALL, heartbeat: heartbeat, classStatus: classStatus,
+        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, classStage: classStage, classDone: classDone, gateSteps: gateSteps, stageInfo: stageInfo, STAGE_ALL: STAGE_ALL, heartbeat: heartbeat, classStatus: classStatus,
         myClasses: myClasses, classExport: classExport, deleteClass: deleteClass, reopenCode: reopenCode, expireText: expireText
     };
 });

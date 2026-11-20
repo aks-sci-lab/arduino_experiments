@@ -60,6 +60,7 @@ test('선생님이 여는 단계: 교사 진행 화면 → 학생 폰 둘 저절
         await T.selectOption('#inExp', 'qdot');
         await T.click('#btnCreate');
         await T.waitForSelector('#viewMain:not([hidden]) #classOut:not([hidden])');
+        await T.click('#btnToRun');
         assert.match(await T.textContent('#stageNow'), /1 목적.*\(1 \/ 7\)/);
         assert.match(await T.textContent('#btnStageNext'), /2 이론/);
         assert.equal(await T.isDisabled('#btnStagePrev'), true);
@@ -95,7 +96,7 @@ test('선생님이 여는 단계: 교사 진행 화면 → 학생 폰 둘 저절
         await P[1].waitForFunction(() => { const b = document.querySelector('nav.steps button[aria-selected="true"]'); return b && b.dataset.step === 'purpose'; }, null, { timeout: 15000 });
         assert.equal(await P[1].isVisible('nav.steps button[data-step="theory"].cs-locked'), true);
         // 모두 열기
-        await T.click('#btnStageAll');
+        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); }); await T.click('#btnStageAll');
         await P[1].waitForFunction(() => !document.querySelector('nav.steps .cs-locked'), null, { timeout: 15000 });
         assert.match(await T.textContent('#stageNow'), /모든 단계 열림/);
 
@@ -123,6 +124,7 @@ test('선생님이 여는 단계: 교사 진행 화면 → 학생 폰 둘 저절
         await T.selectOption('#inExp', 'rocket'); await T.fill('#inTeams', '4');
         await T.click('#btnCreate');
         await T.waitForSelector('#viewMain:not([hidden]) #classOut:not([hidden])');
+        await T.click('#btnToRun');
         assert.match(await T.textContent('#stageNow'), /생각 열기.*\(1 \/ 4\)/);
         const rlink = (await T.getAttribute('#outLink', 'href')).replace(/^https?:\/\/[^/]+\//, ROOT);
         const F = await ctx(devices['iPhone 13'], 'F');
@@ -155,7 +157,7 @@ test('선생님이 여는 단계: 교사 진행 화면 → 학생 폰 둘 저절
         // ---- 교사 375px ----
         const T3 = await ctx({ viewport: { width: 375, height: 800 } }, 'T3');
         await T3.goto(ROOT + 'projects/class-teacher.html');
-        await T3.click('#btnLogin'); await T3.waitForSelector('#stageCard:not([hidden])');
+        await T3.click('#btnLogin'); await T3.click('#classList button[data-open]'); await T3.click('#btnToRun'); await T3.waitForSelector('#stageCard:not([hidden])');
         await layout(T3, '교사 진행 화면 375');
         await T3.click('#btnSettings');
         await layout(T3, '교사 설정 375');

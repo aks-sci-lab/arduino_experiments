@@ -227,10 +227,16 @@
         </div>
         <p class="note dev-links" id="devLinks" hidden>🛠 개발용 도구 (선생님 전용, 실험 목록에 없음): <a href="projects/ble-explorer.html">블루투스 센서 해석 도구</a> — 시판 무선 센서가 보내는 바이트를 기록해 해석 규칙을 찾아요 (PC 크롬·엣지, 안드로이드 크롬) · <a href="projects/face-hr-lab.html">🙂 얼굴 심박(rPPG) 개발</a></p>
         </details>
-            <p class="note"><a href="#boardTitle">🧰 센서 보드 준비 안내</a>와 예전 기록은 아래 실험 목록 뒤에 있어요.</p>
         </section>
 
         <div id="homeLabs" hidden>
+        <!-- 교사 화면: 작은 탭 (실험 목록 / 보드 준비 / 예전 기록). 학생 '수업 없이 실험'은 실험 목록만 -->
+        <nav class="subtabs" id="homeTabs" aria-label="교사 화면 고르기" hidden>
+            <button data-tab="labs">🧪 실험 목록</button>
+            <button data-tab="board">🧰 보드 준비</button>
+            <button data-tab="records">🗂 예전 기록</button>
+        </nav>
+        <div class="tab-panel" data-tab="labs">
         <p class="note">수행할 실험을 고르세요. 카드 아래 작은 표시는 필요한 기기예요 (⚠ 는 이 기기·브라우저에서 안 되는 것).</p>
         <div id="labsList">
             <h2 class="group-title">📋 보고서 순서로 하는 실험 <small>목적 → 결론 7단계</small></h2>
@@ -243,8 +249,12 @@
                 <a class="pick-card" href="projects/heart-rate.html" data-needs="camera"><span class="ic" aria-hidden="true">❤️</span><b>스마트폰 카메라 심박수</b><small>운동 전후 심박수와 회복</small></a>
                 <a class="pick-card" href="projects/data-lab.html" data-needs="pc"><span class="ic" aria-hidden="true">🧪</span><b>데이터 가공 실험실</b><small>심박수 원본 → 결과, 단계마다 골라 보기</small></a>
                 <a class="pick-card" href="projects/quantum-dot.html" data-needs="camera"><span class="ic" aria-hidden="true">🌈</span><b>탄소 양자점 형광</b><small>가열 시간·비율 → 형광 색·에너지 (폰 카메라·간이 분광기)</small></a>
-                <a class="pick-card" href="projects/film-rocket.html" data-needs="camera"><span class="ic" aria-hidden="true">🚀</span><b>필름통 로켓 (가족 행사)</b><small>열리는 시간 맞추기·아이 키만큼 로켓 (팀 이름으로 입장)</small></a>
                 <a class="pick-card" id="pendulumCard" href="projects/pendulum-report.html" data-needs="phone" data-phone-href="projects/pendulum-measure.html"><span class="ic" aria-hidden="true">⏱️</span><b>스마트폰 진자</b><small>폰으로 재고, 노트북으로 분석 (폰에서 열면 측정 화면)</small></a>
+            </div>
+
+            <h2 class="group-title">🎉 행사 · 체험 교실 <small>한 화면에 한 가지 일, 큰 단추</small></h2>
+            <div class="pick-grid">
+                <a class="pick-card" href="projects/film-rocket.html" data-needs="phone1"><span class="ic" aria-hidden="true">🚀</span><b>필름통 로켓 (가족 행사)</b><small>열리는 시간 맞추기·아이 키만큼 로켓 (팀 이름으로 입장)</small></a>
             </div>
 
             <!-- 넓은 화면: 센서 묶음(4칸)과 수업 도구(2칸)를 한 줄에 나란히 -->
@@ -281,9 +291,9 @@
 
 
         </div><!-- /labsList -->
-        <div id="teacherExtra" hidden>
+        </div><!-- /tab-panel labs -->
             <!-- 보드별 준비 안내 (교사 화면) -->
-            <section class="board-guide" aria-labelledby="boardTitle">
+            <section class="board-guide tab-panel" data-tab="board" aria-labelledby="boardTitle" hidden>
                 <h2 id="boardTitle" class="group-title">🧰 센서 보드 준비 안내</h2>
                 <nav class="subtabs" id="boardTabs" aria-label="센서 보드 고르기">
                     <button data-tab="pico">📡 Pico 환경 센서</button>
@@ -309,19 +319,18 @@
             </section>
 
             <!-- 예전 기록 (구글 로그인으로 experiments 에 저장한 것, ?report=·?record= 보기 링크) — 교사 화면에만 -->
-            <section class="records-wrap">
+            <section class="records-wrap tab-panel" data-tab="records" hidden>
             <div id="studentRecordsSection" class="records-section">
                 <h2 id="recordsTitle" class="group-title">🧪 실험 데이터 저장 & 조회</h2>
                 <p id="recordsNotice">구글 로그인 시 작성된 실험 기록을 저장하고 조회할 수 있습니다.</p>
                 <div id="experimentsList" style="display:none;"></div>
             </div>
             </section>
-        </div>
         </div><!-- /homeLabs -->
     </div>
     </main>
     <footer class="home-foot"><p class="note">센서 기반 실험실 · 크게 보기 <kbd>Alt</kbd>+<kbd>B</kbd> · 학생 이름·학번은 받지 않아요</p></footer>
-    <script>LabUI.initTabs('#boardTabs', { key: 'home-board' });</script>
+    <script>LabUI.initTabs('#boardTabs', { key: 'home-board' }); window.homeTabs = LabUI.initTabs('#homeTabs', { start: 'labs' });</script>
 
     <!-- 학생으로 시작: 수업 코드 → 사이트 저장소에서 수업을 찾아 그 실험 페이지로 (?c=코드&s=수업 공간) -->
     <script src="js/pendulum-config.js"></script>
@@ -344,7 +353,9 @@
             $('homePick').hidden = !!r;
             $('homeStudent').hidden = r !== 'student';
             $('homeTeacher').hidden = r !== 'teacher';
-            $('teacherExtra').hidden = r !== 'teacher';   // 보드 준비 안내·예전 기록은 교사 화면에만
+            // 보드 준비 안내·예전 기록은 교사 화면의 작은 탭에만 (학생은 실험 목록만)
+            $('homeTabs').hidden = r !== 'teacher';
+            if (r !== 'teacher' && window.homeTabs) window.homeTabs.show('labs');
             $('roleSwitch').hidden = !r;
             $('homeLabs').hidden = !(r === 'teacher' || (r === 'student' && solo));
             $('soloBtn').setAttribute('aria-expanded', String(solo));
@@ -358,7 +369,7 @@
         applyRole(getRole());
 
         // ----- 실험 카드의 필요 기기 표시 + 이 기기·브라우저에서 안 되는 것 ⚠ (들어가는 것은 막지 않음) -----
-        var NEED = { pico: '📡 Pico 블루투스', 'pico-opt': '📡 Pico 블루투스(선택)', nano: '🔷 Nano 블루투스', serial: '🔌 USB 시리얼 · PC 크롬', camera: '📷 폰 카메라', phone: '📱 폰 센서', pc: '💻 노트북·PC' };
+        var NEED = { pico: '📡 Pico 블루투스', 'pico-opt': '📡 Pico 블루투스(선택)', nano: '🔷 Nano 블루투스', serial: '🔌 USB 시리얼 · PC 크롬', camera: '📷 폰 카메라', phone: '📱 폰 센서', pc: '💻 노트북·PC', phone1: '📱 폰 한 대로 (측정·결과 모두)' };
         var IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         var DEV = window.LabUI && LabUI.device ? LabUI.device().kind : 'laptop';
         function warnOf(n) {

@@ -165,9 +165,11 @@ service cloud.firestore {
                     (!('aiLimit' in request.resource.data) || (request.resource.data.aiLimit is int && request.resource.data.aiLimit >= 0 && request.resource.data.aiLimit <= 200)) &&
                     request.resource.data.classCode is string && request.resource.data.classCode.matches('^[0-9]{1,2}-[0-9]{4}$') &&
                     request.resource.data.groups is list && request.resource.data.groups.size() <= 60 && okExpire(request.resource.data);
-      // 주인 교사: 행사 설정(예비 실험 값·목표)과 학생에게 열 단계(stage)만 고칠 수 있음
+      // 주인 교사: 행사 설정(예비 실험 값·목표)·학생에게 열 단계(stage)·'수업 마침' 표시(done·doneAt)만 고칠 수 있음
       allow update: if isGoogle() && resource.data.owner == request.auth.uid &&
-                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['setup', 'stage']) &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['setup', 'stage', 'done', 'doneAt']) &&
+                    (!('done' in request.resource.data) || request.resource.data.done is bool) &&
+                    (!('doneAt' in request.resource.data) || request.resource.data.doneAt == null || request.resource.data.doneAt == request.time) &&
                     (!('setup' in request.resource.data) || (request.resource.data.setup is map && request.resource.data.setup.size() <= 24)) &&
                     okStage(request.resource.data);
       allow delete: if signedIn() && resource.data.owner == request.auth.uid;
