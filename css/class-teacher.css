@@ -110,6 +110,19 @@ html.big-view .ct-bigqr { zoom: calc(1 / 1.35); }
 .ct-boardbig button { min-height: var(--tap); padding: var(--sp-2) var(--sp-5); border: 0; border-radius: var(--r-ctl); background: var(--c-primary); color: #fff; font-size: 1rem; }
 html.big-view .ct-boardbig { zoom: calc(1 / 1.35); }
 
+/* 진행 화면 (첫 화면): 머리줄·학생에게 여는 단계 */
+.ct-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-2); }
+.ct-head h1 { margin: 0; flex: 1 1 auto; }
+.ct-head-r { display: flex; gap: var(--sp-2); }
+.ct-bar .ct-row { margin: 0; }
+.ct-stage { border-left: 6px solid var(--c-success); }
+.ct-stage-now { font-size: clamp(1.4rem, 4vw, 2.2rem); font-weight: 800; margin: 0 0 var(--sp-2); color: var(--c-text); }
+.ct-stage-steps { display: flex; flex-wrap: wrap; gap: var(--sp-1); list-style: none; padding: 0; margin: 0 0 var(--sp-2); }
+.ct-stage-steps li { padding: var(--sp-1) var(--sp-3); border-radius: 999px; font-size: var(--fs-sm); background: var(--c-fill); color: var(--c-muted); }
+.ct-stage-steps li.open { background: var(--c-ok-bg); color: var(--c-ok-text); }
+.ct-stage-steps li.cur { outline: 2px solid var(--c-success); font-weight: 700; }
+.ct-wrap button.ct-big { font-size: 1.15rem; min-height: 56px; padding: 0 var(--sp-5); }
+
 /* 플랑크 상수 결과 (js/class-teacher-planck.js) */
 .ctp-scroll { overflow-x: auto; max-width: 100%; }
 .ctp-row { cursor: pointer; }

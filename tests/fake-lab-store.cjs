@@ -34,6 +34,8 @@ function loadLabStore(opts) {
             let o = raw;
             if (typeof raw === 'string') { try { o = JSON.parse(raw || '{}'); } catch (e) { return { ok: false, error: '요청 형식이 올바르지 않습니다.' }; } }
             if (o && o.body && typeof o.body === 'object' && 'auth' in o) return handle(o.body, o.auth || {});
+            // 시험이 직접 만드는 수업은 모든 단계를 연 채로 (단계 열기 자체는 tests/class-stage-ui.test.cjs). 페이지(교사 화면)로 만든 수업은 진짜처럼 1단계만
+            if (o && o.action === 'createClass' && o.stage == null) o = Object.assign({ stage: 99 }, o);
             return handle(o, auth || TEACHER);
         },
         async get(params, auth) {

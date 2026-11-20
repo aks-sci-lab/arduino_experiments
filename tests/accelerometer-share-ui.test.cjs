@@ -135,7 +135,7 @@ test('수업 참여 → 조 공유 보내기·자동 불러오기 → 교사 진
             const T = await openPage(browser, app, site.base + '/projects/class-teacher.html', {
                 'lab-store:fake-user': JSON.stringify({ uid: 'teacher-1', google: true, teacher: true })   // 가짜 구글 로그인 (수업 주인)
             });
-            await T.page.click('#ctTabs button[data-tab="watch"]');
+            await T.page.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });
             await T.page.waitForSelector('.ct-group');
             const g1 = await T.page.textContent('.ct-group');
             assert.match(g1, /📤 제출: 1개/, C.exp + ': 조 제출');

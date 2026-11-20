@@ -39,7 +39,7 @@
         // 탄소 양자점 형광 (시료 하나 = 한 줄, 저장은 Firestore)
         qdot: { name: '탄소 양자점 형광 실험', icon: '🌈', page: 'projects/quantum-dot.html', steps: STEPS7, ready: true },
         // 가족 행사 (행사형 화면): 조를 미리 나누지 않고 가족이 팀 이름을 정해 들어옴 (team: true → 수업 만들 때 '팀 수'·예비 실험 값)
-        rocket: { name: '발포비타민 필름통 로켓 (가족 행사)', icon: '🚀', page: 'projects/film-rocket.html', steps: { enter: '입장', think: '생각 열기', t1: '1차시 열리는 시간', t2: '2차시 로켓 높이', end: '정리' }, ready: true, team: true }
+        rocket: { name: '발포비타민 필름통 로켓 (가족 행사)', icon: '🚀', page: 'projects/film-rocket.html', steps: { enter: '입장', think: '생각 열기', t1: '1차시 열리는 시간', t2: '2차시 로켓 높이', end: '정리' }, gate: ['think', 't1', 't2', 'end'], ready: true, team: true }
     };
     var CUSTOM_RE = /^custom:([A-Za-z0-9_-]{1,40})$/;
     var CUSTOM_STEPS = Object.assign({ live: '한 화면' }, STEPS7);
@@ -52,6 +52,22 @@
         return null;
     }
     function isExp(exp) { return !!expInfo(exp); }
+    /* 교사가 하나씩 여는 단계 (교사 화면 '▶ 다음 단계 열기', 학생 화면 잠금은 js/class-share.js)
+       7단계 보고서 실험 = 목적…결론, 필름통 로켓 = 생각 열기·1차시·2차시·정리 (입장은 늘 열림), 한 화면 실험·선생님이 만든 실험 = 없음(null) */
+    var STAGE_ALL = 99;
+    function gateSteps(exp) {
+        var e = EXPS[exp];
+        if (!e) return null;
+        if (e.gate) return e.gate.slice();
+        return e.steps === STEPS7 ? Object.keys(STEPS7) : null;
+    }
+    // 지금 열린 단계: { n(열린 수), all, keys(열린 단계들), cur(가장 뒤 열린 단계) } — stage 가 없으면(예전 수업) 모두 열림
+    function stageInfo(exp, stage) {
+        var g = gateSteps(exp);
+        if (!g) return null;
+        var n = stage == null || !isFinite(Number(stage)) ? g.length : Math.max(1, Math.min(g.length, Math.round(Number(stage))));
+        return { gate: g, n: n, all: n >= g.length, keys: g.slice(0, n), cur: g[n - 1] };
+    }
 
     function normalizeClass(s) {
         return String(s == null ? '' : s)
@@ -191,6 +207,7 @@
     function joinTeam(url, o, fetchImpl) { return post(url, { action: 'teamJoin', 'class': o.classCode, name: String(o.name || ''), device: o.device || '' }, fetchImpl, 20000); }
     // 수업 정보 새로 읽기 (선생님이 행사 설정을 고친 뒤)
     function classInfo(url, classCode, fetchImpl) { return post(url, { action: 'classInfo', 'class': classCode }, fetchImpl, 15000); }
+    function classStage(space, stage, fetchImpl) { return post('lab:' + space, { action: 'classStage', stage: Number(stage) }, fetchImpl, 20000); }
     function classSetup(space, setup, fetchImpl) { return post('lab:' + space, { action: 'classSetup', setup: setup }, fetchImpl, 20000); }
     function joinInfo(url, classCode, fetchImpl) { return getQ(url, { action: 'joinInfo', 'class': classCode, _: Date.now() }, fetchImpl); }
     function heartbeat(url, o, fetchImpl) {
@@ -214,7 +231,7 @@
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
         studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
-        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, heartbeat: heartbeat, classStatus: classStatus,
+        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, classStage: classStage, gateSteps: gateSteps, stageInfo: stageInfo, STAGE_ALL: STAGE_ALL, heartbeat: heartbeat, classStatus: classStatus,
         myClasses: myClasses, classExport: classExport, deleteClass: deleteClass, reopenCode: reopenCode, expireText: expireText
     };
 });
