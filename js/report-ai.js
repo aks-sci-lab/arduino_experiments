@@ -220,7 +220,7 @@
         if (!mount) return null;
         var LSt = window.LabStore, CC = window.ClassCloud;
         var exp = String(opts.exp || '');
-        var expName = (CC && CC.expInfo && CC.expInfo(exp) ? CC.expInfo(exp).name : '') || opts.title || exp;
+        var expName = opts.title || (CC && CC.expInfo && CC.expInfo(exp) ? CC.expInfo(exp).name : '') || exp;   // 선생님이 만든 실험은 그 실험 제목
         // 진행 방법(📋 7단계 / 🔍 가설연역, LabUI.initSteps({ flows: true }))마다 항목이 다름. 화면에는 두 묶음을 다 만들어 두고 지금 방법 것만 보임
         var repSecs = (opts.sections || DEFAULT_SECTIONS).map(sectionInfo).filter(Boolean);
         var hdSecs = (opts.hdSections || HD_SECTIONS).map(sectionInfo).filter(Boolean);
