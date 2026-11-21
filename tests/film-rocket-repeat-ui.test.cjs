@@ -56,7 +56,7 @@ test('로켓: 다시 재기 바로 가기·반복 측정·끊긴 채 새로고�
         await go('t1-safe');
         for (const k of ['goggle', 'face', 'away', 'wait']) await A.check('[data-safe="' + k + '"]');
         await next(); await go('q-pressure'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next();
-        await go('t1-var'); await A.click('.ev-choice[data-k="water"]'); await next();
+        await go('t1-var'); await A.click('.ev-choice[data-k="water"]'); await A.click('[data-guess] [data-dir="up"]'); await next();
         await go('q-control'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next();
         await go('t1-cond');
         assert.equal(await A.textContent('#ev-count'), '0');

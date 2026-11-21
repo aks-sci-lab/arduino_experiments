@@ -57,6 +57,9 @@ test('선생님 설정 합치기: 범위가 뒤집히면 고치고, 기본값은
 
 test('퀴즈 점수: 처음 10점, 두 번째 5점, 그 뒤 0점 → 팀 점수', () => {
     assert.equal(M.quizPoints(1, true), 10); assert.equal(M.quizPoints(2, true), 5); assert.equal(M.quizPoints(3, true), 0); assert.equal(M.quizPoints(1, false), 0);
+    // 풀이가 열린 뒤 처음 고른 퀴즈(late): 맞혀도 5점까지
+    assert.equal(M.quizPoints(1, true, true), 5); assert.equal(M.quizPoints(2, true, true), 5); assert.equal(M.quizPoints(3, true, true), 0);
+    assert.equal(M.score({ a: { tries: 1, correct: true, late: true }, b: { tries: 1, correct: true } }).points, 15);
     const sc = M.score({ pressure: { tries: 1, correct: true }, control: { tries: 2, correct: true }, gas: { tries: 3, correct: true }, action: { tries: 1, correct: false } });
     assert.deepEqual(sc, { points: 15, correct: 3, total: 4 });
     Object.values(M.QUIZ).forEach(q => assert.equal(q.opts.filter(o => o.k === 'ok').length, 1, q.q + ' 정답 하나'));

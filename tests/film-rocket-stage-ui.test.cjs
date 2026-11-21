@@ -94,7 +94,7 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         await go(A, 't1-safe');
         for (const k of ['goggle', 'face', 'away', 'wait']) await A.check('[data-safe="' + k + '"]');
         await next(A); await go(A, 'q-pressure'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next(A);
-        await go(A, 't1-var'); await A.click('.ev-choice[data-k="water"]'); await next(A);
+        await go(A, 't1-var'); await A.click('.ev-choice[data-k="water"]'); await A.click('[data-guess] [data-dir="up"]'); await next(A);
         await go(A, 'q-control'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next(A);
         await go(A, 't1-cond'); await next(A); await go(A, 't1-predict'); await next(A); await go(A, 't1-measure');
         await A.click('#ev-m-sw'); await A.click('#ev-sw1');

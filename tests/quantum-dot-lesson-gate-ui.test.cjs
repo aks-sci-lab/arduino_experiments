@@ -179,7 +179,7 @@ test('양자점: 설명 화면을 안 쓴 수업·수업 없이 연 화면은 �
     }
 });
 
-test('양자점 설명 화면: 학생이 고르거나 쓰는 장(mode phone)은 노트북·폰 띠가 "📱 폰에서 골라요", 풀이를 열면 "👀 앞 화면을 봐요"', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
+test('양자점 설명 화면: 학생이 고르거나 쓰는 장(mode phone)은 노트북·폰 띠가 "✍️ 내 화면에서 해요", 풀이를 열면 "👀 앞 화면을 봐요"', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
     const app = loadLabStore();
     const browser = await chromium.launch();
     try {
@@ -193,7 +193,7 @@ test('양자점 설명 화면: 학생이 고르거나 쓰는 장(mode phone)은 
         await T.page.goto(ORIGIN + '/projects/class-teacher.html#class=' + cls.space + '&view=present');
         await T.page.waitForFunction(() => document.querySelector('#presentPane.ls-on .ls-slide'), null, { timeout: 20000 });
         assert.match((await slide(T.page)).title, /먼저 보기/);
-        await L.page.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return b && !b.hidden && /폰에서 골라요/.test(b.textContent); }, null, { timeout: 15000 });
+        await L.page.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return b && !b.hidden && /내 화면에서 해요/.test(b.textContent); }, null, { timeout: 15000 });
         assert.equal(app.db.docs.get('labClasses/' + cls.space).lesson.mode, 'phone');
         // 풀이를 열면 앞 화면을 봐요
         await T.page.keyboard.press('ArrowRight');
