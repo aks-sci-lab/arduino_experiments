@@ -198,6 +198,19 @@
         return (words || []).filter(function (w) { return EASY[w]; }).map(function (w) { return w + ' = ' + EASY[w]; }).join(' · ');
     }
 
+    /* 예측·정리 문장 (2026-11-21 선생님 '예측·정리 문장 적는 칸'): 행사형이라 고르기 먼저, 까닭은 짧은 칸(40자, 안 써도 됨)
+       dir: up(늘어남)·down(줄어듦)·same(비슷) — 1차시는 열리는 시간, 2차시는 높이 */
+    var GUESS = {
+        t1: { what: '열리는 시간이', up: '길어질 것 같아요', down: '짧아질 것 같아요', same: '비슷할 것 같아요', upDone: '길어졌어요', downDone: '짧아졌어요', sameDone: '비슷했어요', word: { up: '길어짐', down: '짧아짐', same: '비슷' } },
+        t2: { what: '높이가', up: '높아질 것 같아요', down: '낮아질 것 같아요', same: '비슷할 것 같아요', upDone: '높아졌어요', downDone: '낮아졌어요', sameDone: '비슷했어요', word: { up: '높아짐', down: '낮아짐', same: '비슷' } }
+    };
+    // 정리 '왜냐하면' 고르기 (직접 쓰기도 됨)
+    var BECAUSE = {
+        t1: ['기체(거품)가 더 빨리 생겨서', '기체가 더 많이 생겨서', '뚜껑을 미는 힘(압력)이 달라서', '잘 모르겠어요'],
+        t2: ['무거워서 덜 빨라져서(질량)', '아래로 미는 힘이 세져서', '공기에 덜 막혀서', '잘 모르겠어요']
+    };
+    function cleanShort(t) { return String(t == null ? '' : t).replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40); }
+
     // 예측과 왜 달랐을까? (고르기형)
     var WHY = [
         { k: 'speed', t: '기체가 생각보다 빨리(또는 늦게) 생겼어요', fb: '물의 온도·조각 크기가 반응 빠르기를 바꿔요. 따뜻할수록, 조각이 작을수록 기체가 빨리 생겨요.' },
@@ -223,6 +236,14 @@
         out['로켓 발사 수'] = t2.length + ch2.length;
         // 바꾼 조건의 값 가짓수 (1 이하 = 아직 한 가지 값으로만 잼 → 교사 발표 화면 '값 안 바꾼 팀')
         out['1차시 값 가짓수'] = valueKinds(t1); out['2차시 값 가짓수'] = valueKinds(t2);
+        // 예측·정리 문장 (교사 결과판 '💬 생각'): 짧은 글만, 40자까지
+        ['t1', 't2'].forEach(function (k, i) {
+            var p = st[k] || {}, G = GUESS[k], n = (i + 1) + '차시';
+            if (p.guess && G.word[p.guess.dir]) out[n + ' 예측'] = G.word[p.guess.dir];
+            var c = st.concl && st.concl[k];
+            if (c && G.word[c.dir]) out[n + ' 결과'] = G.word[c.dir];
+            if (c && c.why) out[n + ' 까닭'] = cleanShort(c.why);
+        });
         if (maxPct >= 0) out['높이 최고(%)'] = Math.round(maxPct);
         if (b2) { out['높이 도전 차이(%)'] = Math.round(b2.diff); out['높이 도전 성공'] = Math.abs(b2.diff) <= s.tolPct + 1e-9 ? 1 : 0; }
         out['생각 바뀜 ✨'] = ch.filter(function (c) { return c.sparkle; }).length;
@@ -237,12 +258,13 @@
             think: { first: (st.think && st.think.first) || {}, last: (st.think && st.think.last) || {} },
             quiz: st.quiz || {},
             t1: { changed: t1.changed || '', base: t1.base || {}, trials: pick(t1.trials, ['value', 'predict', 'y', 'method', 'at']), why: t1.why || '', challenge: pick(t1.challenge, ['value', 'predict', 'y', 'diff', 'ok', 'method', 'at']) },
-            t2: { changed: t2.changed || '', base: t2.base || {}, trials: pick(t2.trials, ['value', 'pct', 'method', 'hand', 'at']), challenge: pick(t2.challenge, ['value', 'pct', 'diff', 'ok', 'method', 'hand', 'at']) }
+            t2: { changed: t2.changed || '', base: t2.base || {}, trials: pick(t2.trials, ['value', 'pct', 'method', 'hand', 'at']), challenge: pick(t2.challenge, ['value', 'pct', 'diff', 'ok', 'method', 'hand', 'at']) },
+            guess: { t1: t1.guess || null, t2: t2.guess || null }, concl: st.concl || {}
         };
     }
 
     return {
-        DEFAULT_SETUP: DEFAULT_SETUP, mergeSetup: mergeSetup, valueKinds: valueKinds, EASY: EASY, KEY_WORDS: KEY_WORDS, easyLine: easyLine, PIECES: PIECES, NOSES: NOSES, tabletLabel: tabletLabel, vars1: vars1, vars2: vars2,
+        DEFAULT_SETUP: DEFAULT_SETUP, mergeSetup: mergeSetup, valueKinds: valueKinds, EASY: EASY, KEY_WORDS: KEY_WORDS, easyLine: easyLine, GUESS: GUESS, BECAUSE: BECAUSE, cleanShort: cleanShort, PIECES: PIECES, NOSES: NOSES, tabletLabel: tabletLabel, vars1: vars1, vars2: vars2,
         range: range, stepIn: stepIn, axisValue: axisValue, mean: mean, sd: sd, round: round, byValue: byValue, targetDiff: targetDiff,
         heightPct: heightPct, cmFrom: cmFrom, HAND: HAND, handPct: handPct,
         DEF: DEF, CONCEPTS: CONCEPTS, QUIZ: QUIZ, quizPoints: quizPoints, score: score, conceptChanges: conceptChanges, optText: optText, WHY: WHY,

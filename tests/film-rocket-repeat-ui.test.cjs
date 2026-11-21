@@ -76,7 +76,7 @@ test('로켓: 다시 재기 바로 가기·반복 측정·끊긴 채 새로고�
         await go('t1-result');
         assert.match(await A.textContent('.ev-screen'), /이 조건: 2번째/);
         // ④ 조건 화면: 같은 값은 2번, + 로 바꾸면 그 값은 0번
-        await A.click('[data-go="t1-cond"]'); await go('t1-cond');
+        await A.click('#ev-change'); await go('t1-cond');
         assert.equal(await A.textContent('#ev-count'), '2');
         await A.click('.ev-stepper:not(.locked) [data-pm="1"]');
         assert.equal(await A.textContent('#ev-count'), '0', '바꾼 값 기준');

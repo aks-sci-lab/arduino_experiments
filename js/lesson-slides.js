@@ -124,6 +124,8 @@
                 }
                 if (s && s.kind === 'vars' && !(s.vars && s.vars.change && s.vars.measure && Array.isArray(s.vars.keep) && s.vars.keep.length)) bad.push(at + ': vars 는 change·keep[]·measure');
                                 if (s && s.revealImg && !s.reveal) bad.push(at + ': revealImg 는 reveal 과 함께');
+                // mode: 이 장을 띄울 때 학생 폰 띠 ('look' 👀 앞 화면을 봐요 · 'phone' 📱 폰에서 골라요)
+                if (s && s.mode != null && s.mode !== 'look' && s.mode !== 'phone') bad.push(at + ": mode 는 'look' 또는 'phone'");
                 ['title', 'body', 'ask', 'reveal', 'note', 'img', 'revealImg'].forEach(function (f) {
                     if (s && s[f] != null && typeof s[f] !== 'string') bad.push(at + ': ' + f + ' 는 글');
                     if (s && typeof s[f] === 'string' && /<script|\son\w+\s*=|javascript:/i.test(s[f])) bad.push(at + ': ' + f + ' 에 스크립트');

@@ -62,6 +62,11 @@
             pull: function () { return Promise.resolve({ ok: true }); },   // 다른 팀 것은 불러오지 않음
             // 선생님이 여는 단계 (교사 화면 '▶ 다음 단계 열기'): 열리지 않은 단계는 🔒, 새로 열리면 그 단계 첫 화면으로
             gateDom: false,
+            // 설명 화면 풀이가 열리면(2026-11-21 '점수 퀴즈 정답 표시도 풀이 뒤로') 퀴즈 화면의 ⭕·📘·점수를 다시 그림
+            onLesson: function () {
+                if (PRESENT) return;
+                if (/^(q-|end-(force|accel|pressure)$)/.test(st.screen) && app.getAttribute('data-screen') === st.screen) show(st.screen, { back: true }); else renderTop();
+            },
             onStage: function (open, o) {
                 stageOpen = open;
                 if (PRESENT) {   // 발표용: 새로 열린 단계(처음엔 열린 마지막 단계)의 첫 화면
@@ -181,7 +186,7 @@
         return { cls: 'ok', t: '✅ 선생님께 보냄' };
     }
     function renderTop() {
-        var sc = M.score(st.quiz), sy = syncText();
+        var sc = M.score(shownQuiz()), sy = syncText();   // 풀이 전 퀴즈 점수는 아직 보이지 않음
         $('#ev-team').innerHTML = st.team ? '👨‍👩‍👧 <b>' + esc(st.team.name) + '</b>' : '';
         $('#ev-score').innerHTML = '⭐ <b>' + sc.points + '</b>점';
         var s = $('#ev-sync'); s.textContent = sy.t; s.className = 'ev-sync ' + sy.cls; s.hidden = !sy.t;
@@ -194,7 +199,8 @@
             nt.hidden = !nx;
             if (nx) {
                 var b = busy();
-                nt.innerHTML = '<span>' + esc(nx.text) + '</span><button type="button" class="ev-next good ev-notice-go" id="ev-notice-go" data-next="' + nx.next + '"' + (b ? ' disabled' : '') + '>' +
+                var op = b ? '' : oneValuePart(nx.next);
+                nt.innerHTML = '<span>' + esc(nx.text) + '</span>' + (op ? '<span class="ev-notice-more">🔧 넘어가기 전에 값을 하나 바꿔 한 번 더 ' + (op === 't1' ? '재' : '쏘아') + ' 볼까요? (지금은 한 가지 값)</span>' : '') + '<button type="button" class="ev-next good ev-notice-go" id="ev-notice-go" data-next="' + nx.next + '"' + (b ? ' disabled' : '') + '>' +
                     (b ? '⏳ 이 측정을 끝내고 가요' : '‘' + esc(stageName(nx.next)) + '’ 로 가기 →') + '</button>' +
                     (nx.jump && !b ? '<button type="button" class="ev-link ev-notice-jump" id="ev-notice-jump" data-next="' + nx.jump + '">‘' + esc(stageName(nx.next)) + '’ 건너뛰고 ‘' + esc(stageName(nx.jump)) + '’ 로 바로 가기</button>' : '');
             }
@@ -239,10 +245,14 @@
         var last = stageOpen && stageOpen.length ? stageOpen[stageOpen.length - 1] : 'think';
         return STAGE_START[last];
     }
+    // 한 가지 값으로만 잰 차시(1·2차시)가 있으면 그 차시 키 (안내만, 막지 않음)
+    function oneValuePart(stage) { var k = stage === 't2' ? 't1' : stage === 'end' ? 't2' : stage; return (k === 't1' || k === 't2') && st[k] && st[k].changed && M.valueKinds(st[k].trials) < 2 ? k : ''; }
     function lockScreen(stage) {
-        var to = backTarget();
+        var to = backTarget(), op = oneValuePart(stage);
         return { html: '<div class="ev-hero"><div class="ev-hero-ic" aria-hidden="true">⏳</div><h2>‘' + esc(stageName(stage)) + '’ 은 아직 잠겨 있어요</h2>' +
             '<p>선생님이 다음 단계를 열면 <b>저절로 넘어가요</b>. 그동안 앞 단계를 다시 보거나 기다려요.</p></div>' +
+            (op ? '<div class="ev-def ev-more-hint"><p>🔧 기다리는 동안 <b>값을 하나 바꿔</b> 한 번 더 ' + (op === 't1' ? '재' : '쏘아') + ' 볼까요? 지금은 한 가지 값으로만 ' + (op === 't1' ? '쟀어요' : '쐈어요') + '.</p>' +
+                '<div class="ev-nav col"><button type="button" class="ev-next good" data-go="' + op + '-more">🔧 값 바꿔서 한 번 더</button></div></div>' : '') +
             '<div class="ev-nav col"><button type="button" class="ev-next secondary" data-go="' + to + '">← ‘' + esc(stageName(stageOf(to))) + '’ 으로 돌아가기</button></div>' };
     }
     var LAST_SCREEN = { 't1-ch-result': 't1', 't2-ch-result': 't2', 'end-card': 'end' };
@@ -312,6 +322,15 @@
             (easy ? '<p class="ev-easy">🧒 쉬운 말 · ' + esc(easy) + '</p>' : '') + '</div>';
     }
     function easySpan(w) { return M.EASY[w] ? ' <span class="ev-easy">(' + esc(M.EASY[w]) + ')</span>' : ''; }
+
+    // 설명 화면을 쓴 수업에서 그 장의 풀이(key)를 아직 안 열었으면 정답 표시(⭕·📘·점수)를 미룸 — 고른 답·점수는 바로 저장
+    function quizLessonKey(k) { return /^end_/.test(k) ? 'end-think' : k; }
+    function held(k) { return !!(share && share.lessonHidden && share.lessonHidden(quizLessonKey(k))); }
+    function shownQuiz() { var o = {}; Object.keys(st.quiz || {}).forEach(function (k) { if (!(held(k) && st.quiz[k] && st.quiz[k].tries)) o[k] = st.quiz[k]; }); return o; }
+    var HOLD_TXT = '<p class="ev-hold" role="status">골랐어요 ✓ — <b>앞 화면을 봐요</b>. 선생님이 풀이를 보여 주면 맞았는지 나와요.</p>';
+    function heldChoices(opts, picks) {
+        return '<div class="ev-choices">' + opts.map(function (o) { return '<button type="button" class="ev-choice' + (picks.indexOf(o.k) >= 0 ? ' on' : '') + '" data-k="' + o.k + '" disabled>' + esc(o.t) + '</button>'; }).join('') + '</div>';
+    }
 
     var SCREENS = {};
 
@@ -406,6 +425,7 @@
             }
             // 정리: 다시 풀기 = 정의 퀴즈 (처음 고른 것 = 지금 생각)
             var qk = 'end_' + c.key, q = st.quiz[qk] || { tries: 0, correct: false, picks: [] }, done = q.correct || q.tries >= 3;
+            if (q.tries && held(qk)) return { html: '<p class="ev-kicker">⭐ 다시 풀기 · 정의 퀴즈</p><h2>' + esc(c.q) + '</h2>' + heldChoices(c.opts, q.picks) + HOLD_TXT + nav(next, '다음 →') };
             var html2 = '<p class="ev-kicker">⭐ 다시 풀기 · 정의 퀴즈</p><h2>' + esc(c.q) + '</h2>' +
                 '<div class="ev-choices">' + c.opts.map(function (o) {
                     var cls = q.picks.indexOf(o.k) >= 0 ? (o.k === 'ok' ? ' right' : ' wrong') : '';
@@ -436,6 +456,7 @@
     function quizScreen(key, next, kicker) {
         return function () {
             var Q = M.QUIZ[key], q = st.quiz[key] || { tries: 0, correct: false, picks: [] };
+            if (q.tries && held(key)) return { html: '<p class="ev-kicker">⭐ 정의 퀴즈' + (kicker ? ' · ' + esc(kicker) : '') + '</p><h2>' + esc(Q.q) + '</h2>' + heldChoices(Q.opts, q.picks) + HOLD_TXT + nav(next, '다음 →') };
             var last = q.picks[q.picks.length - 1];
             var done = q.correct || q.tries >= 3;
             var html = '<p class="ev-kicker">⭐ 정의 퀴즈' + (kicker ? ' · ' + esc(kicker) : '') + '</p><h2>' + esc(Q.q) + '</h2>' +
@@ -529,15 +550,35 @@
                     return stepper(k, defs[k].short || defs[k].name, defs[k].label(p.base[k]), { locked: true });
                 }).join('') : '') +
                 (p.trials.length && p.changed ? '<p class="ev-small">바꿀 조건을 바꾸면 지금까지 잰 값은 그대로 두고, 그래프는 새 조건으로 그려요.</p>' : '') +
+                (p.changed ? guessBlock(part, defs[p.changed]) : '') +
                 nav(next, '다음 →', p.changed ? '' : ' disabled');
             return { html: html, mount: function (el) {
                 el.querySelector('.ev-choices').addEventListener('click', function (e) {
                     var b = e.target.closest('[data-k]'); if (!b) return;
-                    if (p.changed !== b.dataset.k) { p.changed = b.dataset.k; p.value = p.base[p.changed]; changed(); }
+                    if (p.changed !== b.dataset.k) { p.changed = b.dataset.k; p.value = p.base[p.changed]; p.guess = null; changed(); }
                     show(st.screen, { back: true });
                 });
+                mountGuess(el, part);
             } };
         };
+    }
+    /* 🔮 예측 (2026-11-21 '예측·정리 문장 적는 칸'): 고른 조건을 늘리면(바꾸면) 어떻게 될까? — 큰 고르기 + 까닭 짧은 칸(안 써도 됨) */
+    function guessBlock(part, d) {
+        var G = M.GUESS[part], g = st[part].guess || {};
+        return '<div class="ev-guess" data-guess="' + part + '"><h3>🔮 ' + esc(d.short || d.name) + '을(를) ' + (d.cat ? '바꾸면' : '늘리면') + ' ' + G.what + '?</h3>' +
+            '<div class="ev-choices">' + ['down', 'up', 'same'].map(function (k) {
+                return '<button type="button" class="ev-choice' + (g.dir === k ? ' on' : '') + '" data-dir="' + k + '">' + esc(G[k]) + '</button>';
+            }).join('') + '</div>' +
+            '<label class="ev-field">왜 그렇게 생각해요? <small>(짧게, 안 써도 돼요)</small><input type="text" class="ev-why-in" maxlength="40" autocomplete="off" placeholder="예: 따뜻하면 거품이 빨리 나서" value="' + esc(g.why || '') + '"></label></div>';
+    }
+    function mountGuess(el, part) {
+        var box = el.querySelector('[data-guess]'); if (!box) return;
+        box.querySelector('.ev-choices').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-dir]'); if (!b) return;
+            st[part].guess = Object.assign({}, st[part].guess, { dir: b.dataset.dir }); changed();
+            Array.prototype.forEach.call(box.querySelectorAll('[data-dir]'), function (x) { x.classList.toggle('on', x === b); });
+        });
+        box.querySelector('.ev-why-in').addEventListener('change', function () { st[part].guess = Object.assign({}, st[part].guess, { why: M.cleanShort(this.value) }); changed(); });
     }
     SCREENS['t1-var'] = varScreen('t1', '무엇을 바꿔 볼까요?', 'q-control');
     SCREENS['q-control'] = quizScreen('control', 't1-cond');
@@ -558,6 +599,7 @@
                 '<h3>같게 할 조건 🔒</h3>' + Object.keys(defs).filter(function (k) { return k !== p.changed; }).map(function (k) { return stepper(k, defs[k].short || defs[k].name, defs[k].label(p.base[k]), { locked: true }); }).join('') +
                 (!challenge && part === 't1' ? '<p class="ev-small">같은 조건으로 <b>' + s.repeats + '번</b> 재서 평균' + easySpan('평균') + '을 내요. 이 조건은 지금까지 <b id="ev-count">' + count + '</b>번 쟀어요.</p>' : '') +
                 (challenge && part === 't1' ? '<div id="ev-mini"></div>' : '') +
+                (!challenge && p.mustChange != null ? '<p class="ev-small" id="ev-must">🔧 지난번(<b>' + esc(d.label(p.mustChange)) + '</b>)과 <b>다른 값</b>으로 바꿔요. + 나 − 를 눌러요.</p>' : '') +
                 nav(next, '이 조건으로 →');
             return { html: html, mount: function (el) {
                 el.querySelector('.ev-stepper:not(.locked)').addEventListener('click', function (e) {
@@ -567,6 +609,17 @@
                     var ce = el.querySelector('#ev-count'); if (ce) ce.textContent = String(countOf());
                 });
                 if (challenge && part === 't1') miniTable(el.querySelector('#ev-mini'), 't1');
+                // '바꿔서 다시'로 왔는데 값을 안 바꾸면 받지 않음
+                var go = el.querySelector('.ev-next[data-go]');
+                if (go && !challenge) go.addEventListener('click', function (e) {
+                    if (p.mustChange == null) return;
+                    if (p.value === p.mustChange) {
+                        e.preventDefault(); e.stopPropagation();
+                        var m = $('#ev-must'); if (m) { m.className = 'ev-no'; m.setAttribute('role', 'alert'); m.innerHTML = '✋ <b>값을 하나 바꿔요</b> — 지금은 지난번과 같은 ' + esc(d.label(p.value)) + '이에요. + 나 − 를 눌러요.'; }
+                        return;
+                    }
+                    p.mustChange = null; save();
+                });
             } };
         };
     }
@@ -736,16 +789,19 @@
         if (!r) return { html: '<p>아직 잰 값이 없어요.</p>' + nav('t1-cond', '재러 가기 →') };
         var same = p.trials.filter(function (t) { return t.value === r.value; }), avg = M.mean(same.map(function (t) { return t.y; }));
         var diff = r.y - r.predict;
+        var oneKind = M.valueKinds(p.trials) < 2 && same.length >= s.repeats;   // 한 값으로 다 쟀음 → 바로 '값을 하나 바꿔'
         var html = '<p class="ev-kicker">결과 · ' + esc(d ? d.label(r.value) : '') + '</p><h2>💥 ' + fmtS(r.y) + ' 만에 ‘펑’!</h2>' +
             card('<p>예측 <b>' + r.predict + '초</b> → 실제 <b>' + fmtS(r.y) + '</b></p><p>' + (Math.abs(diff) < 1 ? '🎉 거의 맞았어요!' : '예측보다 ' + fmtS(Math.abs(diff)) + ' ' + (diff > 0 ? '늦었어요' : '빨랐어요')) + '</p>' +
                 '<p>이 조건: <b>' + same.length + '번째</b> · 평균 <b>' + fmtS(avg) + '</b></p>') +
             '<div class="ev-nav col">' + (same.length < s.repeats ? '<button type="button" class="ev-next good" id="ev-again">🔁 같은 조건으로 한 번 더 (' + same.length + '/' + s.repeats + ')</button>' : '<p class="ev-ok">✅ 같은 조건으로 ' + s.repeats + '번 쟀어요!</p>') +
-            '<button type="button" class="ev-next ' + (same.length < s.repeats ? 'secondary' : 'good') + '" data-go="t1-cond">🔧 ' + esc(d ? d.short || d.name : '조건') + '을(를) 바꿔서 재기</button>' +
-            '<button type="button" class="ev-next secondary" data-go="t1-graph">📈 그래프 보기</button></div>' +
+            (oneKind ? moreHint('t1') : '') +
+            '<button type="button" class="ev-next ' + (same.length < s.repeats ? 'secondary' : 'good') + '" id="ev-change">🔧 ' + esc(d ? d.short || d.name : '조건') + '을(를) 바꿔서 재기</button>' +
+            (oneKind ? '' : '<button type="button" class="ev-next secondary" data-go="t1-graph">📈 그래프 보기</button>') + '</div>' +
             '<p class="ev-small">잘못 잰 값이면 <button type="button" class="ev-link" id="ev-undo">이 기록 지우기</button></p>';
         return { html: html, mount: function () {
             var ag = $('#ev-again');
             if (ag) ag.addEventListener('click', function () { p.value = r.value; p.quick = true; save(); show('t1-measure'); });
+            $('#ev-change').addEventListener('click', function () { mustChange('t1', r.value); });
             $('#ev-undo').addEventListener('click', function () {
                 if (!confirm('방금 잰 값을 지울까요?')) return;
                 var i = p.trials.indexOf(r); if (i < 0) i = p.trials.length - 1;
@@ -805,11 +861,21 @@
             var html = '<p class="ev-kicker">' + (t1 ? '1차시' : '2차시') + ' · 한 번 더</p><h2>🔧 하나만 바꿔 한 번 더 재요</h2>' +
                 card((n && d ? '<p>지금은 <b>' + esc(name) + '</b>을(를) <b>' + esc(d.label(one.value)) + '</b> 하나로만 ' + n + '번 쟀어요.</p>' : '<p>아직 잰 값이 없어요.</p>') +
                     '<p class="ev-why">💡 값을 바꿔서 한 번 더 재야 무엇 때문에 ' + (t1 ? '열리는 시간이' : '높이가') + ' 달라지는지 그래프로 볼 수 있어요.</p>') +
-                '<div class="ev-nav col"><button type="button" class="ev-next good" data-go="' + part + '-cond">🔧 ' + esc(name) + ' 바꿔서 다시 ' + (t1 ? '재기' : '발사하기') + ' →</button>' +
-                '<button type="button" class="ev-next secondary" data-go="' + (t1 ? 't2-intro' : 'end-intro') + '">' + (t1 ? '2차시로 가기 →' : '정리로 가기 →') + '</button></div>';
-            return { html: html };
+                '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-change">🔧 ' + esc(name) + ' 바꿔서 다시 ' + (t1 ? '재기' : '발사하기') + ' →</button>' +
+                // 다음 단계가 아직 잠겨 있으면 그리로 가는 단추는 두지 않음
+                (stageLocked(t1 ? 't2' : 'end') ? '' : '<button type="button" class="ev-next secondary" data-go="' + (t1 ? 't2-intro' : 'end-intro') + '">' + (t1 ? '2차시로 가기 →' : '정리로 가기 →') + '</button>') + '</div>';
+            return { html: html, mount: function () { $('#ev-change').addEventListener('click', function () { mustChange(part, one ? one.value : null); }); } };
         };
     }
+    // 결과 화면에서 바로: 한 값으로만 쟀으면 '값을 하나 바꿔 한 번 더' (그래프를 안 눌러도)
+    function moreHint(part) {
+        var p = st[part], d = ensureBase(part)[p.changed];
+        return '<div class="ev-def ev-more-hint"><p>🔧 이제 <b>' + esc(d ? d.short || d.name : '바꿀 조건') + '</b> 값을 하나 바꿔 한 번 더 ' + (part === 't1' ? '재요' : '쏘아요') + '!</p>' +
+            '<p class="ev-small">값이 두 가지 넘어야 무엇 때문에 ' + (part === 't1' ? '열리는 시간이' : '높이가') + ' 달라지는지 알 수 있어요.</p></div>';
+    }
+    // '바꿔서 다시' → 조건 화면: 지난 값 그대로는 받지 않음 ('값을 하나 바꿔요')
+    function mustChange(part, from) { st[part].mustChange = from; save(); show(part + '-cond'); }
+    function massNow() { var p = st.t2; return Number(p.changed === 'mass' ? p.value : p.base && p.base.mass) || 0; }
     SCREENS['t1-more'] = moreScreen('t1');
     SCREENS['t2-more'] = moreScreen('t2');
     SCREENS['t1-why'] = function () {
@@ -988,13 +1054,17 @@
         var p = st.t2, r = st.last2 || p.trials[p.trials.length - 1], defs = ensureBase('t2'), d = defs[p.changed];
         if (!r) return { html: nav('t2-cond', '발사하러 가기 →') };
         var html = '<p class="ev-kicker">결과 · ' + esc(d ? d.label(r.value) : '') + '</p><h2>🚀 아이 키의 ' + r.pct + '%' + (r.method === 'hand' ? ' <small>(눈으로)</small>' : '') + '</h2>' + '<p class="ev-small ev-easy">🧒 % = ' + esc(M.EASY['%']) + '</p>' +
-            card('<p>' + (r.pct >= 90 && r.pct <= 110 ? '🎉 아이 키와 거의 같아요!' : r.pct > 110 ? '아이 키보다 높아요. 천장 조심! 무게를 늘려 볼까요?' : '아이 키보다 낮아요. 무게를 줄이거나 물·발포비타민을 바꿔 볼까요?') + '</p>' +
+            card('<p>' + (r.pct >= 90 && r.pct <= 110 ? '🎉 아이 키와 거의 같아요!' : r.pct > 110 ? '아이 키보다 높아요. 천장 조심! 무게를 늘려 볼까요?' :
+                    // 몸체 무게가 0개면 '무게를 줄이거나'는 할 수 없음 (가상 수업 기록)
+                    '아이 키보다 낮아요. ' + (massNow() > 0 ? '무게를 줄이거나 ' : '') + '물·발포비타민을 바꿔 볼까요?') + '</p>' +
                 '<p class="ev-small">' + esc(M.DEF.design) + '</p>') +
             '<details class="ev-more"><summary>📏 아이 키(cm)로도 보기 (선택, 이 폰에만)</summary>' + stepper('child', '아이 키', st.childCm ? st.childCm + ' cm' : '넣지 않음', {}) +
             '<p class="ev-small" id="ev-cm">' + (st.childCm ? '로켓 높이 약 ' + M.cmFrom(r.pct, st.childCm) + ' cm' : '+ 를 누르면 넣어요. 선생님께는 %만 보내요.') + '</p></details>' +
-            '<div class="ev-nav col"><button type="button" class="ev-next good" data-go="t2-cond">🔧 바꿔서 다시 발사</button><button type="button" class="ev-next secondary" data-go="t2-graph">📈 그래프 보기</button></div>' +
+            '<div class="ev-nav col">' + (M.valueKinds(p.trials) < 2 ? moreHint('t2') : '') + '<button type="button" class="ev-next good" id="ev-change">🔧 바꿔서 다시 발사</button>' +
+            (M.valueKinds(p.trials) < 2 ? '' : '<button type="button" class="ev-next secondary" data-go="t2-graph">📈 그래프 보기</button>') + '</div>' +
             '<p class="ev-small">잘못 잰 값이면 <button type="button" class="ev-link" id="ev-undo">이 기록 지우기</button></p>';
         return { html: html, mount: function (el) {
+            $('#ev-change').addEventListener('click', function () { mustChange('t2', r.value); });
             el.querySelector('[data-var="child"]').addEventListener('click', function (e) {
                 var b = e.target.closest('[data-pm]'); if (!b) return;
                 st.childCm = Math.max(80, Math.min(190, (st.childCm || 129) + Number(b.dataset.pm))); save();
@@ -1043,8 +1113,40 @@
             return '<div class="ev-cmp' + (c.sparkle ? ' spark' : '') + '"><h3>' + esc(c.word) + (c.sparkle ? ' ✨' : '') + '</h3>' +
                 '<p><span class="ev-tag">처음</span> ' + esc(M.optText(opts, c.first) || '–') + '</p><p><span class="ev-tag now">지금</span> ' + esc(M.optText(opts, c.last) || '–') + (c.lastOk ? ' ⭕' : '') + '</p>' +
                 '<p class="ev-small" data-lesson-answer="' + M.CONCEPTS[i].key + '">📘 ' + esc(M.CONCEPTS[i].def) + '</p></div>';
-        }).join('') + '</div>' + nav('end-card', '결과 카드 만들기 →');
+        }).join('') + '</div>' + nav('end-sentence', '다음: 우리 팀 정리 문장 →');
         return { html: html };
+    };
+    /* 정리 문장 (2026-11-21): '○○을(를) 늘렸더니 □□가 ___. 왜냐하면 ___' — 고르기 먼저, 까닭은 고르거나 짧게 쓰기 */
+    SCREENS['end-sentence'] = function () {
+        st.concl = st.concl || {};
+        var parts = ['t1', 't2'].filter(function (k) { return st[k].changed && st[k].trials.length; });
+        var html = '<h2>✍️ 우리 팀 정리 문장</h2><p>잰 것을 보고 한 문장으로 말해 봐요. <b>원인(바꾼 것) → 결과(잰 것) → 까닭</b></p>' +
+            (parts.length ? parts.map(function (k) {
+                var d = ensureBase(k)[st[k].changed], G = M.GUESS[k], c = st.concl[k] || {}, g = st[k].guess;
+                return '<div class="ev-card ev-concl" data-concl="' + k + '"><p class="ev-kicker">' + (k === 't1' ? '1차시' : '2차시') + (g && G[g.dir] ? ' · 내 예측: ' + esc(G[g.dir]) : '') + '</p>' +
+                    '<p><b>' + esc(d.short || d.name) + '</b>을(를) ' + (d.cat ? '바꿨더니' : '늘렸더니') + ' ' + G.what + '</p>' +
+                    '<div class="ev-choices">' + ['down', 'up', 'same'].map(function (x) { return '<button type="button" class="ev-choice' + (c.dir === x ? ' on' : '') + '" data-dir="' + x + '">' + esc(G[x + 'Done']) + '</button>'; }).join('') + '</div>' +
+                    '<p>왜냐하면…</p><div class="ev-choices">' + M.BECAUSE[k].map(function (t) { return '<button type="button" class="ev-choice' + (c.why === t ? ' on' : '') + '" data-why="' + esc(t) + '">' + esc(t) + '</button>'; }).join('') + '</div>' +
+                    '<label class="ev-field">직접 쓰기 <small>(짧게, 안 써도 돼요)</small><input type="text" class="ev-why-in" maxlength="40" autocomplete="off" value="' + esc(c.why && M.BECAUSE[k].indexOf(c.why) < 0 ? c.why : '') + '"></label></div>';
+            }).join('') : card('<p>아직 바꿔서 잰 조건이 없어요. 결과 카드로 가요.</p>')) +
+            nav('end-card', '결과 카드 만들기 →');
+        return { html: html, mount: function (el) {
+            Array.prototype.forEach.call(el.querySelectorAll('[data-concl]'), function (box) {
+                var k = box.dataset.concl;
+                box.addEventListener('click', function (e) {
+                    var b = e.target.closest('[data-dir], [data-why]'); if (!b) return;
+                    var c = st.concl[k] = st.concl[k] || {};
+                    if (b.dataset.dir) c.dir = b.dataset.dir; else { c.why = b.dataset.why; box.querySelector('.ev-why-in').value = ''; }
+                    Array.prototype.forEach.call(box.querySelectorAll(b.dataset.dir ? '[data-dir]' : '[data-why]'), function (x) { x.classList.toggle('on', x === b); });
+                    changed();
+                });
+                box.querySelector('.ev-why-in').addEventListener('change', function () {
+                    var v = M.cleanShort(this.value), c = st.concl[k] = st.concl[k] || {};
+                    if (v) { c.why = v; Array.prototype.forEach.call(box.querySelectorAll('[data-why]'), function (x) { x.classList.remove('on'); }); }
+                    changed();
+                });
+            });
+        } };
     };
     SCREENS['end-card'] = function () {
         var html = '<h2>🏅 우리 팀 결과 카드</h2><canvas id="ev-card" class="ev-cardimg" width="1080" height="1350" aria-label="팀 결과 카드"></canvas>' +

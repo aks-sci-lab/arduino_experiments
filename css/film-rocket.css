@@ -131,3 +131,12 @@
 .ev-notice > span { flex: 1 1 12em; }
 .ev-notice .ev-notice-go { flex: 1 1 100%; min-height: var(--ev-tap, 56px); }
 .ev-notice .ev-notice-jump { flex: 1 1 100%; min-height: 44px; font-size: .95em; }
+
+/* 🔮 예측 · ✍️ 정리 문장 · 🔧 한 번 더 안내 · 퀴즈 풀이 기다림 (2026-11-21) */
+.ev-guess { margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3); border: 2px dashed var(--c-primary); border-radius: 14px; }
+.ev-guess h3 { margin: var(--sp-1) 0 var(--sp-2); }
+.ev-field small { font-weight: 400; color: var(--c-muted); }
+.ev-concl .ev-choices { margin: var(--sp-1) 0 var(--sp-2); }
+.ev-more-hint { border-left-color: var(--c-warn-text); background: var(--c-warn-bg); }
+.ev-notice-more { flex: 1 1 100%; font-weight: 600; color: var(--c-warn-text); }
+.ev-hold { font-weight: 700; color: var(--c-primary-dark); background: var(--c-primary-soft); border-radius: 10px; padding: var(--sp-2) var(--sp-3); }

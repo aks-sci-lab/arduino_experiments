@@ -40,6 +40,8 @@ test('규칙: 설명 장 상태 lesson·lessonOpen (에뮬레이터)', { skip, t
         await RUT.assertFails(doc('t1').update({ lesson: Object.assign({ at: ts, extra: 1 }, ok) }), '모르는 칸');
         await RUT.assertFails(doc('t1').update({ lesson: Object.assign({ at: ts }, ok, { i: 500 }) }), 'i 범위');
         await RUT.assertFails(doc('t1').update({ lesson: Object.assign({ at: ts }, ok, { on: 'yes' }) }), 'on 은 참·거짓');
+        await RUT.assertFails(doc('t1').update({ lesson: Object.assign({ at: ts }, ok, { mode: 'shout' }) }), "mode 는 'look'·'phone' 만");
+        await RUT.assertSucceeds(doc('t1').update({ lesson: Object.assign({ at: ts }, ok, { mode: 'phone' }) }));
         await RUT.assertFails(doc('t1').update({ lesson: Object.assign({ at: new Date(2020, 1, 1) }, ok) }), 'at 은 서버 시각');
         await RUT.assertFails(doc('t1').update({ lessonOpen: new Array(201).fill('k') }), '200개까지');
         await RUT.assertFails(doc('t1').update({ lessonOpen: 'force' }), '목록만');
@@ -58,7 +60,8 @@ test('규칙: 설명 장 상태 lesson·lessonOpen (에뮬레이터)', { skip, t
         assert.equal((await T1({ action: 'classLesson', space: c.space, lesson: { on: true, stage: 't1', i: 0, key: 'gas', reveal: false } })).ok, true);
         assert.equal((await T1({ action: 'classLesson', space: c.space, lesson: { on: false } })).ok, true);
         assert.equal((await T1({ action: 'classStage', space: c.space, stage: 3 })).ok, true, '설명 장 → 학생 화면 → 다음 단계 열기');
-        const r3 = await T1({ action: 'classLesson', space: c.space, lesson: { on: true, stage: 't2', i: 0, key: 'action', reveal: true }, open: ['action'] });
+        const r3 = await T1({ action: 'classLesson', space: c.space, lesson: { on: true, stage: 't2', i: 0, key: 'action', reveal: true, mode: 'phone' }, open: ['action'] });
+        assert.equal(r3.lesson.mode, 'phone', '띠 문구 mode 저장');
         assert.equal(r3.ok, true, r3.error); assert.deepEqual(r3.lessonOpen, ['force', 'gas', 'action']);
         const fin = await S1({ action: 'classInfo', space: c.space });
         assert.equal(fin.stage, 3); assert.equal(fin.done, true); assert.equal(fin.lesson.key, 'action');
