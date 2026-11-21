@@ -302,7 +302,7 @@
             if (!c || (code && c.classCode !== code)) return null;
             return Object.assign({ space: space }, c);
         }
-        // mode: 띠 문구 ('look' = 👀 앞 화면을 봐요, 'phone' = 📱 폰에서 골라요 — 장의 mode, js/lesson-slides.js)
+        // mode: 띠 문구 ('look' = 👀 앞 화면을 봐요, 'phone' = ✍️ 내 화면에서 해요 — 장의 mode, js/lesson-slides.js)
         function lessonOut(L) { return L && typeof L === 'object' ? { on: L.on === true, stage: String(L.stage || ''), i: Number(L.i) || 0, key: String(L.key || ''), reveal: L.reveal === true, mode: L.mode === 'phone' ? 'phone' : 'look' } : null; }
         function aiLimitOf(c) { var n = Number(c && c.aiLimit); return c && c.aiLimit != null && isFinite(n) ? n : AI.LIMIT_DEFAULT; }   // 예전 수업(칸 없음)은 기본 20
         function publicClass(c) {

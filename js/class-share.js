@@ -593,8 +593,8 @@
             }
             if (look.band) {
                 look.band.hidden = !look.on;
-                // 장의 mode: 'phone' = 물음을 폰에서 고르는 장 → '📱 폰에서 골라요', 그 밖 = '👀 앞 화면을 봐요'
-                look.band.innerHTML = look.mode === 'phone' ? '📱 <b>폰에서 골라요</b> — 고른 뒤 앞 화면을 봐요' : '👀 <b>앞 화면을 봐요</b> — 선생님이 설명 중이에요';
+                // 장의 mode: 'phone' = 물음을 내 화면(폰·노트북)에서 하는 장 → '✍️ 내 화면에서 해요'(기기 상관없이 같은 문구), 그 밖 = '👀 앞 화면을 봐요'
+                look.band.innerHTML = look.mode === 'phone' ? '✍️ <b>내 화면에서 해요</b> — 다 하면 앞 화면을 봐요' : '👀 <b>앞 화면을 봐요</b> — 선생님이 설명 중이에요';
                 look.band.classList.toggle('phone', look.mode === 'phone');
             }
             hideAnswers();
