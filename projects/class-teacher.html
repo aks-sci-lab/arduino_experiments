@@ -7,6 +7,7 @@
     <script src="../js/lab-ui.js"></script>
     <title>수업 연결 (교사)</title>
     <link rel="stylesheet" href="../css/class-teacher.css">
+    <link rel="stylesheet" href="../css/lesson-slides.css">
     <!-- QR (qr.html·진자와 같은 판) -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" defer></script>
 </head>
@@ -106,6 +107,10 @@
                 <button id="btnStageAll" class="secondary">모두 열기</button>
             </div>
             <p id="stageMsg" class="note" role="status" aria-live="polite"></p>
+            <details class="ct-teach" id="lessonTeach" hidden><summary>🔧 선생님용: 📖 설명 화면의 풀이</summary>
+                <p class="note">학생 화면의 답(📘 정의 등)은 🎬 발표 보기에서 그 장의 풀이를 열 때까지 가려져요. 설명 없이 진행하려면 한꺼번에 열 수 있어요.</p>
+                <button id="btnLessonOpenAll" class="secondary">🔓 모든 풀이 열기</button> <span id="lessonMsg" class="note" role="status"></span>
+            </details>
         </section>
 
 
@@ -136,6 +141,7 @@
                 <span class="ct-pbtns">
                     <button id="btnPPrev" class="secondary" aria-label="이전 탭">◀ 이전</button>
                     <button id="btnPNext" class="secondary" aria-label="다음 탭">다음 ▶</button>
+                    <button id="btnPMode" class="secondary" hidden>📱 학생 화면</button>
                     <button id="btnPOpen" class="good">▶ 다음 단계 열기</button>
                     <button id="btnPFull" class="secondary">⛶ 전체 화면</button>
                     <button id="btnPExit" class="secondary">✕ 진행 화면으로</button>
@@ -146,8 +152,8 @@
                 <button id="btnPAskYes" class="good">열기 (Enter)</button>
                 <button id="btnPAskNo" class="secondary">아니요 (Esc)</button>
             </div>
-            <div class="ct-pframe"><iframe id="presentFrame" title="학생 화면 (발표용)" src="about:blank"></iframe></div>
-            <details class="ct-teach ct-phint"><summary>⌨ 넘기는 키</summary><p id="pHint" class="note">→ · PageDown · Space = 아래로 한 화면, 끝이면 다음 탭 · ← · PageUp = 반대로 (발표용 리모컨도 돼요). 이 화면에서 넘기는 탭은 학생 폰에 영향이 없어요. 단계 끝에서 한 번 더 누르면 다음 단계를 열지 물어요.</p></details>
+            <div class="ct-pframe"><div id="pSlides" class="ls-deck" role="region" aria-label="수업 설명" aria-live="polite"></div><iframe id="presentFrame" title="학생 화면 (발표용)" src="about:blank"></iframe></div>
+            <details class="ct-teach ct-phint"><summary>⌨ 넘기는 키</summary><p id="pHint" class="note">→ · PageDown · Space = 아래로 한 화면, 끝이면 다음 탭 · ← · PageUp = 반대로 (발표용 리모컨도 돼요). 이 화면에서 넘기는 탭은 학생 폰에 영향이 없어요. 단계 끝에서 한 번 더 누르면 다음 단계를 열지 물어요(여는 것은 Enter 나 ‘열기’ 단추로만, → 를 또 눌러도 열리지 않아요). 설명 화면(📖)이 있는 실험은 단계마다 설명부터 나오고, 물음(❓)은 한 번 더 넘겨야 풀이가 열려요.</p></details>
         </section>
       </div><!-- /viewClass -->
     </div>
@@ -290,6 +296,7 @@
 <script src="../js/pendulum-config.js"></script>
 <script src="../js/pendulum-cloud.js"></script><script src="../js/lab-store.js"></script>
 <script src="../js/class-cloud.js"></script>
+<script src="../js/lesson-slides.js"></script>
 <script src="../js/class-teacher.js"></script>
 <script src="../js/planck-math.js"></script>
 <script src="../js/planck-cloud.js"></script>

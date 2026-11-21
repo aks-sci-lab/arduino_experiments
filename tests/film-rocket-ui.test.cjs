@@ -95,21 +95,23 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         assert.match(await A.textContent('.ev-def'), /압력 = 일정한 넓이에 작용하는 힘/);
         await next(A); await go(A, 't1-intro');
         assert.match(await A.textContent('.ev-screen'), /목표 시간\(12초\)/, '선생님 목표가 가족 화면에');
-        await next(A); await go(A, 't1-safe');
+        // 1차시 첫 퀴즈는 시작하자마자 (발표 보기 1차시 첫 장과 같은 때)
+        await next(A); await go(A, 'q-gas'); await quiz(A, false);   // 10점
+        await go(A, 't1-safe');
         assert.equal(await A.isDisabled('.ev-screen .ev-next'), true);
         for (const k of ['goggle', 'face', 'away']) await A.check('[data-safe="' + k + '"]');
         assert.equal(await A.isDisabled('.ev-screen .ev-next'), true, '하나라도 안 하면 못 넘어감');
         await A.check('[data-safe="wait"]');
         await next(A); await go(A, 'q-pressure');
-        await quiz(A, false);                         // 10점
+        await quiz(A, false);                         // 10점 → 20점
         await go(A, 't1-var');
         await A.click('.ev-choice[data-k="water"]');
         await A.waitForSelector('.ev-stepper.locked');
         assert.match(await A.textContent('.ev-screen'), /🔒 물의 온도/);
         await next(A); await go(A, 'q-control');
-        await quiz(A, true);                          // 두 번째에 맞힘 5점
+        await quiz(A, true);                          // 두 번째에 맞힘 5점 → 25점
         await go(A, 't1-cond');
-        assert.match(await A.textContent('#ev-score'), /15점/);
+        assert.match(await A.textContent('#ev-score'), /25점/);
         await A.click('.ev-stepper:not(.locked) [data-pm="1"]');   // 10 → 15 mL
         assert.match(await A.textContent('.ev-stepper:not(.locked) .ev-sval'), /15 mL/);
         await next(A); await go(A, 't1-predict');
@@ -156,8 +158,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await next(A); await go(A, 't1-why');
         await A.click('.ev-choice[data-k="lid"]');
         await A.waitForSelector('.ev-def');
-        await next(A); await go(A, 'q-gas'); await quiz(A, false);   // 10점 → 25점
-        await go(A, 't1-challenge');
+        await next(A); await go(A, 't1-challenge');
         assert.match(await A.textContent('.ev-screen h2'), /12초/);
         await A.click('.ev-screen [data-go="t1-ch-cond"]'); await go(A, 't1-ch-cond');
         assert.match(await A.textContent('#ev-mini'), /15 mL/, '도전 조건 화면에 지난 평균 표');
@@ -191,7 +192,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await go(B, 'think-intro');
         // 생각 열기 → 1차시 퀴즈 하나 (두 번째에 맞힘 5점)
         for (const id of ['think-force', 'think-accel', 'think-pressure']) { await next(B); await go(B, id); await B.click('.ev-choice >> nth=1'); }
-        await next(B); await go(B, 't1-intro'); await next(B); await go(B, 't1-safe');
+        await next(B); await go(B, 't1-intro'); await next(B); await go(B, 'q-gas'); await quiz(B, true); await go(B, 't1-safe');
         for (const k of ['goggle', 'face', 'away', 'wait']) await B.check('[data-safe="' + k + '"]');
         await next(B); await go(B, 'q-pressure'); await quiz(B, true);
         await B.waitForFunction(() => /선생님께 보냄/.test(document.getElementById('ev-sync').textContent), null, { timeout: 15000 });
@@ -199,11 +200,11 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         // ---- 교사 결과판 ----
         await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); });
         await T.waitForSelector('#boardCard:not([hidden])');
-        await T.waitForFunction(() => /달님 탐험대5/.test(document.getElementById('board').textContent), null, { timeout: 20000 });
+        await T.waitForFunction(() => /달님 탐험대10/.test(document.getElementById("board").textContent), null, { timeout: 20000 });
         const rows = await T.$$eval('#board tbody tr', trs => trs.map(t => t.textContent));
         assert.equal(rows.length, 2);
         assert.match(rows[0], /별빛[\s\S]*25[\s\S]*초 차이/, '점수 높은 팀이 위');
-        assert.match(rows[1], /달님 탐험대[\s\S]*5/);
+        assert.match(rows[1], /달님 탐험대[\s\S]*10/);   // 두 퀴즈 모두 두 번째에 맞힘 5 + 5
         assert.match(await T.textContent('#watchSum'), /들어온 팀2 \/ 6/);
         await T.click('#btnBoardBig');
         assert.equal(await T.isVisible('#boardBig'), true);

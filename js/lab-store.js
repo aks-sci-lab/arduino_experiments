@@ -53,6 +53,8 @@
     // '팀 이름으로 입장' (가족 행사): 팀 이름 1~12글자, 같은 수업에서 겹치지 않게. 이 실험의 줄은 그 팀 폰만 쓴다
     var TEAM = { NAME: 12, MAX: 40 };
     var STAGE_ALL = 99;   // 수업 stage 의 '모두 열림'
+    // 🎬 설명 화면: 장의 key(학생 화면 답 [data-lesson-answer] 와 짝), 단계 키, 풀이를 연 key 목록 최대 수 (firestore.rules 와 같게)
+    var LESSON_KEY_RE = /^[a-z0-9][a-z0-9-]{0,39}$/, STAGE_KEY_RE = /^[a-z0-9_-]{1,20}$/, LESSON_OPEN_MAX = 200;
     var TEAM_EXPS = { rocket: 1 };
     function cleanTeamName(v) {
         var s = String(v == null ? '' : v);
@@ -300,13 +302,16 @@
             if (!c || (code && c.classCode !== code)) return null;
             return Object.assign({ space: space }, c);
         }
+        function lessonOut(L) { return L && typeof L === 'object' ? { on: L.on === true, stage: String(L.stage || ''), i: Number(L.i) || 0, key: String(L.key || ''), reveal: L.reveal === true } : null; }
         function aiLimitOf(c) { var n = Number(c && c.aiLimit); return c && c.aiLimit != null && isFinite(n) ? n : AI.LIMIT_DEFAULT; }   // 예전 수업(칸 없음)은 기본 20
         function publicClass(c) {
             return { ok: true, classCode: c.classCode, space: c.space, ban: c.ban, nStudents: c.nStudents, groupSize: c.groupSize, exp: c.exp,
                 groups: c.groups || [], aiLimit: aiLimitOf(c), created: iso(c.createdAt), expireAt: iso(c.expireAt), mode: c.mode === 'team' ? 'team' : '', setup: c.setup || null,
                 flow: c.flow === 'hd' ? 'hd' : '',   // 진행 방법: 'hd' = 가설연역 6단계, '' = 7단계(예전 수업 포함)
                 stage: c.stage == null || !isFinite(Number(c.stage)) ? null : Number(c.stage),
-                done: c.done === true, doneAt: c.done === true && c.doneAt ? iso(c.doneAt) : '' };
+                done: c.done === true, doneAt: c.done === true && c.doneAt ? iso(c.doneAt) : '',
+                // 🎬 발표 보기 설명 화면 (없으면 이 수업은 설명 화면을 안 씀 → 학생 화면 답 가리기 없음)
+                lesson: lessonOut(c.lesson), lessonOpen: Array.isArray(c.lessonOpen) ? c.lessonOpen.slice(0, LESSON_OPEN_MAX) : [] };
         }
         // ----- 팀 이름으로 입장 (mode 'team') -----
         async function teamList(c) {
@@ -354,6 +359,23 @@
             if (st % 1) fail('열 단계는 정수로 넣어 주세요.');
             await db.update('labClasses/' + c.space, { stage: st });
             return { ok: true, stage: st };
+        }
+        /* 교사: 🎬 발표 보기의 설명 장 상태 (js/class-teacher.js). 학생 화면(js/class-share.js)이 수업 문서를 듣고
+           lesson.on 이면 '👀 앞 화면을 봐요' 띠, lessonOpen 에 없는 key 의 답([data-lesson-answer])은 가림. 장을 넘길 때마다 한 번 씀 */
+        async function classLesson(b, auth) {
+            var c = await ownedClass(b, auth);
+            var L = b.lesson && typeof b.lesson === 'object' ? b.lesson : {};
+            var i = Math.round(Number(L.i));
+            var lesson = { on: L.on === true, stage: STAGE_KEY_RE.test(String(L.stage || '')) ? String(L.stage) : '', i: isFinite(i) && i >= 0 && i < 200 ? i : 0,
+                key: LESSON_KEY_RE.test(String(L.key || '')) ? String(L.key) : '', reveal: L.reveal === true, at: db.stamp() };
+            var fresh = await db.get('labClasses/' + c.space, { cache: false }) || c;
+            var open = Array.isArray(fresh.lessonOpen) ? fresh.lessonOpen.slice(0, LESSON_OPEN_MAX) : [];
+            var add = (Array.isArray(b.open) ? b.open : []).map(String).filter(function (k, j, arr) { return LESSON_KEY_RE.test(k) && open.indexOf(k) < 0 && arr.indexOf(k) === j; });
+            var up = { lesson: lesson };
+            if (add.length) { open = open.concat(add).slice(0, LESSON_OPEN_MAX); up.lessonOpen = open; }
+            else if (!Array.isArray(fresh.lessonOpen)) up.lessonOpen = open;
+            await db.update('labClasses/' + c.space, up);
+            return { ok: true, lesson: lessonOut(lesson), lessonOpen: open };
         }
         // 교사: '✅ 수업 마치기' 표시 (저절로 판단하지 않음, 되돌릴 수 있음). 학생 화면은 그대로 둠
         async function classDone(b, auth) {
@@ -765,6 +787,7 @@
                 if (a === 'classSetup') return await classSetup(body, auth);
                 if (a === 'classStage') return await classStage(body, auth);
                 if (a === 'classDone') return await classDone(body, auth);
+                if (a === 'classLesson') return await classLesson(body, auth);
                 if (a === 'classStatus') return await classStatus(body, auth);
                 if (a === 'classExport') return await classExport(body, auth);
                 if (a === 'myClasses') return await myClasses(body, auth);
@@ -1034,7 +1057,9 @@
             var space = spaceOf(url); if (!space) return null;
             await getCore();
             return browserDb.subscribeDoc ? browserDb.subscribeDoc('labClasses/' + space, function (d) {
-                if (d) cb({ stage: d.stage == null ? null : Number(d.stage), setup: d.setup || null });
+                if (d) cb({ stage: d.stage == null ? null : Number(d.stage), setup: d.setup || null,
+                    lesson: d.lesson && typeof d.lesson === 'object' ? { on: d.lesson.on === true, stage: String(d.lesson.stage || ''), i: Number(d.lesson.i) || 0, key: String(d.lesson.key || ''), reveal: d.lesson.reveal === true } : null,
+                    lessonOpen: Array.isArray(d.lessonOpen) ? d.lessonOpen.slice(0, LESSON_OPEN_MAX) : [] });
             }) : null;
         } catch (e) { return null; }
     }

@@ -52,7 +52,8 @@ test('로켓: 다시 재기 바로 가기·반복 측정·끊긴 채 새로고�
         await next(); await go('think-accel'); await A.click('.ev-choice[data-k="fast"]');
         await next(); await go('think-pressure'); await A.click('.ev-choice[data-k="ok"]');
         await next(); await go('t1-intro');
-        await next(); await go('t1-safe');
+        await next(); await go('q-gas'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next();
+        await go('t1-safe');
         for (const k of ['goggle', 'face', 'away', 'wait']) await A.check('[data-safe="' + k + '"]');
         await next(); await go('q-pressure'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next();
         await go('t1-var'); await A.click('.ev-choice[data-k="water"]'); await next();

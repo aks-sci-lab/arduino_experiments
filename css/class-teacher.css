@@ -179,6 +179,11 @@ body.ct-presenting .ct-wrap { max-width: none; padding-top: var(--sp-2); padding
 .ct-pbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-2) var(--sp-3); }
 .ct-pstage { font-size: 1.05rem; }
 .ct-pjoined { color: var(--c-muted); }
+.ct-pmore { display: inline-block; position: relative; }
+.ct-pmore > summary { cursor: pointer; color: var(--c-primary); font-weight: 600; }
+.ct-pmore[open] > div { position: absolute; z-index: 30; left: 0; top: 100%; min-width: 18em; max-width: 60vw; margin-top: 4px; padding: 6px 10px; background: var(--c-card); border: 1px solid var(--c-line); border-radius: 8px; color: var(--c-text); box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+.ct-pmore p { margin: 2px 0; }
+.ct-pname { display: inline-block; margin: 2px 6px 2px 0; padding: 0 6px; border-radius: 6px; background: var(--c-fill); }
 .ct-pbtns { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-left: auto; }
 .ct-pask { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 2px solid var(--c-success); border-radius: var(--r-card); background: var(--c-ok-bg); font-size: 1.1rem; }
 .ct-pask[hidden] { display: none; }

@@ -75,6 +75,8 @@
 .ev-def { background: var(--c-primary-soft); border-left: 6px solid var(--c-primary); border-radius: 10px; padding: var(--sp-2) var(--sp-3); margin: var(--sp-3) 0; }
 .ev-def-w { font-weight: 800; color: var(--c-primary); font-size: .95rem; }
 .ev-def p { font-weight: 700; margin: var(--sp-1) 0; }
+/* 초3 쉬운 말 한 줄 (js/film-rocket-math.js EASY) */
+.ev-easy, .ev-def p.ev-easy { font-weight: 400; color: var(--c-muted); font-size: 0.95em; }
 .ev-ex { color: var(--c-text); }
 .ev-ok { color: var(--c-ok-text); background: var(--c-ok-bg); border-radius: 10px; padding: var(--sp-2) var(--sp-3); font-weight: 700; }
 .ev-no { color: var(--c-err-text); background: var(--c-err-bg); border-radius: 10px; padding: var(--sp-2) var(--sp-3); font-weight: 700; }

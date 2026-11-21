@@ -265,6 +265,9 @@
             beatIfChanged();
             return;
         }
+        // 한 가지 바꿔 한 번 더 (2026-11-21 선생님): 바꾼 조건을 한 가지 값으로만 쟀으면 그래프·도전으로 가지 않고 '하나만 바꿔 한 번 더' 안내
+        var need = NEED_KINDS[id];
+        if (need && !PAST && M.valueKinds(st[need].trials) < 2) id = need + '-more';
         if (!(opt && opt.back) && st.screen !== id) { st.history.push(st.screen); if (st.history.length > 40) st.history.shift(); }
         var stage = stageOf(id), stageMoved = stage !== st.stage;
         st.screen = id; st.stage = stage; save();
@@ -302,7 +305,13 @@
     }
     function fmtS(v) { return isFinite(v) ? (Math.round(v * 10) / 10).toFixed(1) + '초' : '–'; }
     function card(t) { return '<div class="ev-card">' + t + '</div>'; }
-    function defBox(t, word) { return '<div class="ev-def"><span class="ev-def-w">📘 ' + esc(word || '과학적 정의') + '</span><p>' + esc(t) + '</p></div>'; }
+    // 📘 정의 상자. key 가 있으면 발표 보기 설명 장의 풀이(같은 key)를 열 때까지 가림 (js/class-share.js, 설명 화면을 쓴 수업만) + 초3 쉬운 말 한 줄
+    function defBox(t, word, key) {
+        var easy = key && M.KEY_WORDS[key] ? M.easyLine(M.KEY_WORDS[key]) : '';
+        return '<div class="ev-def"' + (key ? ' data-lesson-answer="' + esc(key) + '"' : '') + '><span class="ev-def-w">📘 ' + esc(word || '과학적 정의') + '</span><p>' + esc(t) + '</p>' +
+            (easy ? '<p class="ev-easy">🧒 쉬운 말 · ' + esc(easy) + '</p>' : '') + '</div>';
+    }
+    function easySpan(w) { return M.EASY[w] ? ' <span class="ev-easy">(' + esc(M.EASY[w]) + ')</span>' : ''; }
 
     var SCREENS = {};
 
@@ -386,7 +395,7 @@
             if (!final) {
                 var picked = st.think.first[c.key];
                 var html = '<p class="ev-kicker">내 생각</p><h2>' + esc(c.q) + '</h2>' + choiceList(c.opts, picked) +
-                    (picked ? defBox(c.def, c.word + '의 과학적 정의') + '<p class="ev-ex">💡 ' + esc(c.ex) + '</p>' : '<p class="ev-small">정답이 아니어도 괜찮아요. 지금 생각을 골라요.</p>') +
+                    (picked ? '<div data-lesson-answer="' + c.key + '">' + defBox(c.def, c.word + '의 과학적 정의', c.key).replace(' data-lesson-answer="' + c.key + '"', '') + '<p class="ev-ex">💡 ' + esc(c.ex) + '</p></div>' : '<p class="ev-small">정답이 아니어도 괜찮아요. 지금 생각을 골라요.</p>') +
                     nav(next, '다음 →', picked ? '' : ' disabled');
                 return { html: html, mount: function (el) {
                     el.querySelector('.ev-choices').addEventListener('click', function (e) {
@@ -401,7 +410,7 @@
                 '<div class="ev-choices">' + c.opts.map(function (o) {
                     var cls = q.picks.indexOf(o.k) >= 0 ? (o.k === 'ok' ? ' right' : ' wrong') : '';
                     return '<button type="button" class="ev-choice' + cls + '" data-k="' + o.k + '"' + (done ? ' disabled' : '') + '>' + esc(o.t) + '</button>';
-                }).join('') + '</div>' + quizFeedback(q) + (done ? defBox(c.def, c.word + '의 과학적 정의') : '') + nav(next, '다음 →', done ? '' : ' disabled');
+                }).join('') + '</div>' + quizFeedback(q) + (done ? defBox(c.def, c.word + '의 과학적 정의', c.key) : '') + nav(next, '다음 →', done ? '' : ' disabled');
             return { html: html2, mount: function (el) {
                 el.querySelector('.ev-choices').addEventListener('click', function (e) {
                     var b = e.target.closest('[data-k]'); if (!b || b.disabled) return;
@@ -435,7 +444,7 @@
                     return '<button type="button" class="ev-choice' + cls + '" data-k="' + o.k + '"' + (done ? ' disabled' : '') + '>' + esc(o.t) + '</button>';
                 }).join('') + '</div>' +
                 (q.tries ? (q.correct ? '<p class="ev-ok">⭕ 맞았어요! +' + M.quizPoints(q.tries, true) + '점</p>' : last ? '<p class="ev-no">❌ 아니에요. ' + (done ? '정답을 확인해요.' : '한 번 더 골라 보세요! (맞히면 5점)') + '</p>' : '') : '<p class="ev-small">처음에 맞히면 10점, 두 번째에 맞히면 5점!</p>') +
-                (done ? defBox(Q.def, Q.word) : '') + nav(next, '다음 →', done ? '' : ' disabled');
+                (done ? defBox(Q.def, Q.word, key) : '') + nav(next, '다음 →', done ? '' : ' disabled');
             return { html: html, mount: function (el) {
                 el.querySelector('.ev-choices').addEventListener('click', function (e) {
                     var b = e.target.closest('[data-k]'); if (!b || b.disabled) return;
@@ -451,10 +460,10 @@
     // ===== 2 1차시: 필름통이 열리는 시간 맞추기 =====
     SCREENS['t1-intro'] = function () {
         var s = setup();
-        return { html: '<p class="ev-kicker">1차시</p><h2>⏱ 필름통이 ‘펑’ 열리는 시간 맞추기</h2>' +
+        return { html: '<p class="ev-kicker">1차시' + easySpan('1차시') + '</p><h2>⏱ 필름통이 ‘펑’ 열리는 시간 맞추기</h2>' +
             card('<p>필름통에 물과 발포비타민을 넣고 뚜껑을 닫으면, 잠시 뒤 <b>‘펑’</b> 하고 뚜껑이 열려요.</p><p>조건을 바꾸면 열리는 시간이 어떻게 달라질까요? 마지막에는 선생님이 낸 <b>목표 시간(' + esc(s.targetTime) + '초)</b>에 맞춰 보는 도전을 해요!</p>') +
             '<details class="ev-more"><summary>🧰 준비물</summary><p>필름통(뚜껑이 안쪽으로 끼워지는 것) · 발포비타민 · 물 · 계량스푼 · 스포이트 · 초시계 · 온도계 · 보안경 · 쟁반 · 걸레</p></details>' +
-            nav('t1-safe', '안전 확인 →') };
+            nav('q-gas', '다음 →') };
     };
     function safetyScreen(part, items, next) {
         return function () {
@@ -547,7 +556,7 @@
                 (challenge ? '<p class="ev-target">목표: <b>' + (part === 't1' ? esc(s.targetTime) + '초' : '아이 키만큼 (' + esc(s.targetPct) + '%)') + '</b> · 그래프를 보고 정해요</p>' : '') +
                 stepper(p.changed, d.short || d.name, d.label(p.value), {}) +
                 '<h3>같게 할 조건 🔒</h3>' + Object.keys(defs).filter(function (k) { return k !== p.changed; }).map(function (k) { return stepper(k, defs[k].short || defs[k].name, defs[k].label(p.base[k]), { locked: true }); }).join('') +
-                (!challenge && part === 't1' ? '<p class="ev-small">같은 조건으로 <b>' + s.repeats + '번</b> 재서 평균을 내요. 이 조건은 지금까지 <b id="ev-count">' + count + '</b>번 쟀어요.</p>' : '') +
+                (!challenge && part === 't1' ? '<p class="ev-small">같은 조건으로 <b>' + s.repeats + '번</b> 재서 평균' + easySpan('평균') + '을 내요. 이 조건은 지금까지 <b id="ev-count">' + count + '</b>번 쟀어요.</p>' : '') +
                 (challenge && part === 't1' ? '<div id="ev-mini"></div>' : '') +
                 nav(next, '이 조건으로 →');
             return { html: html, mount: function (el) {
@@ -787,15 +796,32 @@
         };
     }
     SCREENS['t1-graph'] = graphScreen('t1', 't1-why', '다음: 왜 달랐을까? →');
+    // 그래프·도전 앞에서: 값을 두 가지 넘게 재야 넘어감
+    var NEED_KINDS = { 't1-graph': 't1', 't1-why': 't1', 't1-challenge': 't1', 't1-ch-cond': 't1', 't2-graph': 't2', 't2-challenge': 't2', 't2-ch-cond': 't2' };
+    function moreScreen(part) {
+        return function () {
+            var p = st[part], defs = ensureBase(part), d = defs[p.changed], n = p.trials.length, one = p.trials[n - 1], t1 = part === 't1';
+            var name = d ? d.short || d.name : '바꿀 조건';
+            var html = '<p class="ev-kicker">' + (t1 ? '1차시' : '2차시') + ' · 한 번 더</p><h2>🔧 하나만 바꿔 한 번 더 재요</h2>' +
+                card((n && d ? '<p>지금은 <b>' + esc(name) + '</b>을(를) <b>' + esc(d.label(one.value)) + '</b> 하나로만 ' + n + '번 쟀어요.</p>' : '<p>아직 잰 값이 없어요.</p>') +
+                    '<p class="ev-why">💡 값을 바꿔서 한 번 더 재야 무엇 때문에 ' + (t1 ? '열리는 시간이' : '높이가') + ' 달라지는지 그래프로 볼 수 있어요.</p>') +
+                '<div class="ev-nav col"><button type="button" class="ev-next good" data-go="' + part + '-cond">🔧 ' + esc(name) + ' 바꿔서 다시 ' + (t1 ? '재기' : '발사하기') + ' →</button>' +
+                '<button type="button" class="ev-next secondary" data-go="' + (t1 ? 't2-intro' : 'end-intro') + '">' + (t1 ? '2차시로 가기 →' : '정리로 가기 →') + '</button></div>';
+            return { html: html };
+        };
+    }
+    SCREENS['t1-more'] = moreScreen('t1');
+    SCREENS['t2-more'] = moreScreen('t2');
     SCREENS['t1-why'] = function () {
         var p = st.t1, w = M.WHY.filter(function (x) { return x.k === p.why; })[0];
         var html = '<h2>🤔 예측과 왜 달랐을까?</h2><p>가장 그럴듯한 까닭을 하나 골라요.</p>' + choiceList(M.WHY, p.why) +
-            (w ? '<div class="ev-def"><p>💡 ' + esc(w.fb) + '</p></div>' + defBox(M.DEF.gas, '기체 발생과 압력') : '') + nav('q-gas', '다음 →', w ? '' : ' disabled');
+            (w ? '<div class="ev-def"><p>💡 ' + esc(w.fb) + '</p></div>' + defBox(M.DEF.gas, '기체 발생과 압력', 'gas') : '') + nav('t1-challenge', '다음 →', w ? '' : ' disabled');
         return { html: html, mount: function (el) {
             el.querySelector('.ev-choices').addEventListener('click', function (e) { var b = e.target.closest('[data-k]'); if (!b) return; p.why = b.dataset.k; changed(); show(st.screen, { back: true }); });
         } };
     };
-    SCREENS['q-gas'] = quizScreen('gas', 't1-challenge');
+    // 1차시 첫 퀴즈 (발표 보기 1차시 첫 장 '뚜껑은 왜 열릴까요?' 와 같은 때에 풀고, 선생님이 풀이를 열면 📘 정의가 보임)
+    SCREENS['q-gas'] = quizScreen('gas', 't1-safe', '시작 전');
     SCREENS['t1-challenge'] = function () {
         var s = setup();
         var html = '<p class="ev-kicker">🎯 도전</p><h2>' + esc(s.targetTime) + '초에 ‘펑’ 하게 만들어요!</h2>' +
@@ -961,7 +987,7 @@
     SCREENS['t2-result'] = function () {
         var p = st.t2, r = st.last2 || p.trials[p.trials.length - 1], defs = ensureBase('t2'), d = defs[p.changed];
         if (!r) return { html: nav('t2-cond', '발사하러 가기 →') };
-        var html = '<p class="ev-kicker">결과 · ' + esc(d ? d.label(r.value) : '') + '</p><h2>🚀 아이 키의 ' + r.pct + '%' + (r.method === 'hand' ? ' <small>(눈으로)</small>' : '') + '</h2>' +
+        var html = '<p class="ev-kicker">결과 · ' + esc(d ? d.label(r.value) : '') + '</p><h2>🚀 아이 키의 ' + r.pct + '%' + (r.method === 'hand' ? ' <small>(눈으로)</small>' : '') + '</h2>' + '<p class="ev-small ev-easy">🧒 % = ' + esc(M.EASY['%']) + '</p>' +
             card('<p>' + (r.pct >= 90 && r.pct <= 110 ? '🎉 아이 키와 거의 같아요!' : r.pct > 110 ? '아이 키보다 높아요. 천장 조심! 무게를 늘려 볼까요?' : '아이 키보다 낮아요. 무게를 줄이거나 물·발포비타민을 바꿔 볼까요?') + '</p>' +
                 '<p class="ev-small">' + esc(M.DEF.design) + '</p>') +
             '<details class="ev-more"><summary>📏 아이 키(cm)로도 보기 (선택, 이 폰에만)</summary>' + stepper('child', '아이 키', st.childCm ? st.childCm + ' cm' : '넣지 않음', {}) +
@@ -1016,7 +1042,7 @@
             var opts = M.CONCEPTS[i].opts;
             return '<div class="ev-cmp' + (c.sparkle ? ' spark' : '') + '"><h3>' + esc(c.word) + (c.sparkle ? ' ✨' : '') + '</h3>' +
                 '<p><span class="ev-tag">처음</span> ' + esc(M.optText(opts, c.first) || '–') + '</p><p><span class="ev-tag now">지금</span> ' + esc(M.optText(opts, c.last) || '–') + (c.lastOk ? ' ⭕' : '') + '</p>' +
-                '<p class="ev-small">📘 ' + esc(M.CONCEPTS[i].def) + '</p></div>';
+                '<p class="ev-small" data-lesson-answer="' + M.CONCEPTS[i].key + '">📘 ' + esc(M.CONCEPTS[i].def) + '</p></div>';
         }).join('') + '</div>' + nav('end-card', '결과 카드 만들기 →');
         return { html: html };
     };
