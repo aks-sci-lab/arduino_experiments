@@ -400,19 +400,20 @@
         c.setup = r.setup; $('setupMsg').textContent = '✅ 저장했어요. 1차시 목표 ' + r.setup.targetTime + '초 · 2차시 ' + r.setup.targetPct + '%';
     });
     // ----- 팀 결과판 (가족 행사) -----
-    // 행사(팀 수업): 팀 폰은 화면이 켜져 있는 동안 3분마다 신호(js/class-share.js) → 4분 넘게 없으면 🔌 끊김(와이파이·화면 꺼짐)
-    var OFF_MS = 4 * 60 * 1000;
+    // 행사(팀 수업): 팀 폰은 화면이 켜져 있는 동안 1분마다 신호(js/film-rocket.js beatEvery) → 2분 넘게 없으면 🔌 끊김(와이파이·화면 꺼짐)
+    var OFF_MS = 2 * 60 * 1000;
     function boardRows(st) {
         var subs = {}; (st.submissions || []).forEach(function (x) { subs[x.jo] = x; });
         var prog = {}; (st.students || []).forEach(function (x) { prog[x.jo] = x; });
         return (st.teams || []).map(function (t) {
             var sub = subs[t.jo], sm = (sub && sub.summary) || {}, pg = prog[t.jo] || null;
-            // 팀 폰은 앞 단계를 끝내고 잠김 화면에서 기다리면 '앞단계-done' 을 보냄 (js/film-rocket.js stepNow)
-            var done = pg && /^([a-z0-9_]+)-done$/.exec(String(pg.step || '')), ss = CC.studentState(pg, st.now);
+            // 팀 폰은 앞 단계를 끝내고 잠김 화면에서 기다리면 '앞단계-done', 끝낸 단계에서 결과를 보거나 더 재면 '단계-more' (js/film-rocket.js stepNow)
+            var done = pg && /^([a-z0-9_]+)-(done|more)$/.exec(String(pg.step || '')), ss = CC.studentState(pg, st.now);
             return { jo: t.jo, name: t.name, score: Number(sm['팀 점수']) || 0, quiz: sm['퀴즈 맞힘'], tDiff: sm['시간 도전 차이(초)'], tOk: sm['시간 도전 성공'] === 1,
                 hMax: sm['높이 최고(%)'], hDiff: sm['높이 도전 차이(%)'], hOk: sm['높이 도전 성공'] === 1, spark: sm['생각 바뀜 ✨'],
-                step: !pg ? '–' : done ? CC.stepName(st.exp, done[1], st.flow) + ' ✓ 기다림' : CC.stepName(st.exp, pg.step, st.flow),
-                doneStage: done ? done[1] : '', off: !!(ss.joined && ss.ago != null && ss.ago > OFF_MS), state: ss };
+                step: !pg ? '–' : done ? CC.stepName(st.exp, done[1], st.flow) + (done[2] === 'more' ? ' ✓ 끝냄 · 더 재는 중' : ' ✓ 기다림') : CC.stepName(st.exp, pg.step, st.flow),
+                doneStage: done ? done[1] : '', at: done ? done[1] : pg ? String(pg.step || '') : '', joined: !!pg,
+                off: !!(ss.joined && ss.ago != null && ss.ago > OFF_MS), state: ss };
         }).sort(function (a, b) { return b.score - a.score || a.jo - b.jo; });
     }
     // 열린 단계 카드·결과판 크게 보기: '⏳ 기다리는 팀 N / 들어온 팀 M' (기다림 = 지금 열린 마지막 단계를 끝내고 잠김 화면)
@@ -420,6 +421,10 @@
         var c = watched(), si = c && c.mode === 'team' && CC.stageInfo(c.exp, c.stage);
         var els = [$('stageWait'), $('boardBigWait')];
         if (!si || !rows) { els.forEach(function (e) { e.hidden = true; }); return; }
+        // 앞 단계에 남은 팀: 지금 열린 마지막 단계보다 앞 단계에 있는 팀 (끝낸 앞 단계에서 더 하는 중이어도)
+        var curI = si.gate.indexOf(si.cur);
+        rows.forEach(function (r) { var k = si.gate.indexOf(r.at); r.behind = !!(r.joined && r.doneStage !== si.cur && (k < 0 || k < curI)); });
+        var behind = rows.filter(function (r) { return r.behind; });
         var w = rows.filter(function (r) { return r.doneStage === si.cur; }).length, m = rows.length, off = rows.filter(function (r) { return r.off; }).length;
         if (si.all) {   // 모두 열림: 기다림은 없음 — 끊긴 팀만 알림
             els.forEach(function (e) { e.innerHTML = off ? '<span class="ct-off">🔌 연결 끊김 ' + off + '팀</span> · 결과판에서 마지막 신호를 봐요' : ''; e.hidden = !off; e.classList.remove('all'); });
@@ -429,6 +434,8 @@
         var html = all ? '✅ <b>모든 팀이 기다려요</b> (' + w + ' / ' + m + ') · 다음 단계를 열어도 돼요'
             : '⏳ 기다리는 팀 <b>' + w + '</b> / 들어온 팀 <b>' + m + '</b>' + (m ? '' : ' · 아직 들어온 팀이 없어요');
         if (off) html += ' <span class="ct-off">· 🔌 연결 끊김 ' + off + '팀</span>';
+        if (behind.length) html += '<details class="ct-behind"><summary>↩ 앞 단계에 남은 팀 <b>' + behind.length + '</b></summary>' +
+            behind.map(function (r) { return '<span class="ct-behind-team">' + esc(r.name) + ' · ' + esc(r.step) + '</span>'; }).join('') + '</details>';
         els.forEach(function (e) { e.innerHTML = html; e.hidden = false; e.classList.toggle('all', all); });
     }
     function boardTable(rows, big) {
@@ -442,7 +449,7 @@
                     '<td class="' + (r.tOk ? 'ok' : '') + '">' + (r.tDiff == null ? '–' : (r.tOk ? '🎉 ' : '') + n(r.tDiff, '초 차이')) + '</td>' +
                     '<td>' + (r.hMax == null ? '–' : esc(r.hMax) + '%') + '</td>' +
                     '<td class="' + (r.hOk ? 'ok' : '') + '">' + (r.hDiff == null ? '–' : (r.hOk ? '🎉 ' : '') + n(r.hDiff, '% 차이')) + '</td>' +
-                    (big ? '' : '<td class="note' + (r.doneStage ? ' ct-waitcell' : '') + '">' + esc(r.step) + '</td>') + '</tr>';
+                    (big ? '' : '<td class="note' + (r.doneStage ? ' ct-waitcell' : '') + (r.behind ? ' ct-behindcell' : '') + '">' + (r.behind ? '↩ ' : '') + esc(r.step) + (r.behind ? ' (앞 단계)' : '') + '</td>') + '</tr>';
             }).join('') + '</tbody></table></div>';
     }
     function renderBoard(st) {

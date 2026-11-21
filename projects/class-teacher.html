@@ -98,7 +98,7 @@
         <section class="ct-card ct-stage" id="stageCard" hidden>
             <p class="note">학생 화면에서 지금 열린 단계</p>
             <p class="ct-stage-now" id="stageNow"></p>
-            <p class="ct-stage-wait" id="stageWait" role="status" aria-live="polite" hidden></p>
+            <div class="ct-stage-wait" id="stageWait" role="status" aria-live="polite" hidden></div>
             <ol class="ct-stage-steps" id="stageSteps"></ol>
             <div class="ct-row">
                 <button id="btnStageNext" class="good ct-big">▶ 다음 단계 열기</button>
@@ -275,7 +275,7 @@
 <!-- 팀 결과판 크게 보기 (프로젝터) -->
 <div id="boardBig" class="ct-boardbig" hidden role="dialog" aria-label="팀 결과판 크게 보기">
     <div class="ct-row"><h2 id="boardBigTitle">🏆 팀 결과판</h2><button id="btnBoardClose">닫기</button></div>
-    <p id="boardBigWait" class="ct-stage-wait" hidden></p>
+    <div id="boardBigWait" class="ct-stage-wait" hidden></div>
     <div id="boardBigQr" class="ct-boardqr" aria-label="학생 연결 QR"></div>
     <div id="boardBigBody"></div>
 </div>

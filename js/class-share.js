@@ -465,7 +465,8 @@
             beat(true);
             clearInterval(cls.timer);
             // 폰은 측정·보내기 때만 신호 (노트북의 신호와 번갈아 덮어쓰지 않게). 무료 한도를 아끼려고 3분마다 (5분 넘게 없으면 '쉬는 중')
-            if (!PHONE) cls.timer = setInterval(function () { if (!document.hidden) beat(true); }, 180000);
+            // opts.beatEvery: 신호 간격(ms, 30초 이상). 행사형(필름통 로켓)은 1분 — 교사 화면 🔌 끊김을 빨리 알게
+            if (!PHONE) cls.timer = setInterval(function () { if (!document.hidden) beat(true); }, Math.max(30000, Number(opts.beatEvery) || 180000));
         }
         function tellClass() { if (typeof opts.onClass === 'function') { try { opts.onClass(cls.info, cls.me); } catch (e) { /* 실험 쪽 오류 */ } } }
         async function startClass() {

@@ -23,7 +23,7 @@
         return { v: 1, screen: 'enter', stage: 'enter', team: null, setup: null, think: { first: {}, last: {} }, quiz: {},
             t1: { changed: '', base: null, value: null, trials: [], why: '', challenge: [] },
             t2: { changed: '', base: null, value: null, trials: [], challenge: [] },
-            cur: null, childCm: null, dirty: false, sentAt: '', history: [] };
+            cur: null, childCm: null, dirty: false, sentAt: '', history: [], done: {} };
     }
     function load() {
         var d = null;
@@ -49,7 +49,7 @@
     function initShare() {
         if (!CLASS || !window.ClassShare) return;
         share = window.ClassShare.init({
-            exp: 'rocket', barMount: '#class-bar', teamPicker: false,
+            exp: 'rocket', barMount: '#class-bar', teamPicker: false, beatEvery: 60000,   // 1분마다 신호 → 교사 화면 2분 넘게 없으면 🔌
             getItems: function () {
                 if (!st.team) return [];
                 // n 이 0 이면 공용 저장에서 '지운 줄'로 보므로, 팀 줄은 늘 1 이상 (1 + 잰 횟수)
@@ -146,6 +146,7 @@
     function stepNow() {
         var i = STAGE_KEYS.indexOf(st.stage);
         if (i > 0 && stageLocked(st.stage)) return STAGE_KEYS[i - 1] + '-done';
+        if (i >= 0 && st.done && st.done[st.stage]) return st.stage + '-more';   // 끝낸 단계에서 결과를 다시 보거나 더 재는 중 ('✓ 끝냄 · 더 재는 중')
         return st.stage;
     }
     var lastStep = null;
@@ -156,13 +157,14 @@
     function resumeId(id) { return /measure$/.test(id) ? id.replace(/measure$/, 'cond') : id; }
     // 선생님이 내 단계보다 뒤 단계를 열었을 때 위에 늘 보이는 띠
     function openNotice() {
-        if (!st.team || app.getAttribute('data-screen') === 'locked') return '';
+        if (!st.team || app.getAttribute('data-screen') === 'locked') return null;
         // 모두 열림(stageOpen null)은 선생님이 단계를 여는 수업(수업 문서에 stage 가 있음)일 때만 '정리까지'로 봄 (수업 없이·예전 수업은 띠 없음)
         var ci = share && share.classInfo && share.classInfo();
-        if (!stageOpen && !(ci && ci.stage != null)) return '';
+        if (!stageOpen && !(ci && ci.stage != null)) return null;
         var i = STAGE_KEYS.indexOf(st.stage), last = stageOpen ? stageOpen[stageOpen.length - 1] : STAGE_KEYS[STAGE_KEYS.length - 1], j = STAGE_KEYS.indexOf(last);
-        if (i < 0 || j <= i) return '';
-        return '▶ 선생님이 ‘' + stageName(last) + '’ 단계' + (j > i + 1 ? '까지' : '를') + ' 열었어요 · 지금 단계를 끝내면 넘어가요';
+        if (i < 0 || j <= i) return null;
+        // 한 단계 넘게 뒤처졌어도 바로 다음 단계부터 차례로
+        return { text: '▶ 선생님이 ‘' + stageName(last) + '’ 단계' + (j > i + 1 ? '까지' : '를') + ' 열었어요', next: STAGE_KEYS[i + 1] };
     }
     var STAGE_START = { think: 'think-intro', t1: 't1-intro', t2: 't2-intro', end: 'end-intro' };
     function syncText() {
@@ -186,10 +188,22 @@
             var lock = stageLocked(x[0]);
             return '<button type="button" class="ev-stage' + (st.stage === x[0] ? ' on' : '') + (lock ? ' locked' : '') + '" data-stage="' + x[0] + '"' + (st.team ? '' : ' disabled') + (lock ? ' aria-disabled="true" title="선생님이 열면 넘어가요"' : '') + '>' + (lock ? '🔒 ' : '') + x[1] + '</button>';
         }).join('');
-        var nt = $('#ev-notice'), nx = openNotice(); if (nt) { nt.textContent = nx; nt.hidden = !nx; }
+        var nt = $('#ev-notice'), nx = openNotice();
+        if (nt) {
+            nt.hidden = !nx;
+            if (nx) {
+                var b = busy();
+                nt.innerHTML = '<span>' + esc(nx.text) + '</span><button type="button" class="ev-next good ev-notice-go" id="ev-notice-go" data-next="' + nx.next + '"' + (b ? ' disabled' : '') + '>' +
+                    (b ? '⏳ 이 측정을 끝내고 가요' : '‘' + esc(stageName(nx.next)) + '’ 로 가기 →') + '</button>';
+            }
+        }
         $('#ev-top').hidden = st.screen === 'enter';
         if (!saveOk) { s.hidden = false; s.className = 'ev-sync warn'; s.textContent = '⚠ 이 브라우저는 저장이 안 돼요 (사생활 보호 모드?)'; }
     }
+    $('#ev-notice').addEventListener('click', function (e) {
+        var b = e.target.closest('#ev-notice-go'); if (!b || b.disabled || busy() || !st.team) return;
+        show(entryFor(b.dataset.next));
+    });
     $('#ev-stages').addEventListener('click', function (e) {
         var b = e.target.closest('[data-stage]'); if (!b || !st.team) return;
         show(entryFor(b.dataset.stage));
@@ -229,9 +243,18 @@
             '<p>선생님이 다음 단계를 열면 <b>저절로 넘어가요</b>. 그동안 앞 단계를 다시 보거나 기다려요.</p></div>' +
             '<div class="ev-nav col"><button type="button" class="ev-next secondary" data-go="' + to + '">← ‘' + esc(stageName(stageOf(to))) + '’ 으로 돌아가기</button></div>' };
     }
+    var LAST_SCREEN = { 't1-ch-result': 't1', 't2-ch-result': 't2', 'end-card': 'end' };
+    function markDone(id) {
+        if (PRESENT || !st.team) return;
+        st.done = st.done || {};
+        var from = STAGE_KEYS.indexOf(st.stage), to = STAGE_KEYS.indexOf(stageOf(id));
+        if (from >= 0 && to > from) st.done[st.stage] = true;   // 다음 단계로 나아감 = 이 단계를 끝냄
+        if (LAST_SCREEN[id]) st.done[LAST_SCREEN[id]] = true;
+    }
     function show(id, opt) {
         cleanup.forEach(function (f) { try { f(); } catch (e) { /* 무시 */ } }); cleanup = [];
         if (!SCREENS[id]) id = 'enter';
+        markDone(id);
         if (stageLocked(stageOf(id))) {   // 잠긴 단계: 화면 자리는 기억하고 잠금 안내만
             if (!(opt && opt.back) && st.screen !== id && st.screen !== 'enter') { st.history.push(st.screen); if (st.history.length > 40) st.history.shift(); }
             st.screen = id; st.stage = stageOf(id); save();
@@ -649,6 +672,8 @@
         pl.ready.then(function () {
             label();
             if (mode === 'time' && !needStart && pl.duration() > 2.5) return pl.seek(Math.max(clip.clockOffset || 0, pl.duration() - 2)).then(show2);
+            // 2차시 발사: 로켓을 세우고 물러나는 동안도 찍히고, 가장 높은 때는 발사 0.5~1초 뒤 → 떨어진 뒤 녹화를 멈추니 끝에서 2.5초 앞에서 열기
+            if (mode === 'top' && pl.duration() > 3) return pl.seek(pl.duration() - 2.5).then(show2);
             show2();
         });
         vid.addEventListener('timeupdate', show2); vid.addEventListener('seeked', show2);
