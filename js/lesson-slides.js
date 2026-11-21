@@ -80,10 +80,11 @@
             (hasReveal ? (revealed ? '<div class="ls-reveal">' + slide.reveal + '</div>' : '<p class="ls-wait">→ 이야기를 나눈 뒤 넘기면 풀이가 나와요</p>') : '');
         var dots = '';
         for (var i = 0; i < (pos.n || 0); i++) dots += '<i' + (i === pos.i ? ' class="on"' : '') + '></i>';
-        return '<article class="ls-slide ls-k-' + k + (slide.img ? ' has-img' : '') + '" data-kind="' + k + '"' + (hasReveal ? ' data-revealed="' + (revealed ? '1' : '0') + '"' : '') + '>' +
+        return '<article class="ls-slide ls-k-' + k + (slide.img || (revealed && slide.revealImg) ? ' has-img' : '') + '" data-kind="' + k + '"' + (hasReveal ? ' data-revealed="' + (revealed ? '1' : '0') + '"' : '') + '>' +
             '<p class="ls-kicker">' + KINDS[k] + (pos.stageName ? ' <span>· ' + esc(pos.stageName) + '</span>' : '') + '</p>' +
             '<h2 class="ls-title">' + (slide.title || '') + '</h2>' +
-            '<div class="ls-main"><div class="ls-text">' + text + '</div>' + imgHtml(slide.img) + '</div>' +
+            // revealImg: 답을 보여 주는 그림은 풀이를 연 뒤에만 (없으면 img)
+            '<div class="ls-main"><div class="ls-text">' + text + '</div>' + imgHtml(revealed && slide.revealImg ? slide.revealImg : slide.img) + '</div>' +
             '<footer class="ls-foot"><span class="ls-dots" aria-label="' + ((pos.i || 0) + 1) + ' / ' + (pos.n || 1) + '">' + dots + '</span>' +
             (slide.note ? '<details class="ct-teach ls-note"><summary>🔧 선생님용</summary><div>' + slide.note + '</div></details>' : '') + '</footer>' +
             '</article>';
@@ -122,7 +123,8 @@
                     else seenKey[s.key] = at;
                 }
                 if (s && s.kind === 'vars' && !(s.vars && s.vars.change && s.vars.measure && Array.isArray(s.vars.keep) && s.vars.keep.length)) bad.push(at + ': vars 는 change·keep[]·measure');
-                ['title', 'body', 'ask', 'reveal', 'note', 'img'].forEach(function (f) {
+                                if (s && s.revealImg && !s.reveal) bad.push(at + ': revealImg 는 reveal 과 함께');
+                ['title', 'body', 'ask', 'reveal', 'note', 'img', 'revealImg'].forEach(function (f) {
                     if (s && s[f] != null && typeof s[f] !== 'string') bad.push(at + ': ' + f + ' 는 글');
                     if (s && typeof s[f] === 'string' && /<script|\son\w+\s*=|javascript:/i.test(s[f])) bad.push(at + ': ' + f + ' 에 스크립트');
                 });
