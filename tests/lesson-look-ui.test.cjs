@@ -64,8 +64,8 @@ test('설명 화면 ↔ 학생 폰: 👀 띠·답 가리기·풀이 열기, 설�
         // 교사: 힘 장 → 풀이 열기 → 폰에 정의가 보임
         await T.keyboard.press('ArrowRight');
         assert.match((await slide(T)).title, /힘/);
-        // 폰에서 고르는 장(mode 'phone'): 풀이 전에는 폰 띠가 '📱 폰에서 골라요'
-        await A.waitForFunction(() => /폰에서 골라요/.test((document.querySelector('.cs-look-band') || {}).textContent || ''), null, { timeout: 15000 });
+        // 폰에서 고르는 장(mode 'phone'): 풀이 전에는 폰 띠가 '✍️ 내 화면에서 해요'
+        await A.waitForFunction(() => /내 화면에서 해요 — 다 하면 앞 화면을 봐요/.test((document.querySelector('.cs-look-band') || {}).textContent || ''), null, { timeout: 15000 });
         assert.equal(app.db.docs.get('labClasses/' + c.space).lesson.mode, 'phone');
         await T.keyboard.press('ArrowRight');
         assert.equal((await slide(T)).rev, '1');

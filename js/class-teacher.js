@@ -632,7 +632,7 @@
     function lessonSync(now) {
         var c = watched(); if (!c || !c.space) return;
         var s = lesson.on ? lesson.list[lesson.i] : null;
-        // 'phone' 장은 풀이를 열기 전까지 학생 띠가 '📱 폰에서 골라요' (풀이를 열면 '👀 앞 화면을 봐요')
+        // 'phone' 장은 풀이를 열기 전까지 학생 띠가 '✍️ 내 화면에서 해요' (풀이를 열면 '👀 앞 화면을 봐요')
         var L = { on: !!lesson.on, stage: lesson.on ? lesson.gate : '', i: lesson.on ? lesson.i : 0, key: s && s.key ? s.key : '', reveal: !!(lesson.on && lesson.rev),
             mode: s && s.mode === 'phone' && !(lesson.rev && s.reveal) ? 'phone' : 'look' };
         var open = s && s.key && lesson.rev ? [s.key] : [];

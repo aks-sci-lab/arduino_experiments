@@ -327,6 +327,10 @@
     function quizLessonKey(k) { return /^end_/.test(k) ? 'end-think' : k; }
     function held(k) { return !!(share && share.lessonHidden && share.lessonHidden(quizLessonKey(k))); }
     function shownQuiz() { var o = {}; Object.keys(st.quiz || {}).forEach(function (k) { if (!(held(k) && st.quiz[k] && st.quiz[k].tries)) o[k] = st.quiz[k]; }); return o; }
+    // 설명 화면을 쓴 반에서 그 장 풀이가 이미 열렸으면 → 지금 처음 고르면 '늦게 고름'(맞혀도 5점)
+    function lateNow(k) { return !!(share && share.lessonUsed && share.lessonUsed() && !held(k)); }
+    var LATE_TXT = '<p class="ev-small ev-late">풀이를 본 뒤 골라서 5점이에요</p>';
+    function quizHint(k, q) { return q && q.tries ? (q.late ? LATE_TXT : '') : (lateNow(k) ? '<p class="ev-small ev-late">풀이가 이미 나왔어요 — 풀이를 본 뒤 골라서 맞히면 5점이에요</p>' : '<p class="ev-small">처음에 맞히면 10점, 두 번째에 맞히면 5점!</p>'); }
     var HOLD_TXT = '<p class="ev-hold" role="status">골랐어요 ✓ — <b>앞 화면을 봐요</b>. 선생님이 풀이를 보여 주면 맞았는지 나와요.</p>';
     function heldChoices(opts, picks) {
         return '<div class="ev-choices">' + opts.map(function (o) { return '<button type="button" class="ev-choice' + (picks.indexOf(o.k) >= 0 ? ' on' : '') + '" data-k="' + o.k + '" disabled>' + esc(o.t) + '</button>'; }).join('') + '</div>';
@@ -430,12 +434,13 @@
                 '<div class="ev-choices">' + c.opts.map(function (o) {
                     var cls = q.picks.indexOf(o.k) >= 0 ? (o.k === 'ok' ? ' right' : ' wrong') : '';
                     return '<button type="button" class="ev-choice' + cls + '" data-k="' + o.k + '"' + (done ? ' disabled' : '') + '>' + esc(o.t) + '</button>';
-                }).join('') + '</div>' + quizFeedback(q) + (done ? defBox(c.def, c.word + '의 과학적 정의', c.key) : '') + nav(next, '다음 →', done ? '' : ' disabled');
+                }).join('') + '</div>' + quizFeedback(q, qk) + (done ? defBox(c.def, c.word + '의 과학적 정의', c.key) : '') + nav(next, '다음 →', done ? '' : ' disabled');
             return { html: html2, mount: function (el) {
                 el.querySelector('.ev-choices').addEventListener('click', function (e) {
                     var b = e.target.closest('[data-k]'); if (!b || b.disabled) return;
                     var cur = st.quiz[qk] || (st.quiz[qk] = { tries: 0, correct: false, picks: [] });
                     if (cur.correct || cur.picks.indexOf(b.dataset.k) >= 0) return;
+                    if (!cur.tries && lateNow(qk)) cur.late = true;
                     cur.tries++; cur.picks.push(b.dataset.k); if (b.dataset.k === 'ok') cur.correct = true;
                     if (!st.think.last[c.key]) st.think.last[c.key] = b.dataset.k;
                     changed(); show(st.screen, { back: true });
@@ -443,9 +448,9 @@
             } };
         };
     }
-    function quizFeedback(q) {
-        if (!q || !q.tries) return '<p class="ev-small">처음에 맞히면 10점, 두 번째에 맞히면 5점!</p>';
-        return q.correct ? '<p class="ev-ok">⭕ 맞았어요! +' + M.quizPoints(q.tries, true) + '점</p>' :
+    function quizFeedback(q, k) {
+        if (!q || !q.tries) return quizHint(k, q);
+        return q.correct ? '<p class="ev-ok">⭕ 맞았어요! +' + M.quizPoints(q.tries, true, q.late) + '점</p>' + quizHint(k, q) :
             '<p class="ev-no">❌ 아니에요. 한 번 더 골라 보세요! (맞히면 5점)</p>';
     }
     SCREENS['think-force'] = conceptScreen(M.CONCEPTS[0], 'think-accel');
@@ -464,13 +469,14 @@
                     var cls = q.picks.indexOf(o.k) >= 0 ? (o.k === 'ok' ? ' right' : ' wrong') : '';
                     return '<button type="button" class="ev-choice' + cls + '" data-k="' + o.k + '"' + (done ? ' disabled' : '') + '>' + esc(o.t) + '</button>';
                 }).join('') + '</div>' +
-                (q.tries ? (q.correct ? '<p class="ev-ok">⭕ 맞았어요! +' + M.quizPoints(q.tries, true) + '점</p>' : last ? '<p class="ev-no">❌ 아니에요. ' + (done ? '정답을 확인해요.' : '한 번 더 골라 보세요! (맞히면 5점)') + '</p>' : '') : '<p class="ev-small">처음에 맞히면 10점, 두 번째에 맞히면 5점!</p>') +
+                (q.tries ? (q.correct ? '<p class="ev-ok">⭕ 맞았어요! +' + M.quizPoints(q.tries, true, q.late) + '점</p>' + quizHint(key, q) : last ? '<p class="ev-no">❌ 아니에요. ' + (done ? '정답을 확인해요.' : '한 번 더 골라 보세요! (맞히면 5점)') + '</p>' : '') : quizHint(key, q)) +
                 (done ? defBox(Q.def, Q.word, key) : '') + nav(next, '다음 →', done ? '' : ' disabled');
             return { html: html, mount: function (el) {
                 el.querySelector('.ev-choices').addEventListener('click', function (e) {
                     var b = e.target.closest('[data-k]'); if (!b || b.disabled) return;
                     var cur = st.quiz[key] || (st.quiz[key] = { tries: 0, correct: false, picks: [] });
                     if (cur.correct || cur.picks.indexOf(b.dataset.k) >= 0) return;
+                    if (!cur.tries && lateNow(key)) cur.late = true;
                     cur.tries++; cur.picks.push(b.dataset.k); if (b.dataset.k === 'ok') cur.correct = true;
                     changed(); show(st.screen, { back: true });
                 });
@@ -542,16 +548,19 @@
         return function () {
             var defs = ensureBase(part), p = st[part];
             var keys = part === 't1' ? ['water', 'temp', 'tablet', 'piece'] : ['mass', 'water', 'tablet', 'fins'];
-            var html = '<h2>🔒 ' + esc(title) + '</h2><p><b>한 가지만 바꾸기(변인 통제)</b>: 바꿀 조건을 <b>하나</b> 고르면, 나머지는 같게 🔒 잠가요.</p>' +
-                '<div class="ev-choices">' + keys.map(function (k) {
+            // 고른 뒤에는 설명 글을 줄이고 단추를 두 칸으로 → 🔮 예측 칸이 첫 화면에 보이게
+            var html = '<h2>🔒 ' + esc(title) + '</h2>' + (p.changed ? '<p class="ev-small"><b>한 가지만 바꾸기(변인 통제)</b> · 나머지는 같게 🔒</p>' : '<p><b>한 가지만 바꾸기(변인 통제)</b>: 바꿀 조건을 <b>하나</b> 고르면, 나머지는 같게 🔒 잠가요.</p>') +
+                '<div class="ev-choices' + (p.changed ? ' ev-var-compact' : '') + '">' + keys.map(function (k) {
                     return '<button type="button" class="ev-choice' + (p.changed === k ? ' on' : '') + '" data-k="' + k + '">' + (p.changed === k ? '🔓 ' : '') + esc(defs[k].short || defs[k].name) + ' 바꾸기</button>';
                 }).join('') + '</div>' +
+                // 🔮 예측은 고른 단추 바로 아래 (스크롤 없이 보이게), 방향을 골라야 [다음 →] (2026-11-21)
+                (p.changed ? guessBlock(part, defs[p.changed]) : '') +
                 (p.changed ? '<h3>같게 할 조건 🔒</h3>' + Object.keys(defs).filter(function (k) { return k !== p.changed; }).map(function (k) {
                     return stepper(k, defs[k].short || defs[k].name, defs[k].label(p.base[k]), { locked: true });
                 }).join('') : '') +
                 (p.trials.length && p.changed ? '<p class="ev-small">바꿀 조건을 바꾸면 지금까지 잰 값은 그대로 두고, 그래프는 새 조건으로 그려요.</p>' : '') +
-                (p.changed ? guessBlock(part, defs[p.changed]) : '') +
-                nav(next, '다음 →', p.changed ? '' : ' disabled');
+                (p.changed && !hasGuess(part) ? '<p class="ev-small ev-need-guess">🔮 예측을 골라야 다음으로 가요</p>' : '') +
+                nav(next, '다음 →', hasGuess(part) ? '' : ' disabled');
             return { html: html, mount: function (el) {
                 el.querySelector('.ev-choices').addEventListener('click', function (e) {
                     var b = e.target.closest('[data-k]'); if (!b) return;
@@ -571,12 +580,15 @@
             }).join('') + '</div>' +
             '<label class="ev-field">왜 그렇게 생각해요? <small>(짧게, 안 써도 돼요)</small><input type="text" class="ev-why-in" maxlength="40" autocomplete="off" placeholder="예: 따뜻하면 거품이 빨리 나서" value="' + esc(g.why || '') + '"></label></div>';
     }
+    function hasGuess(part) { var p = st[part]; return !!(p.changed && p.guess && p.guess.dir); }
     function mountGuess(el, part) {
         var box = el.querySelector('[data-guess]'); if (!box) return;
         box.querySelector('.ev-choices').addEventListener('click', function (e) {
             var b = e.target.closest('[data-dir]'); if (!b) return;
             st[part].guess = Object.assign({}, st[part].guess, { dir: b.dataset.dir }); changed();
             Array.prototype.forEach.call(box.querySelectorAll('[data-dir]'), function (x) { x.classList.toggle('on', x === b); });
+            var nx = el.querySelector('.ev-next[data-go]'); if (nx) nx.disabled = false;
+            var need = el.querySelector('.ev-need-guess'); if (need) need.remove();
         });
         box.querySelector('.ev-why-in').addEventListener('change', function () { st[part].guess = Object.assign({}, st[part].guess, { why: M.cleanShort(this.value) }); changed(); });
     }
