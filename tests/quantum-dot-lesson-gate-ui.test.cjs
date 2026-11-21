@@ -1,8 +1,8 @@
 // 탄소 양자점 — 설명 화면 답 가리기 (2026-11-21, 공통 부품 js/class-share.js applyLesson 위에서 양자점 key 7개 확인)
 // Playwright, 가짜 저장소(tests/fake-lab-store.cjs)
-//  ① 교사 🎬 발표 보기로 2 이론 설명을 띄우면 노트북·📱 폰(수업 QR) 모두 '👀 앞 화면을 봐요', key 7개 모두 '🔒 선생님 설명 뒤에 열려요'
+//  ① 교사 🎬 발표 보기로 2 이론 설명을 띄우면 노트북·📱 폰(수업 QR) 모두 '👀 앞 화면을 봐요', key 8개 모두 '🔒 선생님 설명 뒤에 열려요'
 //  ② 교사가 상자 장 풀이를 열면(→ 키) 그 답만 열림, 이론의 나머지 장도 → 키로 차례로 열림
-//  ③ 3 준비물·5 데이터·6 결과 장의 풀이도 열면 노트북·폰 모두 7개가 열림 (가열 시간 방향 qd-heat-dir 은 6 결과 장)
+//  ③ 1 목적·3 준비물·5 데이터·6 결과 장의 풀이도 열면 노트북·폰 모두 7개가 열림 (가열 시간 방향 qd-heat-dir 은 6 결과 장)
 //  ④ 설명 화면을 안 쓴 수업·수업 없이 연 화면은 처음부터 다 보임
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -15,7 +15,7 @@ const ROOT = path.join(__dirname, '..');
 const ORIGIN = 'https://lab.test';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const QR = 'window.qrcode=function(){return{addData(){},make(){},createSvgTag(){return "<svg viewBox=\\"0 0 10 10\\"></svg>"}}};';
-const KEYS = ['qd-box', 'qd-energy', 'qd-stokes', 'qd-auto', 'qd-microwave', 'qd-hue', 'qd-heat-dir'];
+const KEYS = ['qd-measure', 'qd-box', 'qd-energy', 'qd-stokes', 'qd-auto', 'qd-microwave', 'qd-hue', 'qd-heat-dir'];
 
 async function newPage(browser, app, opt, teacher) {
     const ctx = await browser.newContext(Object.assign({ viewport: { width: 1280, height: 900 } }, opt || {}));
@@ -54,7 +54,7 @@ const waitMap = (pg, hiddenKeys) => pg.waitForFunction(([keys, hid]) => keys.eve
 }), [KEYS, hiddenKeys], { timeout: 15000 });
 const slide = pg => pg.evaluate(() => { const s = document.querySelector('#presentPane.ls-on #pSlides .ls-slide'); return s ? { title: s.querySelector('.ls-title').textContent, rev: s.dataset.revealed } : null; });
 
-test('양자점 설명 화면: key 7개 가림 → 교사 풀이 열기 → 열림 (노트북·📱 폰)', { skip: !chromium && 'playwright 없음', timeout: 240000 }, async () => {
+test('양자점 설명 화면: key 8개 가림 → 교사 풀이 열기 → 열림 (노트북·📱 폰)', { skip: !chromium && 'playwright 없음', timeout: 240000 }, async () => {
     const app = loadLabStore();
     const browser = await chromium.launch();
     try {
@@ -90,7 +90,14 @@ test('양자점 설명 화면: key 7개 가림 → 교사 풀이 열기 → 열�
         await L.page.click('nav.steps button[data-step="theory"]');
         const lock = await L.page.evaluate(() => { const e = document.querySelector('[data-lesson-answer="qd-box"]'); return { vis: getComputedStyle(e).visibility, after: getComputedStyle(e, '::after').content }; });
         assert.equal(lock.vis, 'hidden');
-        assert.match(lock.after, /선생님 설명 뒤에 열려요/);
+        assert.match(lock.after, /2\. 이론 설명 뒤에 열려요/);
+        // 가린 자리마다 '언제 열리는지' (1 목적의 접힌 실험 목적 글도 가림)
+        const when = await L.page.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-lesson-answer]')].map(e => [e.dataset.lessonAnswer, getComputedStyle(e, '::after').content])));
+        assert.match(when['qd-measure'], /1\. 목적 설명 뒤에/);
+        assert.match(when['qd-microwave'], /3\. 준비물 설명 뒤에/);
+        assert.match(when['qd-hue'], /5\. 데이터 설명 뒤에/);
+        assert.match(when['qd-heat-dir'], /6\. 결과 설명 뒤에/);
+        assert.equal(await L.page.evaluate(() => document.querySelector('details.qd-purpose-more ol[data-lesson-answer="qd-measure"]').classList.contains('cs-ans-hide')), true, '접힌 실험 목적 글');
 
         // ② → 키: 상자 풀이 → qd-box 만 열림
         await T.page.keyboard.press('ArrowRight');
@@ -110,7 +117,7 @@ test('양자점 설명 화면: key 7개 가림 → 교사 풀이 열기 → 열�
         for (const P of [L, F]) await waitMap(P.page, KEYS.filter(k => !theoryKeys.includes(k)));
 
         // ③ 3 준비물·5 데이터·6 결과 장의 풀이 (발표 화면이 그 장에서 부르는 것과 같은 요청)
-        for (const [stage, key] of [['materials', 'qd-microwave'], ['data', 'qd-hue'], ['result', 'qd-heat-dir']]) {
+        for (const [stage, key] of [['purpose', 'qd-measure'], ['materials', 'qd-microwave'], ['data', 'qd-hue'], ['result', 'qd-heat-dir']]) {
             const r = await T.page.evaluate(([sp, st, k]) => ClassCloud.classLesson(sp, { on: true, stage: st, i: 0, key: k, reveal: true }, [k]), [cls.space, stage, key]);
             assert.equal(r.ok, true, r.error);
         }
@@ -145,6 +152,23 @@ test('양자점: 설명 화면을 안 쓴 수업·수업 없이 연 화면은 �
         await L.page.waitForSelector('#cs-cjoined:not([hidden])');
         await L.page.waitForTimeout(3500);
         expectHidden(await hiddenMap(L.page), [], '설명 안 쓴 수업');
+        // 가설연역 수업: 가린 자리 글이 그 방법의 단계 이름
+        const hd = await app.post({ action: 'createClass', ban: 4, nStudents: 4, groupSize: 2, exp: 'qdot', stage: 7, flow: 'hd' });
+        assert.equal(hd.ok, true, hd.error);
+        const H = await newPage(browser, app);
+        await H.page.goto(ORIGIN + '/projects/quantum-dot.html?c=' + hd.classCode + '&s=' + hd.space);
+        await H.page.waitForSelector('#cs-cpick:not([hidden])');
+        await H.page.selectOption('#cs-cjo', '1'); await H.page.selectOption('#cs-cnum', '1'); await H.page.click('#cs-cjoin');
+        await H.page.waitForSelector('#cs-cjoined:not([hidden])');
+        assert.equal((await app.post({ action: 'classLesson', space: hd.space, lesson: { on: true, stage: 'theory', i: 0, key: 'qd-box' }, open: [] })).ok, true);
+        await waitMap(H.page, KEYS);
+        const hdWhen = await H.page.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-lesson-answer]')].map(e => [e.dataset.lessonAnswer, getComputedStyle(e, '::after').content])));
+        assert.match(hdWhen['qd-measure'], /① 문제 인식 설명 뒤에/);
+        assert.match(hdWhen['qd-box'], /② 가설 설정 설명 뒤에/);
+        assert.match(hdWhen['qd-microwave'], /③ 탐구 설계 설명 뒤에/);
+        assert.match(hdWhen['qd-hue'], /④ 탐구 수행 설명 뒤에/);
+        assert.match(hdWhen['qd-heat-dir'], /⑤ 자료 해석 설명 뒤에/);
+        assert.deepEqual(H.errors, []);
         const S = await newPage(browser, app, devices['iPhone 13']);
         await S.page.goto(ORIGIN + '/projects/quantum-dot.html');
         await S.page.waitForTimeout(1500);
