@@ -72,6 +72,9 @@ test('양자점 설명 장: 띠 틈 두 장(낱말 둘씩·계단 물음 먼저)
     assert.doesNotMatch(p0.ask, /바꿀 것 하나/); assert.match(p0.ask, /무슨 일이/);
     // 이론은 8장까지 (한계 장은 6 결과의 문헌 장 앞으로)
     assert.ok(th.length <= 8);
+    // 학생이 자기 화면에서 고르거나 쓰는 장 = mode 'phone' (우리 생각 · 변인 카드 ①② · 뺀 점 넣기/빼기)
+    const phone = []; for (const st of Object.keys(lesson.stages)) lesson.stages[st].forEach(c => { if (c.mode === 'phone') phone.push(c.title); });
+    assert.deepEqual(phone, ['👀 먼저 보기', '🧪 실험 ① 가열 시간', '🧪 실험 ② 재료 비율', '⚠ 뺀 점은 왜 뺐나']);
     const res = lesson.stages.result, li = res.findIndex(c => /한계/.test(c.title));
     assert.ok(li >= 0 && res[li + 1].key === 'qd-heat-dir', '한계 → 문헌 장');
 });

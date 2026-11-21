@@ -178,3 +178,31 @@ test('양자점: 설명 화면을 안 쓴 수업·수업 없이 연 화면은 �
         await browser.close();
     }
 });
+
+test('양자점 설명 화면: 학생이 고르거나 쓰는 장(mode phone)은 노트북·폰 띠가 "📱 폰에서 골라요", 풀이를 열면 "👀 앞 화면을 봐요"', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
+    const app = loadLabStore();
+    const browser = await chromium.launch();
+    try {
+        const cls = await app.post({ action: 'createClass', ban: 5, nStudents: 4, groupSize: 2, exp: 'qdot', stage: 1 });
+        const L = await newPage(browser, app);
+        await L.page.goto(ORIGIN + '/projects/quantum-dot.html?c=' + cls.classCode + '&s=' + cls.space);
+        await L.page.waitForSelector('#cs-cpick:not([hidden])');
+        await L.page.selectOption('#cs-cjo', '1'); await L.page.selectOption('#cs-cnum', '1'); await L.page.click('#cs-cjoin');
+        await L.page.waitForSelector('#cs-cjoined:not([hidden])');
+        const T = await newPage(browser, app, { viewport: { width: 1920, height: 1080 } }, true);
+        await T.page.goto(ORIGIN + '/projects/class-teacher.html#class=' + cls.space + '&view=present');
+        await T.page.waitForFunction(() => document.querySelector('#presentPane.ls-on .ls-slide'), null, { timeout: 20000 });
+        assert.match((await slide(T.page)).title, /먼저 보기/);
+        await L.page.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return b && !b.hidden && /폰에서 골라요/.test(b.textContent); }, null, { timeout: 15000 });
+        assert.equal(app.db.docs.get('labClasses/' + cls.space).lesson.mode, 'phone');
+        // 풀이를 열면 앞 화면을 봐요
+        await T.page.keyboard.press('ArrowRight');
+        assert.equal((await slide(T.page)).rev, '1');
+        await L.page.waitForFunction(() => /앞 화면을 봐요/.test(document.querySelector('.cs-look-band').textContent), null, { timeout: 15000 });
+        // '우리 생각' 칸은 띠가 떠 있어도 쓸 수 있음
+        await L.page.fill('.qd-look .rai-inline[data-sec="problem"] textarea', '알갱이 크기?');
+        assert.deepEqual(L.errors, []); assert.deepEqual(T.errors, []);
+    } finally {
+        await browser.close();
+    }
+});
