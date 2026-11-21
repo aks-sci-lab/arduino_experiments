@@ -45,5 +45,24 @@ test('규칙: 설명 장 상태 lesson·lessonOpen (에뮬레이터)', { skip, t
         await RUT.assertFails(doc('t1').update({ lessonOpen: 'force' }), '목록만');
         await RUT.assertFails(doc('t1').update({ lessonOpen: ['x'], groups: [] }), '다른 칸은 그대로 못 고침');
         await RUT.assertSucceeds(doc('t1').update({ lesson: Object.assign({ at: ts }, ok), lessonOpen: ['force', 'gas'] }));
+        // 설명 화면을 쓴 뒤에도(예전 lesson.at 이 남아 있어도) 단계 열기·수업 마치기·설정 고치기·다시 설명 장 쓰기가 됨 (실제 저장 경로)
+        await new Promise(r => setTimeout(r, 1100));
+        const st2 = await T1({ action: 'classStage', space: c.space, stage: 2 }); assert.equal(st2.ok, true, 'classLesson 뒤 classStage: ' + JSON.stringify(st2));
+        const dn = await T1({ action: 'classDone', space: c.space, done: true }); assert.equal(dn.ok, true, 'classLesson 뒤 classDone: ' + JSON.stringify(dn));
+        // (예전 규칙은 수업을 마친 뒤(doneAt 이 남아 있으면) 설정·단계 고치기도 막았음 — 함께 고침)
+        const su = await T1({ action: 'classSetup', space: c.space, setup: { targetTime: 12 } }); assert.equal(su.ok, true, 'classLesson·수업 마치기 뒤 classSetup: ' + JSON.stringify(su));
+        assert.equal((await T1({ action: 'classStage', space: c.space, stage: 2 })).ok, true, '수업 마치기 뒤 classStage');
+        assert.equal((await T1({ action: 'classDone', space: c.space, done: false })).ok, true, '다시 진행 중으로');
+        assert.equal((await T1({ action: 'classDone', space: c.space, done: true })).ok, true);
+        // 발표 보기 흐름: 설명 장(on) → 학생 화면(off) → 다음 단계 열기 → 새 단계 설명 장 → 풀이 열기
+        assert.equal((await T1({ action: 'classLesson', space: c.space, lesson: { on: true, stage: 't1', i: 0, key: 'gas', reveal: false } })).ok, true);
+        assert.equal((await T1({ action: 'classLesson', space: c.space, lesson: { on: false } })).ok, true);
+        assert.equal((await T1({ action: 'classStage', space: c.space, stage: 3 })).ok, true, '설명 장 → 학생 화면 → 다음 단계 열기');
+        const r3 = await T1({ action: 'classLesson', space: c.space, lesson: { on: true, stage: 't2', i: 0, key: 'action', reveal: true }, open: ['action'] });
+        assert.equal(r3.ok, true, r3.error); assert.deepEqual(r3.lessonOpen, ['force', 'gas', 'action']);
+        const fin = await S1({ action: 'classInfo', space: c.space });
+        assert.equal(fin.stage, 3); assert.equal(fin.done, true); assert.equal(fin.lesson.key, 'action');
+        // lesson 을 안 바꾸는 쓰기에 이상한 lessonOpen 은 여전히 막음
+        await RUT.assertFails(doc('t1').update({ stage: 4, lessonOpen: 'bad' }), 'lessonOpen 을 바꾸면 검사');
     } finally { await env.cleanup(); }
 });
