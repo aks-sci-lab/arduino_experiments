@@ -85,7 +85,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         assert.equal(teams0.length, 1, '팀 자리 하나');
         assert.equal(teams0[0].name.includes('<'), false);
         await next(A); await go(A, 'think-force');
-        assert.equal(await A.isDisabled('.ev-next'), true, '고르기 전 다음 단추 꺼짐');
+        assert.equal(await A.isDisabled('.ev-screen .ev-next'), true, '고르기 전 다음 단추 꺼짐');
         await A.click('.ev-choice[data-k="have"]');   // 흔한 생각
         await A.waitForSelector('.ev-def');
         assert.match(await A.textContent('.ev-def'), /힘 = 물체의 모양이나 운동 상태를 바꾸는 원인/);
@@ -96,9 +96,9 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await next(A); await go(A, 't1-intro');
         assert.match(await A.textContent('.ev-screen'), /목표 시간\(12초\)/, '선생님 목표가 가족 화면에');
         await next(A); await go(A, 't1-safe');
-        assert.equal(await A.isDisabled('.ev-next'), true);
+        assert.equal(await A.isDisabled('.ev-screen .ev-next'), true);
         for (const k of ['goggle', 'face', 'away']) await A.check('[data-safe="' + k + '"]');
-        assert.equal(await A.isDisabled('.ev-next'), true, '하나라도 안 하면 못 넘어감');
+        assert.equal(await A.isDisabled('.ev-screen .ev-next'), true, '하나라도 안 하면 못 넘어감');
         await A.check('[data-safe="wait"]');
         await next(A); await go(A, 'q-pressure');
         await quiz(A, false);                         // 10점

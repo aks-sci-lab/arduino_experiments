@@ -89,7 +89,8 @@ test('진행 방법 PR 2: 보고서 실험 7개 가설연역 + 가설·판정 �
             // 7단계로 바꾸면 쓰기 칸 숨김, 보고서 항목 원래대로
             await P.click('.flow-pick button[data-flow="report"]');
             assert.equal((await stepKeys(P)).length, 7);
-            assert.equal(await P.locator('.rai-inline:not([hidden])').count(), 0, name + ' 7단계엔 쓰기 칸 없음');
+            // 양자점은 7단계에도 '우리 생각'·변인 카드가 있음(같은 칸이 이름만 바뀜, tests/quantum-dot-scaffold-ui.test.cjs)
+            assert.deepEqual(await P.$$eval('.rai-inline:not([hidden])', a => a.map(b => b.dataset.sec).sort()), name === 'quantum-dot' ? ['design', 'problem'] : [], name + ' 7단계엔 가설연역 쓰기 칸 없음');
             assert.equal(await P.isVisible('#rai-tabs button[data-tab="hypothesis"]'), false);
             await P.click('nav.steps button[data-step="conclusion"]');
             assert.equal(await P.isVisible('#rai-tabs button[data-tab="theory"]'), true);
