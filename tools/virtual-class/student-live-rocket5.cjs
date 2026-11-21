@@ -119,6 +119,94 @@ const SP = 'labClasses/ck525km29tytpymq23fiwnjr', PAGE = 'projects/film-rocket.h
             await team('C', async () => { const t = (await btns(C)).find(x => /바꿔/.test(x)); await W.tap(C, t.slice(0, 10)); await C.waitForTimeout(500); await W.tap(C, '이 조건으로 →', 0, true); await C.waitForTimeout(600);
                 note('C 값 화면에서 값을 안 바꾸고 [이 조건으로 →]', await full(C)); await W.shot(C, 'C 같은 값 안내', true); await W.tap(C, '← 뒤로'); await C.waitForTimeout(400); });
             await team('D', async () => { await W.tap(D, '그래프 보기'); await D.waitForTimeout(600); note('D(1번 잼)가 그래프 보기를 누름', await full(D)); await W.tap(D, '← 뒤로').catch(() => {}); await D.waitForTimeout(400); note('D 뒤로', (await full(D)).slice(0, 200)); });
+        },
+        3: async () => {   // 50~85분: 2차시 열림 · 퀴즈(action·mass) · 🔮 예측 · 발사('하나만 바꿔')
+            setStage(2);
+            const A = await live.student('A', 'phone'), B = await live.student('B', 'phone'), C = await live.student('C', 'Pixel 7'), D = await live.student('D', 'phone');
+            const P = { A, B, C, D };
+            const res = async pg => ({ 띠: await bandTxt(pg), 글: (await W.text(pg)).split('\n').slice(6).join(' / ').slice(0, 760), 단추: (await btns(pg)).slice(4) });
+            const go = pg => pg.locator('button, a').filter({ hasText: /로 가기|끝내고 가요/ }).locator('visible=true');
+            const EYE = /영상으로 재기|눈으로 보고 고르기/;
+            const eye = async (pg, pick) => { await W.tap(pg, '눈으로 보고 고르기'); await pg.waitForTimeout(400); await W.tap(pg, pick); await pg.waitForTimeout(700); };
+            const why = pg => pg.locator('textarea, input[type=text]').locator('visible=true');
+            await A.waitForTimeout(1200); setStage(3); await lesson('t2', 0, 'action', false);
+            note('2차시 열림 · D(1차시 한 값·1번)', { 띠: await bandTxt(D), 줄: (await W.text(D)).split('\n').filter(l => /선생님이|한 가지|하나만|바꿔|로 가기/.test(l)).slice(0, 6) }); await W.shot(D, 'D 2차시 열림 띠');
+            note('2차시 열림 · C', (await W.text(C)).split('\n').filter(l => /선생님이|한 가지|하나만|로 가기/.test(l)).slice(0, 5));
+            for (const [n, pg] of Object.entries(P)) await team(n, async () => { if (await go(pg).count()) { await go(pg).first().click(); await pg.waitForTimeout(700); } });
+            note('D 띠 단추 누른 뒤', await res(D));
+            for (const [n, pg, pick] of [['B', B, '공기가 로켓을 위로 빨아올려서'], ['A', A, '발포비타민이 가벼워서'], ['C', C, '물과 기체를 아래로 밀어내고']]) await team(n + ' action', async () => { await W.tap(pg, '다음 →'); await pg.waitForTimeout(400); await pickQ(pg, pick); });
+            note('t2 0 물음(phone) · B 틀린 보기 고른 뒤', await res(B));
+            await lesson('t2', 0, 'action', true);
+            note('t2 0 풀이 뒤 · A(틀림)', await res(A)); await pickQ(A, '물과 기체를 아래로 밀어내고').catch(() => {}); await pickQ(B, '물과 기체를 아래로 밀어내고').catch(() => {});
+            await team('D action(풀이 뒤)', async () => { await W.tap(D, '다음 →'); await D.waitForTimeout(400); await pickQ(D, '물과 기체를 아래로 밀어내고'); note('D 풀이 듣고 고름', (await res(D)).글.slice(0, 260)); });
+            await lesson('t2', 1, 'mass', false, 3000);
+            for (const [n, pg, pick] of [['A', A, '가속도가 작아져서 덜 높이'], ['B', B, '가속도가 커져서 더 높이'], ['C', C, '가속도가 작아져서 덜 높이'], ['D', D, '가속도가 작아져서 덜 높이']]) await team(n + ' mass', async () => { await W.tap(pg, '다음 →'); await pg.waitForTimeout(400); if (await has(pg, '설계 끝')) { await W.tap(pg, '설계 끝'); await pg.waitForTimeout(400); } await pickQ(pg, pick); });
+            note('t2 1 물음(phone) · A 폰', await res(A));
+            await lesson('t2', 1, 'mass', true); note('t2 1 풀이 뒤 · A', (await res(A)).글.slice(0, 420)); await pickQ(B, '가속도가 작아져서 덜 높이').catch(() => {});
+            for (const i of [2, 3]) await lesson('t2', i, '', false, 1200);
+            // 계획 + 🔮 예측
+            const plan = async (n, pg, v, re, txt) => team(n + ' 계획', async () => { if (!(await has(pg, '몸체 무게 바꾸기'))) { await W.tap(pg, '다음 →'); await pg.waitForTimeout(400); } await W.tap(pg, v); await pg.waitForTimeout(500); if (n === 'A') { note('A 2차시 계획 화면(바꿀 것 고른 뒤)', await res(A)); await W.shot(A, 'A 2차시 예측', true); }
+                const t = (await btns(pg)).find(x => re.test(x)); if (t) await W.tap(pg, t.slice(0, 8)); else note(n + ' 예측 단추', '못 찾음: ' + (await btns(pg)).join(' | ')); if (txt && await why(pg).count()) { await why(pg).first().fill(txt); await why(pg).first().blur(); } await pg.waitForTimeout(500); });
+            await plan('A', A, '몸체 무게 바꾸기', /낮아|덜|줄어/, '무거우면 덜 빨라져서');
+            await plan('B', B, '물의 양 바꾸기', /높아|더 /, '물이 많으면 더 세게 밀어서');
+            await plan('C', C, '발포비타민 양 바꾸기', /높아|더 /, '');
+            await plan('D', D, '몸체 무게 바꾸기', /낮아|덜|줄어/, '무거운 가방 메면 못 뛰니까');
+            for (const i of [4, 5, 6]) await lesson('t2', i, '', false, 1000); await lesson(null, 0, '', false, 3000);
+            for (const [n, pg] of Object.entries(P)) await team(n, () => W.stroll(pg, n, 12, 0, EYE, quiet));
+            await team('A', async () => { await eye(A, '아이 키보다 높'); note('A 첫 발사(0개, 높다)', await res(A)); const t = (await btns(A)).find(x => /바꿔/.test(x)); await W.tap(A, t.slice(0, 10)); await A.waitForTimeout(500); await W.tap(A, '+'); await W.stroll(A, 'A', 8, 0, EYE, quiet); await eye(A, '아이 키와 비슷'); note('A 두 번째(1개, 비슷)', await res(A)); });
+            await team('B', async () => { await eye(B, '아이 키보다 높'); const t = (await btns(B)).find(x => /바꿔/.test(x)); await W.tap(B, t.slice(0, 10)); await B.waitForTimeout(500); await W.tap(B, '−'); await W.stroll(B, 'B', 8, 0, EYE, quiet); await eye(B, '아이 키와 비슷'); if (await has(B, '그래프 보기')) { await W.tap(B, '그래프 보기'); await B.waitForTimeout(500); note('B 그래프', await res(B)); } });
+            await team('C', async () => { await eye(C, '아이 키와 비슷'); note('C 첫 발에 목표(비슷) 결과 화면', await res(C)); await W.shot(C, 'C 첫 발 목표', true);
+                if (await has(C, '그래프 보기')) { await W.tap(C, '그래프 보기'); await C.waitForTimeout(500); note('C(1번 쏨) 그래프를 누름', await res(C)); }
+                const t = (await btns(C)).find(x => /바꿔/.test(x)); if (t) { await W.tap(C, t.slice(0, 10)); await C.waitForTimeout(500); await W.tap(C, '+'); await W.stroll(C, 'C', 8, 0, EYE, quiet); await eye(C, '아이 키보다 높'); note('C 두 번째(값 바꿈, 높다)', await res(C)); } });
+            await team('D', async () => { await eye(D, '아이 키보다 낮'); note('D 첫 발사(0개, 낮다)', await res(D)); const t = (await btns(D)).find(x => /바꿔/.test(x)); await W.tap(D, t.slice(0, 10)); await D.waitForTimeout(500); await W.tap(D, '+'); await W.stroll(D, 'D', 8, 0, EYE, quiet); await eye(D, '아이 키보다 낮'); note('D 두 번째(1개, 낮다)', await res(D)); });
+            await A.waitForTimeout(3000);
+        },
+        31: async () => {   // 85분~: 정리 열림 · 다시 풀기 · ✍️ 문장 화면 (살펴보기: A·C)
+            setStage(3);
+            const A = await live.student('A', 'phone'), B = await live.student('B', 'phone'), C = await live.student('C', 'Pixel 7'), D = await live.student('D', 'phone');
+            const P = { A, B, C, D };
+            const res = async pg => ({ 띠: await bandTxt(pg), 글: (await W.text(pg)).split('\n').slice(6).join(' / ').slice(0, 900), 단추: (await btns(pg)).slice(4) });
+            const go = pg => pg.locator('button, a').filter({ hasText: /로 가기|끝내고 가요/ }).locator('visible=true');
+            const inputs = pg => pg.evaluate(() => [...document.querySelectorAll('input, textarea, select')].filter(e => e.offsetParent).map(e => (e.tagName === 'SELECT' ? 'select:' + [...e.options].map(o => o.textContent).join('|') : (e.type || e.tagName) + ':' + (e.placeholder || '') + (e.maxLength > 0 ? ' (최대 ' + e.maxLength + '자)' : ''))));
+            await A.waitForTimeout(1200); setStage(4); await lesson('end', 0, 'end-think', false);
+            for (const [n, pg] of Object.entries(P)) await team(n, async () => { if (await go(pg).count()) { await go(pg).first().click(); await pg.waitForTimeout(700); } });
+            const solve = async (pg, picks) => { await W.tap(pg, '다시 풀기 →'); await pg.waitForTimeout(400); for (const p of picks) { await W.tap(pg, p); await pg.waitForTimeout(500); if (p === picks[0] && pg === A) note('end 0 물음(phone) · A 다시 풀기 힘 고른 뒤', await res(A)); await W.tap(pg, '다음 →'); await pg.waitForTimeout(500); } };
+            await team('A', () => solve(A, ['물체의 모양이나 움직임을 바꾸는 원인', '속도가 변하는 정도', '누르는 힘의 크기']));
+            await team('B', () => solve(B, ['물체의 모양이나 움직임을 바꾸는 원인', '속도가 변하는 정도', '일정한 넓이에 작용하는 힘']));
+            await team('C', () => solve(C, ['물체의 모양이나 움직임을 바꾸는 원인', '속도가 변하는 정도', '일정한 넓이에 작용하는 힘']));
+            await team('D', () => solve(D, ['물체의 모양이나 움직임을 바꾸는 원인', '빠른 정도', '일정한 넓이에 작용하는 힘']));
+            note('end 0 풀이 전 · A 지금 화면', await res(A));
+            await lesson('end', 0, 'end-think', true);
+            note('end 0 풀이 뒤 · A', await res(A));
+            await lesson('end', 1, 'end-cause', false);
+            for (const [n, pg] of Object.entries(P)) note('end 1 물음(phone: 문장) ' + n + ' 폰', { 화면: await res(pg), 입력칸: await inputs(pg) });
+            await W.shot(A, 'A 정리 문장 화면 전', true);
+        },
+        32: async () => {   // ✍️ 우리 팀 정리 문장 화면 살펴보기(A·C·D 화면 글만 — 아직 안 적음)
+            setStage(4);
+            const A = await live.student('A', 'phone'), C = await live.student('C', 'Pixel 7'), D = await live.student('D', 'phone');
+            const dump = async pg => ({ 띠: await bandTxt(pg), 글: (await W.text(pg)).split('\n').slice(6).join(' / ').slice(0, 1300), 단추: (await btns(pg)).slice(4), 입력칸: await pg.evaluate(() => [...document.querySelectorAll('input, textarea, select')].filter(e => e.offsetParent).map(e => (e.tagName === 'SELECT' ? 'select:' + [...e.options].map(o => o.textContent).join('|') : (e.type || e.tagName) + ':' + (e.placeholder || '') + (e.maxLength > 0 ? ' (최대 ' + e.maxLength + '자)' : '')))) });
+            await lesson('end', 1, 'end-cause', false, 3000);
+            for (const [n, pg] of [['A', A], ['C', C], ['D', D]]) await team(n, async () => { await W.tap(pg, '우리 팀 정리 문장'); await pg.waitForTimeout(700); note(n + ' ✍️ 문장 화면', await dump(pg)); });
+            await W.shot(A, 'A 정리 문장 화면', true); note('A 화면 길이', (await W.check(A, 56)).pages);
+        },
+        33: async () => {   // ✍️ 문장 고르고 적기 → end 1 풀이 → 결과 카드 (95분)
+            setStage(4);
+            const A = await live.student('A', 'phone'), B = await live.student('B', 'phone'), C = await live.student('C', 'Pixel 7'), D = await live.student('D', 'phone');
+            const txt = pg => pg.locator('input[type=text]').locator('visible=true');
+            const full = async pg => (await W.text(pg)).split('\n').slice(6).join(' / ').slice(0, 1100);
+            await lesson('end', 1, 'end-cause', false, 2500);
+            await team('B', async () => { await W.tap(B, '우리 팀 정리 문장'); await B.waitForTimeout(600); });
+            for (const pg of [A, B, C, D]) if (!(await has(pg, '우리 팀 정리 문장')) && !(await has(pg, '왜냐하면…'))) await W.tap(pg, '우리 팀 정리 문장').catch(() => {});
+            await team('A', async () => { await W.tap(A, '길어졌어요'); await W.tap(A, '잘 모르겠어요', 0); await txt(A).nth(0).fill('물이 많아서 늦게 차서'); await txt(A).nth(0).blur(); await W.tap(A, '낮아졌어요'); await W.tap(A, '무거워서 덜 빨라져서'); await A.waitForTimeout(800); note('A 문장 고르고 적은 뒤', await full(A)); await W.shot(A, 'A 정리 문장 적음', true); });
+            await team('B', async () => { await W.tap(B, '짧아졌어요'); await W.tap(B, '기체(거품)가 더 빨리 생겨서'); await W.tap(B, '높아졌어요'); await W.tap(B, '아래로 미는 힘이 세져서'); await B.waitForTimeout(600); });
+            await team('C', async () => { await W.tap(C, '짧아졌어요'); await W.tap(C, '기체가 더 많이 생겨서'); await W.tap(C, '높아졌어요'); await C.waitForTimeout(600); });
+            await team('D', async () => { await W.tap(D, '비슷했어요', 0); await D.waitForTimeout(400); note('D 1차시(한 값·1번)인데 결과를 고름', (await full(D)).slice(0, 420)); await W.tap(D, '비슷했어요', 1); await txt(D).nth(1).fill('점토 붙여도 똑같이 낮았어요'); await txt(D).nth(1).blur(); await D.waitForTimeout(600); });
+            await lesson('end', 1, 'end-cause', true); note('end 1 풀이 뒤 · A', { 띠: await bandTxt(A), 글: (await full(A)).slice(0, 500) });
+            await lesson('end', 2, '', false, 1500); await lesson(null, 0, '', false, 3000);
+            await team('A 카드', async () => { await W.tap(A, '결과 카드 만들기'); await A.waitForTimeout(1500); note('A 결과 카드', (await full(A)).slice(0, 400)); await W.shot(A, 'A 결과 카드', true); });
+            for (const pg of [B, C, D]) await team('카드', async () => { await W.tap(pg, '결과 카드 만들기'); await pg.waitForTimeout(1000); });
+            await A.waitForTimeout(3000);
         }
         // TURNS
     };
