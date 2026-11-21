@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 탄소 양자점 '먼저 보기' 그림(예시): projects/quantum-dot.html 1 목적과 같은 그림 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 170" role="img" aria-label="어두운 곳에서 자외선을 비춘 시료 세 병. A 는 파랑, B 는 청록, C 는 연두 빛으로 빛난다.">
+    <defs>
+        <radialGradient id="qdg1"><stop offset="0" stop-color="#7fd3ff"/><stop offset="1" stop-color="#7fd3ff" stop-opacity="0"/></radialGradient>
+        <radialGradient id="qdg2"><stop offset="0" stop-color="#5ff0c8"/><stop offset="1" stop-color="#5ff0c8" stop-opacity="0"/></radialGradient>
+        <radialGradient id="qdg3"><stop offset="0" stop-color="#c8f560"/><stop offset="1" stop-color="#c8f560" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="360" height="170" rx="12" fill="#14121f"/>
+    <text x="14" y="22" fill="#b39ddb" font-size="12">💡 자외선 손전등</text>
+    <g><circle cx="70" cy="95" r="52" fill="url(#qdg1)"/><rect x="50" y="55" width="40" height="80" rx="6" fill="#4fc3f7" opacity=".85"/><text x="70" y="158" fill="#fff" font-size="14" text-anchor="middle">A</text></g>
+    <g><circle cx="180" cy="95" r="52" fill="url(#qdg2)"/><rect x="160" y="55" width="40" height="80" rx="6" fill="#26d9a6" opacity=".85"/><text x="180" y="158" fill="#fff" font-size="14" text-anchor="middle">B</text></g>
+    <g><circle cx="290" cy="95" r="52" fill="url(#qdg3)"/><rect x="270" y="55" width="40" height="80" rx="6" fill="#aee53f" opacity=".85"/><text x="290" y="158" fill="#fff" font-size="14" text-anchor="middle">C</text></g>
+</svg>
