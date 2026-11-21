@@ -7,11 +7,11 @@
     var data = factory();
     if (typeof module === 'object' && module.exports) module.exports = data;
     if (root) {
-        // js/lesson-slides.js 가 먼저 오면 그 add 를, 아니면 나중에 읽어 가도록 대기열에 둠
+        // 보통은 js/lesson-slides.js 가 먼저 와 그 add 를 씀. 혹시 없으면 대기열에 둠
         var LC = root.LessonContent || (root.LessonContent = { _wait: {}, add: function (k, v) { this._wait[k] = v; } });
         LC.add(data.key, data.lesson);
     }
-})(typeof self !== 'undefined' ? self : null, function () {
+})(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : null, function () {
     'use strict';
     var lesson = {
         title: '탄소 양자점 형광',
@@ -40,14 +40,14 @@
                 { kind: 'ask', title: '🤔 상자가 작아지면?',
                     body: '<p>전자를 아주 작은 상자(지름 1~10 nm 알갱이)에 가두면, 전자는 <b>띄엄띄엄한 에너지</b>만 가질 수 있어요.</p>',
                     ask: '상자가 작아지면 에너지 간격은 커질까, 작아질까?',
-                    reveal: '<p class="formula">E ∝ 1 / L²</p><p>상자가 <b>작을수록</b> 간격이 <b>커져요</b>. L 이 반이면 1/L² 은 <b>4배</b>.</p>',
+                    reveal: '<p><b>E ∝ 1 / L²</b></p><p>상자가 <b>작을수록</b> 간격이 <b>커져요</b>. L 이 반이면 1/L² 은 <b>4배</b>.</p>',
                     note: '엄지 위·아래로 답하게. 막히면 "L 이 반이면 1/L² 은 몇 배?"' },
                 { kind: 'concept', title: '📘 양자점 · 양자 가둠',
                     body: '<ul><li><b>양자점</b>: 지름 약 1~10 nm(10억 분의 1 m)인 반도체·탄소 알갱이, 원자 수백~수천 개</li><li>전자가 <b>좁은 상자에 갇힌 것처럼</b> 움직여 에너지가 띄엄띄엄(양자화)</li><li>같은 물질이라도 <b>크기</b>로 에너지 간격이 바뀜</li></ul>' },
                 { kind: 'concept', title: '📘 띠 틈 → 빛 하나',
-                    body: '<ul><li><b>원자가띠</b>(전자가 찬 곳)와 <b>전도띠</b>(빈 곳) 사이 에너지 차 = <b>띠 틈</b> E<sub>g</sub></li><li>전자가 전도띠 → 원자가띠로 떨어질 때 띠 틈만큼 에너지를 가진 <b>광자 하나</b>를 냄</li></ul><p class="formula">E = hf = hc / λ</p>' },
+                    body: '<ul><li><b>원자가띠</b>(전자가 찬 곳)와 <b>전도띠</b>(빈 곳) 사이 에너지 차 = <b>띠 틈</b> E<sub>g</sub></li><li>전자가 전도띠 → 원자가띠로 떨어질 때 띠 틈만큼 에너지를 가진 <b>광자 하나</b>를 냄</li></ul><p><b>E = hf = hc / λ</b></p>' },
                 { kind: 'concept', title: '📘 E ≈ 1240 / λ',
-                    body: '<p class="formula">E (eV) ≈ 1240 / λ (nm)</p><table><tr><th>빛</th><th>λ</th><th>E</th></tr><tr><td>자외선 손전등</td><td>365 nm</td><td>3.40 eV</td></tr><tr><td>파랑</td><td>450 nm</td><td>2.76 eV</td></tr><tr><td>초록</td><td>530 nm</td><td>2.34 eV</td></tr><tr><td>빨강</td><td>650 nm</td><td>1.91 eV</td></tr></table>',
+                    body: '<p><b>E (eV) ≈ 1240 / λ (nm)</b></p><ul><li>자외선 손전등 365 nm → <b>3.40 eV</b></li><li>파랑 450 nm → <b>2.76 eV</b></li><li>초록 530 nm → <b>2.34 eV</b></li><li>빨강 650 nm → <b>1.91 eV</b></li></ul>',
                     ask: '파장이 길어지면 광자 에너지는?',
                     reveal: '<p><b>작아져요.</b> 띠 틈이 작으면 긴 파장(빨강 쪽), 크면 짧은 파장(파랑 쪽).</p>' },
                 { kind: 'concept', title: '📘 형광 · 스토크스 이동',
@@ -136,7 +136,7 @@
                     reveal: '<p>가열을 늘릴수록 <b>파장이 길어진다</b>(빨강 쪽) = 광자 에너지가 <b>작아진다</b> = 띠 틈이 작아지는 쪽.</p>',
                     note: '기울기의 부호와 크기로 말하게 한다. 점이 하나뿐인 조는 다른 조 값을 함께 본다.' },
                 { kind: 'concept', title: '💡 왜 보정 밝기로 견주나',
-                    body: '<p>사진 밝기는 <b>노출 시간 t</b>와 <b>ISO</b>를 곱한 만큼 커져요.</p><p class="formula">보정 밝기 = 선형 밝기 ÷ (t × ISO/100)</p>',
+                    body: '<p>사진 밝기는 <b>노출 시간 t</b>와 <b>ISO</b>를 곱한 만큼 커져요.</p><p><b>보정 밝기 = 선형 밝기 ÷ (t × ISO/100)</b></p>',
                     ask: '노출 10 ms 로 찍은 시료와 40 ms 로 찍은 시료, 사진 밝기를 그대로 견줘도 될까?',
                     reveal: '<p><b>안 돼요.</b> 40 ms 쪽이 4배 오래 빛을 모았어요. t·ISO 로 나눈 <b>보정 밝기</b>로 견줘야 공정해요.</p>' },
                 { kind: 'ask', title: '🔮 내 예상 ↔ 📊 결과',
