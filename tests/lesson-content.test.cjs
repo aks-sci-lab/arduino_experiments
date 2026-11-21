@@ -11,7 +11,8 @@ test('설명 화면 내용 파일: 모양·단계 키', () => {
     assert.ok(files.includes('rocket.js'));
     for (const f of files) {
         const exp = f.replace(/\.js$/, '');
-        vm.runInNewContext(fs.readFileSync(path.join(DIR, f), 'utf8'), { LessonContent }, { filename: f });
+        const box = { LessonContent }; box.window = box; box.self = box;   // 내용 파일은 window.LessonContent 로 넣기도 함
+        vm.runInNewContext(fs.readFileSync(path.join(DIR, f), 'utf8'), box, { filename: f });
         const def = LessonContent.get(exp);
         assert.ok(def, f + ': LessonContent.add(\'' + exp + '\', …) 로 넣어야 해요 (파일 이름 = 실험 키)');
         assert.deepEqual(LessonSlides.check(exp, def), [], f);
@@ -21,6 +22,14 @@ test('설명 화면 내용 파일: 모양·단계 키', () => {
         const ok = new Set([...(CC.gateSteps(exp) || []), ...(CC.gateSteps(exp, 'hd') || []), ...Object.keys(info.steps)]);
         for (const k of Object.keys(def.stages)) assert.ok(ok.has(k), f + ': 모르는 단계 키 ' + k);
     }
+});
+
+test('LessonSlides: 먼저 불린 내용 파일 대기열(_wait)', () => {
+    const box = {}; box.window = box;
+    vm.runInNewContext(fs.readFileSync(path.join(DIR, 'rocket.js'), 'utf8'), box);
+    assert.ok(box.LessonContent._wait.rocket, '부품 없이 불리면 대기열에');
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'lesson-slides.js'), 'utf8'), Object.assign(box, { self: box }));
+    assert.ok(box.LessonContent.get('rocket'), '부품이 대기열을 가져감');
 });
 
 test('LessonSlides: 가설연역은 같은 패널 키 장을 이어 붙임, 물음 뒤 풀이, 검사', () => {

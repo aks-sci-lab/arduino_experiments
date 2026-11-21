@@ -20,7 +20,9 @@
         ask: '❓ 생각해 봐요',
         safety: '🦺 안전 약속'
     };
-    var DB = (root && root.LessonContent && root.LessonContent._db) || {};
+    var prev = root && root.LessonContent, DB = (prev && prev._db) || {};
+    // 내용 파일이 이 부품보다 먼저 불렸으면 window.LessonContent = { _wait: {}, add } 대기열에 있음 → 가져옴
+    if (prev && prev._wait) Object.keys(prev._wait).forEach(function (k) { DB[k] = prev._wait[k]; });
     var LessonContent = {
         _db: DB,
         add: function (exp, def) { DB[exp] = def; return def; },

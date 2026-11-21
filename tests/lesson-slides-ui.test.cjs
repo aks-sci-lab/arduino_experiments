@@ -13,7 +13,7 @@ const QR = 'window.qrcode=function(){return{addData(){},make(){},createSvgTag(){
 // 시험용 퀀텀닷 내용 (진행 방법 세션이 쓰는 진짜 파일과 상관없이)
 const QDOT = `LessonContent.add('qdot', { title: '시험', stages: {
   purpose: [ { kind: 'why', title: '목적 설명 1', body: '<p>하나</p>' }, { kind: 'ask', title: '목적 물음', body: '<p>둘</p>', ask: '왜?', reveal: '<p>풀이-목적</p>' } ],
-  theory: [ { kind: 'concept', title: '이론 설명 1', body: '<p>이론</p>', note: '선생님 말' } ] } });`;
+  theory: [ { kind: 'concept', title: '이론 설명 1', body: '<p>이론</p><p class="formula">E = hc / λ</p><table><thead><tr><th>λ</th><th>E</th></tr></thead><tbody><tr><td>365 nm</td><td>3.40 eV</td></tr><tr><td>450 nm</td><td>2.76 eV</td></tr></tbody></table>', note: '선생님 말' } ] } });`;
 
 test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이, 학생 화면으로, 내용 없는 실험은 그대로, 4K', { skip: !chromium && 'playwright 없음', timeout: 240000 }, async () => {
     const app = loadLabStore(), api = labServer(app);
@@ -125,6 +125,12 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         // 목적에서 → 끝까지 → 이론 설명부터 (학생 화면은 아직 목적)
         for (let i = 0; i < 30 && !(await slide(T)); i++) { await T.keyboard.press('ArrowRight'); await T.waitForTimeout(40); }
         assert.equal((await slide(T)).title, '이론 설명 1', '다음 단계로 가기 전에 그 단계 설명');
+        // 본문의 표·식: 칸이 테두리·간격으로 나뉘고, 식은 본문보다 크고 굵게
+        const look = await T.evaluate(() => { const s = document.querySelector('#pSlides .ls-slide'), td = s.querySelector('td'), f = s.querySelector('.formula'), p = s.querySelector('.ls-body p'), cs = getComputedStyle(td);
+            return { border: parseFloat(cs.borderLeftWidth), pad: parseFloat(cs.paddingLeft), gap: s.querySelectorAll('td')[1].getBoundingClientRect().left - td.getBoundingClientRect().right, fw: +getComputedStyle(f).fontWeight, fs: parseFloat(getComputedStyle(f).fontSize) / parseFloat(getComputedStyle(p).fontSize), over: s.scrollHeight > s.clientHeight + 1 }; });
+        assert.ok(look.border >= 1 && look.pad >= 4, '표 칸 테두리·간격: ' + JSON.stringify(look));
+        assert.ok(look.fw >= 700 && look.fs >= 1.2, '식은 크고 굵게: ' + JSON.stringify(look));
+        assert.equal(look.over, false, '표·식이 있어도 넘치지 않음');
         assert.equal(await sel(), 'purpose');
         await T.keyboard.press('ArrowRight');
         assert.equal(await slide(T), null);

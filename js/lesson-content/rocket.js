@@ -23,7 +23,10 @@
         '<path d="M160 120 L160 40 M148 54 L160 40 L172 54" stroke="#2e7d32" stroke-width="6" fill="none"/><text x="160" y="140" text-anchor="middle" font-size="15" fill="#2e7d32">몸통 ↑</text>' +
         '<path d="M40 150 L40 205 M28 192 L40 205 L52 192" stroke="#1565c0" stroke-width="6" fill="none"/><text x="40" y="140" text-anchor="middle" font-size="15" fill="#1565c0">물·기체 ↓</text></svg>';
 
-    LessonContent.add('rocket', {
+    // 공통 부품(js/lesson-slides.js)보다 먼저 불려도 되게: 없으면 대기열에 넣어 두고 부품이 가져감
+    var LC = (typeof window !== 'undefined' && window.LessonContent) || (typeof LessonContent !== 'undefined' ? LessonContent : null);
+    if (!LC) LC = window.LessonContent = { _wait: {}, add: function (k, d) { this._wait[k] = d; return d; } };
+    LC.add('rocket', {
         title: '발포비타민 필름통 로켓',
         stages: {
             // 1 생각 열기
