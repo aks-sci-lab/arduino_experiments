@@ -54,6 +54,63 @@ const SP = 'labClasses/cb63cejb3spj924cwsebbpq8', PAGE = 'projects/film-rocket.h
             await lesson('', 0, '', false, ['force', 'accel', 'pressure'], false);
             await all('(8) 설명 닫힘 · 12분'); note('(8) 띠', Object.fromEntries(await Promise.all(Object.entries(W.pages).map(async ([n, pg]) => [n, (await st(pg, 10)).띠]))));
             await W.tap(B, '돌아가기').catch(() => {}); await B.waitForTimeout(600); note('B 가 생각 열기로 돌아가 본 화면', await st(B, 520));
+        },
+        2: async () => {   // 12~18분: 1차시 열림 + 설명 장 1~5 — (9)~(16)
+            const A = await live.student('A', 'phone'), B = await live.student('B', 'phone'), C = await live.student('C', 'Pixel 7'), D = await live.student('D', 'phone');
+            const O3 = ['force', 'accel', 'pressure']; const lg = (k, v) => note(k, { 글: v.글 ? v.글.slice(0, 520) : v, 단추: v.단추 });
+            const SW = /초시계로 재기|시작 \(뚜껑/;
+            await A.waitForTimeout(1200); if (await has(D, '공기의 무게')) { await pickQ(D, '공기의 무게'); }
+            setStage(2); await lesson('t1', 0, 'gas', false, O3);
+            for (const [n, pg] of Object.entries(W.pages)) note('(9) 1차시 열림 ' + n, await st(pg, 330));
+            if (await D.locator('button, a').filter({ hasText: /로 가기/ }).locator('visible=true').count()) await D.locator('button, a').filter({ hasText: /로 가기/ }).locator('visible=true').first().click();
+            // B: 설명 중에 먼저 누름
+            await W.stroll(B, '(9) B 먼저', 7, 0, /🔒 무엇을 바꿔|물의 양 바꾸기/, lg); await W.shot(B, 'B 1차시 퀴즈 가림');
+            await lesson('t1', 0, 'gas', true, O3.concat('gas'));
+            note('(10) 풀이 뒤 B 폰', await st(B, 520));
+            await W.stroll(A, '(10) A 풀이 듣고', 5, 0, /🔒 무엇을 바꿔|물의 양 바꾸기|안전 확인 →/, lg);
+            await lesson('t1', 1, '', false, O3.concat('gas'));
+            await lesson('t1', 2, 'control', false, O3.concat('gas'));
+            await W.stroll(B, '(12) B 먼저', 8, 1, /이 조건으로|예측했어요|초시계로 재기/, lg);
+            await lesson('t1', 2, 'control', true, O3.concat('gas', 'control'));
+            note('(13) 풀이 뒤 B 폰', await st(B, 420));
+            await lesson('t1', 3, '', false, O3.concat('gas', 'control'));
+            await lesson('t1', 4, '', false, O3.concat('gas', 'control'));
+            await lesson('', 0, '', false, O3.concat('gas', 'control'), false);
+            await W.stroll(A, '(16) A', 22, 0, SW, lg);
+            for (const [n, pg, k] of [['B', B, 1], ['C', C, 2]]) await W.stroll(pg, n, 22, k, SW, quiet);
+            await W.stroll(D, 'D', 8, 0, SW, quiet);
+            await all('(16) 시작! 뒤');
+        },
+        21: async () => {   // 18~50분: 측정 — 한 값으로만 재면? · (17)~(20) 돌아보기
+            setStage(2);
+            const A = await live.student('A', 'phone'), B = await live.student('B', 'phone'), C = await live.student('C', 'Pixel 7'), D = await live.student('D', 'phone');
+            const O5 = ['force', 'accel', 'pressure', 'gas', 'control']; const lg = (k, v) => note(k, { 글: v.글 ? v.글.slice(0, 560) : v, 단추: v.단추 });
+            const SW = /초시계로 재기|시작 \(뚜껑/; const team = async (n, f) => { try { await f(); } catch (e) { note(n + ' 막힘', String(e.message).split('\n')[0]); } };
+            const res = async pg => ({ 글: (await top(pg, 620)).split(' / ').slice(3).join(' / '), 단추: (await btns(pg)).slice(4) });
+            await team('A', async () => { for (let i = 0; i < 3; i++) { await toSw(A); await sw(A, 2 + i * 0.4); } note('A 10 mL 로만 3번 잰 뒤', await res(A)); await W.shot(A, 'A 한 값 3번');
+                if (await has(A, '그래프 보기')) { await W.tap(A, '그래프 보기'); await A.waitForTimeout(600); note('A 그래프 눌러 봄(값 한 가지)', await res(A)); await W.shot(A, 'A 그래프 값 한 가지'); } });
+            await team('B', async () => { for (let i = 0; i < 3; i++) { await toSw(B); await sw(B, 2 + i * 0.3); } note('B 20 °C 로만 3번 잰 뒤', await res(B));
+                if (await has(B, '그래프 보기')) { await W.tap(B, '그래프 보기'); await B.waitForTimeout(600); note('B 그래프(값 한 가지)', await res(B)); await W.stroll(B, 'B 더 가 봄', 4, 0, /도전하기/, lg); } });
+            await team('C', async () => { for (let i = 0; i < 2; i++) { await toSw(C); await sw(C, 2.2); } });
+            await team('D', async () => { await W.stroll(D, 'D', 22, 0, SW, quiet); await start(D); await D.waitForTimeout(1200); });
+            await lesson('t1', 5, '', false, O5);
+            for (const [n, pg] of Object.entries(W.pages)) note('(17) 돌아보기 ' + n, await st(pg, 300)); await W.shot(D, 'D 초시계 + 앞 화면 띠');
+            await team('D', async () => { await stop(D); note('(17) D 띠가 뜬 채 펑 멈춤', await res(D)); });
+            await lesson('t1', 5, '', true, O5); await lesson('t1', 6, '', false, O5); await lesson('', 0, '', false, O5, false);
+            // 돌아보기 뒤: 폰 말을 따라 값을 바꿔 재는지 (A·B 는 따라 함, C 는 그대로)
+            await team('A 값 바꿈', async () => { const t = (await btns(A)).find(x => /바꿔|더 재기/.test(x)); note('A 가 누른 단추', t); await W.tap(A, t.slice(0, 10)); await A.waitForTimeout(600); note('A 값 고르는 화면', await res(A)); await W.tap(A, '+'); await toSw(A); await sw(A, 3.2); note('A 15 mL 1번 잰 뒤', await res(A)); await W.tap(A, '그래프 보기'); await A.waitForTimeout(600); note('A 그래프(값 두 가지)', await res(A)); });
+            await team('B 값 바꿈', async () => { const t = (await btns(B)).find(x => /바꿔|더 재기/.test(x)); await W.tap(B, t.slice(0, 10)); await B.waitForTimeout(500); await W.tap(B, '+'); await toSw(B); await sw(B, 1.5); await W.tap(B, '그래프 보기'); await B.waitForTimeout(500); await W.stroll(B, 'B 값 두 가지 뒤', 9, 0, /도전하기/, lg); if (await has(B, '도전하기')) { await W.tap(B, '도전하기'); await B.waitForTimeout(500); note('B 도전 화면', await res(B)); } });
+            await A.waitForTimeout(3000); await all('50분');
+        },
+        22: async () => {   // B: '바꿔서 다시 재기'를 누르고도 값을 안 바꾼 채(20 °C) 한 번 더 → 그 뒤 값을 바꿈 → 그래프 → 도전
+            setStage(2); const B = await live.student('B', 'phone'); const lg = (k, v) => note(k, { 글: v.글 ? v.글.slice(0, 560) : v, 단추: v.단추 });
+            const res = async pg => ({ 글: (await top(pg, 620)).split(' / ').slice(3).join(' / '), 단추: (await btns(pg)).slice(4) });
+            note('B 지금 화면', await res(B)); if (await has(B, '녹화 시작')) { await W.tap(B, '← 뒤로'); await B.waitForTimeout(500); } note('B 뒤로 뒤', await res(B)); await toSw(B); await W.tap(B, '초시계로 재기').catch(() => {}); await B.waitForTimeout(300); await W.tap(B, '시작 (뚜껑'); await B.waitForTimeout(2000); await stop(B); note('B 값을 안 바꾸고(20 °C) 4번째 잰 뒤', await res(B));
+            await W.tap(B, '그래프 보기'); await B.waitForTimeout(500); note('B 그래프 눌러 봄', await res(B));
+            await W.tap(B, '바꿔서 다시 재기'); await B.waitForTimeout(500); await W.tap(B, '+'); await toSw(B); await sw(B, 1.4); note('B 30 °C 1번 잰 뒤', await res(B));
+            await W.tap(B, '그래프 보기'); await B.waitForTimeout(500); await W.stroll(B, 'B 값 두 가지 뒤', 9, 0, /도전하기/, lg);
+            if (await has(B, '도전하기')) { await W.tap(B, '도전하기'); await B.waitForTimeout(500); note('B 도전 화면', await res(B)); }
+            await B.waitForTimeout(2500);
         }
         // TURNS
     };
