@@ -155,6 +155,38 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         assert.match(await T.textContent('#stageWait'), /🔌 연결 끊김 1팀/);
         assert.doesNotMatch(await T.textContent('#board'), /별빛가족 🔌/);
 
+        // ⑥ 👀 눈으로 고르기 화면: 고르기 전에는 띠 단추 꺼짐, 고르면 켜짐·그 발사가 저장됨 (A 는 2차시, 정리가 열림)
+        await A.evaluate(() => window.__filmRocket.show('t2-hand'));
+        await go(A, 't2-hand');
+        await A.waitForFunction(() => { const n = document.getElementById('ev-notice'); return n && !n.hidden; }, null, { timeout: 15000 });
+        assert.equal(await A.isDisabled('#ev-notice-go'), true, '고르기 전에는 못 누름');
+        assert.match(await A.textContent('#ev-notice-go'), /이 측정을 끝내고 가요/);
+        assert.equal(await A.locator('#ev-notice-jump').count(), 0, '한 단계 차이면 바로 가기 없음');
+        await A.click('.ev-choice[data-k="same"]');
+        await go(A, 't2-result');
+        assert.equal((await A.evaluate(() => window.__filmRocket.state())).t2.trials.length, 1, '눈으로 고른 발사가 저장됨');
+        assert.equal(await A.isDisabled('#ev-notice-go'), false, '고른 뒤에는 누를 수 있음');
+        assert.match(await A.textContent('#ev-notice-go'), /‘정리’ 로 가기/);
+
+        // ⑦ 1차시에 남은 B: '2차시로 가기' 와 함께 '정리로 바로 가기' → 한 번에 정리, 2차시는 하지 않음으로 남음
+        assert.match(await B.textContent('#ev-notice-go'), /‘2차시’ 로 가기/);
+        assert.match(await B.textContent('#ev-notice-jump'), /‘2차시’ 건너뛰고 ‘정리’ 로 바로 가기/);
+        const jb = await B.locator('#ev-notice-jump').boundingBox();
+        assert.ok(jb.height >= 43.5, '바로 가기 44px: ' + jb.height);
+        await B.click('#ev-notice-jump');
+        await go(B, 'end-intro');
+        assert.equal(await notice(B), '', '정리에 오면 띠가 사라짐');
+        const bs = await B.evaluate(() => window.__filmRocket.state());
+        assert.ok(!(bs.done && bs.done.t2), '건너뛴 2차시는 끝내지 않은 것으로');
+        assert.equal(bs.t2.trials.length, 0);
+        await T.click('#btnRefresh');
+        await T.waitForFunction(() => /달님 탐험대/.test(document.getElementById('board').textContent) && !/달님 탐험대[^\n]*\(앞 단계\)/.test(document.getElementById('board').innerText), null, { timeout: 20000 });
+        // 건너뛴 2차시는 위 탭으로 나중에 할 수 있음
+        await B.click('#ev-stages [data-stage="t2"]');
+        await go(B, 't2-intro');
+        await B.click('#ev-stages [data-stage="end"]');
+        await go(B, 'end-intro');
+
         // 375px (iPhone 13) 가로 스크롤 없음·단추 56px
         for (const P of [A, B]) {
             assert.equal(await P.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '가로 스크롤');

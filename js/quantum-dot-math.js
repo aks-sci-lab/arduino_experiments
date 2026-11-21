@@ -267,6 +267,8 @@
             fwhm: s.spec ? s.spec.fwhmNm : null, Y, corr: round(corr, 5), ev: cam.ev, lux: cam.lux
         };
     }
+    // 직선 맞춤·예상 ↔ 결과에 넣는 시료인가 (두 가지가 바뀐 시료는 학생이 '넣기'를 골랐을 때만)
+    function inFit(s) { return !(s && s.mix) || s.mix.use === 'in'; }
     function sampleTitle(s) {
         const bits = ['시료 ' + s.no];
         if (fin(s.heatS)) bits.push(s.heatS + '초');
@@ -281,6 +283,7 @@
         if (m.peak != null) o['봉우리(nm)'] = m.peak; else if (m.hueNm != null) o['색 추정(nm)'] = m.hueNm;
         if (m.corr != null) o['보정 밝기'] = round(m.corr, 4);
         if (m.energy != null) o['E(eV)'] = m.energy;
+        if (s.mix) o['⚠두 가지 바뀜'] = s.mix.use === 'in' ? '맞춤에 넣음' : '맞춤에서 뺌';
         return o;
     }
     // 보낼 것: 시료 하나 = 한 줄 (사진·영상은 없음, 숫자만)
@@ -309,6 +312,11 @@
             s.spec = { peakNm: numOr(p.peakNm), fwhmNm: numOr(p.fwhmNm), peakPx: numOr(p.peakPx), fwhmPx: numOr(p.fwhmPx), clip: numOr(p.clip) || 0, edge: !!p.edge };
             if (Array.isArray(p.grid)) s.spec.grid = p.grid.slice(0, gridLen()).map(v => (v == null || !fin(Number(v)) ? null : round(Number(v), 3)));
             if (p.cal && fin(Number(p.cal.a)) && fin(Number(p.cal.b))) s.spec.cal = { a: Number(p.cal.a), b: Number(p.cal.b), n: numOr(p.cal.n), r2: numOr(p.cal.r2) };
+        }
+        // 두 가지가 함께 바뀐 시료: 잰 기기가 저장할 때 붙임({ with: 함께 바뀐 변인 이름, use: 'out'(맞춤에서 뺌, 기본)|'in', why: 고른 까닭 })
+        if (d.mix && typeof d.mix === 'object' && Array.isArray(d.mix.with) && d.mix.with.length) {
+            s.mix = { with: d.mix.with.slice(0, 5).map(x => str(x, 30)).filter(Boolean), use: d.mix.use === 'in' ? 'in' : 'out', why: str(d.mix.why, 80) };
+            if (!s.mix.with.length) delete s.mix;
         }
         const c = d.cam && typeof d.cam === 'object' ? d.cam : {};
         s.cam = { exposureMs: numOr(c.exposureMs), iso: numOr(c.iso), colorTemp: numOr(c.colorTemp), N: numOr(c.N) || 1.8, locked: c.locked === true ? true : c.locked === false ? false : null };
@@ -344,7 +352,7 @@
     /* ---------- CSV ---------- */
     const COLS = ['source', 'no', 'at', 'heat_s', 'citric_g', 'urea_g', 'urea_per_citric', 'water_mL', 'dilution', 'light', 'memo',
         'R', 'G', 'B', 'Y', 'hue', 'lambda_hue_nm', 'peak_nm', 'fwhm_nm', 'E_eV', 'exposure_ms', 'iso', 'color_temp_K', 'locked',
-        'aperture_N', 'EV100', 'lux', 'corrected', 'cal_a', 'cal_b', 'spectrum_380_750_step2'];
+        'aperture_N', 'EV100', 'lux', 'corrected', 'cal_a', 'cal_b', 'spectrum_380_750_step2', 'mixed_with', 'fit_use', 'fit_why'];
     const q = v => { const t = v == null ? '' : String(v); return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
     function toCsv(samples) {
         const lines = ['# 탄소 양자점 형광 실험 (센서 기반 실험실) · 시료 한 줄 · 사진·영상 없음', COLS.join(',')];
@@ -353,7 +361,8 @@
             const row = [s.source || '', s.no, s.at, s.heatS, s.citric, s.urea, round(m.ratio, 4), s.water, s.dilution, s.light, s.memo,
                 p.r, p.g, p.b, p.Y, p.hue, p.lambda, sp.peakNm, sp.fwhmNm, m.energy, c.exposureMs, c.iso, c.colorTemp,
                 c.locked == null ? '' : c.locked ? 1 : 0, c.N, c.ev, c.lux, m.corr, sp.cal ? round(sp.cal.a, 5) : '', sp.cal ? round(sp.cal.b, 6) : '',
-                sp.grid ? sp.grid.map(v => (v == null ? '' : v)).join(';') : ''];
+                sp.grid ? sp.grid.map(v => (v == null ? '' : v)).join(';') : '',
+                s.mix ? s.mix.with.join(';') : '', s.mix ? s.mix.use : '', s.mix ? s.mix.why : ''];
             lines.push(row.map(v => q(v == null ? '' : v)).join(','));
         });
         return lines.join('\n') + '\n';
@@ -391,6 +400,7 @@
                 if (sp) d.spec.grid = sp.split(';').map(v => (v === '' ? null : Number(v)));
                 if (g('cal_a') !== '' && g('cal_b') !== '') d.spec.cal = { a: n('cal_a'), b: n('cal_b') };
             }
+            if (g('mixed_with')) d.mix = { with: g('mixed_with').split(';'), use: g('fit_use'), why: g('fit_why') };
             const s = cleanSample(d);
             if (s) samples.push(s);
         });
@@ -401,7 +411,7 @@
     return {
         HC_EV_NM, KNOWN_LINES, GRID0, GRID1, GRID_STEP, gridNm, gridLen,
         linear, rgbToHue, hueToWavelength, regionStats, colorInfo,
-        lineProfile, smooth, findPeaks, mainPeak, linFit, fitCalibration, pxToNm, nmToPx, suggestLamp, analyzeSpectrum, toGrid,
+        inFit, lineProfile, smooth, findPeaks, mainPeak, linFit, fitCalibration, pxToNm, nmToPx, suggestLamp, analyzeSpectrum, toGrid,
         exposureMs, ev100, luxFromEv, correctedBrightness, cameraInfo, photonEv,
         ratioOf, ratioLabel, metrics, sampleTitle, summaryOf, buildItems, cleanSample, applyIncoming, allSamples,
         toCsv, parseCsv

@@ -182,6 +182,9 @@ test('📱 폰 측정 · 노트북 분석: 노트북 QR → 폰(iPhone 13)에서
         await P.click('#btn-save');
         await P.waitForFunction(() => document.querySelectorAll('.cs-run').length === 2);
         assert.match(await P.textContent('#cs-runs'), /시료 1 · 60초 · 1:1[\s\S]*시료 2 · 180초 · 1:2/);
+        // 가열 시간·비율을 함께 바꿈(바꿀 것을 안 고름) → 두 가지가 바뀐 시료, 기본은 맞춤에서 뺌
+        assert.match(await P.textContent('#mine-list'), /두 가지가 바뀌었어요[\s\S]*넣을까요, 뺄까요/);
+        assert.equal(await P.isChecked('#mine-list [data-mix-no="2"] input[value="out"]'), true);
         assert.equal(await noSideScroll(P), true, '폰 가로 스크롤');
         assert.deepEqual(await smallControls(P, '.cs-phone button, #qdTabs button, #btn-save, #mine-list button'), []);
 
@@ -192,6 +195,7 @@ test('📱 폰 측정 · 노트북 분석: 노트북 QR → 폰(iPhone 13)에서
         const rows = (await app.get({ action: 'list', exp: 'qdot', group: G })).items;
         assert.deepEqual(rows.map(r => r.title), ['시료 2 · 180초 · 1:2']);
         assert.ok(Math.abs(rows[0].summary['봉우리(nm)'] - 520) <= 5);
+        assert.equal(rows[0].summary['⚠두 가지 바뀜'], '맞춤에서 뺌', '교사 조 카드 요약에도');
         assert.match(rows[0].device, /^p/);
         assert.doesNotMatch(JSON.stringify(rows[0].data), /data:image/, '사진은 보내지 않음');
 
@@ -207,7 +211,22 @@ test('📱 폰 측정 · 노트북 분석: 노트북 QR → 폰(iPhone 13)에서
         await P.locator('.cs-run input[type=checkbox][data-id=s1]').check();
         await P.click('#cs-rsend');
         await L.waitForFunction(() => /불러온 값 2개/.test(document.getElementById('cnt').textContent), null, { timeout: 20000 });
-        assert.match(await L.textContent('#xy-fit'), /최소제곱 직선[\s\S]*점 2개/);
+        // 받은 노트북에도 같은 ⚠ 표시, 폰이 고른 '빼기'를 따라 직선에서 빠짐
+        assert.match(await L.textContent('#tbody'), /⚠ 두 가지가 바뀜 \(가열 시간, 재료 비율.*\) · 맞춤에서 뺌/);
+        assert.match(await L.textContent('#mix-box'), /고르기는 잰 기기에서/);
+        assert.equal(await L.locator('#mix-box input').count(), 0, '받은 시료는 보기만');
+        assert.match(await L.textContent('#xy-fit'), /가로값이 다른 시료가 2개 이상[\s\S]*시료 1개는 두 가지가 바뀌어 직선에서 뺐어요/);
+        // 폰에서 '넣기' + 까닭 → 다시 보내면 노트북 직선이 2점으로
+        await P.check('#mine-list [data-mix-no="2"] input[value="in"]');
+        await P.fill('#mine-list [data-mix-no="2"] [data-mix-why]', '비율 차이는 작아서');
+        await P.press('#mine-list [data-mix-no="2"] [data-mix-why]', 'Tab');
+        assert.deepEqual(await smallControls(P, '#mine-list label, #mine-list input[type=text]'), []);
+        assert.equal(await noSideScroll(P), true, '폰 가로 스크롤 (⚠ 칸)');
+        await P.locator('.cs-run input[type=checkbox][data-id=s2]').check();
+        await P.click('#cs-rsend');
+        await L.waitForFunction(() => /최소제곱 직선[\s\S]*점 2개/.test(document.getElementById('xy-fit').textContent), null, { timeout: 20000 });
+        assert.match(await L.textContent('#xy-fit'), /두 가지가 바뀌었지만 직선에 넣었어요/);
+        assert.match(await L.textContent('#mix-box'), /맞춤에 넣음 · 까닭: 비율 차이는 작아서/);
         await L.selectOption('#sel-y', 'corr');
         assert.match(await L.textContent('#xy-fit'), /가로값이 다른 시료가 2개 이상/, '보정 밝기는 시료 1(카메라)만 있음');
         // CSV 다운로드

@@ -128,3 +128,4 @@
 .ev-notice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); }
 .ev-notice > span { flex: 1 1 12em; }
 .ev-notice .ev-notice-go { flex: 1 1 100%; min-height: var(--ev-tap, 56px); }
+.ev-notice .ev-notice-jump { flex: 1 1 100%; min-height: 44px; font-size: .95em; }
