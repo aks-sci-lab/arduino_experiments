@@ -126,6 +126,54 @@ const NOTES = 'quantum-dot-notes-v1', CODE = '2-0050', SP = 'labClasses/cii65iqv
             await P4.evaluate(() => scrollTo(0, 0)); note('4조 폰 맨 위', (await W.text(P4)).split('\n').slice(6, 16).join(' / ').slice(0, 420));
             await W.tap(P4, '고른 회차 보내기'); await P4.waitForTimeout(3500); note('4조 폰 보낸 뒤', (await W.text(P4)).split('\n').filter(l => /보냄|보내기 전|고른 회차/.test(l)).slice(0, 4));
             await L4.waitForTimeout(3000); note('65분 4조 노트북', await panel(L4, /🆕|기다리는|⚠/, 4));
+        },
+        3: async () => {   // 65~80분: 6 결과 — 가로축 · 문헌 장(qd-heat-dir) · 넣기 → 빼기
+            setStage(5);
+            const L = {}; for (const j of [1, 2, 3, 4]) L[j] = await live.student(j + '조노트북', 'laptop'); const P3 = await live.student('3조폰', 'phone');
+            const team = async (n, f) => { try { await f(); } catch (e) { note(n + ' 막힘', String(e.message).split('\n')[0]); } };
+            const RE = /시료 \d|⚠|≈ 표시|속 빈|예상|📊|최소제곱|기울기|뺐|넣었|직선|점이|점 \d|필요|아직|문헌|📚/;
+            const axis = pg => pg.evaluate(() => [...document.querySelectorAll('#sel-x option')].map(o => (o.selected ? '●' : '') + o.textContent));
+            await L[1].waitForTimeout(1200); setStage(6); await lesson('result', 0, '', false, 6500);
+            for (const j of [1, 2, 3, 4]) note('6 결과 ' + j + '조', { 단계: await cur(L[j]), 가로축: await axis(L[j]), 줄: await panel(L[j], RE, 18), 가리기: await gates(L[j]) });
+            await W.shot(L[3], '3조 6 결과 넣음', true); await W.shot(L[2], '2조 6 결과', true);
+            await lesson('result', 1, '', false, 1200); await lesson('result', 1, '', true, 1200); await lesson('result', 2, '', false, 1200); await lesson('result', 2, '', true, 1200); await lesson('result', 3, '', false, 1200); await lesson('result', 3, '', true, 1200);
+            await lesson('result', 4, 'qd-heat-dir', false, 1500);
+            await W.tap(L[2], /^2\s*이론/); await L[2].waitForTimeout(500); await W.tap(L[2], '탄소 양자점'); await L[2].waitForTimeout(400);
+            note('result 4 물음(문헌에서는) · 2조가 2 이론 [탄소 양자점] 탭을 봄', await gates(L[2]));
+            note('result 4 물음 · 6 결과 화면의 가리기(1조)', await gates(L[1]));
+            await lesson('result', 4, 'qd-heat-dir', true);
+            note('result 4 풀이 뒤 · 2조 [탄소 양자점] 탭', await gates(L[2])); note('result 4 풀이 뒤 · 1조 6 결과', { 가리기: await gates(L[1]), 줄: await panel(L[1], /문헌|📚|경향/, 5) });
+            await W.tap(L[2], /^6\s*결과/); await L[2].waitForTimeout(500);
+            await lesson('result', 5, '', false, 1500); await lesson('result', 5, '', true, 1200); await lesson(null, 0, '', false, 6500);
+            await team('3조 빼기로', async () => {
+                note('3조 노트북 ⚠ 상자(노트북에서 바꿀 수 있나)', { 고르기칸: await L[3].locator('.qd-mix input[type=radio]').locator('visible=true').count(), 글: await panel(L[3], /잰 기기|폰에서|고른 것|맞춤에/, 5) });
+                await W.tap(P3, '④ 저장').catch(() => {}); await P3.waitForTimeout(500);
+                await P3.locator('input[type=radio][value=out]').locator('visible=true').first().check(); const why = P3.locator('.qd-mix input[type=text], .qd-mix textarea').locator('visible=true'); await why.first().fill('요소와 가열을 같이 바꿔서 무엇 때문인지 알 수 없어서 뺌'); await why.first().blur(); await P3.waitForTimeout(700);
+                note('3조 폰 빼기로 바꾼 뒤 띠', { 줄: (await W.text(P3)).split('\n').filter(l => /✏️|바뀜|보냄|보내기 전|고른 회차/.test(l)).slice(0, 5), 체크: await P3.locator('input[type=checkbox]').locator('visible=true').evaluateAll(a => a.map(e => e.checked)) });
+                const btn = P3.locator('button').filter({ hasText: '고른 회차 보내기' }).locator('visible=true').first(); if (await btn.isDisabled()) { const boxes = P3.locator('input[type=checkbox]').locator('visible=true'); await boxes.nth((await boxes.count()) - 1).check(); note('3조', '보내기 단추가 꺼져 있어 회차를 다시 체크함'); }
+                await P3.evaluate(() => scrollTo(0, 0)); await W.tap(P3, '고른 회차 보내기'); await P3.waitForTimeout(3500); await L[3].waitForTimeout(3000);
+                note('3조 노트북(빼기 뒤)', { 가로축: await axis(L[3]), 줄: await panel(L[3], RE, 16) }); await W.shot(L[3], '3조 6 결과 뺌', true);
+            });
+            note('4조 노트북(점 하나)', { 가로축: await axis(L[4]), 줄: await panel(L[4], RE, 10) });
+        },
+        31: async () => {   // 80~95분: 7 결론
+            setStage(6);
+            const L = {}; for (const j of [1, 2, 3, 4]) L[j] = await live.student(j + '조노트북', 'laptop');
+            const team = async (n, f) => { try { await f(); } catch (e) { note(n + ' 막힘', String(e.message).split('\n')[0]); } };
+            await L[1].waitForTimeout(1200); setStage(7); await lesson('conclusion', 0, '', false, 6500);
+            note('7 결론 위쪽(보고서 밖, 2조)', (await L[2].locator('.step-panel').locator('visible=true').first().innerText()).split('📝 보고서 쓰기')[0].replace(/\n+/g, ' / ').slice(0, 1100));
+            await lesson('conclusion', 1, '', false, 1200); await lesson('conclusion', 1, '', true, 1200); await lesson('conclusion', 2, '', false, 1200); await lesson('conclusion', 2, '', true, 1200); await lesson('conclusion', 3, '', false, 1200); await lesson('conclusion', 3, '', true, 1200); await lesson('conclusion', 4, '', false, 1200); await lesson(null, 0, '', false, 6500);
+            const rai = async pg => (await pg.locator('#report-ai').innerText()).replace(/\n+/g, ' / ');
+            const write = async (pg, tab, txt) => { await W.tap(pg, tab); await pg.waitForTimeout(300); const ta = pg.locator('#report-ai textarea').locator('visible=true').first(); await ta.fill(txt); await pg.waitForTimeout(1200); };
+            await W.tap(L[2], '결론 및 검토'); await L[2].waitForTimeout(400); note('결론 칸 위 글(2조) — 틀·물음', (await rai(L[2])).split(' / ').filter(l => /주장|증거|추론|물음|\?|우리 조|스토크스/.test(l)).slice(0, 10));
+            await team('1조', async () => { await write(L[1], '데이터 분석', '가열 60·120·180초의 색 추정 파장은 538.8, 540.4, 535.5 nm 로 5 nm 안에서 오르내렸다(뚜렷한 방향 없음). 분광기를 못 써서 ≈ 추정값이다.');
+                await write(L[1], '결론 및 검토', '[주장] 우리 자료로는 가열 시간을 늘리면 파장이 길어진다고 말할 수 없다. [증거] 60→180초에서 ≈538.8→535.5 nm, 차이가 색 추정 오차(±5~10 nm) 안. [추론] 예상은 "조각이 자라면 길어진다"였지만 크기를 재지 않았으니 가정이었다. 문헌 경향(초록 쪽)과 다른 까닭은 RGB 색 추정의 한계나 가열 범위일 수 있다. 스토크스 이동: 1240/538 ≈ 2.30 eV, 3.40 − 2.30 = 1.10 eV.');
+                await W.tap(L[1], '제출·인쇄'); await W.tap(L[1], '최종 제출'); await L[1].waitForTimeout(2000); });
+            await team('2조', async () => { await write(L[2], '결론 및 검토', '주장: 우리 측정에서는 가열 60초와 120초의 파장이 거의 같았다(예상 "길어진다"와 다름). 증거: 60초 ≈539.2 nm, 120초 ≈540.4 nm, 차이 1.2 nm. 추론: 점이 2개뿐이고 ≈ 추정값이라 방향을 말하기 어렵다. 예상이 틀렸다고도 맞았다고도 못 한다. 스토크스 이동: 1240/540 = 2.30 eV, 3.40 − 2.30 = 1.10 eV');
+                note('2조 7 결론 예상 ↔ 결과', await panel(L[2], /내 예상|📊|길어|그대로|달라요|맞았/, 6)); await W.tap(L[2], '제출·인쇄'); await W.tap(L[2], '최종 제출'); await L[2].waitForTimeout(2000); });
+            await team('3조', async () => { await write(L[3], '결론 및 검토', '요소를 늘린 시료는 가열도 같이 바꿔서 뺐다. 남은 시료가 하나라 결론을 못 낸다. 다음에는 가열을 120초로 같게 하고 요소만 0.5, 1, 2 로 바꾼다. (4조 시료 요소 1 · 536 nm 를 같이 보면 0.5 → 1 에서 540 → 536)'); });
+            await team('4조', async () => { await write(L[4], '결론 및 검토', '시료 1개(요소 1, 120초) ≈536 nm. 예상(길어진다)은 확인 못 함. 시료가 더 필요하다.'); });
+            await L[1].waitForTimeout(3000);
         }
         // TURNS
     };
