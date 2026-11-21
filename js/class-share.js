@@ -582,17 +582,24 @@
         }
         function applyLesson(d) {
             if (PRESENT || !CLASS || !d) return;
-            look.used = !!d.lesson; look.on = !!(d.lesson && d.lesson.on);
+            var before = JSON.stringify([look.used, look.open, look.on, look.mode]);
+            look.used = !!d.lesson; look.on = !!(d.lesson && d.lesson.on); look.mode = d.lesson && d.lesson.mode === 'phone' ? 'phone' : 'look';
             look.open = Array.isArray(d.lessonOpen) ? d.lessonOpen.map(String) : [];
             if (cls.info) { cls.info.lesson = d.lesson || null; cls.info.lessonOpen = look.open; }
             try { document.documentElement.classList.toggle('cs-look', look.on); } catch (e) { /* 무시 */ }
             if (look.on && !look.band) {
                 look.band = document.createElement('div'); look.band.className = 'cs-look-band'; look.band.setAttribute('role', 'status'); look.band.setAttribute('aria-live', 'polite');
-                look.band.innerHTML = '👀 <b>앞 화면을 봐요</b> — 선생님이 설명 중이에요';
                 document.body.insertBefore(look.band, document.body.firstChild);
             }
-            if (look.band) look.band.hidden = !look.on;
+            if (look.band) {
+                look.band.hidden = !look.on;
+                // 장의 mode: 'phone' = 물음을 폰에서 고르는 장 → '📱 폰에서 골라요', 그 밖 = '👀 앞 화면을 봐요'
+                look.band.innerHTML = look.mode === 'phone' ? '📱 <b>폰에서 골라요</b> — 고른 뒤 앞 화면을 봐요' : '👀 <b>앞 화면을 봐요</b> — 선생님이 설명 중이에요';
+                look.band.classList.toggle('phone', look.mode === 'phone');
+            }
             hideAnswers();
+            // 실험 페이지가 스스로 가리는 것(행사형 점수 퀴즈의 ⭕·점수)은 opts.onLesson 으로 알림
+            if (before !== JSON.stringify([look.used, look.open, look.on, look.mode]) && typeof opts.onLesson === 'function') { try { opts.onLesson({ used: look.used, on: look.on, mode: look.mode, open: look.open.slice() }); } catch (e) { /* 실험 쪽 오류 */ } }
             // 화면을 새로 그려도(행사형은 화면마다 다시 그림) 답 가리기가 이어지게
             if (look.used && !look.obs && window.MutationObserver) {
                 look.obs = new MutationObserver(function () { if (!look.raf) look.raf = (window.requestAnimationFrame || setTimeout)(hideAnswers); });
@@ -888,7 +895,9 @@
         if (groupOk() && typeof opts.onGroup === 'function' && !CLASS) opts.onGroup(st.group);
         var api = {
             send: send, pull: pull, render: render, beat: beat,
-            role: function () { return role; }, solo: function () { return SOLO; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
+            role: function () { return role; }, solo: function () { return SOLO; },
+            // 이 수업이 설명 화면을 쓰고, 그 key 의 풀이를 아직 안 열었으면 true (실험 페이지가 답·정답 표시를 미룰 때)
+            lessonHidden: function (key) { return !PRESENT && !!CLASS && look.used && look.open.indexOf(String(key)) < 0; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
             openPhone: openPhone, phoneLink: phoneLink, phoneCard: phoneCard,
             // 실험이 측정 하나를 저장했을 때 부른다: 폰 화면(또는 autoSendOnSave)이면 바로 보내기
             // 폰은 기본으로 회차 목록에 쌓기만 하고(고른 회차 보내기), autoSendOnSave: true 면 바로 보낸다

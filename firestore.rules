@@ -134,7 +134,8 @@ service cloud.firestore {
     // 🎬 발표 보기 설명 장 상태 (주인 교사만 씀, js/lab-store.js classLesson): 학생 화면이 '👀 앞을 봐요' 띠·답 가리기에 씀
     //  바뀐 칸만 검사 (예전 lesson.at 은 그때 시각이라, 단계 열기·수업 마치기처럼 lesson 을 안 건드리는 쓰기를 막지 않게)
     function okLesson(d, changed) {
-      return (!changed.hasAny(['lesson']) || (d.lesson is map && d.lesson.keys().hasOnly(['on', 'stage', 'i', 'key', 'reveal', 'at']) &&
+      return (!changed.hasAny(['lesson']) || (d.lesson is map && d.lesson.keys().hasOnly(['on', 'stage', 'i', 'key', 'reveal', 'mode', 'at']) &&
+               (!('mode' in d.lesson) || d.lesson.mode in ['look', 'phone']) &&
                d.lesson.on is bool && d.lesson.reveal is bool && d.lesson.i is int && d.lesson.i >= 0 && d.lesson.i < 200 &&
                d.lesson.stage is string && d.lesson.stage.size() <= 20 && d.lesson.key is string && d.lesson.key.size() <= 40 && d.lesson.at == request.time)) &&
              // lessonOpen: 목록·200개까지 (원소 모양 ^[a-z0-9][a-z0-9-]{0,39}$ 은 js/lab-store.js classLesson 이 거름 — 규칙에서는 목록 원소를 하나씩 볼 수 없음)

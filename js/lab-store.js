@@ -302,7 +302,8 @@
             if (!c || (code && c.classCode !== code)) return null;
             return Object.assign({ space: space }, c);
         }
-        function lessonOut(L) { return L && typeof L === 'object' ? { on: L.on === true, stage: String(L.stage || ''), i: Number(L.i) || 0, key: String(L.key || ''), reveal: L.reveal === true } : null; }
+        // mode: 띠 문구 ('look' = 👀 앞 화면을 봐요, 'phone' = 📱 폰에서 골라요 — 장의 mode, js/lesson-slides.js)
+        function lessonOut(L) { return L && typeof L === 'object' ? { on: L.on === true, stage: String(L.stage || ''), i: Number(L.i) || 0, key: String(L.key || ''), reveal: L.reveal === true, mode: L.mode === 'phone' ? 'phone' : 'look' } : null; }
         function aiLimitOf(c) { var n = Number(c && c.aiLimit); return c && c.aiLimit != null && isFinite(n) ? n : AI.LIMIT_DEFAULT; }   // 예전 수업(칸 없음)은 기본 20
         function publicClass(c) {
             return { ok: true, classCode: c.classCode, space: c.space, ban: c.ban, nStudents: c.nStudents, groupSize: c.groupSize, exp: c.exp,
@@ -367,7 +368,7 @@
             var L = b.lesson && typeof b.lesson === 'object' ? b.lesson : {};
             var i = Math.round(Number(L.i));
             var lesson = { on: L.on === true, stage: STAGE_KEY_RE.test(String(L.stage || '')) ? String(L.stage) : '', i: isFinite(i) && i >= 0 && i < 200 ? i : 0,
-                key: LESSON_KEY_RE.test(String(L.key || '')) ? String(L.key) : '', reveal: L.reveal === true, at: db.stamp() };
+                key: LESSON_KEY_RE.test(String(L.key || '')) ? String(L.key) : '', reveal: L.reveal === true, mode: L.mode === 'phone' ? 'phone' : 'look', at: db.stamp() };
             var fresh = await db.get('labClasses/' + c.space, { cache: false }) || c;
             var open = Array.isArray(fresh.lessonOpen) ? fresh.lessonOpen.slice(0, LESSON_OPEN_MAX) : [];
             var add = (Array.isArray(b.open) ? b.open : []).map(String).filter(function (k, j, arr) { return LESSON_KEY_RE.test(k) && open.indexOf(k) < 0 && arr.indexOf(k) === j; });
@@ -1058,7 +1059,7 @@
             await getCore();
             return browserDb.subscribeDoc ? browserDb.subscribeDoc('labClasses/' + space, function (d) {
                 if (d) cb({ stage: d.stage == null ? null : Number(d.stage), setup: d.setup || null,
-                    lesson: d.lesson && typeof d.lesson === 'object' ? { on: d.lesson.on === true, stage: String(d.lesson.stage || ''), i: Number(d.lesson.i) || 0, key: String(d.lesson.key || ''), reveal: d.lesson.reveal === true } : null,
+                    lesson: d.lesson && typeof d.lesson === 'object' ? { on: d.lesson.on === true, stage: String(d.lesson.stage || ''), i: Number(d.lesson.i) || 0, key: String(d.lesson.key || ''), reveal: d.lesson.reveal === true, mode: d.lesson.mode === 'phone' ? 'phone' : 'look' } : null,
                     lessonOpen: Array.isArray(d.lessonOpen) ? d.lessonOpen.slice(0, LESSON_OPEN_MAX) : [] });
             }) : null;
         } catch (e) { return null; }

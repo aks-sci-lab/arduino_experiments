@@ -415,6 +415,11 @@
             return { jo: t.jo, name: t.name, score: Number(sm['팀 점수']) || 0, quiz: sm['퀴즈 맞힘'], tDiff: sm['시간 도전 차이(초)'], tOk: sm['시간 도전 성공'] === 1,
                 hMax: sm['높이 최고(%)'], hDiff: sm['높이 도전 차이(%)'], hOk: sm['높이 도전 성공'] === 1, spark: sm['생각 바뀜 ✨'],
                 kinds: { t1: Number(sm['1차시 값 가짓수']) || 0, t2: Number(sm['2차시 값 가짓수']) || 0 },
+                // 💬 예측·정리 문장 (팀 폰 js/film-rocket.js 의 🔮 예측·✍️ 정리 문장)
+                talk: ['1차시', '2차시'].map(function (n) {
+                    var g = sm[n + ' 예측'], r = sm[n + ' 결과'], w = sm[n + ' 까닭'];
+                    return g || r || w ? n + ': ' + (g ? '예측 ' + g : '') + (g && r ? ' → ' : '') + (r ? '결과 ' + r : '') + (w ? ' · ' + w : '') : '';
+                }).filter(Boolean),
                 step: !pg ? '–' : done ? CC.stepName(st.exp, done[1], st.flow) + (done[2] === 'more' ? ' ✓ 끝냄 · 더 재는 중' : ' ✓ 기다림') : CC.stepName(st.exp, pg.step, st.flow),
                 doneStage: done ? done[1] : '', at: done ? done[1] : pg ? String(pg.step || '') : '', joined: !!pg,
                 off: !!(ss.joined && ss.ago != null && ss.ago > OFF_MS), state: ss };
@@ -445,7 +450,7 @@
     function boardTable(rows, big) {
         if (!rows.length) return '<p class="note">아직 들어온 팀이 없어요. 가족이 QR 로 들어와 팀 이름을 정하면 여기에 나와요.</p>';
         var n = function (v, unit) { return v == null || v === '' ? '–' : esc(Math.abs(Number(v))) + unit; };
-        return '<div class="ct-board-wrap"><table class="ct-board"><thead><tr><th>팀</th><th>⭐ 점수</th><th>⏱ 시간 도전</th><th>🚀 최고 높이</th><th>🎯 높이 도전</th>' + (big ? '' : '<th>지금</th>') + '</tr></thead><tbody>' +
+        return '<div class="ct-board-wrap"><table class="ct-board"><thead><tr><th>팀</th><th>⭐ 점수</th><th>⏱ 시간 도전</th><th>🚀 최고 높이</th><th>🎯 높이 도전</th>' + (big ? '' : '<th>💬 생각</th><th>지금</th>') + '</tr></thead><tbody>' +
             rows.map(function (r, i) {
                 return '<tr><td>' + (i < 3 && r.score ? ['🥇', '🥈', '🥉'][i] + ' ' : '') + '<b>' + esc(r.name) + '</b>' +
                     (r.off ? ' <span class="ct-off" title="마지막 신호 ' + esc(CC.agoText(r.state.ago)) + '">🔌 ' + esc(CC.agoText(r.state.ago)) + '</span>' : '') +
@@ -453,6 +458,7 @@
                     '<td class="' + (r.tOk ? 'ok' : '') + '">' + (r.tDiff == null ? '–' : (r.tOk ? '🎉 ' : '') + n(r.tDiff, '초 차이')) + '</td>' +
                     '<td>' + (r.hMax == null ? '–' : esc(r.hMax) + '%') + '</td>' +
                     '<td class="' + (r.hOk ? 'ok' : '') + '">' + (r.hDiff == null ? '–' : (r.hOk ? '🎉 ' : '') + n(r.hDiff, '% 차이')) + '</td>' +
+                    (big ? '' : '<td class="note ct-talk">' + (r.talk && r.talk.length ? r.talk.map(function (t) { return '<div>' + esc(t) + '</div>'; }).join('') : '–') + '</td>') +
                     (big ? '' : '<td class="note' + (r.doneStage ? ' ct-waitcell' : '') + (r.behind ? ' ct-behindcell' : '') + '">' + (r.behind ? '↩ ' : '') + esc(r.step) + (r.behind ? ' (앞 단계)' : '') + '</td>') + '</tr>';
             }).join('') + '</tbody></table></div>';
     }
@@ -626,7 +632,9 @@
     function lessonSync(now) {
         var c = watched(); if (!c || !c.space) return;
         var s = lesson.on ? lesson.list[lesson.i] : null;
-        var L = { on: !!lesson.on, stage: lesson.on ? lesson.gate : '', i: lesson.on ? lesson.i : 0, key: s && s.key ? s.key : '', reveal: !!(lesson.on && lesson.rev) };
+        // 'phone' 장은 풀이를 열기 전까지 학생 띠가 '📱 폰에서 골라요' (풀이를 열면 '👀 앞 화면을 봐요')
+        var L = { on: !!lesson.on, stage: lesson.on ? lesson.gate : '', i: lesson.on ? lesson.i : 0, key: s && s.key ? s.key : '', reveal: !!(lesson.on && lesson.rev),
+            mode: s && s.mode === 'phone' && !(lesson.rev && s.reveal) ? 'phone' : 'look' };
         var open = s && s.key && lesson.rev ? [s.key] : [];
         var sig = JSON.stringify([c.space, L, open]);
         if (sig === lsync.last) return;
