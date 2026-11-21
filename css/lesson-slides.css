@@ -1,0 +1,39 @@
+/* 🎬 발표 보기의 수업 설명 화면 (js/lesson-slides.js). 프로젝터 4K 기준: 글자는 화면 높이(vh)에 맞추고, 넘치면 --ls-scale 로 줄임 */
+.ls-deck { --ls-scale: 1; height: 100%; min-height: 420px; box-sizing: border-box; display: flex; }
+.ls-deck[hidden] { display: none; }
+.ls-slide { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden;
+    background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card);
+    padding: calc(3vh * var(--ls-scale)) calc(4vh * var(--ls-scale)); font-family: var(--font); color: var(--c-text);
+    font-size: calc(3.8vh * var(--ls-scale)); line-height: 1.45; }
+.ls-slide .ls-kicker { margin: 0; font-size: 0.8em; font-weight: 700; color: var(--c-primary); }
+.ls-kicker span { color: var(--c-muted); font-weight: 600; }
+.ls-slide .ls-title, .ct-wrap .ls-slide h2.ls-title { margin: 0.25em 0 0.45em; font-size: 1.65em; line-height: 1.2; color: var(--c-text); }
+.ls-main { flex: 1 1 auto; min-height: 0; display: flex; gap: 1.2em; align-items: flex-start; }
+.ls-text { flex: 1 1 0; min-width: 0; }
+.ls-body p, .ls-body ul, .ls-body ol { margin: 0 0 0.45em; }
+.ls-body ul, .ls-body ol { padding-left: 1.3em; }
+.ls-body li { margin: 0.12em 0; }
+.ls-body b, .ls-reveal b { color: var(--c-primary); }
+.ls-fig { flex: 0 1 38%; margin: 0; display: flex; justify-content: center; }
+.ls-fig svg, .ls-fig img { width: 100%; height: auto; max-height: calc(48vh * var(--ls-scale)); }
+.ls-ask { margin: 0.5em 0 0; padding: 0.45em 0.7em; border-left: 0.3em solid var(--c-primary); background: var(--c-primary-soft); border-radius: 0.3em; font-weight: 700; }
+.ls-reveal { margin-top: 0.55em; padding: 0.45em 0.7em; border: 2px solid var(--c-success); border-radius: 0.4em; background: var(--c-ok-bg); }
+.ls-reveal[hidden] { display: none; }
+.ls-reveal p { margin: 0 0 0.3em; }
+.ls-reveal p:last-child { margin-bottom: 0; }
+.ls-wait { margin: 0.5em 0 0; font-size: 0.7em; color: var(--c-muted); }
+.ls-vars { border-collapse: collapse; margin: 0.2em 0 0; width: 100%; }
+.ls-vars th, .ls-vars td { border: 1px solid var(--c-line); padding: 0.3em 0.55em; text-align: left; vertical-align: top; }
+.ls-vars th { width: 34%; white-space: nowrap; background: var(--c-bg, #f5f7fa); }
+.ls-vars small { font-weight: 400; color: var(--c-muted); }
+.ls-foot { display: flex; align-items: flex-end; gap: 1em; margin-top: 0.4em; }
+.ls-dots { display: flex; gap: 0.3em; }
+.ls-dots i { width: 0.45em; height: 0.45em; border-radius: 50%; background: var(--c-line); }
+.ls-dots i.on { background: var(--c-primary); }
+.ls-note { margin: 0 0 0 auto; font-size: 0.55em; max-width: 60%; }
+.ls-note > summary { font-size: 1em; }
+/* 발표 화면 안: 설명을 보일 때는 학생 화면(iframe)을 감춤 */
+.ct-present.ls-on .ct-pframe iframe { display: none; }
+.ct-present:not(.ls-on) .ls-deck { display: none; }
+#btnPMode[hidden] { display: none; }
+@media (max-width: 899px) { .ls-main { flex-direction: column; } .ls-fig { flex-basis: auto; width: 70%; } }

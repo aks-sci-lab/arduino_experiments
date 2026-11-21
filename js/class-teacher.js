@@ -519,12 +519,14 @@
             var u = new URL(studentLink(c));
             u.searchParams.set('present', '1');
             $('presentFrame').src = u.href;
+            lessonLoad(c);
         }
         renderPresentBar();
     }
     function closePresent() {
         if (!pres.space) return;
         pres.space = ''; pres.ask = false; $('presentFrame').src = 'about:blank'; $('pAsk').hidden = true;
+        lesson.def = null; lessonOff();
         if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () { /* 무시 */ });
     }
     function stepNames(c) { return function (k) { return CC.stepName(c.exp, k, c.flow); }; }
@@ -538,6 +540,9 @@
         $('btnPOpen').disabled = !si || si.all || state.stageBusy;
         $('btnPOpen').textContent = si && !si.all ? '▶ 다음 단계 열기: ' + name(si.gate[si.n]) : '▶ 다음 단계 열기';
         if (pres.ask && (!si || si.all)) askOpen(false);
+        var pm = $('btnPMode');
+        pm.hidden = !lesson.def;
+        pm.textContent = lesson.on ? '📱 학생 화면' : '📖 설명';
     }
     function askOpen(on) {
         var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow);
@@ -545,10 +550,98 @@
         $('pAsk').hidden = !pres.ask;
         if (pres.ask) { $('pAskText').innerHTML = '▶ <b>' + esc(stepNames(c)(si.gate[si.n])) + '</b> 단계를 열까요? 학생 폰도 함께 넘어가요.'; $('btnPAskYes').focus(); }
     }
-    function openNext() { askOpen(false); $('btnStageNext').click(); }
+    function openNext() {
+        var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow), nx = si && !si.all ? si.gate[si.n] : '';
+        askOpen(false); $('btnStageNext').click();
+        if (nx) lessonStart(nx, 0);   // 새로 연 단계는 설명 화면부터
+    }
+    // ---------- 📖 수업 설명 화면 (2026-11-21 선생님 "교사가 프로젝트에 띄우게 될 화면에 내용이 있어야", 내용은 js/lesson-content/<exp>.js, 부품은 js/lesson-slides.js) ----------
+    // 단계를 열면 그 단계 설명부터 → 한 장씩(물음 ❓ 다음 키에 풀이) → 마지막 장 다음은 학생 화면(iframe) → 작은 탭 → 단계 끝이면 '열까요?'
+    var LSx = window.LessonSlides;
+    var lesson = { def: null, on: false, gate: '', list: [], i: 0, rev: false };
+    function lessonLoad(c) {
+        lesson.def = null; lessonOff();
+        if (!LSx) return;
+        var space = c.space;
+        LSx.load(c.exp).then(function (def) {
+            if (pres.space !== space || !def) return;
+            lesson.def = def;
+            // 발표를 열면 가장 뒤에 연 단계의 설명부터 (설명이 끝나면 학생 화면도 그 단계로)
+            var si = CC.stageInfo(c.exp, c.stage, c.flow);
+            if (!lessonStart(si ? si.cur : frameGate(c), 0)) renderPresentBar();
+        });
+    }
+    // 발표 화면이 지금 보이는 단계 (iframe 의 단계 단추 키 = 교사가 여는 단계 키, 가설연역도 같음). 행사형은 가장 뒤 열린 단계
+    function frameGate(c) {
+        var d = frameDoc(), b = d && d.querySelector('nav.steps button[data-step][aria-selected="true"]');
+        if (b) return b.dataset.step;
+        var si = CC.stageInfo(c.exp, c.stage, c.flow);
+        return si ? si.cur : '';
+    }
+    function lessonStart(gate, i, rev) {
+        var c = watched();
+        if (!lesson.def || !c || !LSx) return false;
+        var list = LSx.slidesFor(lesson.def, gate, c.flow);
+        if (!list.length) return false;
+        lesson.on = true; lesson.gate = gate; lesson.list = list;
+        lesson.i = Math.max(0, Math.min(list.length - 1, i < 0 ? list.length + i : i));
+        lesson.rev = !!(rev && list[lesson.i].reveal);
+        lessonRender();
+        return true;
+    }
+    function lessonRender() {
+        var c = watched(), box = $('pSlides');
+        $('presentPane').classList.add('ls-on');
+        box.innerHTML = LSx.render(lesson.list[lesson.i], lesson.rev, { i: lesson.i, n: lesson.list.length, stageName: c ? CC.stepName(c.exp, lesson.gate, c.flow) : '' });
+        LSx.fit(box);
+        renderPresentBar();
+    }
+    function lessonOff() {
+        lesson.on = false;
+        $('presentPane').classList.remove('ls-on');
+        $('pSlides').innerHTML = '';
+        renderPresentBar();
+    }
+    // 한 장 넘기기: 처리했으면 true, 처음·끝을 넘어가면 false
+    function lessonMove(dir) {
+        var s = lesson.list[lesson.i];
+        if (dir > 0) {
+            if (s.reveal && !lesson.rev) { lesson.rev = true; lessonRender(); return true; }
+            if (lesson.i + 1 < lesson.list.length) { lesson.i++; lesson.rev = false; lessonRender(); return true; }
+            return false;
+        }
+        if (s.reveal && lesson.rev) { lesson.rev = false; lessonRender(); return true; }
+        if (lesson.i > 0) { lesson.i--; lesson.rev = !!lesson.list[lesson.i].reveal; lessonRender(); return true; }
+        return false;
+    }
+    function stepBtns(d) { return d ? Array.prototype.slice.call(d.querySelectorAll('nav.steps button[data-step]')) : []; }
+    function subBtns(d) {
+        var sub = d && Array.prototype.filter.call(d.querySelectorAll('nav.subtabs'), shown)[0];
+        return sub ? Array.prototype.filter.call(sub.querySelectorAll('button[data-tab]'), shown) : [];
+    }
+    // 설명을 닫고 학생 화면으로: 앞으로 가면 그 단계 첫 작은 탭 맨 위, 뒤로 가면 앞 단계의 마지막 작은 탭
+    function lessonToFrame(dir) {
+        var gate = lesson.gate, d = frameDoc();
+        lessonOff();
+        var bs = stepBtns(d), k = bs.findIndex(function (b) { return b.dataset.step === gate; });
+        if (k < 0) return;
+        var b = dir < 0 ? bs[k - 1] : bs[k];
+        if (!b || b.classList.contains('cs-locked')) return;
+        if (b.getAttribute('aria-selected') !== 'true' || dir < 0) b.click();
+        var sb = subBtns(d);
+        if (sb.length) sb[dir < 0 ? sb.length - 1 : 0].click();
+        try { d.defaultView.scrollTo(0, 0); } catch (e) { /* 무시 */ }
+    }
+    window.addEventListener('resize', function () { if (lesson.on && LSx) LSx.fit($('pSlides')); });
+    $('btnPMode').addEventListener('click', function () {
+        var c = watched(); if (!c) return;
+        if (lesson.on) lessonToFrame(1);
+        else if (!lessonStart(frameGate(c), 0)) $('pHint').textContent = '이 단계에는 설명 화면이 없어요.';
+    });
     // 그 단계 안의 작은 탭 → 다음 단계(열려 있으면) → 잠겨 있으면 열기 확인
     function presentMove(dir) {
         if (pres.ask) { if (dir > 0) openNext(); else askOpen(false); return; }
+        if (lesson.on) { if (!lessonMove(dir)) lessonToFrame(dir); return; }
         var d = frameDoc(), c = watched();
         if (!d || !c) return;
         // 글자를 크게 키우면 한 화면에 다 안 들어옴 → 먼저 남은 내용을 한 화면씩 내리고(←는 올리고), 끝에 닿은 뒤에 다음(이전) 탭
@@ -567,6 +660,10 @@
         var steps = Array.prototype.slice.call(d.querySelectorAll('nav.steps button[data-step], nav.tabs button[data-tab]'));
         var k = steps.findIndex(function (b) { return b.getAttribute('aria-selected') === 'true'; });
         var nb = k >= 0 ? steps[k + dir] : null;
+        // 설명 화면: 다음 단계로 넘어가기 전에 그 단계 설명부터, 단계 첫 화면에서 ← 는 이 단계 설명의 마지막 장
+        var curKey = k >= 0 ? steps[k].dataset.step : '';
+        if (dir > 0 && nb && !nb.classList.contains('cs-locked') && nb.dataset.step && lessonStart(nb.dataset.step, 0)) return;
+        if (dir < 0 && curKey && lessonStart(curKey, -1, true)) return;
         if (nb && !nb.classList.contains('cs-locked')) {
             nb.click();
             if (dir < 0) {   // 앞 단계로 가면 그 단계의 마지막 작은 탭부터

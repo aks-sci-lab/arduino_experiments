@@ -26,6 +26,8 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API, { pollSeconds: 3 }) }));
         await c.route(/cdn\.jsdelivr|cdnjs/, r => { const u = r.request().url(); r.fulfill({ contentType: 'text/javascript', body: /qrcode/.test(u) ? QR : /chart/i.test(u) ? CHART_STUB : '' }); });
         await c.route(/gstatic/, r => r.abort());
+        // 설명 화면(📖)은 tests/lesson-slides-ui.test.cjs 가 봄 — 여기서는 학생 화면(iframe)만
+        await c.route('**/js/lesson-content/**', r => r.fulfill({ status: 404, body: '' }));
         await c.addInitScript(t => {
             if (t) localStorage.setItem('lab-store:fake-user', JSON.stringify({ uid: 'teacher-1', google: true, teacher: true }));
             // 카메라·센서 권한 요청을 세어 봄 (발표용은 0 이어야)
