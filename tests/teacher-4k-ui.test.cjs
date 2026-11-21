@@ -32,6 +32,8 @@ test('교사 화면 4K: 발표 글자·먼저 내리기·큰 QR 한 화면·결�
             }
             if (/cdn\.jsdelivr|cdnjs/.test(u.hostname)) return route.fulfill({ contentType: 'application/javascript', body: /qrcode/.test(u.pathname) ? QR : /chart/i.test(u.pathname) ? CHART : '' });
             if (u.origin !== ORIGIN) return route.abort();
+            // 설명 화면(📖)은 tests/lesson-slides-ui.test.cjs 가 봄 — 여기서는 학생 화면(iframe)만
+            if (/\/js\/lesson-content\//.test(u.pathname)) return route.fulfill({ status: 404, body: '' });
             const file = path.join(ROOT, decodeURIComponent(u.pathname));
             if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return route.fulfill({ status: 404, body: '' });
             return route.fulfill({ contentType: TYPES[path.extname(file)] || 'application/octet-stream', body: fs.readFileSync(file) });
