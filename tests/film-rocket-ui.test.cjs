@@ -108,6 +108,8 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await A.click('.ev-choice[data-k="water"]');
         await A.waitForSelector('.ev-stepper.locked');
         assert.match(await A.textContent('.ev-screen'), /🔒 물의 온도/);
+        assert.equal(await A.isDisabled('.ev-screen .ev-next[data-go]'), true, '🔮 예측을 골라야 다음');
+        await A.click('[data-guess] [data-dir="up"]'); 
         await next(A); await go(A, 'q-control');
         await quiz(A, true);                          // 두 번째에 맞힘 5점 → 25점
         await go(A, 't1-cond');
@@ -302,7 +304,7 @@ test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 설계 → �
         await P.click('[data-var="mass"] [data-pm="1"]'); await P.click('[data-var="mass"] [data-pm="1"]');
         assert.match(await P.textContent('[data-var="mass"] .ev-sval'), /2개/);
         await next(); await go('q-mass'); await P.click('.ev-choice[data-k="ok"]'); await next();
-        await go('t2-var'); await P.click('.ev-choice[data-k="mass"]'); await next();
+        await go('t2-var'); await P.click('.ev-choice[data-k="mass"]'); await P.click('[data-guess] [data-dir="up"]'); await next();
         await go('t2-cond'); assert.match(await P.textContent('.ev-stepper:not(.locked)'), /2개/, '설계 값에서 시작');
         await next(); await go('t2-safe');
         for (const k of ['goggle', 'face', 'away', 'wait']) await P.check('[data-safe="' + k + '"]');

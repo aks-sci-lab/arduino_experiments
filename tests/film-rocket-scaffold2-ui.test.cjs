@@ -1,7 +1,7 @@
 // 필름통 로켓 2026-11-21 고침 — Playwright, 가짜 저장소, iPhone 13
 //  ① '하나만 바꿔' 구멍: 결과 화면에서 바로 안내·그래프 단추 없음, '바꿔서 다시'에서 값을 안 바꾸면 받지 않음, 잠김 화면·띠에 한 줄, 잠긴 단계로 가는 단추 없음
 //  ② 설명 화면을 쓴 반: 점수 퀴즈 ⭕·점수는 그 장 풀이가 열릴 때 (고른 답·점수는 바로 저장)
-//  ③ 띠 문구 mode 'phone' → '📱 폰에서 골라요'   ④ 🔮 예측 → 요약·교사 결과판 💬 생각   ⑤ 몸체 무게 0개면 '무게를 줄이거나' 없음
+//  ③ 띠 문구 mode 'phone' → '✍️ 내 화면에서 해요'   ④ 🔮 예측 → 요약·교사 결과판 💬 생각   ⑤ 몸체 무게 0개면 '무게를 줄이거나' 없음
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
@@ -11,7 +11,7 @@ const REPO = path.join(__dirname, '..');
 const CHART_STUB = 'window.Chart = class Chart { constructor(c, cfg) { this.data = (cfg && cfg.data) || { datasets: [] }; this.options = {}; } update() {} destroy() {} resize() {} };';
 const QR = 'window.qrcode=function(){return{addData(){},make(){},createSvgTag(){return "<svg data-fake=1 viewBox=\\"0 0 10 10\\"><rect width=10 height=10 /></svg>"}}};';
 
-test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·폰에서 골라요 띠·예측 → 결과판', { skip: !chromium && 'playwright 없음', timeout: 240000 }, async () => {
+test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 화면에서 해요 띠·예측 → 결과판', { skip: !chromium && 'playwright 없음', timeout: 240000 }, async () => {
     const app = loadLabStore(), api = labServer(app);
     const stat = http.createServer((req, res) => {
         const p = path.join(REPO, decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -42,9 +42,9 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·폰�
         const A = await ctx(devices['iPhone 13'], 'A');
         await A.goto(ROOT + 'projects/film-rocket.html?c=' + c.classCode + '&s=' + c.space); await go(A, 'enter');
         await A.fill('#ev-name', '별빛가족'); await A.click('#ev-start'); await go(A, 'think-intro');
-        // ③ 'phone' 장: 띠가 '📱 폰에서 골라요'
+        // ③ 'phone' 장: 띠가 '✍️ 내 화면에서 해요'
         await A.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return b && !b.hidden; }, null, { timeout: 15000 });
-        assert.match(await A.textContent('.cs-look-band'), /폰에서 골라요/);
+        assert.match(await A.textContent('.cs-look-band'), /내 화면에서 해요 — 다 하면 앞 화면을 봐요/);
         // ② 1차시 첫 퀴즈: 고르면 '골랐어요 ✓ — 앞 화면을 봐요', ⭕·점수는 아직
         await A.evaluate(() => window.__filmRocket.show('q-gas')); await go(A, 'q-gas');
         await A.click('.ev-choice[data-k="ok"]');

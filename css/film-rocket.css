@@ -45,6 +45,9 @@
 /* 고르기 (젖은 손으로도 누르기 쉽게 크게) */
 .ev-choices { display: grid; gap: var(--sp-2); margin: var(--sp-3) 0; }
 .ev-choices.two { grid-template-columns: 1fr; }
+/* 바꿀 것을 고른 뒤: 두 칸·작은 여백 (🔮 예측 칸이 첫 화면에 보이게) */
+.ev-choices.ev-var-compact { grid-template-columns: 1fr 1fr; margin: var(--sp-2) 0; }
+.ev-var-compact .ev-choice { min-height: var(--ev-tap); padding: var(--sp-2) var(--sp-3); font-size: 1rem; }
 .ev-choice { min-height: var(--ev-tap); text-align: left; padding: var(--sp-3) var(--sp-4); border: 2px solid var(--c-line); border-radius: 14px; background: var(--c-card); color: var(--c-text); font-size: 1.08rem; font-weight: 600; line-height: 1.35; cursor: pointer; }
 .ev-choice small { display: block; font-weight: 400; font-size: .9rem; color: var(--c-muted); margin-top: 2px; }
 .ev-choice.big { min-height: 76px; font-size: 1.2rem; }
@@ -133,7 +136,7 @@
 .ev-notice .ev-notice-jump { flex: 1 1 100%; min-height: 44px; font-size: .95em; }
 
 /* 🔮 예측 · ✍️ 정리 문장 · 🔧 한 번 더 안내 · 퀴즈 풀이 기다림 (2026-11-21) */
-.ev-guess { margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3); border: 2px dashed var(--c-primary); border-radius: 14px; }
+.ev-guess { margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 2px dashed var(--c-primary); border-radius: 14px; }
 .ev-guess h3 { margin: var(--sp-1) 0 var(--sp-2); }
 .ev-field small { font-weight: 400; color: var(--c-muted); }
 .ev-concl .ev-choices { margin: var(--sp-1) 0 var(--sp-2); }
