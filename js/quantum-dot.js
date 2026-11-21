@@ -547,9 +547,29 @@
         $('mix-box').innerHTML = mixed.length ? '<h3>⚠ 두 가지가 바뀐 시료 ' + mixed.length + '개</h3>' + mixed.map(x => '<div class="qd-mix-item"><b>' + esc((x.ext ? x.source + ' · ' : '') + Q.sampleTitle(x)) + '</b>' + mixHtml(x, 'r') + '</div>').join('') : '';
     }
     const Y_INFO = { lambda: ['파장 λ (nm)', 1], energy: ['E (eV)', 3], corr: ['보정 밝기', 3], fwhm: ['반치폭 (nm)', 1] };
+    // 6-2 가로축 = 조가 바꾼 것: 변인 카드(폰은 고른 '바꿀 것')에서, 없으면 시료 값으로 추정
+    //  - 맞춤에 넣는 시료 중 한 가지만 여러 값이면 그것, 둘 다 여러 값이면 '두 가지가 바뀜'(mix) 표시에 없는 쪽
+    function groupChange(all) {
+        const v = curVars();
+        if (v && v.change) return { key: v.change, from: 'card' };
+        const use = all.filter(Q.inFit), n = k => new Set(use.map(s => { const m = Q.metrics(s); return k === 'heat' ? m.heat : m.ratio; }).filter(x => x != null)).size;
+        const h = n('heat'), r = n('ratio');
+        if (h > 1 && r <= 1) return { key: 'heat', from: 'data' };
+        if (r > 1 && h <= 1) return { key: 'ratio', from: 'data' };
+        const withNames = all.filter(s => s.mix).flatMap(s => s.mix.with);
+        const name = k => VARS.vars.find(x => x.key === k).name;
+        if (withNames.length) {
+            const c = VARS.choose.filter(k => withNames.indexOf(name(k)) < 0);
+            if (c.length === 1) return { key: c[0], from: 'data' };
+        }
+        return null;
+    }
+    let xManual = false;
     function renderCharts() {
         if (state.tab !== 'result') return;
-        const all = everything(), xk = $('sel-x').value, yk = $('sel-y').value;
+        const all = everything(), yk = $('sel-y').value, gc = groupChange(all);
+        if (gc && !xManual && $('sel-x').value !== gc.key) $('sel-x').value = gc.key;
+        const xk = $('sel-x').value;
         const groups = {};
         all.forEach(s => {
             const m = Q.metrics(s), x = xk === 'heat' ? m.heat : m.ratio, y = m[yk];
@@ -565,7 +585,9 @@
         const xl = xk === 'heat' ? '가열 시간 (초)' : '요소/구연산 (질량비)';
         drawXY($('xy-chart'), series, xl, Y_INFO[yk][0], f);
         $('xy-fit').innerHTML = (series.length ? '점 색 = 그 시료의 형광 색, 테두리 색: ' + series.map(s => '<span style="color:' + s.color + '">●</span> ' + esc(s.label)).join(' · ') + '<br>' : '') +
-            (f ? '최소제곱 직선: ' + Y_INFO[yk][0] + ' = ' + fmt(f.a, Y_INFO[yk][1]) + ' + (' + f.b.toPrecision(3) + ') × ' + xl.replace(/ \(.*\)/, '') + ' · 점 ' + f.n + '개, R² = ' + fmt(f.r2, 3)
+            (gc && gc.key !== xk ? '<span class="qd-xhint">ⓘ 우리 조가 바꾼 것은 <b>' + esc(VARS.vars.find(x => x.key === gc.key).name) + '</b>' + (gc.from === 'data' ? '(시료 값으로 짐작)' : '') + '이에요. 지금 가로축은 바꾸지 않은 것이라 직선이 뜻을 잃을 수 있어요. <button type="button" class="secondary" data-xfix="' + gc.key + '">가로축 되돌리기</button></span><br>' : '') +
+            (f ? '최소제곱 직선: ' + Y_INFO[yk][0] + ' = ' + fmt(f.a, Y_INFO[yk][1]) + ' + (' + f.b.toPrecision(3) + ') × ' + xl.replace(/ \(.*\)/, '') + ' · 점 ' + f.n + '개, ' +
+                (f.n === 2 ? '<b>점이 2개라 직선이 늘 꼭 맞아요</b>(R² 는 뜻이 없어요) — 더 재요' : 'R² = ' + fmt(f.r2, 3))
                 : '직선을 그리려면 가로값이 다른 시료가 2개 이상 필요해요.') +
             (mixOut ? '<br>⚠ 시료 ' + mixOut + '개는 두 가지가 바뀌어 직선에서 뺐어요 (속 빈 점).' : '') + (mixIn ? '<br>⚠ 시료 ' + mixIn + '개는 두 가지가 바뀌었지만 직선에 넣었어요.' : '') +
             (yk === 'lambda' && all.some(s => Q.metrics(s).lambdaFrom === 'hue') ? '<br>≈ 표시 시료는 색상으로 구한 추정 파장이 섞여 있어요(분광기 값이 더 정확).' : '');
@@ -573,7 +595,8 @@
         drawSpectra($('spec-chart'), specs);
         $('spec-legend').innerHTML = specs.length ? specs.map((s, k) => '<span style="color:' + COLORS[k % COLORS.length] + '">━</span> ' + esc((s.ext ? s.source + ' · ' : '') + Q.sampleTitle(s)) + ' (' + fmt(s.spec.peakNm, 0) + ' nm)').join('<br>') + '<br>곡선은 각 시료의 최대를 1 로 맞춘 모양입니다(밝기 비교는 6-2 의 보정 밝기로).' : '';
     }
-    $('sel-x').onchange = renderCharts; $('sel-y').onchange = renderCharts;
+    $('sel-x').onchange = () => { xManual = true; renderCharts(); }; $('sel-y').onchange = renderCharts;
+    $('xy-fit').addEventListener('click', e => { const b = e.target.closest('[data-xfix]'); if (b) { $('sel-x').value = b.dataset.xfix; xManual = false; renderCharts(); } });
     window.addEventListener('resize', () => { if (state.tab === 'result') renderCharts(); });
 
     function downloadCsv() {
