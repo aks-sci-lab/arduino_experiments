@@ -65,6 +65,45 @@ const SP = 'labClasses/ckc58rnhy9xkwtidzy4xh5tg', PAGE = 'projects/film-rocket.h
             await team('A', async () => { await toSw(A); await sw(A, 2.5); await W.stroll(A, 'A+', 6, 0, /그래프 보기|왜 달랐을까|도전하기/, lg); });
             await team('C', async () => { await toSw(C); await sw(C, 2.5); });
             await A.waitForTimeout(3000); await all('50분');
+        },
+        3: async () => {   // 50분: 2차시 열림 + 설명 장 7장 — 폰 2차시 순서, 첫 발사
+            setStage(2);
+            const A = await live.student('A', 'phone'), B = await live.student('B', 'phone'), C = await live.student('C', 'Pixel 7'), D = await live.student('D', 'phone');
+            const lg = (k, v) => note(k, { 글: v.글 ? v.글.slice(0, 560) : v, 단추: v.단추 });
+            const go = pg => pg.locator('button, a').filter({ hasText: /로 가기|끝내고 가요/ }).locator('visible=true');
+            const team = async (n, f) => { try { await f(); } catch (e) { note(n + ' 막힘', String(e.message).split('\n')[0]); } };
+            await A.waitForTimeout(1500); setStage(3); await A.waitForTimeout(7000);
+            for (const [n, pg] of Object.entries(W.pages)) note('2차시 열린 순간 ' + n, { 띠: ((await W.text(pg)).split('\n').find(l => /선생님이/.test(l)) || '띠 없음'), 띠단추: (await go(pg).count()) ? (await go(pg).first().innerText()).trim() : '없음', 화면: (await top(pg, 200)).split(' / ').slice(3, 6).join(' / ') });
+            for (const [n, pg] of Object.entries(W.pages)) await team(n, async () => { if (await go(pg).count()) { await go(pg).first().click(); await pg.waitForTimeout(700); } });
+            await W.stroll(B, 'B', 30, 1, /영상으로 재기|눈으로 보고 고르기/, lg);
+            for (const [n, pg, k] of [['A', A, 0], ['C', C, 2], ['D', D, 0]]) await team(n, () => W.stroll(pg, n, 30, k, /영상으로 재기|눈으로 보고 고르기/, quiet));
+            await all('장 7 뒤 폰 틀로 바뀔 때');
+            for (const [n, pg, pick] of [['A', A, '아이 키보다 높'], ['B', B, '아이 키보다 높'], ['C', C, '아이 키와 비슷'], ['D', D, '아이 키보다 낮']]) await team(n, async () => {
+                await W.tap(pg, '눈으로 보고 고르기'); await pg.waitForTimeout(500); if (n === 'B') note('B 눈으로 고르기 화면', { 글: await top(pg, 500), 단추: (await btns(pg)).slice(4) });
+                await W.tap(pg, pick); await pg.waitForTimeout(700); note(n + ' 첫 발사 결과', { 글: await top(pg, 520), 단추: (await btns(pg)).slice(4) });
+            });
+        },
+        31: async () => {   // 60~95분: 하나만 바꿔 한 번 더 → (85분) 정리 열림 → 다시 풀기·결과 카드
+            setStage(3);
+            const A = await live.student('A', 'phone'), B = await live.student('B', 'phone'), C = await live.student('C', 'Pixel 7'), D = await live.student('D', 'phone');
+            const lg = (k, v) => note(k, { 글: v.글 ? v.글.slice(0, 600) : v, 단추: v.단추 });
+            const go = pg => pg.locator('button, a').filter({ hasText: /로 가기|끝내고 가요/ }).locator('visible=true');
+            const team = async (n, f) => { try { await f(); } catch (e) { note(n + ' 막힘', String(e.message).split('\n')[0]); } };
+            await team('A', async () => {
+                await W.tap(A, '바꿔서 다시 발사'); await A.waitForTimeout(600); note('A 바꿔서 다시 발사 누른 뒤', { 글: await top(A, 500), 단추: (await btns(A)).slice(4) });
+                await W.tap(A, '+'); await A.waitForTimeout(300); await W.stroll(A, 'A', 8, 0, /영상으로 재기|눈으로 보고 고르기/, quiet); await W.tap(A, '눈으로 보고 고르기'); await W.tap(A, '아이 키와 비슷'); await A.waitForTimeout(600);
+                note('A 두 번째 발사 결과', { 글: await top(A, 500), 단추: (await btns(A)).slice(4) });
+                await W.tap(A, '그래프 보기'); await A.waitForTimeout(600); note('A 그래프', { 글: (await W.text(A)).split('\n').slice(3, 22).join(' / ').slice(0, 700), 단추: (await btns(A)).slice(4) });
+            });
+            await team('B', async () => { await W.tap(B, '그래프 보기'); await B.waitForTimeout(500); await W.stroll(B, 'B', 8, 1, /영상으로 재기|눈으로 보고 고르기/, lg); });
+            await team('D', async () => { await W.tap(D, '바꿔서 다시 발사'); await D.waitForTimeout(500); await W.tap(D, '+'); await W.stroll(D, 'D', 8, 0, /영상으로 재기|눈으로 보고 고르기/, quiet); await W.tap(D, '눈으로 보고 고르기'); await W.tap(D, '아이 키보다 낮'); await D.waitForTimeout(500); note('D 두 번째(무게 +1) 결과', await top(D, 420)); });
+            setStage(4); await A.waitForTimeout(7000);
+            for (const [n, pg] of Object.entries(W.pages)) note('정리 열린 순간 ' + n, { 띠단추: (await go(pg).count()) ? (await go(pg).first().innerText()).trim() : '없음', 화면: (await top(pg, 220)).split(' / ').slice(3, 7).join(' / ') });
+            for (const [n, pg] of Object.entries(W.pages)) await team(n, async () => { if (await go(pg).count()) { await go(pg).first().click(); await pg.waitForTimeout(700); } });
+            await W.stroll(A, 'A정리', 16, 2, /결과 카드 만들기/, lg);
+            for (const [n, pg, k] of [['B', B, 1], ['C', C, 1], ['D', D, 2]]) await team(n, async () => { await W.stroll(pg, n, 16, k, /결과 카드 만들기/, quiet); note(n + ' 정리 끝', { 글: await top(pg, 700) }); });
+            await team('A', async () => { await W.tap(A, '결과 카드 만들기'); await A.waitForTimeout(1200); note('A 결과 카드', await top(A, 500)); });
+            await A.waitForTimeout(3000);
         }
         // TURNS
     };
