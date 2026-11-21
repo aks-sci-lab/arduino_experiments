@@ -696,8 +696,10 @@
     });
     // 그 단계 안의 작은 탭 → 다음 단계(열려 있으면) → 잠겨 있으면 열기 확인
     function presentMove(dir) {
-        if (pres.ask) { if (dir > 0) openNext(); else askOpen(false); return; }
-        if (lesson.on) { if (!lessonMove(dir)) lessonToFrame(dir); return; }
+        // '다음 단계를 열까요?' 가 떠 있는 동안 → 는 무시 (빨리 두 번 눌러 잘못 열리지 않게): 열기는 Enter·단추로만, ← 는 닫기
+        if (pres.ask) { if (dir < 0) askOpen(false); return; }
+        // 설명 장: ← 는 앞 장, 첫 장이면 그대로 머묾 · → 는 다음 장, 마지막 장 다음은 학생 화면
+        if (lesson.on) { if (!lessonMove(dir) && dir > 0) lessonToFrame(1); return; }
         var d = frameDoc(), c = watched();
         if (!d || !c) return;
         // 글자를 크게 키우면 한 화면에 다 안 들어옴 → 먼저 남은 내용을 한 화면씩 내리고(←는 올리고), 끝에 닿은 뒤에 다음(이전) 탭
@@ -730,6 +732,8 @@
             try { d.defaultView.scrollTo(0, 0); } catch (e) { /* 무시 */ }
             return;
         }
+        // 행사형(로켓, 단계 단추 없음): 학생 화면에서 ← 는 지금 단계 설명의 마지막 장으로
+        if (dir < 0 && !steps.length && lessonStart(frameGate(c), -1, true)) return;
         if (dir > 0 && (nb || !steps.length)) askOpen(true);   // 잠긴 다음 단계 (또는 단계 단추가 없는 행사형)
     }
     function presentKey(e) {

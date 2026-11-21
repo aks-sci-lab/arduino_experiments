@@ -67,17 +67,33 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         assert.equal((await slide(T)).rev, false, '← 는 풀이 접기');
         await T.keyboard.press('ArrowLeft');
         assert.match((await slide(T)).title, /필름통 로켓/, '← 앞 장');
+        await T.keyboard.press('ArrowLeft');
+        assert.match((await slide(T)).title, /필름통 로켓/, '첫 장에서 ← 는 그대로 머묾 (말없이 학생 화면으로 가지 않음)');
         // 끝까지 → 학생 화면 (생각 열기 첫 화면)
         for (let i = 0; i < 20 && await slide(T); i++) await T.keyboard.press('ArrowRight');
         assert.equal(await slide(T), null, '마지막 장 다음은 학생 화면');
         await T.waitForFunction(() => { const d = document.getElementById('presentFrame').contentDocument; return d && d.getElementById('ev-app') && d.getElementById('ev-app').getAttribute('data-screen') === 'think-intro'; }, null, { timeout: 15000 });
         assert.match(await T.textContent('#btnPMode'), /설명/);
-        // 다음 → '열까요?' → Enter → 1차시 설명부터 (학생 폰과 같이 단계는 열림)
+        // 폰 틀 학생 화면에서 ← → 생각 열기 설명의 마지막 장, → 로 다시 학생 화면
+        await T.keyboard.press('ArrowLeft');
+        assert.ok(await slide(T), '행사형 학생 화면에서 ← 는 설명 마지막 장');
         await T.keyboard.press('ArrowRight');
+        assert.equal(await slide(T), null);
+        // 다음 → '열까요?' — 빨리 한 번 더 → 를 눌러도 열리지 않음 (열기는 Enter·단추로만)
+        await T.keyboard.press('ArrowRight');
+        assert.equal(await T.isVisible('#pAsk'), true);
+        await T.keyboard.press('ArrowRight'); await T.keyboard.press('PageDown');
+        await T.waitForTimeout(300);
+        assert.equal(app.db.docs.get('labClasses/' + r.space).stage, 1, '→ 를 거듭 눌러도 열리지 않음');
         assert.equal(await T.isVisible('#pAsk'), true);
         await T.keyboard.press('Enter');
         await T.waitForFunction(() => document.querySelector('#presentPane.ls-on .ls-slide'), null, { timeout: 5000 });
         assert.match((await slide(T)).title, /펑/, '1차시 설명 첫 장');
+        // 답을 보여 주는 그림(기체가 뚜껑을 미는 화살표)은 풀이 뒤에
+        assert.equal(await T.locator('#pSlides .ls-fig').count(), 0, '풀이 전에는 그림 없음');
+        await T.keyboard.press('ArrowRight');
+        assert.equal(await T.locator('#pSlides .ls-fig svg').count(), 1, '풀이를 열면 그림');
+        await T.keyboard.press('ArrowLeft');
         assert.equal(app.db.docs.get('labClasses/' + r.space).stage, 2, '단계는 열림');
         // 변인 통제 장: 바꿀 것·같게 할 것·잴 것 표
         for (let i = 0; i < 12 && (await slide(T)).kind !== 'vars'; i++) await T.keyboard.press('ArrowRight');
@@ -135,13 +151,15 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         await T.keyboard.press('ArrowRight');
         assert.equal(await slide(T), null);
         assert.equal(await sel(), 'theory', '설명 다음은 그 단계 학생 화면');
-        // 이론 첫 화면 맨 위에서 ← → 이론 설명 마지막 장 → ← → 목적 학생 화면(마지막 작은 탭)
+        // 이론 첫 화면 맨 위에서 ← → 이론 설명 마지막 장, 설명 첫 장에서 ← 는 그대로 머묾
         await T.evaluate(() => document.getElementById('presentFrame').contentWindow.scrollTo(0, 0));
         for (let i = 0; i < 12 && !(await slide(T)); i++) { await T.keyboard.press('ArrowLeft'); await T.waitForTimeout(40); }
         assert.equal((await slide(T)).title, '이론 설명 1');
         await T.keyboard.press('ArrowLeft');
+        assert.equal((await slide(T)).title, '이론 설명 1', '첫 장에서 ← 는 그대로');
+        await T.click('#btnPMode');
         assert.equal(await slide(T), null);
-        assert.equal(await sel(), 'purpose');
+        assert.equal(await sel(), 'theory');
         // 이론 다음(준비물)은 잠김 → '열까요?' → 내용 없는 단계(준비물)는 바로 학생 화면
         await T.evaluate(() => document.getElementById('presentFrame').contentDocument.querySelector('nav.steps button[data-step="theory"]').click());
         for (let i = 0; i < 30 && !(await T.isVisible('#pAsk')); i++) { await T.keyboard.press('ArrowRight'); await T.waitForTimeout(40); }
