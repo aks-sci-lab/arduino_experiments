@@ -131,6 +131,13 @@ service cloud.firestore {
     }
     // 학생에게 열 단계 수: 1 = 첫 단계만 … 99 = 모두 (없으면 예전 수업 = 모두 열림)
     function okStage(d) { return !('stage' in d) || (d.stage is int && d.stage >= 1 && d.stage <= 99); }
+    // 🎬 발표 보기 설명 장 상태 (주인 교사만 씀, js/lab-store.js classLesson): 학생 화면이 '👀 앞을 봐요' 띠·답 가리기에 씀
+    function okLesson(d) {
+      return (!('lesson' in d) || (d.lesson is map && d.lesson.keys().hasOnly(['on', 'stage', 'i', 'key', 'reveal', 'at']) &&
+               d.lesson.on is bool && d.lesson.reveal is bool && d.lesson.i is int && d.lesson.i >= 0 && d.lesson.i < 200 &&
+               d.lesson.stage is string && d.lesson.stage.size() <= 20 && d.lesson.key is string && d.lesson.key.size() <= 40 && d.lesson.at == request.time)) &&
+             (!('lessonOpen' in d) || (d.lessonOpen is list && d.lessonOpen.size() <= 200));
+    }
     function classOwner(space) { return get(/databases/$(database)/documents/labClasses/$(space)).data.owner; }
     // 팀 이름 수업(필름통 로켓, mode 'team'): 이 실험의 줄은 그 팀 자리(teams/{조 번호})를 잡은 폰(익명 uid)만 만들고 고친다
     function teamUid(space, group) { return get(/databases/$(database)/documents/labClasses/$(space)/teams/$(group.split('-')[1])).data.uid; }
@@ -167,9 +174,10 @@ service cloud.firestore {
                     (!('aiLimit' in request.resource.data) || (request.resource.data.aiLimit is int && request.resource.data.aiLimit >= 0 && request.resource.data.aiLimit <= 200)) &&
                     request.resource.data.classCode is string && request.resource.data.classCode.matches('^[0-9]{1,2}-[0-9]{4}$') &&
                     request.resource.data.groups is list && request.resource.data.groups.size() <= 60 && okExpire(request.resource.data);
-      // 주인 교사: 행사 설정(예비 실험 값·목표)·학생에게 열 단계(stage)·'수업 마침' 표시(done·doneAt)만 고칠 수 있음
+      // 주인 교사: 행사 설정(예비 실험 값·목표)·학생에게 열 단계(stage)·'수업 마침' 표시(done·doneAt)·발표 보기 설명 장(lesson·lessonOpen)만 고칠 수 있음
       allow update: if isGoogle() && resource.data.owner == request.auth.uid &&
-                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['setup', 'stage', 'done', 'doneAt']) &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['setup', 'stage', 'done', 'doneAt', 'lesson', 'lessonOpen']) &&
+                    okLesson(request.resource.data) &&
                     (!('done' in request.resource.data) || request.resource.data.done is bool) &&
                     (!('doneAt' in request.resource.data) || request.resource.data.doneAt == null || request.resource.data.doneAt == request.time) &&
                     (!('setup' in request.resource.data) || (request.resource.data.setup is map && request.resource.data.setup.size() <= 24)) &&

@@ -567,8 +567,42 @@
             var keys = stepButtons().map(stepKey), i = keys.indexOf(currentStep()), j = i + (e.key === 'ArrowRight' ? 1 : -1);
             if (j >= 0 && j < keys.length && isLocked(keys[j])) { e.preventDefault(); e.stopImmediatePropagation(); gateToast('🔒 아직 잠겨 있어요 — 선생님이 열면 저절로 넘어가요'); }
         }, true);
-        function stageChanged(stage, setup) {
+        // ----- 👀 선생님 설명 화면 (교사 🎬 발표 보기의 설명 장, 2026-11-21 선생님 "👀 앞을 봐요 + 답 가리기") -----
+        // 수업 문서 lesson.on 이면 위에 '👀 앞 화면을 봐요' 띠 + <html class="cs-look">.
+        // 이 수업이 설명 화면을 한 번이라도 썼으면(lesson 칸이 있으면) 학생 화면의 [data-lesson-answer="key"] 는 key 가 lessonOpen 에 들어올 때까지 가림.
+        // 설명 화면을 안 쓴 수업·수업 없이 연 화면·발표용(iframe) 은 그대로 다 보임
+        var look = { used: false, on: false, open: [], band: null, obs: null, raf: 0 };
+        function hideAnswers() {
+            look.raf = 0;
+            Array.prototype.forEach.call(document.querySelectorAll('[data-lesson-answer]'), function (el) {
+                var hide = look.used && look.open.indexOf(el.getAttribute('data-lesson-answer')) < 0;
+                if (el.classList.contains('cs-ans-hide') !== hide) el.classList.toggle('cs-ans-hide', hide);
+                if (hide) el.setAttribute('aria-label', '🔒 선생님 설명 뒤에 열려요'); else if (el.getAttribute('aria-label') === '🔒 선생님 설명 뒤에 열려요') el.removeAttribute('aria-label');
+            });
+        }
+        function applyLesson(d) {
+            if (PRESENT || !CLASS || !d) return;
+            look.used = !!d.lesson; look.on = !!(d.lesson && d.lesson.on);
+            look.open = Array.isArray(d.lessonOpen) ? d.lessonOpen.map(String) : [];
+            if (cls.info) { cls.info.lesson = d.lesson || null; cls.info.lessonOpen = look.open; }
+            try { document.documentElement.classList.toggle('cs-look', look.on); } catch (e) { /* 무시 */ }
+            if (look.on && !look.band) {
+                look.band = document.createElement('div'); look.band.className = 'cs-look-band'; look.band.setAttribute('role', 'status'); look.band.setAttribute('aria-live', 'polite');
+                look.band.innerHTML = '👀 <b>앞 화면을 봐요</b> — 선생님이 설명 중이에요';
+                document.body.insertBefore(look.band, document.body.firstChild);
+            }
+            if (look.band) look.band.hidden = !look.on;
+            hideAnswers();
+            // 화면을 새로 그려도(행사형은 화면마다 다시 그림) 답 가리기가 이어지게
+            if (look.used && !look.obs && window.MutationObserver) {
+                look.obs = new MutationObserver(function () { if (!look.raf) look.raf = (window.requestAnimationFrame || setTimeout)(hideAnswers); });
+                look.obs.observe(document.body, { childList: true, subtree: true });
+            }
+        }
+        function stageChanged(stage, setup, doc) {
             if (!cls.info) return;
+            applyLesson(doc);
+            if (!gateSt.gate) { cls.info.stage = stage; if (setup && JSON.stringify(setup) !== JSON.stringify(cls.info.setup || null)) { cls.info.setup = setup; tellClass(); } return; }
             if (setup && JSON.stringify(setup) !== JSON.stringify(cls.info.setup || null)) { cls.info.setup = setup; tellClass(); }
             var before = gateSt.prev;
             cls.info.stage = stage;
@@ -583,18 +617,22 @@
         }
         function startGate() {
             applyFlow();
-            if (gateSt.on || PHONE || !cls.info || cls.info.exp !== exp || (!GATE && typeof opts.onStage !== 'function')) return;
+            if (gateSt.on || !cls.info || cls.info.exp !== exp) return;
+            // 단계 잠금은 📱 폰 측정 화면에서는 안 함 — 설명 화면(👀 띠·답 가리기)은 폰에도 (발표용은 applyLesson 이 건너뜀)
+            gateSt.gate = !PHONE && !!(GATE || typeof opts.onStage === 'function');
+            if (!gateSt.gate && (PRESENT || !CLASS)) return;
             gateSt.on = true;
-            gateSt.prev = cls.info.stage; applyGate(null);
+            if (gateSt.gate) { gateSt.prev = cls.info.stage; applyGate(null); }
+            applyLesson(cls.info);
             var poll = function () {
                 clearTimeout(gateSt.poll);
                 gateSt.poll = setTimeout(function () {
                     if (document.hidden) return poll();
-                    CC.classInfo(srv().url, CLASS).then(function (r) { if (r && r.ok) stageChanged(r.stage, r.setup); poll(); });
+                    CC.classInfo(srv().url, CLASS).then(function (r) { if (r && r.ok) stageChanged(r.stage, r.setup, r); poll(); });
                 }, (gateSt.off ? 120 : Math.max(3, Number(CFG.pollSeconds) || 5)) * 1000);
             };
             // Firestore 는 수업 문서를 실시간으로 (읽기 한 번). 못 들으면(가짜 서버 등) 몇 초마다 확인
-            PCF.labStore().then(function (L) { return L.watchClassDoc ? L.watchClassDoc(srv().url, function (d) { stageChanged(d.stage, d.setup); }) : null; })
+            PCF.labStore().then(function (L) { return L.watchClassDoc ? L.watchClassDoc(srv().url, function (d) { stageChanged(d.stage, d.setup, d); }) : null; })
                 .then(function (off) { gateSt.off = off || null; if (!off) poll(); }, function () { poll(); });
         }
         // 팀 이름으로 입장: 빈 조 자리 하나를 이 이름으로 잡는다 (이 폰은 한 팀만. 이미 팀이 있으면 그 팀으로)
