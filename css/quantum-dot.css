@@ -115,3 +115,6 @@ body.qd-phone .show-on-laptop { display: none !important; }
 .qd-mix-why { display: block; width: 100%; box-sizing: border-box; min-height: var(--tap); margin-top: var(--sp-1); font: inherit; padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); }
 .qd-mix-box h3 { margin: var(--sp-3) 0 var(--sp-1); font-size: 1rem; }
 .qd-mix-item { margin-bottom: var(--sp-2); }
+/* 6-2: 가로축이 조가 바꾼 것과 다를 때 */
+.qd-xhint { display: inline-block; margin: var(--sp-1) 0; padding: var(--sp-1) var(--sp-2); background: var(--c-warn-bg); color: var(--c-warn-text); border-radius: var(--r-ctl); }
+.qd-xhint button { margin-left: var(--sp-1); }

@@ -291,3 +291,39 @@ test('양자점 수업: 우리 생각·변인 카드 → 선생님께 저장 · 
         await browser.close();
     }
 });
+
+test('양자점 6-2: 가로축 = 조가 바꾼 것(변인 카드 → 시료 값으로 짐작), 다른 축이면 안내, 점 2개면 R² 대신 안내', { skip: !chromium && 'playwright 없음', timeout: 120000 }, async () => {
+    const app = loadLabStore();
+    const browser = await chromium.launch();
+    try {
+        // 재료 비율 조: 가열은 같고 요소만 1 → 2 g
+        const ratioSamples = [sample(1, 120, 470), sample(2, 120, 500, { urea: 2 })];
+        const store = { 'lab-flow': 'report', 'quantum-dot-v1': JSON.stringify({ samples: ratioSamples }) };
+        const { page: P, errors } = await newPage(browser, app, devices['Galaxy Tab S4'], Object.assign({ arg: store }, seed));
+        await P.goto(ORIGIN + '/projects/quantum-dot.html#step-6');
+        await P.waitForSelector('#report-ai .rai-card', { state: 'attached' });
+        await P.waitForFunction(() => /점이 2개라/.test(document.getElementById('xy-fit').textContent));
+        assert.equal(await P.inputValue('#sel-x'), 'ratio', '바꿀 것을 안 골라도 시료 값으로 짐작(요소만 바뀜)');
+        assert.doesNotMatch(await P.textContent('#xy-fit'), /R² = 1\.000/, '점 2개면 R² 대신 안내');
+        // 변인 카드에서 재료 비율을 고르고, 가로축을 가열 시간으로 바꾸면 안내 → 되돌리기
+        await P.click('nav.steps button[data-step="procedure"]');
+        await P.check('.rai-vc input[data-vc="change"][value="ratio"]');
+        await P.click('nav.steps button[data-step="result"]');
+        assert.equal(await P.inputValue('#sel-x'), 'ratio');
+        await P.selectOption('#sel-x', 'heat');
+        assert.match(await P.textContent('#xy-fit'), /우리 조가 바꾼 것은 재료 비율.*바꾸지 않은 것/s);
+        assert.deepEqual(await small(P, '#xy-fit button'), []);
+        await P.click('#xy-fit [data-xfix]');
+        assert.equal(await P.inputValue('#sel-x'), 'ratio');
+        assert.doesNotMatch(await P.textContent('#xy-fit'), /우리 조가 바꾼 것은/);
+        assert.deepEqual(errors, []);
+        // 받은 시료처럼: 바꿀 것을 안 고른 기기에서 가열만 다른 시료 3개 → 가열 시간, R² 표시
+        const heat = await newPage(browser, app, devices['Galaxy Tab S4'], Object.assign({ arg: { 'lab-flow': 'report', 'quantum-dot-v1': JSON.stringify({ samples: [sample(1, 60, 470), sample(2, 120, 480), sample(3, 180, 495)] }) } }, seed));
+        await heat.page.goto(ORIGIN + '/projects/quantum-dot.html#step-6');
+        await heat.page.waitForFunction(() => /R² = /.test(document.getElementById('xy-fit').textContent));
+        assert.equal(await heat.page.inputValue('#sel-x'), 'heat');
+        assert.deepEqual(heat.errors, []);
+    } finally {
+        await browser.close();
+    }
+});

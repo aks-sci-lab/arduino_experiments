@@ -42,6 +42,24 @@ test('양자점 설명 장: 7단계 4~8장 · 물음 먼저 · 변인 통제 · 
     assert.match(lesson.stages.result.map(c => plain(c.body + c.reveal)).join(' '), /보정 밝기/);
 });
 
+// 답 가리기 약속: 장의 key = 학생 화면 data-lesson-answer (설명 화면을 쓴 수업은 교사가 그 장 풀이를 열 때까지 js/class-share.js 가 가림)
+test('양자점 설명 장: 답 가리기 key ↔ 학생 화면 data-lesson-answer, 가열 시간 방향은 결과 뒤로', () => {
+    const { lesson } = require('../js/lesson-content/qdot.js');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'projects', 'quantum-dot.html'), 'utf8');
+    const pageKeys = new Set([...html.matchAll(/data-lesson-answer="([a-z0-9-]+)"/g)].map(m => m[1]));
+    const slideKeys = new Map();
+    for (const st of STEPS) lesson.stages[st].forEach(c => { if (c.key) { assert.match(c.key, /^[a-z0-9-]+$/); assert.ok(c.ask && c.reveal, c.key + ' 은 물음 → 풀이 장'); slideKeys.set(c.key, st); } });
+    assert.deepEqual([...pageKeys].sort(), [...slideKeys.keys()].sort(), '학생 화면 가림 표시와 장의 key 가 짝');
+    // 가열 시간에 따른 색의 방향은 예상(4 과정) 뒤, 결과(6)에서
+    assert.equal(slideKeys.get('qd-heat-dir'), 'result');
+    for (const st of ['purpose', 'theory', 'materials', 'procedure', 'data'])
+        lesson.stages[st].forEach(c => assert.doesNotMatch(plain([c.body, c.reveal, c.ask].join(' ')), /초록 쪽|파란 형광/, st + ' ' + c.title + ': 방향을 미리 주지 않음'));
+    const heat = /<li data-lesson-answer="qd-heat-dir"><b>가열이 길어지면/.test(html);
+    assert.ok(heat, '학생 화면 2-4 의 가열 시간 경향도 가림 대상');
+    // 증거가 예상·주장과 반대라면 → 풀이
+    assert.ok(lesson.stages.conclusion.some(c => /반대/.test(c.title) && c.ask && /증거/.test(plain(c.reveal))));
+});
+
 // 🎬 발표 보기(교사 화면)에서 37장을 풀이까지 모두 그려 4K 배율 100·150·200% 에서 넘치지 않고 글자가 너무 작아지지 않는지
 let chromium = null; try { ({ chromium } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
 test('양자점 설명 장: 4K(3840×2160 배율 100·150·200%) 넘침 없음 · 글자 줄임 없음에 가까움', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
@@ -88,7 +106,7 @@ test('양자점 설명 장: 4K(3840×2160 배율 100·150·200%) 넘침 없음 �
                 })));
                 return { n, min, bad };
             });
-            assert.equal(r.n, 56, '37장 + 풀이 19장');
+            assert.equal(r.n, 60, '39장 + 풀이 21장');
             assert.deepEqual(r.bad, [], w + '×' + h + ' (가장 작은 배율 ' + r.min + ')');
         }
         assert.deepEqual(errors, []);
