@@ -156,14 +156,15 @@
         mass: { q: '같은 힘으로 밀 때, 로켓을 더 무겁게 하면?', def: DEF.design, word: '질량과 가속도',
                opts: [{ k: 'ok', t: '가속도가 작아져서 덜 높이 올라요' }, { k: 'more', t: '가속도가 커져서 더 높이 올라요' }, { k: 'same', t: '아무 차이가 없어요' }] }
     };
-    function quizPoints(tries, correct) { return !correct ? 0 : tries <= 1 ? 10 : tries === 2 ? 5 : 0; }
+    // late: 설명 화면을 쓴 반에서 그 장 풀이가 이미 열린 뒤 처음 고른 퀴즈 → 맞혀도 5점까지 (2026-11-21)
+    function quizPoints(tries, correct, late) { var p = !correct ? 0 : tries <= 1 ? 10 : tries === 2 ? 5 : 0; return late ? Math.min(p, 5) : p; }
     /* 퀴즈 기록 { key: { tries, correct, picks } } → { points, correct, total } */
     function score(quiz) {
         var o = { points: 0, correct: 0, total: 0 };
         Object.keys(quiz || {}).forEach(function (k) {
             var q = quiz[k]; if (!q) return;
             o.total++;
-            if (q.correct) { o.correct++; o.points += quizPoints(q.tries, true); }
+            if (q.correct) { o.correct++; o.points += quizPoints(q.tries, true, q.late); }
         });
         return o;
     }

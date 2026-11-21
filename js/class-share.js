@@ -897,7 +897,9 @@
             send: send, pull: pull, render: render, beat: beat,
             role: function () { return role; }, solo: function () { return SOLO; },
             // 이 수업이 설명 화면을 쓰고, 그 key 의 풀이를 아직 안 열었으면 true (실험 페이지가 답·정답 표시를 미룰 때)
-            lessonHidden: function (key) { return !PRESENT && !!CLASS && look.used && look.open.indexOf(String(key)) < 0; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
+            lessonHidden: function (key) { return !PRESENT && !!CLASS && look.used && look.open.indexOf(String(key)) < 0; },
+            // 이 수업이 설명 화면을 쓰는지 (풀이가 이미 열린 뒤 고른 퀴즈 점수를 낮출 때)
+            lessonUsed: function () { return !PRESENT && !!CLASS && look.used; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
             openPhone: openPhone, phoneLink: phoneLink, phoneCard: phoneCard,
             // 실험이 측정 하나를 저장했을 때 부른다: 폰 화면(또는 autoSendOnSave)이면 바로 보내기
             // 폰은 기본으로 회차 목록에 쌓기만 하고(고른 회차 보내기), autoSendOnSave: true 면 바로 보낸다
