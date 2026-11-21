@@ -3,7 +3,7 @@
 'use strict';
 const fs = require('node:fs'), path = require('node:path');
 const { openLive } = require('./student-live.cjs');
-const CODE = '2-2266', SP = 'labClasses/cgc2as6qmm85qu89e655tedf', PAGE = 'projects/quantum-dot.html?c=2-2266&s=cgc2as6qmm85qu89e655tedf';
+const NOTES = 'quantum-dot-notes-v1', CODE = '2-2266', SP = 'labClasses/cgc2as6qmm85qu89e655tedf', PAGE = 'projects/quantum-dot.html?c=2-2266&s=cgc2as6qmm85qu89e655tedf';
 (async () => {
     const [dir, turnArg, bundleFile] = process.argv.slice(2), turn = +turnArg;
     const live = await openLive(dir), W = live.W, out = [];
@@ -71,6 +71,46 @@ const CODE = '2-2266', SP = 'labClasses/cgc2as6qmm85qu89e655tedf', PAGE = 'proje
             note('2조 노트북 5 데이터에서 보이는 것', await panel(L2, /QR|기다리는|CSV|폰으로/, 4));
             await L1.waitForTimeout(4000);
             for (const [n, pg] of Object.entries(W.pages)) note('45분 ' + n, { 띠: await band(pg), 단계: await cur(pg) });
+        },
+        2: async () => {   // 45~75분: 6 결과(두 가지 바꾼 시료·내 예상 ↔ 결과) → 7 결론(쓸 곳 하나인지)
+            setStage(5);
+            const L1 = await live.student('1조노트북', 'laptop'), L2 = await live.student('2조노트북', 'laptop'), P3 = await live.student('3조폰', 'phone'), P4 = await live.student('4조폰', 'phone'), P1 = await live.student('1조폰', 'phone');
+            // 2조 노트북은 '예전에 분석 질문 칸에 써 둔 글이 남은 기기'로 만든다 (예전 판이 쓰던 저장 자리에 글을 넣고 다시 엶)
+            await L2.evaluate(k => localStorage.setItem(k, JSON.stringify({ q1: '(지난 학기) 가열 시간이 길수록 파장이 조금 길어졌다.', q4: '(지난 학기) 크기만으로는 설명이 안 되는 것 같다.' })), NOTES); await L2.reload(); await L2.waitForTimeout(2500);
+            // 1조: 세 번째 시료(가열 180 + 요소 2, 경고 무시) 저장·보내기
+            note('1조 폰 다시 연 화면의 ① 값', await P1.locator('input[type=number]').locator('visible=true').evaluateAll(a => a.slice(0, 3).map(e => e.value)).catch(() => '① 아님'));
+            note('1조 세 번째 시료 저장 때 경고', await sample(P1, { heat: 180, urea: 2 })); await P1.evaluate(() => scrollTo(0, 0)); await W.tap(P1, '고른 회차 보내기'); await P1.waitForTimeout(3000);
+            // 3조: 교사 말("선생님께 보내는 곳을 찾아볼래요?")을 듣고
+            if (!/5/.test(await cur(P3))) await W.tap(P3, /^5\s*데이터/);
+            const send3 = P3.locator('button').filter({ hasText: /^\s*📤 선생님께 보내기/ }).locator('visible=true'); if (!(await send3.count())) { await P3.locator('summary').filter({ hasText: '조 공유' }).first().click(); await P3.waitForTimeout(400); note('3조', '조 공유 칸이 접혀 있어 펼침'); }
+            await W.tap(P3, /^\s*📤 선생님께 보내기/); await P3.waitForTimeout(2500);
+            setStage(6); await L1.waitForTimeout(7000);
+            note('(가) 6 열린 뒤 단계', Object.fromEntries(await Promise.all(Object.entries(W.pages).map(async ([n, pg]) => [n, await cur(pg)]))));
+            note('(가) 1조 6 결과: 표·경고·예상↔결과', await panel(L1, /시료 \d|⚠|함께|예상|결과|최소제곱|맞았|달랐/, 14)); await W.shot(L1, '1조 6 결과', true);
+            note('(가) 3조 폰 6 결과: 예상↔결과', await panel(P3, /예상|결과|맞았|달랐|필요/, 6));
+            // 2조: 교사 말대로 QR → 폰 → 90초 시료 → 보내기
+            if (!/5/.test(await cur(L2))) await W.tap(L2, /^5\s*데이터/); await L2.waitForTimeout(800);
+            const u2 = await L2.evaluate(() => (document.querySelector('a[href*="role=phone"]') || {}).href || ''); const P2 = await live.student('2조폰', 'phone'); await P2.goto(u2); await P2.waitForTimeout(2000);
+            await sample(P2, { heat: 90, what: 'heat' }); await P2.evaluate(() => scrollTo(0, 0)); await W.tap(P2, '고른 회차 보내기'); await P2.waitForTimeout(3000);
+            setStage(7); await L1.waitForTimeout(7000);
+            // (나) 7 결론
+            const outside = pg => pg.evaluate(() => [...document.querySelectorAll('.step-panel textarea')].filter(e => e.offsetParent && !e.closest('#report-ai')).length);
+            note('(나) 7 결론 위쪽(보고서 밖) 글', (await L1.locator('.step-panel').locator('visible=true').first().innerText()).split('📝 보고서 쓰기')[0].replace(/\n+/g, ' / ').slice(0, 900));
+            note('(나) 보고서 밖 쓰기 칸 수 (1조·2조)', [await outside(L1), await outside(L2)]); note('7 결론 화면 길이', (await W.check(L1)).pages);
+            const rai = async pg => (await pg.locator('#report-ai').innerText()).replace(/\n+/g, ' / ');
+            await W.tap(L1, '결론 및 검토'); note('1조 결론 칸 위 생각해 볼 물음', (await rai(L1)).split(' / ').filter(l => /물음|\?|예상/.test(l)).slice(0, 7));
+            await L1.locator('#report-ai textarea').locator('visible=true').first().fill('예상(가열 시간을 늘리면 파장이 길어진다)은 맞지 않았다. 60·120초 시료는 539.7, 538.9 nm 로 거의 같았다. 세 번째 시료는 요소 양도 함께 바꿔서 가열 시간 때문인지 알 수 없다. 색 추정값(≈)이라 믿기 어렵다.'); await L1.waitForTimeout(1200);
+            await W.tap(L1, '제출·인쇄'); await W.tap(L1, '최종 제출'); await L1.waitForTimeout(2000); note('1조 최종 제출', (await rai(L1)).split(' / ').filter(l => /제출했|저장됨/.test(l)).slice(0, 2));
+            // 2조(예전 글이 남은 기기): 7 결론에서 보이는 것 → 어디에 쓰나
+            if (!/7/.test(await cur(L2))) await W.tap(L2, /^7\s*결론/); await L2.waitForTimeout(800);
+            note('2조 예전 글 안내', (await L2.locator('.step-panel').locator('visible=true').first().innerText()).split('\n').filter(l => /예전|지난 학기|옮겼/.test(l)).slice(0, 6));
+            await W.tap(L2, '데이터 분석'); note('2조 데이터 분석 칸에 들어 있는 글', await L2.locator('#report-ai textarea').locator('visible=true').first().inputValue());
+            await L2.locator('#report-ai textarea').locator('visible=true').first().fill('90초 시료 하나만 재서 직선은 못 그렸다. 색 추정 약 539 nm.'); await L2.waitForTimeout(1500);
+            note('2조 7 결론의 예상 ↔ 결과', await panel(L2, /내 예상|📊|잘 모르|결과/, 5));
+            // 3조(폰): 7 결론 → 결론만 쓰고 제출 안 함 / 4조: 아무것도 안 씀
+            if (!/7/.test(await cur(P3))) await W.tap(P3, /^7\s*결론/); await W.tap(P3, '결론 및 검토'); await P3.locator('#report-ai textarea').locator('visible=true').first().fill('예상(짧아진다)과 달리 초록색이었다. 시료가 하나라 더 재야 한다.'); await P3.waitForTimeout(1500);
+            note('3조 폰 7 결론 화면 길이', (await W.check(P3)).pages);
+            await L1.waitForTimeout(4000);
         }
         // TURNS
     };
