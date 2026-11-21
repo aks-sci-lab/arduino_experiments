@@ -151,8 +151,9 @@
     }
     var lastStep = null;
     function beatIfChanged() { var s = stepNow(); if (share && st.team && s !== lastStep) { lastStep = s; share.stepChanged(); } }
-    // 측정 중(🎥 녹화·⏱ 초시계·장면 고르기)이면 화면을 바꾸지 않음
-    function busy() { return /measure$/.test(st.screen) && app.getAttribute('data-screen') === st.screen; }
+    // 측정 중(🎥 녹화·⏱ 초시계·장면 고르기·세 곳 누르기, 👀 눈으로 고르기 전)이면 화면을 바꾸지 않음
+    // (촬영 안내 t2-film 은 아직 발사 전이라 막지 않음. 눈으로 고르기 화면은 고르면 바로 결과로 넘어가고 ← 뒤로도 있음)
+    function busy() { return /measure$|^t2-hand$/.test(st.screen) && app.getAttribute('data-screen') === st.screen; }
     // 측정 화면은 처음부터 다시 (조건 화면으로), 나머지는 그 화면 그대로
     function resumeId(id) { return /measure$/.test(id) ? id.replace(/measure$/, 'cond') : id; }
     // 선생님이 내 단계보다 뒤 단계를 열었을 때 위에 늘 보이는 띠
@@ -163,8 +164,8 @@
         if (!stageOpen && !(ci && ci.stage != null)) return null;
         var i = STAGE_KEYS.indexOf(st.stage), last = stageOpen ? stageOpen[stageOpen.length - 1] : STAGE_KEYS[STAGE_KEYS.length - 1], j = STAGE_KEYS.indexOf(last);
         if (i < 0 || j <= i) return null;
-        // 한 단계 넘게 뒤처졌어도 바로 다음 단계부터 차례로
-        return { text: '▶ 선생님이 ‘' + stageName(last) + '’ 단계' + (j > i + 1 ? '까지' : '를') + ' 열었어요', next: STAGE_KEYS[i + 1] };
+        // 한 단계 넘게 뒤처졌으면 바로 다음 단계(차례로) + 마지막 연 단계로 바로 가기
+        return { text: '▶ 선생님이 ‘' + stageName(last) + '’ 단계' + (j > i + 1 ? '까지' : '를') + ' 열었어요', next: STAGE_KEYS[i + 1], jump: j > i + 1 ? last : null };
     }
     var STAGE_START = { think: 'think-intro', t1: 't1-intro', t2: 't2-intro', end: 'end-intro' };
     function syncText() {
@@ -194,14 +195,15 @@
             if (nx) {
                 var b = busy();
                 nt.innerHTML = '<span>' + esc(nx.text) + '</span><button type="button" class="ev-next good ev-notice-go" id="ev-notice-go" data-next="' + nx.next + '"' + (b ? ' disabled' : '') + '>' +
-                    (b ? '⏳ 이 측정을 끝내고 가요' : '‘' + esc(stageName(nx.next)) + '’ 로 가기 →') + '</button>';
+                    (b ? '⏳ 이 측정을 끝내고 가요' : '‘' + esc(stageName(nx.next)) + '’ 로 가기 →') + '</button>' +
+                    (nx.jump && !b ? '<button type="button" class="ev-link ev-notice-jump" id="ev-notice-jump" data-next="' + nx.jump + '">‘' + esc(stageName(nx.next)) + '’ 건너뛰고 ‘' + esc(stageName(nx.jump)) + '’ 로 바로 가기</button>' : '');
             }
         }
         $('#ev-top').hidden = st.screen === 'enter';
         if (!saveOk) { s.hidden = false; s.className = 'ev-sync warn'; s.textContent = '⚠ 이 브라우저는 저장이 안 돼요 (사생활 보호 모드?)'; }
     }
     $('#ev-notice').addEventListener('click', function (e) {
-        var b = e.target.closest('#ev-notice-go'); if (!b || b.disabled || busy() || !st.team) return;
+        var b = e.target.closest('#ev-notice-go, #ev-notice-jump'); if (!b || b.disabled || busy() || !st.team) return;
         show(entryFor(b.dataset.next));
     });
     $('#ev-stages').addEventListener('click', function (e) {
