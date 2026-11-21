@@ -32,6 +32,13 @@
 .ls-dots i.on { background: var(--c-primary); }
 .ls-note { margin: 0 0 0 auto; font-size: 0.55em; max-width: 60%; }
 .ls-note > summary { font-size: 1em; }
+/* 내용 파일 본문의 표(측정값 예·비교)와 식 강조 */
+.ls-body table, .ls-reveal table { border-collapse: collapse; margin: 0.3em 0 0.5em; font-size: 0.9em; }
+.ls-body th, .ls-body td, .ls-reveal th, .ls-reveal td { border: 1px solid var(--c-line); padding: 0.25em 0.7em; text-align: center; vertical-align: middle; }
+.ls-body thead th, .ls-reveal thead th { background: var(--c-primary-soft); color: var(--c-text); }
+.ls-slide .formula { display: block; margin: 0.35em 0 0.5em; padding: 0.25em 0.7em; font-size: 1.35em; font-weight: 700; text-align: center;
+    color: var(--c-primary-dark); background: var(--c-fill); border-radius: 0.3em; font-variant-numeric: tabular-nums; }
+.ls-slide .formula.inline { display: inline-block; margin: 0 0.15em; padding: 0 0.3em; font-size: 1.1em; }
 /* 발표 화면 안: 설명을 보일 때는 학생 화면(iframe)을 감춤 */
 .ct-present.ls-on .ct-pframe iframe { display: none; }
 .ct-present:not(.ls-on) .ls-deck { display: none; }
