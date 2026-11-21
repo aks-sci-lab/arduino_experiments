@@ -36,7 +36,7 @@ const NOTES = 'quantum-dot-notes-v1', CODE = '2-0050', SP = 'labClasses/cii65iqv
     const ptext = async (pg, n) => (await pg.locator('.step-panel').locator('visible=true').first().innerText()).replace(/\n+/g, ' / ').slice(0, n || 1500);
     // 교사 설명 장: 수업 문서 lesson · lessonOpen (교사 세션이 알려 준 규칙). w = 기다릴 ms
     const OPEN = [];
-    const lesson = async (stage, i, key, reveal, w) => { const d = W.app.db.docs.get(SP); if (stage === null) d.lesson = { on: false, stage: '', i: 0, key: '', reveal: false, at: new Date() }; else { d.lesson = { on: true, stage, i, key: key || '', reveal: !!reveal, at: new Date() }; if (reveal && key && !OPEN.includes(key)) OPEN.push(key); } d.lessonOpen = OPEN.slice(); await new Promise(r => setTimeout(r, w || 6500)); };
+    const lesson = async (stage, i, key, reveal, w) => { const d = W.app.db.docs.get(SP); if (!OPEN.length && Array.isArray(d.lessonOpen)) OPEN.push(...d.lessonOpen); if (stage === null) d.lesson = { on: false, stage: '', i: 0, key: '', reveal: false, at: new Date() }; else { d.lesson = { on: true, stage, i, key: key || '', reveal: !!reveal, at: new Date() }; if (reveal && key && !OPEN.includes(key)) OPEN.push(key); } d.lessonOpen = OPEN.slice(); await new Promise(r => setTimeout(r, w || 6500)); };
     const bandOn = async pg => (await pg.locator('.cs-look-band').locator('visible=true').count()) ? '👀 있음' : '없음';
     // 지금 보이는 단계에서 답 가리기 자리: key · 가려졌는지 · 글머리
     const gates = pg => pg.evaluate(() => [...document.querySelectorAll('[data-lesson-answer]')].filter(e => e.offsetParent).map(e => e.getAttribute('data-lesson-answer') + (e.classList.contains('cs-ans-hide') ? ' 🔒가림' : ' 보임') + ' · ' + e.textContent.trim().replace(/\s+/g, ' ').slice(0, 46)));
@@ -74,6 +74,58 @@ const NOTES = 'quantum-dot-notes-v1', CODE = '2-0050', SP = 'labClasses/cii65iqv
             await lesson(null);
             await W.tap(L[2], '탄소 양자점'); await L[2].waitForTimeout(400); note('이론 끝 · 2조 [탄소 양자점] 탭(예상 물음 때)', { 가리기: await gates(L[2]), 글: (await ptext(L[2], 1500)).split('카메라로 재기 / ').slice(1).join('').slice(0, 800) });
             note('끝 · 띠', await bandOn(L[1]));
+        },
+        2: async () => {   // 25~55분: 3 준비물 · 4 과정(변인 카드) · 5 데이터(폰 측정) — 55분 상태(4조 안 보냄)
+            const L = {}; for (const j of [1, 2, 3, 4]) L[j] = await live.student(j + '조노트북', 'laptop'); const P3 = await live.student('3조폰', 'phone');
+            const team = async (n, f) => { try { await f(); } catch (e) { note(n + ' 막힘', String(e.message).split('\n')[0]); } };
+            const find = async (pg, re) => (await pg.locator('.step-panel').locator('visible=true').first().innerText()).split('\n').filter(l => re.test(l)).map(l => l.slice(0, 150)).slice(0, 5);
+            await L[1].waitForTimeout(1200); setStage(3); await lesson('materials', 0, '', false, 6500);
+            await lesson('materials', 1, 'qd-microwave', false, 1500);
+            note('materials 1 물음(왜 같은 전자레인지) · 노트북 3 준비물', { 띠: await bandOn(L[4]), 가리기: await gates(L[4]), 전자레인지글: await find(L[4], /전자레인지/) });
+            await lesson('materials', 1, 'qd-microwave', true); note('materials 1 풀이 뒤', await gates(L[4]));
+            await lesson('materials', 2, '', false, 1500); note('materials 2 물음(파장을 더 정확히?) · 노트북에 보이는 답', await find(L[3], /분광|회절|격자/));
+            await lesson('materials', 2, '', true, 1200); await lesson('materials', 3, '', false, 1200); await lesson(null, 0, '', false, 1500);
+            setStage(4); await lesson('procedure', 0, '', false, 6500);
+            note('procedure 0 물음(바꿀 것 하나) · 노트북 4 과정', { 단계: await cur(L[2]), 가리기: await gates(L[2]), 보이는답: await find(L[2], /하나만|같게|🔒/) });
+            await lesson('procedure', 0, '', true, 1200); await lesson('procedure', 1, '', false, 1500);
+            note('변인 카드 빈 화면(2조)', await panel(L[2], /🔧|🔒|📏|🔮|같게|예상|바꿀 것|까닭|거리|노출/, 12));
+            await team('1조 카드', () => card(L[1], 'heat', 'up', '같은 전자레인지, 시료–폰 거리, 노출 고정', '조각이 자라면 상자가 커지는 셈이라 에너지 간격이 작아져 파장이 길어질 것 같다. 단, 크기는 직접 재지 않으니 가정'));
+            await team('2조 카드', () => card(L[2], 'heat', 'up', '시료–폰 거리, 노출 고정', '상자가 커지면 간격이 작아지니까 에너지가 작은 빨강 쪽? (확실하지 않음)'));
+            await team('3조 카드', () => card(L[3], 'ratio', 'unknown', '폰 거리', '요소가 많으면 질소가 더 들어간다는데 색이 어떻게 될지는 모르겠다'));
+            await team('4조 카드', () => card(L[4], 'ratio', 'up', '', ''));
+            await L[1].waitForTimeout(1200);
+            for (const j of [1, 3, 4]) note(j + '조 변인 카드', await panel(L[j], /🔒 같게|더 같게|🔮|까닭/, 6));
+            await lesson('procedure', 2, '', false, 1200); await lesson('procedure', 3, '', false, 1500);
+            note('procedure 3 물음(두 가지가 함께 바뀌면) · 노트북에 보이는 답', await find(L[2], /두 가지|함께 바/));
+            await lesson('procedure', 3, '', true, 1200); await lesson('procedure', 4, '', false, 1000); await lesson('procedure', 5, '', false, 1000); await lesson('procedure', 6, '', false, 1500);
+            await W.tap(L[2], '③ 보정').catch(() => {}); await L[2].waitForTimeout(300); note('procedure 6 물음(알려진 파장의 빛이 왜?) · 노트북 ③ 보정 탭', await find(L[2], /알려진|436|546|파장/));
+            await lesson('procedure', 6, '', true, 1000); await lesson('procedure', 7, '', false, 1000); await lesson(null, 0, '', false, 1500);
+            setStage(5); await lesson('data', 0, '', false, 6500);
+            const phone = async j => { const u = await L[j].evaluate(() => (document.querySelector('a[href*="role=phone"]') || {}).href || ''); const P = await live.student(j + '조폰', 'phone'); await P.goto(u); await P.waitForTimeout(2500); return P; };
+            const P1 = await phone(1);
+            note('data 0 · 1조 폰(QR 로 엶, 설명 중)', { 띠: await bandOn(P1), 가리기: await gates(P1), 위글: (await W.text(P1)).split('\n').slice(0, 9).join(' / ').slice(0, 330) }); await W.shot(P1, '1조 폰 측정 화면 + 띠');
+            await lesson('data', 1, '', false, 1200); await lesson('data', 1, '', true, 1200); await lesson('data', 2, 'qd-hue', false, 1500);
+            note('data 2 물음(≈ vs 분광기) · 노트북 5 데이터·폰', { 노트북: await gates(L[2]), 폰: await gates(P1), 노트북글: await find(L[2], /≈|추정|분광기/) });
+            await lesson('data', 2, 'qd-hue', true, 1500); await lesson('data', 3, '', false, 1200); await lesson(null, 0, '', false, 6500);
+            note('설명 닫힘 · 띠', { 노트북: await bandOn(L[1]), 폰: await bandOn(P1) });
+            const send = async P => { await P.evaluate(() => scrollTo(0, 0)); await W.tap(P, '고른 회차 보내기'); await P.waitForTimeout(3000); };
+            await team('1조', async () => { await sample(P1, { heat: 60, what: 'heat' }); await sample(P1, { heat: 120 }); await sample(P1, { heat: 180 }); await send(P1); });
+            await team('2조', async () => { const P = await phone(2); await sample(P, { heat: 60, what: 'heat' }); await sample(P, { heat: 120 }); await send(P); });
+            await team('3조', async () => { const P = await phone(3); await sample(P, { heat: 120, urea: 0.5, what: 'ratio' });
+                note('3조 폰: 요소 2 + 가열 180 ① 화면', await sample(P, { heat: 180, urea: 2, upto: 'info' }));
+                await W.tap(P, '다음: ② 형광 색'); await P.waitForTimeout(800); if (await P.getByText('카메라 켜기').locator('visible=true').count()) { await W.tap(P, '카메라 켜기'); await P.waitForTimeout(2500); }
+                await W.tap(P, '이 색 기록'); await W.tap(P, '건너뛰고 ④ 저장'); await W.tap(P, '시료 저장'); await P.waitForTimeout(800);
+                const inR = P.locator('input[type=radio][value=in]').locator('visible=true'); await inR.first().check(); const why = P.locator('.qd-mix input[type=text], .qd-mix textarea').locator('visible=true'); await why.first().fill('둘 다 늘리면 더 잘 보일 것 같아서'); await why.first().blur(); await P.waitForTimeout(500);
+                note('3조 폰 넣기를 고른 뒤 띠', (await W.text(P)).split('\n').filter(l => /✏️|바뀜|보냄|보내기 전|고른 회차/.test(l)).slice(0, 5)); await send(P); });
+            await team('4조', async () => { const P = await phone(4); await sample(P, { heat: 120, urea: 1, what: 'ratio' }); note('4조 폰 저장 뒤(안 보냄)', (await W.text(P)).split('\n').filter(l => /저장했|보내|📤|안 보낸/.test(l)).slice(0, 5)); });
+            await L[1].waitForTimeout(4000);
+            for (const j of [1, 2, 3, 4]) note('55분 ' + j + '조 노트북 5 데이터', await panel(L[j], /🆕|기다리는|⚠/, 4));
+        },
+        21: async () => {   // 55~65분: 교사가 4조에 "폰 맨 위를 봐요" → 4조가 보냄
+            setStage(5); const L4 = await live.student('4조노트북', 'laptop'), P4 = await live.student('4조폰', 'phone'); await P4.waitForTimeout(1500);
+            await P4.evaluate(() => scrollTo(0, 0)); note('4조 폰 맨 위', (await W.text(P4)).split('\n').slice(6, 16).join(' / ').slice(0, 420));
+            await W.tap(P4, '고른 회차 보내기'); await P4.waitForTimeout(3500); note('4조 폰 보낸 뒤', (await W.text(P4)).split('\n').filter(l => /보냄|보내기 전|고른 회차/.test(l)).slice(0, 4));
+            await L4.waitForTimeout(3000); note('65분 4조 노트북', await panel(L4, /🆕|기다리는|⚠/, 4));
         }
         // TURNS
     };
