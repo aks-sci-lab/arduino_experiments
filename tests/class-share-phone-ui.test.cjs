@@ -144,8 +144,9 @@ test('📱 폰 연결: 노트북(1280) QR → 폰(Pixel 7) 저장 → 노트북 
   await new Promise(r => setTimeout(r, 800));
   const st = (await app.post({ action: 'classStatus', class: c.classCode, key: c.key }));
   const s = st.students.find(x => x.jo === 2 && x.num === 3);
-  assert.equal(s.step, 'phone-live');
-  console.log('teacher sees:', s.step, '→', require(REPO + '/js/class-cloud.js').stepName('phoneaccel', s.step), '| submissions', JSON.stringify(st.submissions[1].labels));
+  // 노트북과 그 자리의 폰은 따로 보내고 교사 화면에서 한 학생으로 합침 (2026-11-21, js/lab-store.js mergeSeats)
+  assert.equal(s.step, 'live', '노트북 단계'); assert.equal(s.phone && s.phone.step, 'phone-live', '폰 단계');
+  console.log('teacher sees:', s.step, '+', s.phone.step, '→', require(REPO + '/js/class-cloud.js').stepName('phoneaccel', s.phone.step), '| submissions', JSON.stringify(st.submissions[1].labels));
   // 실패 시 다시 보내기
   await P2.route('**/exec**', r => r.abort());
   await P2.click('#save');

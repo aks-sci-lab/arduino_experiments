@@ -225,9 +225,11 @@
     function heartbeat(url, o, fetchImpl) {
         return post(url, {
             action: 'heartbeat', 'class': o.classCode, jo: Number(o.jo), num: Number(o.num), step: String(o.step || ''),
-            points: Number.isFinite(Number(o.points)) ? Number(o.points) : '', submitted: !!o.submitted, device: o.device || ''
+            points: Number.isFinite(Number(o.points)) ? Number(o.points) : '', submitted: !!o.submitted, device: o.device || '', phone: !!o.phone
         }, fetchImpl, 15000);
     }
+    // 조·번호를 바꾼 기기가 옛 자리 진행 신호를 지움 (자기 기기가 쓴 것만, js/lab-store.js leaveSeat)
+    function leaveSeat(url, o, fetchImpl) { return post(url, { action: 'leaveSeat', 'class': o.classCode, jo: Number(o.jo), num: Number(o.num), phone: !!o.phone }, fetchImpl, 15000); }
     function classStatus(url, classCode, key, fetchImpl) { return post(url, { action: 'classStatus', 'class': classCode, key: key }, fetchImpl, 20000); }
     // 교사(구글 로그인): 내 수업 목록·내려받기·지우기 (Firestore)
     function myClasses(fetchImpl) { return post('lab:', { action: 'myClasses' }, fetchImpl, 20000); }
@@ -243,7 +245,7 @@
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
         studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
-        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, classStage: classStage, classDone: classDone, gateSteps: gateSteps, stageInfo: stageInfo, canFlow: canFlow, flowOf: flowOf, STEPS_HD: STEPS_HD, HD_OF: HD_OF, FLOW_NAMES: FLOW_NAMES, STAGE_ALL: STAGE_ALL, heartbeat: heartbeat, classStatus: classStatus,
+        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, classStage: classStage, classDone: classDone, gateSteps: gateSteps, stageInfo: stageInfo, canFlow: canFlow, flowOf: flowOf, STEPS_HD: STEPS_HD, HD_OF: HD_OF, FLOW_NAMES: FLOW_NAMES, STAGE_ALL: STAGE_ALL, heartbeat: heartbeat, leaveSeat: leaveSeat, classStatus: classStatus,
         myClasses: myClasses, classExport: classExport, deleteClass: deleteClass, reopenCode: reopenCode, expireText: expireText
     };
 });

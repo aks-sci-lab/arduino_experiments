@@ -658,7 +658,8 @@
                 '<p class="ct-sub' + (sub && sub.rows ? ' done' : '') + '">' + subTxt + '</p>' +
                 g.members.map(function (m) {
                     var x = m.st, stt = m.state;
-                    var right = stt.joined ? esc(CC.stepName(st.exp, x.step, st.flow)) + ' · 점 ' + (x.points == null ? '–' : x.points) + (x.submitted ? ' · ✅' : '') + '<br><span class="note">' + (stt.idle ? '💤 ' : '') + esc(CC.agoText(stt.ago)) + '</span>' : '아직 안 들어옴';
+                    // 그 자리의 📱 폰 측정 화면은 따로 보냄 → '5 데이터 · 📱 폰으로 측정 중' (js/lab-store.js mergeSeats)
+                    var right = stt.joined ? esc(CC.stepName(st.exp, x.step, st.flow)) + (x.phone ? ' · ' + esc(CC.stepName(st.exp, x.phone.step, st.flow)) : '') + ' · 점 ' + (x.points == null ? '–' : x.points) + (x.submitted ? ' · ✅' : '') + '<br><span class="note">' + (stt.idle ? '💤 ' : '') + esc(CC.agoText(stt.ago)) + '</span>' : '아직 안 들어옴';
                     return '<button class="ct-mem ' + stt.cls + '" data-jo="' + esc(g.jo) + '" data-num="' + m.num + '"><b>' + m.num + '번</b><span class="ct-mem-r">' + right + '</span></button>';
                 }).join('') + '</section>';
         }).join('');
@@ -677,6 +678,8 @@
             '<table class="ct-detail-table"><tbody>' +
             '<tr><th>상태</th><td>' + (m.state.idle ? '💤 쉬는 중 (5분 넘게 신호 없음)' : '🟢 활동 중') + '</td></tr>' +
             '<tr><th>보고 있는 단계</th><td>' + esc(CC.stepName(st.exp, x.step, st.flow)) + '</td></tr>' +
+            (x.phone ? '<tr><th>📱 이 자리의 폰</th><td>' + esc(CC.stepName(st.exp, x.phone.step, st.flow)) + ' · 점 ' + (x.phone.points == null ? '–' : esc(x.phone.points)) + (x.phone.submitted ? ' · ✅ 보냄' : '') +
+                ' · ' + esc(new Date(x.phone.lastSeen).toLocaleTimeString('ko-KR')) + '</td></tr>' : '') +
             '<tr><th>마지막 활동</th><td>' + esc(new Date(x.lastSeen).toLocaleTimeString('ko-KR')) + ' (' + esc(CC.agoText(m.state.ago)) + ')</td></tr>' +
             '<tr><th>이 학생이 잰 점</th><td>' + (x.points == null ? '–' : esc(x.points) + '개') + '</td></tr>' +
             '<tr><th>선생님께 보냄</th><td>' + (x.submitted ? '✅ 보냄' : '아직') + '</td></tr>' +
