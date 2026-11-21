@@ -93,3 +93,17 @@ body.qd-phone .show-on-laptop { display: none !important; }
     .step-panel { display: block !important; }
     .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
 }
+/* 1 목적: 먼저 보고 묻기 */
+.qd-look .qd-fig { margin: 0 0 var(--sp-2); }
+.qd-look .qd-fig svg { display: block; width: 100%; max-width: 480px; height: auto; margin: 0 auto; border-radius: 12px; }
+.qd-look .qd-ask { font-size: 1.1rem; margin: var(--sp-2) 0; }
+.qd-look .rai-inline { margin-bottom: 0; }
+.qd-purpose-more > summary { min-height: var(--tap); display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); cursor: pointer; font-weight: 700; padding: var(--sp-2) 0; }
+/* 5 데이터: 바꿀 것 · 두 가지가 함께 바뀜 */
+.qd-var-now { margin: var(--sp-1) 0; }
+.qd-var-warn .row { margin-top: var(--sp-2); }
+.qd-hand #old-notes summary { min-height: var(--tap); display: flex; align-items: center; cursor: pointer; }
+.qd-var-pick { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-1); }
+.qd-var-pick .rai-pill { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: var(--tap); padding: 0 var(--sp-3); border: 1px solid var(--c-line); border-radius: 999px; background: var(--c-card); cursor: pointer; color: var(--c-text, #222); }
+.qd-var-pick .rai-pill.on { border-color: var(--c-primary); background: var(--c-primary-soft); font-weight: 700; }
+.qd-var-pick input { width: 20px; height: 20px; }

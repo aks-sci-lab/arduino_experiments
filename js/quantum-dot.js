@@ -34,7 +34,7 @@
             water: p.water != null ? p.water : 10, dilution: p.dilution || '1:10', light: p.light || '365 nm', memo: '', photo: null, spec: null, cam: null, specCam: null };
     }
     function save() {
-        try { localStorage.setItem(STORE_KEY, JSON.stringify({ samples: state.samples, draft: state.draft, ext: state.ext, extFile: state.extFile, share: state.share, line: state.line, thick: state.thick })); } catch (e) { /* 저장 불가 */ }
+        try { localStorage.setItem(STORE_KEY, JSON.stringify({ samples: state.samples, draft: state.draft, ext: state.ext, extFile: state.extFile, share: state.share, line: state.line, thick: state.thick, phoneChange: state.phoneChange })); } catch (e) { /* 저장 불가 */ }
     }
     function load() {
         try {
@@ -42,7 +42,7 @@
             if (o) {
                 state.samples = Array.isArray(o.samples) ? o.samples : [];
                 state.draft = o.draft || null; state.ext = o.ext || {}; state.extFile = o.extFile || {};
-                state.share = o.share || null; state.line = o.line || null; state.thick = o.thick || 9;
+                state.share = o.share || null; state.line = o.line || null; state.thick = o.thick || 9; state.phoneChange = o.phoneChange || '';
             }
         } catch (e) { /* 깨진 저장 무시 */ }
         try { cal = JSON.parse(localStorage.getItem(CAL_KEY) || 'null'); } catch (e) { cal = null; }
@@ -84,7 +84,9 @@
         $('draft-sum').innerHTML = cells.map(([k, v]) => '<div>' + k + '<b>' + v + '</b></div>').join('');
         $('btn-save').disabled = !(d.photo || d.spec);
         $('save-tab-n').textContent = state.samples.length ? '시료 ' + state.samples.length + '개' : '시료 목록';
+        if (typeof renderVarCheck === 'function' && VARS_READY) renderVarCheck();
     }
+    let VARS_READY = false;
 
     function saveSample() {
         const d = state.draft;
@@ -524,6 +526,7 @@
     }
     function render() {
         renderTable(); renderCharts();
+        if (window.ReportAI && ReportAI.current && ReportAI.current.renderCompare) ReportAI.current.renderCompare();
     }
     function renderTable() {
         const all = everything();
@@ -592,14 +595,94 @@
     $('file-csv').onchange = async e => { const r = await importCsv(Array.from(e.target.files)); $('csv-msg').innerHTML = r.html; e.target.value = ''; };
     $('btn-file-clear').onclick = () => { state.extFile = {}; save(); render(); $('csv-msg').textContent = ''; };
 
-    /* ---------- 7. 결론 ---------- */
-    let notes = {};
-    try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') || {}; } catch (e) { notes = {}; }
-    document.querySelectorAll('textarea[data-q]').forEach(t => {
-        t.value = notes[t.dataset.q] || '';
-        t.addEventListener('input', () => { notes[t.dataset.q] = t.value; try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch (e) { /* 무시 */ } });
-    });
+    /* ---------- 7. 결론: 예전 '분석 질문' 칸(이 브라우저에만 저장)은 없앴다. 쓴 글은 보고서 항목에 한 번 옮기고 '예전에 쓴 글' 접기로 보여 줌 ---------- */
+    const OLD_Q = {
+        q1: ['analysis', '가열 시간 ↔ 봉우리 파장'], q2: ['analysis', '재료 비율 ↔ 파장·밝기'], q5: ['analysis', '색상 파장 ↔ 분광기 파장'],
+        q3: ['conclusion', '스토크스 이동'], q4: ['conclusion', '크기 설명이 어디까지 맞나'], q6: ['conclusion', '노출과 보정 밝기']
+    };
+    function moveOldNotes(rai) {
+        let notes = {};
+        try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') || {}; } catch (e) { notes = {}; }
+        const keys = Object.keys(OLD_Q).filter(k => String(notes[k] || '').trim());
+        if (!keys.length) return;
+        $('old-notes').hidden = false;
+        $('old-notes-list').innerHTML = keys.map(k => '<p><b>' + esc(OLD_Q[k][1]) + '</b><br>' + esc(notes[k]).replace(/\n/g, '<br>') + '</p>').join('');
+        if (notes.moved || !rai || !rai.setSection) return;
+        const hd = rai.flow && rai.flow() === 'hd', st = rai.state();
+        const add = {};
+        keys.forEach(k => {
+            const sec = OLD_Q[k][0] === 'conclusion' && hd ? 'verdict' : OLD_Q[k][0];
+            if (String(st.sections[sec] || '').indexOf(String(notes[k]).trim()) >= 0) return;
+            (add[sec] = add[sec] || []).push('(예전 분석 질문 · ' + OLD_Q[k][1] + ') ' + String(notes[k]).trim());
+        });
+        let ok = true;
+        Object.keys(add).forEach(sec => { const cur = String(st.sections[sec] || '').trim(); if (!rai.setSection(sec, (cur ? cur + '\n\n' : '') + add[sec].join('\n\n'))) ok = false; });
+        if (ok) { notes.moved = new Date().toISOString(); try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch (e) { /* 무시 */ } }
+    }
     $('btn-print').onclick = () => window.print();
+
+    /* ---------- 변인 카드 · 예상 ↔ 결과 (보고서 항목 'design' 에 저장, js/report-ai.js) ---------- */
+    const VARS = {
+        vars: [{ key: 'heat', name: '가열 시간' }, { key: 'ratio', name: '재료 비율 (요소/구연산)' }, { key: 'water', name: '물의 양' }, { key: 'dilution', name: '희석' }, { key: 'light', name: '비춘 빛' }],
+        choose: ['heat', 'ratio'],
+        measure: '형광 봉우리 파장(색)과 밝기',
+        predictQ: '— {var}을(를) 늘리면 봉우리 파장은?',
+        predict: [{ key: 'up', label: '길어진다 (빨강 쪽으로)' }, { key: 'down', label: '짧아진다 (파랑 쪽으로)' }, { key: 'same', label: '거의 그대로' }, { key: 'unknown', label: '잘 모르겠다' }],
+        result: v => resultFor(v)
+    };
+    const varVals = s => s ? { heat: s.heatS, ratio: Q.ratioLabel(s) || null, water: s.water, dilution: s.dilution, light: s.light } : null;
+    // 바꿀 것에 따라 봉우리 파장이 어느 쪽으로 움직였나 (이 기기 + 같은 조에서 받은 시료 모두, 최소제곱 직선)
+    function resultFor(v) {
+        if (!v || !v.change) return { text: '4. 과정의 변인 카드에서 바꿀 것을 고르면 여기서 견줘 봐요.' };
+        const name = VARS.vars.find(x => x.key === v.change).name;
+        const pts = everything().map(s => { const m = Q.metrics(s); return { x: v.change === 'heat' ? m.heat : m.ratio, y: m.lambda }; }).filter(p => p.x != null && p.y != null);
+        const xs = [...new Set(pts.map(p => p.x))];
+        if (xs.length < 2) return { text: ReportAI.josa(name, '이', '가') + ' 다른 시료가 2개 이상 있어야 방향을 알 수 있어요 (지금 ' + pts.length + '개). 시료를 더 재거나 같은 조 기기의 시료를 불러와요.' };
+        const f = Q.linFit(pts.map(p => p.x), pts.map(p => p.y));
+        if (!f) return { text: '직선을 맞추지 못했어요.' };
+        const lo = Math.min(...xs), hi = Math.max(...xs), d = f.b * (hi - lo);
+        const dir = Math.abs(d) < 5 ? 'same' : d > 0 ? 'up' : 'down';
+        const unit = v.change === 'heat' ? '초' : '';
+        return { dir, text: ReportAI.josa(name, '을', '를') + ' ' + fmt(lo, v.change === 'heat' ? 0 : 2) + unit + ' → ' + fmt(hi, v.change === 'heat' ? 0 : 2) + unit + '로 늘렸을 때 봉우리 파장이 <b>' + (dir === 'same' ? '거의 그대로' : dir === 'up' ? '길어졌어요' : '짧아졌어요') + '</b> (약 ' + (d >= 0 ? '+' : '') + fmt(d, 0) + ' nm, 점 ' + f.n + '개). 6-2 그래프로 확인해요.' };
+    }
+    // 📱 폰(노트북 QR 로 연 측정 화면): 보고서는 기기마다 따로라 노트북 변인 카드를 읽지 못함 → 폰에서 같은 '바꿀 것'을 한 번 고름(이 폰에 저장)
+    function curVars() {
+        if (PHONE) return state.phoneChange ? { change: state.phoneChange } : null;
+        return window.ReportAI && ReportAI.current && ReportAI.current.vars ? ReportAI.current.vars() : null;
+    }
+    // 5. 데이터: 고른 '바꿀 것' 말고 다른 값이 앞 시료와 달라지면 ⚠ (막지는 않음)
+    function renderVarCheck() {
+        const v = curVars(), d = state.draft, prev = state.samples[state.samples.length - 1];
+        const name = v && v.change ? VARS.vars.find(x => x.key === v.change).name : '';
+        $('var-now').innerHTML = PHONE
+            ? '🔀 우리 조가 바꿀 것 <span class="note">(노트북 변인 카드와 같게)</span><span class="qd-var-pick">' + VARS.choose.map(k => '<label class="rai-pill' + (state.phoneChange === k ? ' on' : '') + '"><input type="radio" name="qd-phone-change" value="' + k + '"' + (state.phoneChange === k ? ' checked' : '') + '> ' + esc(VARS.vars.find(x => x.key === k).name) + '</label>').join('') + '</span>'
+            : name ? '🔀 우리 조가 바꿀 것: <b>' + esc(name) + '</b> · 나머지는 🔒 같게' : '🔀 바꿀 것을 아직 안 골랐어요 — 4. 과정의 변인 카드에서 골라요';
+        const diff = window.ReportAI && ReportAI.changedVars ? ReportAI.changedVars(VARS, varVals(prev), varVals(d), v && v.change) : [];
+        const sig = diff.join('|') + '#' + JSON.stringify(varVals(d));
+        const show = diff.length && d.varOk !== sig;
+        document.querySelectorAll('[data-var-warn]').forEach(el => {
+            el.hidden = !show;
+            el.innerHTML = show ? '⚠️ <b>두 가지가 함께 바뀌었어요</b> · ' + (name ? '바꿀 것은 <b>' + esc(name) + '</b>인데 ' : '') + '<b>' + diff.map(esc).join(', ') + '</b>도 앞 시료(시료 ' + prev.no + ')와 달라요. 그대로 둘까요?' +
+                '<div class="row"><button type="button" class="secondary" data-var-fix>↩ 앞 시료와 같게</button><button type="button" class="secondary" data-var-ok>그대로 둘게요</button></div>' : '';
+        });
+        el_sig = sig;
+    }
+    let el_sig = '';
+    document.addEventListener('click', e => {
+        if (e.target.closest('[data-var-ok]')) { state.draft.varOk = el_sig; save(); renderVarCheck(); }
+        else if (e.target.closest('[data-var-fix]')) {
+            const v = curVars(), prev = state.samples[state.samples.length - 1];
+            if (!prev) return;
+            ['heatS', 'citric', 'urea', 'water', 'dilution', 'light'].forEach(k => {
+                if (v && v.change === 'heat' && k === 'heatS') return;
+                if (v && v.change === 'ratio' && (k === 'citric' || k === 'urea')) return;
+                state.draft[k] = prev[k];
+            });
+            save(); fillForm();
+        }
+    });
+    document.addEventListener('report-ai-vars', () => renderVarCheck());
+    $('var-now').addEventListener('change', e => { if (e.target.name === 'qd-phone-change') { state.phoneChange = e.target.value; save(); renderVarCheck(); } });
 
     /* ---------- 측정 작은 탭 ---------- */
     let measTab = 'sample';
@@ -634,7 +717,6 @@
             exp: 'qdot',
             barMount: '#class-bar-mount', shareMount: '#share-mount',
             csvHint: '6. 결과 → CSV 다운로드',
-            sendButtons: ['#btn-send2'],
             store: { load: () => state.share, save: o => { state.share = o; save(); } },
             getItems: () => Q.buildItems(state.samples),
             onIncoming: items => {
@@ -668,16 +750,34 @@
     makePhoneCard();
     window.addEventListener('lab-device', () => { makePhoneCard(); render(); });
     if (window.LabUI && LabUI.deviceSwitch) LabUI.deviceSwitch('#device-switch');
-    $('btn-send2').onclick = () => {
-        if (!share) { $('send2-status').textContent = '조 공유를 불러오지 못했습니다. 6. 결과의 CSV 다운로드를 쓰세요.'; return; }
-        if (!share.group()) { $('send2-status').textContent = '먼저 5. 데이터 맨 위 \'👥 조 공유\'에서 조 코드를 정하세요.'; return; }
-        share.send('#send2-status');
-    };
-
     tabs = window.LabUI && LabUI.initTabs('#qdTabs', { key: PHONE ? 'quantum-dot-meas-phone' : 'quantum-dot-meas', onShow: onMeasTab });
     steps = window.LabUI && LabUI.initSteps({ key: PHONE ? 'quantum-dot-phone' : 'quantum-dot', start: PHONE ? 'data' : undefined, onShow: onStep, flows: true });
     if (PHONE && steps && state.tab !== 'data') steps.show('data', true);
     if (window.LabUI && LabUI.autoSubtabs) LabUI.autoSubtabs();
+    // 📝 보고서 · AI 피드백 + 단계 안 쓰기 칸('우리 생각'·변인 카드). 7단계와 가설연역이 같은 항목 키를 써서 칸이 한 벌만
+    if (window.ReportAI) {
+        const rai = ReportAI.init({
+            exp: 'qdot', mount: '#report-ai', contextFrom: '#tbl, #xy-fit',
+            sections: [
+                { key: 'problem', name: '우리 생각', step: 'purpose', inline: true, hint: '시료마다 형광 색이 왜 다를까? 실험 전에 떠오른 생각을 한두 줄로.', placeholder: '예: 우리 생각이 실험으로 확인할 수 있는 모양인지 봐 줘.' },
+                { key: 'theory', hint: '양자점 크기 ↔ 띠 틈 ↔ 빛의 색, E = hc/λ 를 내 말로.' },
+                { key: 'design', name: '변인·예상', step: 'procedure', inline: true, vars: VARS, hint: '바꿀 것은 하나만, 나머지는 같게. 재기 전에 결과를 예상해요.' },
+                { key: 'method', hint: '시료 만들기·측정 순서(변인은 4. 과정의 변인 카드에).' },
+                { key: 'analysis', asks: ['가열 시간이 길어질수록 봉우리 파장(또는 E)은 어떻게 변했나요? 6-2 그래프의 기울기로 답해요.', '재료 비율(요소의 양)에 따라 파장·보정 밝기는 어떻게 달라졌나요?', '색상으로 구한 파장(≈)과 분광기 봉우리 파장은 얼마나 달랐나요? 차이는 왜 생겼을까요?'] },
+                { key: 'conclusion', asks: ['내 예상과 결과가 같았나요? 달랐다면 무엇 때문일까요? (위 🔮 ↔ 📊)', '비춘 자외선(365 nm, 3.40 eV)과 형광의 에너지 차이(스토크스 이동)는 얼마이고, 왜 생길까요?', '"가열이 길수록 양자점이 커져서 띠 틈이 작아졌다"는 설명은 우리 결과로 어디까지 뒷받침되나요? 2-5 한계를 보고 다른 설명도 들어 봐요.', '노출이 고정되지 않았을 때 사진 밝기를 그대로 견주면 어떤 문제가 생기나요? 보정 밝기로 풀리나요?'] }
+            ],
+            hdSections: [
+                { key: 'problem', hint: '그림에서 본 것·우리 생각에서, 실험으로 답할 수 있는 질문 한 줄.' },
+                'hypothesis',
+                { key: 'design', vars: VARS, hint: '바꿀 것은 하나만, 나머지는 같게. 재기 전에 결과를 예상해요.' },
+                { key: 'analysis', name: '자료 해석', hint: '그래프·맞춤 결과에서 무엇을 읽었는지, 숫자를 들어 쓰세요. 가설과 맞는지 함께.', asks: ['가열 시간이 길어질수록 봉우리 파장(또는 E)은 어떻게 변했나요? 6-2 그래프의 기울기로 답해요.', '재료 비율(요소의 양)에 따라 파장·보정 밝기는 어떻게 달라졌나요?', '색상으로 구한 파장(≈)과 분광기 봉우리 파장은 얼마나 달랐나요?'] },
+                { key: 'verdict', asks: ['내 예상(변인 카드)과 결과가 같았나요? 가설은 지지되나요?', '스토크스 이동(365 nm 와 형광의 에너지 차이)은 얼마이고, 왜 생길까요?', '"가열이 길수록 양자점이 커진다"는 설명은 우리 결과로 어디까지 뒷받침되나요?', '노출이 고정되지 않았을 때 사진 밝기를 그대로 견주면 어떤 문제가 생기나요?'] }
+            ]
+        });
+        moveOldNotes(rai);
+    }
+    VARS_READY = true;
+    renderVarCheck();
     refreshButtons();
     requestAnimationFrame(frame);
 })();

@@ -73,11 +73,64 @@
     function sectionInfo(s) {
         if (s && typeof s === 'object') {
             var base = SECTIONS[s.key] || {};
-            return { key: String(s.key), name: s.name || base.name || s.key, hint: s.hint != null ? s.hint : base.hint || '', placeholder: s.placeholder || base.placeholder || '예: 내가 쓴 내용에서 부족한 점을 질문으로 알려 줘.', guide: s.guide || base.guide || '', step: s.step || base.step };
+            return { key: String(s.key), name: s.name || base.name || s.key, hint: s.hint != null ? s.hint : base.hint || '', placeholder: s.placeholder || base.placeholder || '예: 내가 쓴 내용에서 부족한 점을 질문으로 알려 줘.', guide: s.guide || base.guide || '', step: s.step || base.step,
+                inline: !!s.inline, asks: Array.isArray(s.asks) ? s.asks.slice() : [], vars: s.vars || null };
         }
         var b = SECTIONS[s];
         return b ? Object.assign({ key: s }, b) : null;
     }
+    // ---------- 변인 카드 (바꿀 것 하나 · 재는 것 · 같게 둘 것 · 예상) ----------
+    // 항목 하나(sections[key])에 글로 저장: 줄마다 '[바꿀 것] 가열 시간' 꼴, 그 밖의 줄은 그대로 남김. 보고서 탭에서 글로 고쳐도 다시 읽힘
+    // cfg = { vars: [{ key, name }], choose: [바꿀 수 있는 key], measure: '재는 것', predictQ: '{var}을(를) 늘리면 …?', predict: [{ key: 'up'|'down'|'same'|…, label }] }
+    var VAR_TAGS = { change: '바꿀 것', measure: '재는 것', keep: '같게 둘 것', extra: '더 같게 둘 것', predict: '예상', reason: '까닭' };
+    // 받침에 맞는 조사: josa('가열 시간', '을', '를') → '가열 시간을'. 괄호·기호 뒤는 그 앞 한글로 판단
+    function josa(w, a, b) {
+        var t = String(w || '').replace(/\s*\([^)]*\)\s*$/, ''), c = t.charCodeAt(t.length - 1);
+        if (!(c >= 0xac00 && c <= 0xd7a3)) return w + a + '(' + b + ')';
+        return w + ((c - 0xac00) % 28 ? a : b);
+    }
+    function varName(cfg, key) { var v = (cfg.vars || []).filter(function (x) { return x.key === key; })[0]; return v ? v.name : ''; }
+    function parseVars(text, cfg) {
+        cfg = cfg || {};
+        var o = { change: '', changeName: '', predict: '', predictLabel: '', reason: '', extra: '', rest: '' }, rest = [];
+        String(text || '').split('\n').forEach(function (line) {
+            var m = /^\[([^\]]+)\] ?(.*)$/.exec(line), tag = m && m[1].trim(), val = m ? m[2].trim() : '';
+            if (tag === VAR_TAGS.change) { o.changeName = val; (cfg.vars || []).forEach(function (v) { if (v.name === val) o.change = v.key; }); }
+            else if (tag === VAR_TAGS.predict) { o.predictLabel = val; (cfg.predict || []).forEach(function (p) { if (p.label === val) o.predict = p.key; }); }
+            else if (tag === VAR_TAGS.reason) o.reason = val;
+            else if (tag === VAR_TAGS.extra) o.extra = val;
+            else if (tag === VAR_TAGS.measure || tag === VAR_TAGS.keep) { /* 화면이 다시 만듦 */ }
+            else rest.push(line);
+        });
+        o.rest = rest.join('\n').trim();
+        o.keep = (cfg.vars || []).filter(function (v) { return o.change && v.key !== o.change; }).map(function (v) { return v.name; });
+        return o;
+    }
+    function serializeVars(o, cfg) {
+        cfg = cfg || {};
+        var name = varName(cfg, o.change) || o.changeName || '', lines = [];
+        if (name) lines.push('[' + VAR_TAGS.change + '] ' + name);
+        if (cfg.measure) lines.push('[' + VAR_TAGS.measure + '] ' + cfg.measure);
+        if (o.change) lines.push('[' + VAR_TAGS.keep + '] ' + (cfg.vars || []).filter(function (v) { return v.key !== o.change; }).map(function (v) { return v.name; }).join(', '));
+        if (o.extra) lines.push('[' + VAR_TAGS.extra + '] ' + o.extra);
+        var pl = ((cfg.predict || []).filter(function (p) { return p.key === o.predict; })[0] || {}).label || o.predictLabel || '';
+        if (pl) lines.push('[' + VAR_TAGS.predict + '] ' + pl);
+        if (o.reason) lines.push('[' + VAR_TAGS.reason + '] ' + o.reason);
+        if (o.rest) lines.push(o.rest);
+        return lines.join('\n');
+    }
+    // 앞 시료(prev)와 지금(cur) 값을 견줘, '바꿀 것' 말고 달라진 변인 이름들. 바꿀 것을 안 골랐으면 달라진 것이 2개 이상일 때만
+    function changedVars(cfg, prev, cur, changeKey) {
+        if (!prev || !cur) return [];
+        var diff = (cfg.vars || []).filter(function (v) {
+            var a = prev[v.key], b = cur[v.key];
+            if (a == null || a === '' || b == null || b === '') return false;
+            return String(a) !== String(b);
+        });
+        if (changeKey) return diff.filter(function (v) { return v.key !== changeKey; }).map(function (v) { return v.name; });
+        return diff.length >= 2 ? diff.map(function (v) { return v.name; }) : [];
+    }
+
     function clip(s, n) { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n) + '…(뒤는 줄임)' : s; }
     // 질문 문서 하나 → { system, user }
     function buildPrompt(ask, expName) {
@@ -227,6 +280,7 @@
         var all = repSecs.slice();
         hdSecs.forEach(function (s) { if (!all.some(function (x) { return x.key === s.key; })) all.push(s); });
         var flow = 'report', secs = repSecs;
+        function infoIn(key, f) { var l = f === 'hd' ? hdSecs : repSecs; return l.filter(function (s) { return s.key === key; })[0] || null; }
         function nameIn(key, f) { var l = f === 'hd' ? hdSecs : repSecs, x = l.filter(function (s) { return s.key === key; })[0]; return x ? x.name : (all.filter(function (s) { return s.key === key; })[0] || {}).name || key; }
         var esc = escHtml;
         var store = null; try { store = window.localStorage; } catch (e) { store = null; }
@@ -267,7 +321,8 @@
             all.map(function (s) {
                 var k = esc(s.key);
                 return '<section class="tab-panel rai-sec" data-tab="' + k + '">' +
-                    '<label class="rai-label" for="rai-t-' + k + '"><b class="rai-sname">' + esc(s.name) + '</b> <span class="rai-note">' + esc(s.hint) + '</span></label>' +
+                    '<label class="rai-label" for="rai-t-' + k + '"><b class="rai-sname">' + esc(s.name) + '</b> <span class="rai-note rai-shint">' + esc(s.hint) + '</span></label>' +
+                    '<div class="rai-asks" id="rai-q-' + k + '" hidden></div>' +
                     '<textarea id="rai-t-' + k + '" class="rai-text" data-sec="' + k + '" rows="7"></textarea>' +
                     '<div class="rai-ask"><label class="rai-label" for="rai-p-' + k + '">🤖 AI 에게 묻기 <span class="rai-note">(프롬프트를 써야 단추가 켜져요)</span></label>' +
                     '<textarea id="rai-p-' + k + '" class="rai-prompt" data-sec="' + k + '" rows="3" maxlength="' + LIMITS.prompt + '" placeholder="' + esc(s.placeholder) + '"></textarea>' +
@@ -305,7 +360,7 @@
         }
         mount.addEventListener('input', function (e) {
             var t = e.target;
-            if (t.classList.contains('rai-text')) { st.sections[t.dataset.sec] = t.value; syncInline(t.dataset.sec); changed(); }
+            if (t.classList.contains('rai-text')) { st.sections[t.dataset.sec] = t.value; syncInline(t.dataset.sec); changed(); varsChanged(t.dataset.sec); }
             else if (t.classList.contains('rai-ext')) { st.external[t.dataset.ext] = t.value; changed(); }
             else if (t.classList.contains('rai-prompt')) { st.prompts[t.dataset.sec] = t.value; saveLocal(); renderButtons(); }
         });
@@ -434,7 +489,7 @@
             var rep = r.report;
             if (!rep) { if (st.submitted) { st.submitted = false; saveLocal(); } return; }
             var fill = false;
-            all.forEach(function (s) { if (!String(st.sections[s.key] || '').trim() && rep.sections[s.key]) { st.sections[s.key] = rep.sections[s.key]; $m('#rai-t-' + s.key).value = rep.sections[s.key]; syncInline(s.key); fill = true; } });
+            all.forEach(function (s) { if (!String(st.sections[s.key] || '').trim() && rep.sections[s.key]) { st.sections[s.key] = rep.sections[s.key]; $m('#rai-t-' + s.key).value = rep.sections[s.key]; syncInline(s.key); varsChanged(s.key); fill = true; } });
             ['prompt', 'adopted', 'verify'].forEach(function (k) { if (!String(st.external[k] || '').trim() && rep.external[k]) { st.external[k] = rep.external[k]; $m('#rai-x-' + k).value = rep.external[k]; fill = true; } });
             st.submitted = !!rep.submitted;
             if (rep.updatedAt) run.lastSync = new Date(rep.updatedAt);
@@ -472,64 +527,145 @@
             setTimeout(function () { try { w.focus(); w.print(); } catch (e) { /* 무시 */ } }, 300);
         }
 
-        // --- 가설연역: 단계 안의 쓰기 칸 (① 탐구 문제·② 가설·③ 탐구 설계·⑥ 가설 판정). 글은 위 항목과 같은 것(어느 쪽에 써도 같이 바뀜) ---
+        // --- 단계 안의 쓰기 칸: 가설연역(① 탐구 문제·② 가설·③ 탐구 설계·⑥ 가설 판정) + 7단계에서도 inline: true 인 항목(예: 양자점 '우리 생각'·'변인·예상').
+        //     글은 위 보고서 항목과 같은 것(어느 쪽에 써도 같이 바뀜). 칸은 항목 하나에 한 벌 — 두 방법이 같은 키를 쓰면 같은 칸을 이름만 바꿔 보임.
+        //     자리: 페이지에 [data-rai-slot="키"] 가 있으면 그 안, 없으면 그 단계 패널의 '다음' 단추 앞. vars 가 있는 항목은 글 칸 대신 변인 카드.
         function inlineEls() { return Array.prototype.slice.call(document.querySelectorAll('.rai-inline[data-for="' + esc(exp) + '"]')); }
         function verdictOf(text) { var m = /^\[판정\] *(\S[^\n]*)/.exec(String(text || '')); return m ? m[1].trim() : ''; }
+        function inlineIn(key, f) { var s = infoIn(key, f); return s && s.step && (f === 'hd' || s.inline) ? s : null; }
+        function boxLabel(s) {
+            return s.vars ? '<b>🧪 ' + esc(s.name) + '</b> <span class="rai-note">' + esc(s.hint) + '</span>' : '<b>✏️ ' + esc(s.name) + ' 쓰기</b> <span class="rai-note">' + esc(s.hint) + '</span>';
+        }
+        function varCardHtml(s, k) {
+            var cfg = s.vars, nm = 'rai-vc-' + esc(exp) + '-' + k;
+            return '<fieldset class="rai-vc-f"><legend>🔀 바꿀 것 <span class="rai-note">하나만 골라요</span></legend><div class="rai-row">' +
+                (cfg.choose || []).map(function (key) { return '<label class="rai-pill"><input type="radio" name="' + nm + '-c" value="' + esc(key) + '" data-vc="change"> ' + esc(varName(cfg, key)) + '</label>'; }).join('') + '</div></fieldset>' +
+                '<p class="rai-vc-line">📏 재는 것: <b>' + esc(cfg.measure || '') + '</b></p>' +
+                '<div class="rai-vc-line">🔒 같게 둘 것: <span class="rai-vc-keep" data-vc-keep></span>' +
+                '<input type="text" class="rai-vc-in" data-vc="extra" maxlength="80" placeholder="그 밖에 같게 둘 것 (예: 같은 컵, 같은 거리)" aria-label="그 밖에 같게 둘 것"></div>' +
+                '<fieldset class="rai-vc-f"><legend>🔮 예상 <span class="rai-note" data-vc-q></span></legend><div class="rai-row">' +
+                (cfg.predict || []).map(function (p) { return '<label class="rai-pill"><input type="radio" name="' + nm + '-p" value="' + esc(p.key) + '" data-vc="predict"> ' + esc(p.label) + '</label>'; }).join('') + '</div>' +
+                '<input type="text" class="rai-vc-in" data-vc="reason" maxlength="120" placeholder="왜 그렇게 생각해요? 한 줄로" aria-label="예상한 까닭"></fieldset>';
+        }
         function buildInline() {
-            if (opts.inline === false || inlineEls().length) return;
-            hdSecs.forEach(function (s) {
-                if (!s.step) return;
-                var panel = document.querySelector('.step-panel[data-step="' + s.step + '"]');
-                if (!panel) return;
-                var k = esc(s.key), box = document.createElement('div');
-                box.className = 'card rai-inline'; box.dataset.for = exp; box.dataset.sec = s.key; box.hidden = true;
-                box.innerHTML = '<label class="rai-label" for="rai-in-' + k + '"><b>✏️ ' + esc(s.name) + ' 쓰기</b> <span class="rai-note">' + esc(s.hint) + '</span></label>' +
-                    (s.key === 'verdict' ? '<div class="rai-row rai-verdict" role="radiogroup" aria-label="가설 판정">' + VERDICTS.map(function (v) {
+            if (opts.inline === false) return;
+            var keys = [];
+            all.forEach(function (s) { if ((inlineIn(s.key, 'hd') || inlineIn(s.key, 'report')) && keys.indexOf(s.key) < 0) keys.push(s.key); });
+            keys.forEach(function (key) {
+                if (inlineEls().some(function (b) { return b.dataset.sec === key; })) return;
+                var s = inlineIn(key, flow) || inlineIn(key, 'hd') || inlineIn(key, 'report');
+                var slot = document.querySelector('[data-rai-slot="' + key + '"]'), panel = document.querySelector('.step-panel[data-step="' + s.step + '"]');
+                if (!slot && !panel) return;
+                var k = esc(key), box = document.createElement('div'), vs = s.vars || (infoIn(key, 'hd') || {}).vars || (infoIn(key, 'report') || {}).vars;
+                box.className = 'card rai-inline' + (vs ? ' rai-vc' : ''); box.dataset.for = exp; box.dataset.sec = key; box.hidden = true;
+                box.innerHTML = '<div class="rai-label rai-ilabel">' + boxLabel(s) + '</div>' +
+                    (key === 'verdict' ? '<div class="rai-row rai-verdict" role="radiogroup" aria-label="가설 판정">' + VERDICTS.map(function (v) {
                         return '<label class="rai-check"><input type="radio" name="rai-vd-' + esc(exp) + '" value="' + esc(v) + '"> ' + esc(v) + '</label>'; }).join('') + '</div>' : '') +
-                    '<textarea id="rai-in-' + k + '" rows="' + (s.key === 'problem' ? 2 : 4) + '" data-sec="' + k + '"></textarea>' +
-                    '<p class="rai-note">💾 아래 ⑥ 결론 도출의 <b>📝 보고서</b>에 같이 저장돼요' + (s.key === 'verdict' ? '' : ' (AI 피드백도 거기서 물어요)') + '.</p>';
-                var at = s.step === 'conclusion' && panel.contains(mount) ? mount : (function () { var a = panel.querySelectorAll('.step-next, .row.next'); return a.length ? a[a.length - 1] : null; })();
-                if (at) at.parentNode.insertBefore(box, at); else panel.appendChild(box);
+                    (vs ? varCardHtml({ vars: vs }, k) : '<textarea id="rai-in-' + k + '" rows="' + (key === 'problem' ? 2 : 4) + '" data-sec="' + k + '" aria-label="' + esc(s.name) + '"></textarea>') +
+                    '<p class="rai-note rai-isave">💾 아래 결론 단계의 <b>📝 보고서</b>에 같이 저장돼요' + (key === 'verdict' ? '' : ' (AI 피드백도 거기서 물어요)') + '.</p>';
+                if (vs) box.dataset.vars = '1';
+                if (slot) slot.appendChild(box);
+                else {
+                    var at = s.step === 'conclusion' && panel.contains(mount) ? mount : (function () { var a = panel.querySelectorAll('.step-next, .row.next'); return a.length ? a[a.length - 1] : null; })();
+                    if (at) at.parentNode.insertBefore(box, at); else panel.appendChild(box);
+                }
+                box._vars = vs;
                 box.addEventListener('input', function (e) {
                     var t = e.target;
-                    if (t.tagName !== 'TEXTAREA') return;
-                    st.sections[s.key] = t.value; $m('#rai-t-' + s.key).value = t.value; syncVerdict(box, t.value); changed();
+                    if (t.tagName === 'TEXTAREA') { setText(key, t.value, box); syncVerdict(box, t.value); }
+                    else if (vs && t.dataset.vc) setText(key, serializeVars(readCard(box, vs), vs), box);
                 });
                 box.addEventListener('change', function (e) {
                     var r = e.target; if (r.type !== 'radio' || !r.checked) return;
+                    if (vs && r.dataset.vc) { setText(key, serializeVars(readCard(box, vs), vs), box); fillCard(box, vs, st.sections[key]); return; }
                     var t = box.querySelector('textarea'), body = String(t.value || '').replace(/^\[판정\][^\n]*\n?/, '');
                     t.value = '[판정] ' + r.value + '\n' + body;
-                    st.sections[s.key] = t.value; $m('#rai-t-' + s.key).value = t.value; changed();
+                    setText(key, t.value, box);
                 });
-                syncInline(s.key);
+                syncInline(key);
             });
         }
-        function syncVerdict(box, text) { var v = verdictOf(text); box.querySelectorAll('input[type=radio]').forEach(function (r) { r.checked = r.value === v; }); }
-        function syncInline(key) {
+        function readCard(box, cfg) {
+            var o = parseVars(st.sections[box.dataset.sec], cfg);   // 보고서 탭에서 덧붙인 줄(rest)은 남김
+            var c = box.querySelector('input[data-vc="change"]:checked'), p = box.querySelector('input[data-vc="predict"]:checked');
+            o.change = c ? c.value : ''; o.predict = p ? p.value : '';
+            o.extra = box.querySelector('input[data-vc="extra"]').value.trim(); o.reason = box.querySelector('input[data-vc="reason"]').value.trim();
+            return o;
+        }
+        function fillCard(box, cfg, text) {
+            var o = parseVars(text, cfg);
+            box.querySelectorAll('input[type=radio][data-vc]').forEach(function (r) { r.checked = r.value === (r.dataset.vc === 'change' ? o.change : o.predict); });
+            box.querySelectorAll('input[type=text][data-vc]').forEach(function (t) { if (document.activeElement !== t) t.value = o[t.dataset.vc] || ''; });
+            box.querySelector('[data-vc-keep]').innerHTML = o.change ? o.keep.map(function (n) { return '<span class="rai-lock">🔒 ' + esc(n) + '</span>'; }).join(' ') : '<span class="rai-note">바꿀 것을 고르면 나머지가 저절로 🔒</span>';
+            var q = cfg.predictQ ? String(cfg.predictQ).replace('{var}을(를)', josa(varName(cfg, o.change) || '바꿀 것', '을', '를')).replace('{var}', varName(cfg, o.change) || '바꿀 것') : '';
+            box.querySelector('[data-vc-q]').textContent = q;
+        }
+        // 글 하나를 바꾸면: 이 기기 저장 → (수업이면) 선생님께 저장, 보고서 탭·다른 칸·예상 ↔ 결과도 함께
+        function setText(key, text, fromBox) {
+            st.sections[key] = text;
+            var t = $m('#rai-t-' + key); if (t && t.value !== text) t.value = text;
+            syncInline(key, fromBox);
+            changed();
+            varsChanged(key);
+        }
+        function syncVerdict(box, text) { var v = verdictOf(text); box.querySelectorAll('.rai-verdict input[type=radio]').forEach(function (r) { r.checked = r.value === v; }); }
+        function syncInline(key, except) {
             inlineEls().forEach(function (box) {
-                if (box.dataset.sec !== key) return;
-                var t = box.querySelector('textarea'), v = st.sections[key] || '';
+                if (box.dataset.sec !== key || box === except) return;
+                var v = st.sections[key] || '';
+                if (box._vars) { fillCard(box, box._vars, v); return; }
+                var t = box.querySelector('textarea');
                 if (t && t.value !== v && document.activeElement !== t) t.value = v;
                 syncVerdict(box, v);
+            });
+        }
+        // --- 예상 ↔ 결과 (페이지의 [data-rai-compare="키"] 자리, vars.result() 가 { dir, text } 를 줌) ---
+        function varsCfg() { var s = all.filter(function (x) { return x.vars; })[0] || hdSecs.filter(function (x) { return x.vars; })[0]; return s ? { key: s.key, cfg: s.vars } : null; }
+        function vars() { var v = varsCfg(); if (!v) return null; var o = parseVars(st.sections[v.key], v.cfg); o.key = v.key; return o; }
+        function varsChanged(key) {
+            var v = varsCfg(); if (!v || v.key !== key) return;
+            renderCompare();
+            try { document.dispatchEvent(new CustomEvent('report-ai-vars', { detail: vars() })); } catch (e) { /* 무시 */ }
+        }
+        function renderCompare() {
+            var v = varsCfg(); if (!v) return;
+            var o = vars(), cfg = v.cfg, r = null;
+            try { r = cfg.result ? cfg.result(o) : null; } catch (e) { r = null; }
+            var pl = o.predictLabel || '', pdir = o.predict, verdict = '';
+            if (r && r.dir && pdir && pdir !== 'unknown') verdict = r.dir === pdir ? '<p class="rai-cmp-v ok">✅ 예상과 같은 방향이에요. 왜 그런지 이론으로 설명해 봐요.</p>' : '<p class="rai-cmp-v warn">🤔 예상과 달라요. 틀린 게 아니라 좋은 단서예요 — 무엇 때문일지 결론에 써 봐요.</p>';
+            document.querySelectorAll('[data-rai-compare="' + v.key + '"]').forEach(function (el) {
+                el.classList.add('card', 'rai-cmp');
+                el.innerHTML = '<h3>🔮 내 예상 ↔ 📊 결과</h3><div class="rai-cmp-grid">' +
+                    '<div><b>🔮 내 예상</b><p>' + (o.changeName ? esc(josa(o.changeName, '을', '를')) + ' 늘리면 → ' : '') + (pl ? '<b>' + esc(pl) + '</b>' : '<span class="rai-note">아직 안 골랐어요 (4. 과정의 변인 카드)</span>') + (o.reason ? '<br><span class="rai-note">까닭: ' + esc(o.reason) + '</span>' : '') + '</p></div>' +
+                    '<div><b>📊 결과</b><p>' + (r && r.text ? r.text : '<span class="rai-note">아직 결과가 없어요</span>') + '</p></div></div>' + verdict;
             });
         }
         function curFlow() { var sp = window.LabUI && LabUI.steps && LabUI.steps(); return sp && sp.flow ? sp.flow() : 'report'; }
         function applyFlow() {
             flow = curFlow() === 'hd' ? 'hd' : 'report';
             secs = flow === 'hd' ? hdSecs : repSecs;
-            if (flow === 'hd') buildInline();
+            buildInline();
             var keys = secs.map(function (s) { return s.key; });
             mount.querySelectorAll('#rai-tabs button[data-tab]').forEach(function (b) {
                 var k = b.dataset.tab, sec = k !== 'external' && k !== 'submit';
                 b.hidden = sec && keys.indexOf(k) < 0;
                 if (sec) b.textContent = nameIn(k, flow);
             });
-            mount.querySelectorAll('section.rai-sec[data-tab]').forEach(function (p) { var n = p.querySelector('.rai-sname'); if (n) n.textContent = nameIn(p.dataset.tab, flow); });
-            inlineEls().forEach(function (box) { box.hidden = flow !== 'hd'; });
+            mount.querySelectorAll('section.rai-sec[data-tab]').forEach(function (p) {
+                var n = p.querySelector('.rai-sname'); if (n) n.textContent = nameIn(p.dataset.tab, flow);
+                var info = infoIn(p.dataset.tab, flow), h = p.querySelector('.rai-shint'), q = p.querySelector('.rai-asks');
+                if (info && h) h.textContent = info.hint;
+                if (q) { var a = info && info.asks || []; q.hidden = !a.length; q.innerHTML = a.length ? '<b>💭 생각해 볼 물음</b><ul>' + a.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : ''; }
+            });
+            inlineEls().forEach(function (box) {
+                var s = inlineIn(box.dataset.sec, flow);
+                box.hidden = !s;
+                if (s) { var l = box.querySelector('.rai-ilabel'); if (l) l.innerHTML = boxLabel(s); }
+            });
             var cur = tabs && tabs.current ? tabs.current() : run.tab;
             if (tabs && cur !== 'external' && cur !== 'submit' && keys.indexOf(cur) < 0) tabs.show(keys[0]);
             else if (tabs && cur) tabs.show(cur);
-            renderButtons();
+            renderButtons(); renderCompare();
         }
         document.addEventListener('lab-flow', applyFlow);
         applyFlow();
@@ -538,12 +674,16 @@
         renderCalc(); render();
         poll(false);
         document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(true); });
-        var api = { render: render, poll: poll, sync: sync, state: function () { return st; }, ctx: ctx, asks: function () { return run.asks; }, printHtml: function () { return printHtml(printData()); }, tabs: tabs, flow: function () { return flow; }, sections: function () { return secs.slice(); } };
+        var api = { render: render, poll: poll, sync: sync, state: function () { return st; }, ctx: ctx, asks: function () { return run.asks; }, printHtml: function () { return printHtml(printData()); }, tabs: tabs, flow: function () { return flow; }, sections: function () { return secs.slice(); },
+            // 변인 카드: 지금 고른 것 { change, changeName, predict, predictLabel, reason, keep, extra } · 예상 ↔ 결과 다시 그리기
+            vars: vars, renderCompare: renderCompare,
+            // 글을 밖에서 넣기(예전 칸에서 옮기기 등). 이미 낸 보고서는 고치지 않음
+            setSection: function (key, text) { if (st.submitted) return false; setText(key, String(text == null ? '' : text)); return true; } };
         window.ReportAI.current = api;
         return api;
     }
 
-    return { PROVIDERS: PROVIDERS, SECTIONS: SECTIONS, DEFAULT_SECTIONS: DEFAULT_SECTIONS, HD_SECTIONS: HD_SECTIONS, VERDICTS: VERDICTS, BASE_RULES: BASE_RULES, LIMITS: LIMITS,
+    return { josa: josa, parseVars: parseVars, serializeVars: serializeVars, changedVars: changedVars, PROVIDERS: PROVIDERS, SECTIONS: SECTIONS, DEFAULT_SECTIONS: DEFAULT_SECTIONS, HD_SECTIONS: HD_SECTIONS, VERDICTS: VERDICTS, BASE_RULES: BASE_RULES, LIMITS: LIMITS,
         sectionInfo: sectionInfo, buildPrompt: buildPrompt, chatRequest: chatRequest, modelsRequest: modelsRequest, parseAnswer: parseAnswer, parseModels: parseModels,
         friendlyHttp: friendlyHttp, callAI: callAI, textOf: textOf, listModels: listModels, printHtml: printHtml, init: init };
 });

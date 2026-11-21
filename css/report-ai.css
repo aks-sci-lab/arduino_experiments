@@ -36,3 +36,25 @@
 .rai-inline[hidden] { display: none; }
 .rai-inline textarea { width: 100%; box-sizing: border-box; font: inherit; padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); }
 .rai-inline .rai-verdict label { min-height: var(--tap); }
+/* 보고서 항목 위 '생각해 볼 물음' (예전 결론 단계 분석 질문을 옮김) */
+.rai .rai-asks { margin: 0 0 var(--sp-2); padding: var(--sp-2) var(--sp-3); background: var(--c-fill); border-radius: var(--r-ctl); font-size: var(--fs-sm); }
+.rai .rai-asks ul { margin: var(--sp-1) 0 0; padding-left: 20px; line-height: 1.6; }
+/* 변인 카드 (바꿀 것 하나 · 재는 것 · 같게 둘 것 · 예상) */
+.rai-vc .rai-vc-f { border: 0; margin: var(--sp-2) 0; padding: 0; min-width: 0; }
+.rai-vc legend { font-weight: 700; padding: 0; margin-bottom: var(--sp-1); }
+.rai-vc .rai-pill { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: var(--tap); padding: 0 var(--sp-3); border: 1px solid var(--c-line); border-radius: 999px; background: var(--c-card); cursor: pointer; font-size: var(--fs-sm); }
+.rai-vc .rai-pill:has(input:checked) { border-color: var(--c-primary); background: var(--c-primary-soft); font-weight: 700; }
+.rai-vc .rai-pill input { width: 20px; height: 20px; }
+.rai-vc .rai-vc-line { margin: var(--sp-2) 0; }
+.rai-vc .rai-lock { display: inline-block; margin: 2px 4px 2px 0; padding: 2px var(--sp-2); border-radius: 999px; background: var(--c-fill); font-size: var(--fs-sm); }
+.rai-vc .rai-vc-in { display: block; width: 100%; box-sizing: border-box; min-height: var(--tap); margin-top: var(--sp-1); font: inherit; padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); }
+/* 예상 ↔ 결과 */
+.rai-cmp h3 { margin: 0 0 var(--sp-2); font-size: 1.05rem; }
+.rai-cmp .rai-cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+.rai-cmp .rai-cmp-grid > div { padding: var(--sp-2) var(--sp-3); background: var(--c-fill); border-radius: var(--r-ctl); min-width: 0; word-break: keep-all; overflow-wrap: anywhere; }
+.rai-cmp .rai-cmp-grid p { margin: var(--sp-1) 0 0; }
+.rai-cmp .rai-cmp-v { margin: var(--sp-2) 0 0; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); }
+.rai-cmp .rai-cmp-v.ok { background: var(--c-ok-bg); color: var(--c-ok-text); }
+.rai-cmp .rai-cmp-v.warn { background: var(--c-warn-bg); color: var(--c-warn-text); }
+.rai-cmp .rai-note { color: var(--c-muted); font-size: var(--fs-sm); }
+@media (max-width: 480px) { .rai-cmp .rai-cmp-grid { grid-template-columns: 1fr; } }
