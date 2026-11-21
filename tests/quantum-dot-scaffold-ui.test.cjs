@@ -111,13 +111,23 @@ test('양자점: 결론 쓸 곳 하나로 · 예상·변인 칸 (수업 없이, 
         await P.click('#btn-save');
         assert.match(await P.textContent('#save-msg'), /시료 2 저장/);
 
-        // ④ 6 결과: 내 예상 ↔ 결과 (60초 470 nm → 180초 520 nm = 길어짐)
+        // 빛을 함께 바꾼 채 저장 → ⚠ 두 가지가 바뀐 시료, 기본은 맞춤에서 뺌
+        assert.match(await P.textContent('#mine-list'), /두 가지가 바뀌었어요 · 비춘 빛도/);
         await P.click('nav.steps button[data-step="result"]');
         const cmp6 = '.step-panel[data-step="result"] [data-rai-compare="design"]';
         await P.waitForSelector(cmp6 + ' .rai-cmp-grid');
+        assert.match(await P.textContent('#tbody'), /⚠ 두 가지가 바뀜 \(비춘 빛\) · 맞춤에서 뺌/);
+        assert.doesNotMatch(await P.textContent('#tbody tr:first-child'), /⚠/, '한 가지만 바꾼(첫) 시료는 그대로');
+        assert.match(await P.textContent(cmp6), /2개 이상 있어야[\s\S]*시료 1개는 두 가지가 바뀌어 뺐어요/);
+        assert.match(await P.textContent('#xy-fit'), /직선에서 뺐어요 \(속 빈 점\)/);
+        // ④ '넣기' 를 고르면 직선·예상 ↔ 결과가 바뀜 (60초 470 nm → 180초 ≈ 530 nm = 길어짐)
+        await P.check('#mix-box [data-mix-no="2"] input[value="in"]');
+        await P.fill('#mix-box [data-mix-no="2"] [data-mix-why]', '빛은 파장에 영향이 작을 것 같아서');
+        await P.press('#mix-box [data-mix-no="2"] [data-mix-why]', 'Tab');
+        assert.match(await P.textContent('#xy-fit'), /최소제곱 직선[\s\S]*점 2개[\s\S]*넣었어요/);
         const c6 = await P.textContent(cmp6);
         assert.match(c6, /내 예상.*가열 시간을 늘리면.*길어진다/s);
-        assert.match(c6, /결과.*봉우리 파장이 길어졌어요.*\+\d+ nm/s);
+        assert.match(c6, /결과.*봉우리 파장이 길어졌어요.*\+\d+ nm.*두 가지가 바뀌었지만 넣었어요/s);
         assert.match(c6, /예상과 같은 방향/);
 
         // ① 7 결론: 분석 질문 칸 없음, 내 예상 ↔ 결과, 물음은 보고서 항목 위, 예전 글은 보고서로 옮김 + 접기
@@ -128,6 +138,7 @@ test('양자점: 결론 쓸 곳 하나로 · 예상·변인 칸 (수업 없이, 
         assert.match(await P.textContent('.qd-hand'), /이 기기에 저장/, '수업 없이: 이 기기 저장·인쇄');
         await P.click('#rai-tabs button[data-tab="analysis"]');
         assert.match(await P.textContent('#rai-q-analysis'), /6-2 그래프의 기울기/);
+        assert.match(await P.textContent('#rai-q-analysis'), /두 가지가 바뀐 시료\(⚠\)를 어떻게 다뤘나요/, '그런 시료가 있을 때만');
         await P.click('#rai-tabs button[data-tab="conclusion"]');
         assert.match(await P.textContent('#rai-q-conclusion'), /스토크스 이동/);
         assert.match(await P.textContent('#rai-q-conclusion'), /내 예상과 결과가 같았나요/);
@@ -215,6 +226,7 @@ test('양자점 수업: 우리 생각·변인 카드 → 선생님께 저장 · 
         // 7 결론: 측정값은 5 데이터, 글은 보고서 최종 제출 하나
         await L.page.click('nav.steps button[data-step="conclusion"]');
         assert.match(await L.page.textContent('.qd-hand'), /최종 제출/);
+        assert.doesNotMatch(await L.page.textContent('#rai-q-analysis'), /두 가지가 바뀐/, '그런 시료가 없으면 물음도 없음');
         assert.equal(await L.page.isVisible('.qd-hand button[data-go="data"]'), true);
         assert.deepEqual(L.errors, []);
 

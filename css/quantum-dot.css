@@ -73,7 +73,7 @@ canvas.chart.small { height: 170px; }
 .draft-sum div { background: #f1f3f5; border-radius: 6px; padding: 6px 8px; font-size: .88em; overflow-wrap: anywhere; }
 .draft-sum b { display: block; font-variant-numeric: tabular-nums; }
 .mine-list { display: flex; flex-direction: column; gap: 6px; }
-.mine-item { display: flex; gap: 8px; align-items: center; border: 1px solid #e3e6ea; border-radius: 8px; padding: 6px 8px; font-size: .9em; }
+.mine-item { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border: 1px solid #e3e6ea; border-radius: 8px; padding: 6px 8px; font-size: .9em; }
 .mine-item .txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .qlist li { margin-bottom: 10px; }
 .qlist label { display: block; }
@@ -107,3 +107,11 @@ body.qd-phone .show-on-laptop { display: none !important; }
 .qd-var-pick .rai-pill { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: var(--tap); padding: 0 var(--sp-3); border: 1px solid var(--c-line); border-radius: 999px; background: var(--c-card); cursor: pointer; color: var(--c-text, #222); }
 .qd-var-pick .rai-pill.on { border-color: var(--c-primary); background: var(--c-primary-soft); font-weight: 700; }
 .qd-var-pick input { width: 20px; height: 20px; }
+/* 두 가지가 바뀐 시료 */
+.qd-mix-tag { display: inline-block; margin-top: 2px; color: var(--c-warn-text); font-size: .85em; }
+.qd-mix { flex-basis: 100%; margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); background: var(--c-warn-bg); color: var(--c-warn-text); border-radius: var(--r-ctl); }
+.qd-mix-q { margin: 0 0 var(--sp-1); }
+.qd-mix .note { color: inherit; }
+.qd-mix-why { display: block; width: 100%; box-sizing: border-box; min-height: var(--tap); margin-top: var(--sp-1); font: inherit; padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); }
+.qd-mix-box h3 { margin: var(--sp-3) 0 var(--sp-1); font-size: 1rem; }
+.qd-mix-item { margin-bottom: var(--sp-2); }

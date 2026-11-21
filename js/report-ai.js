@@ -640,6 +640,15 @@
                     '<div><b>📊 결과</b><p>' + (r && r.text ? r.text : '<span class="rai-note">아직 결과가 없어요</span>') + '</p></div></div>' + verdict;
             });
         }
+        // 💭 생각해 볼 물음: 글 또는 함수(지금 자료에 따라 물음을 돌려줌, 빈 글이면 숨김)
+        function renderAsks() {
+            mount.querySelectorAll('section.rai-sec[data-tab]').forEach(function (p) {
+                var info = infoIn(p.dataset.tab, flow), q = p.querySelector('.rai-asks');
+                if (!q) return;
+                var a = (info && info.asks || []).map(function (x) { try { return typeof x === 'function' ? x() : x; } catch (e) { return ''; } }).filter(Boolean);
+                q.hidden = !a.length; q.innerHTML = a.length ? '<b>💭 생각해 볼 물음</b><ul>' + a.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '';
+            });
+        }
         function curFlow() { var sp = window.LabUI && LabUI.steps && LabUI.steps(); return sp && sp.flow ? sp.flow() : 'report'; }
         function applyFlow() {
             flow = curFlow() === 'hd' ? 'hd' : 'report';
@@ -653,10 +662,10 @@
             });
             mount.querySelectorAll('section.rai-sec[data-tab]').forEach(function (p) {
                 var n = p.querySelector('.rai-sname'); if (n) n.textContent = nameIn(p.dataset.tab, flow);
-                var info = infoIn(p.dataset.tab, flow), h = p.querySelector('.rai-shint'), q = p.querySelector('.rai-asks');
+                var info = infoIn(p.dataset.tab, flow), h = p.querySelector('.rai-shint');
                 if (info && h) h.textContent = info.hint;
-                if (q) { var a = info && info.asks || []; q.hidden = !a.length; q.innerHTML = a.length ? '<b>💭 생각해 볼 물음</b><ul>' + a.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : ''; }
             });
+            renderAsks();
             inlineEls().forEach(function (box) {
                 var s = inlineIn(box.dataset.sec, flow);
                 box.hidden = !s;
@@ -676,7 +685,7 @@
         document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(true); });
         var api = { render: render, poll: poll, sync: sync, state: function () { return st; }, ctx: ctx, asks: function () { return run.asks; }, printHtml: function () { return printHtml(printData()); }, tabs: tabs, flow: function () { return flow; }, sections: function () { return secs.slice(); },
             // 변인 카드: 지금 고른 것 { change, changeName, predict, predictLabel, reason, keep, extra } · 예상 ↔ 결과 다시 그리기
-            vars: vars, renderCompare: renderCompare,
+            vars: vars, renderCompare: renderCompare, renderAsks: renderAsks,
             // 글을 밖에서 넣기(예전 칸에서 옮기기 등). 이미 낸 보고서는 고치지 않음
             setSection: function (key, text) { if (st.submitted) return false; setText(key, String(text == null ? '' : text)); return true; } };
         window.ReportAI.current = api;
