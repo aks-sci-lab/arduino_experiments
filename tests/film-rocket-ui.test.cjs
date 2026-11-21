@@ -148,7 +148,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await A.click('#ev-sw3'); await go(A, 't1-result');
         assert.match(await A.textContent('.ev-screen'), /같은 조건으로 2번 쟀어요/);
         // 다른 값 (20 mL) 초시계 한 번 → 그래프
-        await A.click('[data-go="t1-cond"]'); await go(A, 't1-cond'); await A.click('.ev-stepper:not(.locked) [data-pm="1"]');
+        await A.click('#ev-change'); await go(A, 't1-cond'); await A.click('.ev-stepper:not(.locked) [data-pm="1"]');
         await next(A); await go(A, 't1-predict'); await next(A); await go(A, 't1-measure');
         await A.click('#ev-m-sw'); await A.click('#ev-sw1'); await A.waitForTimeout(300); await A.click('#ev-sw2'); await A.click('#ev-sw3');
         await go(A, 't1-result');
@@ -329,7 +329,7 @@ test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 설계 → �
         await P.click('[data-var="child"] [data-pm="1"]');
         assert.match(await P.textContent('#ev-cm'), /로켓 높이 약 1\d\d cm/);
         // 눈으로 한 번 (무게 3개)
-        await P.click('[data-go="t2-cond"]'); await go('t2-cond'); await P.click('.ev-stepper:not(.locked) [data-pm="1"]');
+        await P.click('#ev-change'); await go('t2-cond'); await P.click('.ev-stepper:not(.locked) [data-pm="1"]');
         await next(); await go('t2-safe'); await next(); await go('t2-film'); await P.click('[data-go="t2-hand"]'); await go('t2-hand');
         await P.click('.ev-choice[data-k="low"]'); await go('t2-result');
         await P.click('[data-go="t2-graph"]'); await go('t2-graph');
@@ -346,6 +346,14 @@ test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 설계 → �
         }
         await go('end-compare');
         assert.equal(await P.locator('.ev-cmp.spark').count(), 3, '처음 셋 다 흔한 생각 → 지금 맞음 ✨');
+        // ✍️ 정리 문장: 결과·까닭 고르기 (2차시를 바꿔 잼)
+        await next(); await go('end-sentence');
+        assert.match(await P.textContent('.ev-concl[data-concl="t2"]'), /늘렸더니 높이가/);
+        await P.click('.ev-concl[data-concl="t2"] [data-dir="down"]');
+        await P.click('.ev-concl[data-concl="t2"] [data-why] >> nth=0');
+        const cs = await P.evaluate(() => window.__filmRocket.state().concl.t2);
+        assert.equal(cs.dir, 'down'); assert.match(cs.why, /무거워서/);
+        assert.equal(await P.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '정리 문장 375px');
         await next(); await go('end-card');
         const [dl] = await Promise.all([P.waitForEvent('download'), P.click('#ev-save')]);
         assert.equal(fs.readFileSync(await dl.path()).subarray(1, 4).toString(), 'PNG', '결과 카드 PNG (시험 브라우저는 한글 파일 이름을 download 로 보임)');

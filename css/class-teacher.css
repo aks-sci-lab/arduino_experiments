@@ -249,3 +249,6 @@ details.ct-phint:not([open]) > summary { min-height: 0; padding: 2px 0; }
 .ct-behind summary { cursor: pointer; min-height: var(--tap); display: flex; align-items: center; color: var(--c-warn-text); font-weight: 700; }
 .ct-behind-team { display: inline-block; margin: 2px var(--sp-2) 2px 0; padding: 2px var(--sp-2); border-radius: var(--r-ctl); background: var(--c-warn-bg); color: var(--c-warn-text); }
 .ct-behindcell { color: var(--c-warn-text); font-weight: 700; }
+
+/* 팀 결과판 💬 생각 (예측·정리 문장) */
+.ct-board td.ct-talk { max-width: 22em; font-size: 0.9em; text-align: left; }
