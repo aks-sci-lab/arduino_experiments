@@ -25,6 +25,24 @@
         '<path d="M160 120 L160 40 M148 54 L160 40 L172 54" stroke="#2e7d32" stroke-width="6" fill="none"/><text x="160" y="140" text-anchor="middle" font-size="15" fill="#2e7d32">몸통 ↑</text>' +
         '<path d="M40 150 L40 205 M28 192 L40 205 L52 192" stroke="#1565c0" stroke-width="6" fill="none"/><text x="40" y="140" text-anchor="middle" font-size="15" fill="#1565c0">물·기체 ↓</text></svg>';
 
+    // '펑' 장면 (2026-11-21 비계 4): 물음 그림은 기체가 조금 있는 닫힌 통만, 풀이 그림은 세 칸 (조금 → 많이 + 미는 화살표 → 펑)
+    var SVG_POP_ASK = '<svg viewBox="0 0 200 200" role="img" aria-label="뚜껑이 닫힌 필름통 안에 기체 알갱이가 조금 있는 그림">' +
+        '<rect x="55" y="50" width="90" height="120" rx="8" fill="#e3f2fd" stroke="#455a64" stroke-width="4"/>' +
+        '<rect x="48" y="34" width="104" height="18" rx="4" fill="#ffb74d"/>' +
+        '<g fill="#1e88e5"><circle cx="80" cy="120" r="7"/><circle cx="115" cy="135" r="7"/><circle cx="100" cy="95" r="7"/></g>' +
+        '<text x="100" y="192" text-anchor="middle" font-size="16" fill="#455a64">뚜껑은 꽉 끼워져 있어요</text></svg>';
+    var SVG_POP = '<svg viewBox="0 0 300 200" role="img" aria-label="기체가 조금 있을 때, 많이 쌓여 뚜껑을 세게 밀 때, 뚜껑이 펑 열릴 때 세 장면">' +
+        '<g><rect x="10" y="70" width="70" height="100" rx="6" fill="#e3f2fd" stroke="#455a64" stroke-width="3"/><rect x="5" y="58" width="80" height="14" rx="3" fill="#ffb74d"/>' +
+        '<g fill="#1e88e5"><circle cx="30" cy="140" r="6"/><circle cx="60" cy="150" r="6"/><circle cx="45" cy="115" r="6"/></g>' +
+        '<g stroke="#e53935" stroke-width="3"><path d="M45 104 L45 80"/></g><text x="45" y="192" text-anchor="middle" font-size="14" fill="#455a64">① 조금</text></g>' +
+        '<g><rect x="115" y="70" width="70" height="100" rx="6" fill="#e3f2fd" stroke="#455a64" stroke-width="3"/><rect x="110" y="58" width="80" height="14" rx="3" fill="#ffb74d"/>' +
+        '<g fill="#1e88e5"><circle cx="130" cy="90" r="6"/><circle cx="150" cy="85" r="6"/><circle cx="170" cy="92" r="6"/><circle cx="135" cy="115" r="6"/><circle cx="160" cy="112" r="6"/><circle cx="140" cy="140" r="6"/><circle cx="168" cy="138" r="6"/><circle cx="150" cy="160" r="6"/></g>' +
+        '<g stroke="#e53935" stroke-width="4"><path d="M128 78 L128 62 M122 68 L128 62 L134 68"/><path d="M150 76 L150 60 M144 66 L150 60 L156 66"/><path d="M172 78 L172 62 M166 68 L172 62 L178 68"/></g>' +
+        '<text x="150" y="192" text-anchor="middle" font-size="14" fill="#455a64">② 많이 → 세게 밀어요</text></g>' +
+        '<g><rect x="220" y="70" width="70" height="100" rx="6" fill="#e3f2fd" stroke="#455a64" stroke-width="3"/><rect x="222" y="12" width="80" height="14" rx="3" fill="#ffb74d" transform="rotate(-18 262 19)"/>' +
+        '<g fill="#1e88e5"><circle cx="240" cy="55" r="6"/><circle cx="262" cy="40" r="6"/><circle cx="280" cy="58" r="6"/><circle cx="250" cy="120" r="6"/><circle cx="272" cy="140" r="6"/></g>' +
+        '<text x="255" y="192" text-anchor="middle" font-size="14" fill="#c62828">③ 펑!</text></g></svg>';
+
     // 공통 부품(js/lesson-slides.js)보다 먼저 불려도 되게: 없으면 대기열에 넣어 두고 부품이 가져감
     var LC = (typeof window !== 'undefined' && window.LessonContent) || (typeof LessonContent !== 'undefined' ? LessonContent : null);
     if (!LC) LC = window.LessonContent = { _wait: {}, add: function (k, d) { this._wait[k] = d; return d; } };
@@ -66,6 +84,14 @@
                   reveal: '<p>발포비타민이 물과 반응해 <b>이산화 탄소</b>(기체)가 생겨요. 닫힌 통 안에 기체가 쌓이면 <b>압력</b>이 커지고, 뚜껑을 미는 힘이 충분히 커지면 뚜껑이 열려요.</p><p class="ls-easy">🧒 쉬운 말 · 이산화 탄소 = 발포비타민에서 나오는 거품 속 기체</p>',
                   revealImg: SVG_PRESSURE,   // 기체가 뚜껑을 미는 화살표 = 답 → 풀이 뒤에
                   note: '폰은 1차시 첫 화면 다음이 바로 ‘기체 발생과 압력’ 퀴즈(팀 점수)예요. 팀들이 다 푼 것을 띠(⏳)로 확인한 뒤 넘겨서 풀이를 보여 주세요. 풀이를 열면 폰의 📘 정의도 열려요.' },
+                // 압력 개념을 '펑' 장면에 잇기 (2026-11-21 비계 4) — 압력 정의는 생각 열기의 말과 같게
+                { kind: 'ask', title: '‘펑!’ 하는 그 순간, 무슨 일이 일어날까요?', mode: 'look',
+                  body: '<p>닫힌 통 안에 기체가 <b>점점</b> 쌓여요. 뚜껑은 통에 꽉 끼워져 있어서, 뚜껑을 <b>붙잡는 힘</b>이 있어요.</p>',
+                  img: SVG_POP_ASK,
+                  ask: '기체가 더 많이 쌓이면 뚜껑 안쪽은 어떻게 될까요? 뚜껑은 언제 ‘펑’ 열릴까요?',
+                  reveal: '<p><b>압력</b> = 일정한 <b>넓이</b>에 작용하는 힘</p><p>기체가 많이 쌓일수록 뚜껑 안쪽의 <b>같은 넓이를 더 세게</b> 밀어요 — 압력이 커져요. 뚜껑을 미는 힘이 <b>붙잡는 힘보다 커지는 순간</b> ‘펑!’ 열려요.</p><p class="ls-easy">🧒 쉬운 말 · 일정한 넓이 = 똑같은 크기의 넓이</p>',
+                  revealImg: SVG_POP,   // 미는 화살표·펑 = 답 → 풀이 뒤에
+                  note: '생각 열기에서 고른 ‘압력’ 처음 생각을 떠올리게 해 주세요. “기체가 많다 = 압력이 크다”에서 멈추지 말고, ‘같은 넓이를 더 세게 민다’와 ‘붙잡는 힘보다 커지면 열린다’를 이어 말하게 해 보세요.' },
                 { kind: 'safety', title: '시작하기 전에 꼭 지켜요',
                   body: '<ul><li>🥽 모두 <b>보안경</b>을 써요</li><li>🙅 필름통에서 <b>얼굴을 멀리</b> 해요</li><li>🏃 뚜껑을 <b>닫고 바로 물러나요</b></li><li>✋ 열리지 않으면 <b>들여다보거나 흔들지 말고</b> 선생님을 불러요</li></ul>',
                   note: '폰에서도 네 가지를 체크해야 다음으로 넘어가요. 보안경을 쓴 것을 눈으로 확인해 주세요.' },

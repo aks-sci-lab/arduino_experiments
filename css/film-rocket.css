@@ -143,3 +143,8 @@
 .ev-more-hint { border-left-color: var(--c-warn-text); background: var(--c-warn-bg); }
 .ev-notice-more { flex: 1 1 100%; font-weight: 600; color: var(--c-warn-text); }
 .ev-hold { font-weight: 700; color: var(--c-primary-dark); background: var(--c-primary-soft); border-radius: 10px; padding: var(--sp-2) var(--sp-3); }
+/* 비계 4 (2026-11-21): 🔎 우리 팀 물음 · 📏 우리 숫자 · 아직 말할 수 없어요 · ↕ 흔들림 */
+.ev-teamq { margin: 0 0 var(--sp-2); padding: var(--sp-1) var(--sp-3); border-radius: 10px; background: var(--c-fill); border: 1px solid var(--c-line); font-size: .95rem; line-height: 1.4; }
+.ev-evidence { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); border-radius: 10px; background: var(--c-primary-soft); font-weight: 700; line-height: 1.45; }
+.ev-notyet { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); border-radius: 10px; border: 2px dashed var(--c-warn-text); background: var(--c-warn-bg); font-weight: 700; }
+.ev-spread[data-spread="overlap"] { border-left-color: var(--c-warn-text); background: var(--c-warn-bg); }

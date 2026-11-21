@@ -205,11 +205,63 @@
         t1: { what: '열리는 시간이', up: '길어질 것 같아요', down: '짧아질 것 같아요', same: '비슷할 것 같아요', upDone: '길어졌어요', downDone: '짧아졌어요', sameDone: '비슷했어요', word: { up: '길어짐', down: '짧아짐', same: '비슷' } },
         t2: { what: '높이가', up: '높아질 것 같아요', down: '낮아질 것 같아요', same: '비슷할 것 같아요', upDone: '높아졌어요', downDone: '낮아졌어요', sameDone: '비슷했어요', word: { up: '높아짐', down: '낮아짐', same: '비슷' } }
     };
-    // 정리 '왜냐하면' 고르기 (직접 쓰기도 됨)
+    // 정리 '왜냐하면' 고르기 (직접 쓰기도 됨) — 2026-11-21 비계 4: 팀이 고른 변인에 맞춘 보기 (잠긴 변인 이야기는 넣지 않음)
+    //   _ = 변인을 모를 때. 보기마다 40자 안 (cleanShort)
     var BECAUSE = {
-        t1: ['기체(거품)가 더 빨리 생겨서', '기체가 더 많이 생겨서', '뚜껑을 미는 힘(압력)이 달라서', '잘 모르겠어요'],
-        t2: ['무거워서 덜 빨라져서(질량)', '아래로 미는 힘이 세져서', '공기에 덜 막혀서', '잘 모르겠어요']
+        t1: {
+            _: ['기체(거품)가 더 빨리 생겨서', '기체가 더 많이 생겨서', '뚜껑을 미는 힘(압력)이 달라서', '잘 모르겠어요'],
+            water: ['통 안 빈 공간(기체가 모일 자리)이 달라져서', '물이 많아 발포비타민이 천천히 퍼져서', '기체가 모이는 자리가 좁아 압력이 빨리 커져서', '잘 모르겠어요'],
+            temp: ['따뜻하면 기체(거품)가 더 빨리 생겨서', '차가우면 반응이 느려져서', '기체가 빨리 쌓여 압력이 빨리 커져서', '잘 모르겠어요'],
+            tablet: ['기체가 더 많이 생겨서', '기체가 빨리 쌓여 압력이 빨리 커져서', '물에 다 녹지 않아서', '잘 모르겠어요'],
+            piece: ['조각이 작으면 물에 닿는 면이 넓어 빨리 녹아서', '기체(거품)가 더 빨리 생겨서', '기체가 빨리 쌓여 압력이 빨리 커져서', '잘 모르겠어요']
+        },
+        t2: {
+            _: ['무거워서 덜 빨라져서(질량)', '아래로 미는 힘이 세져서', '공기에 덜 막혀서', '잘 모르겠어요'],
+            mass: ['무거우면 덜 빨라져서(질량)', '가벼우면 같은 힘으로 더 빨라져서', '무게가 달라도 미는 힘은 같아서', '잘 모르겠어요'],
+            water: ['통 안 빈 공간(기체가 모일 자리)이 달라져서', '물이 많아 아래로 뿜는 양이 달라져서', '물이 많아 로켓이 무거워져서(질량)', '잘 모르겠어요'],
+            tablet: ['기체가 더 많이 생겨 세게 밀어서', '기체가 빨리 쌓여 압력이 커져서', '물에 다 녹지 않아서', '잘 모르겠어요'],
+            fins: ['날개가 공기에 막혀서(공기 저항)', '날개가 있어 똑바로 날아가서', '날개 무게가 달라져서(질량)', '잘 모르겠어요'],
+            nose: ['공기에 덜 막혀서(공기 저항)', '똑바로 날아가서', '앞코 무게가 달라져서(질량)', '잘 모르겠어요']
+        }
     };
+    function becauseFor(part, k) { var b = BECAUSE[part] || BECAUSE.t1; return (b[k] || b._).slice(); }
+    // 🔮 예측 까닭 칸의 보기 글 (차시·변인에 맞게)
+    var WHY_EG = {
+        t1: { _: '예: 따뜻하면 거품이 빨리 나서', water: '예: 물이 많으면 기체 자리가 좁아서', temp: '예: 따뜻하면 거품이 빨리 나서', tablet: '예: 많이 넣으면 기체가 많이 생겨서', piece: '예: 작은 조각이 빨리 녹아서' },
+        t2: { _: '예: 무거우면 덜 올라가서', mass: '예: 무거우면 덜 올라가서', water: '예: 물이 많으면 세게 뿜어서', tablet: '예: 기체가 많으면 세게 밀어서', fins: '예: 날개가 많으면 공기에 막혀서', nose: '예: 뾰족하면 공기에 덜 막혀서' }
+    };
+    function whyExample(part, k) { var w = WHY_EG[part] || WHY_EG.t1; return w[k] || w._; }
+    // 🔎 우리 팀 물음 (바꿀 것을 고르면 측정·결과·정리 화면 위에)
+    var QUESTION = {
+        t1: { water: '물을 많이 넣으면 뚜껑이 열리는 시간은 어떻게 될까?', temp: '물을 따뜻하게 하면 뚜껑이 더 빨리 열릴까?', tablet: '발포비타민을 더 넣으면 뚜껑이 더 빨리 열릴까?', piece: '조각을 작게 하면 뚜껑이 더 빨리 열릴까?' },
+        t2: { mass: '몸체를 무겁게 하면 로켓 높이는 어떻게 될까?', water: '물을 많이 넣으면 로켓이 더 높이 올라갈까?', tablet: '발포비타민을 더 넣으면 로켓이 더 높이 올라갈까?', fins: '날개 수를 바꾸면 로켓 높이는 어떻게 될까?', nose: '앞코 모양을 바꾸면 로켓 높이는 어떻게 될까?' }
+    };
+    function teamQuestion(part, k) { return (QUESTION[part] && QUESTION[part][k]) || ''; }
+    /* 📏 우리 숫자 (정리 문장의 증거): 바꾼 조건의 값마다 평균 → { labels, means, text, short }
+       part 't1' 은 열리는 시간(초), 't2' 는 아이 키의 %. 한 가지 값뿐이면 one: true */
+    function evidence(part, p, setup) {
+        var defs = part === 't2' ? vars2(setup) : vars1(setup), d = p && defs[p.changed];
+        if (!d) return null;
+        var rows = byValue(((p && p.trials) || []).filter(function (t) { return d.values.indexOf(t.value) >= 0; }).map(function (t) { return { value: t.value, y: part === 't2' ? t.pct : t.y }; }), d);
+        if (!rows.length) return null;
+        var unit = function (m) { return part === 't2' ? Math.round(m) + '%' : round(m, 1) + '초'; };
+        var labels = rows.map(function (r) { return d.label(r.value); }), means = rows.map(function (r) { return unit(r.mean); });
+        var name = d.short || d.name, first = rows[0], last = rows[rows.length - 1];
+        var one = rows.length < 2;
+        var text = one ? name + '을(를) ' + labels[0] + ' 로 했더니 평균 ' + means[0]
+            : name + '을(를) ' + labels.join(' → ') + ' 로 바꿨더니 평균 ' + means.join(' → ');
+        // 선생님 결과판용 (40자 안): 처음·끝 값만
+        var short = one ? name + ' ' + labels[0] + ': ' + means[0] : name + ' ' + d.label(first.value) + '→' + d.label(last.value) + ': ' + unit(first.mean) + '→' + unit(last.mean);
+        return { one: one, labels: labels, means: means, text: text, short: cleanShort(short), rows: rows };
+    }
+    /* 반복 흔들림: 같은 조건 반복의 가장 작은 값~가장 큰 값. 처음·끝 값의 범위가 겹치면 '흔들림 안' */
+    function spread(rows) {
+        rows = (rows || []).map(function (r) { var ys = r.ys || []; return { value: r.value, n: ys.length, lo: Math.min.apply(null, ys), hi: Math.max.apply(null, ys) }; });
+        var rep = rows.some(function (r) { return r.n >= 2; });
+        if (rows.length < 2 || !rep) return { rows: rows, rep: rep, verdict: '' };
+        var a = rows[0], b = rows[rows.length - 1];
+        return { rows: rows, rep: rep, verdict: a.lo <= b.hi && b.lo <= a.hi ? 'overlap' : 'clear' };
+    }
     function cleanShort(t) { return String(t == null ? '' : t).replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40); }
 
     // 예측과 왜 달랐을까? (고르기형)
@@ -240,10 +292,17 @@
         // 예측·정리 문장 (교사 결과판 '💬 생각'): 짧은 글만, 40자까지
         ['t1', 't2'].forEach(function (k, i) {
             var p = st[k] || {}, G = GUESS[k], n = (i + 1) + '차시';
-            if (p.guess && G.word[p.guess.dir]) out[n + ' 예측'] = G.word[p.guess.dir];
-            var c = st.concl && st.concl[k];
-            if (c && G.word[c.dir]) out[n + ' 결과'] = G.word[c.dir];
-            if (c && c.why) out[n + ' 까닭'] = cleanShort(c.why);
+            // 예측 = '짧아짐(까닭)' 한 칸 (요약 칸은 20개까지)
+            if (p.guess && G.word[p.guess.dir]) out[n + ' 예측'] = cleanShort(G.word[p.guess.dir] + (p.guess.why ? '(' + p.guess.why + ')' : ''));
+            var c = st.concl && st.concl[k], ev = p.changed && p.trials && p.trials.length ? evidence(k, p, s) : null;
+            // 한 가지 값만 잰 차시는 결과를 말할 수 없음 (결과 없는 결론 막기)
+            if (ev && ev.one) out[n + ' 결과'] = '아직 말할 수 없음';
+            else {
+                if (c && G.word[c.dir]) out[n + ' 결과'] = G.word[c.dir];
+                if (c && c.why) out[n + ' 까닭'] = cleanShort(c.why);
+            }
+            // 📏 증거: 바꾼 것과 우리 숫자 (예: '물의 온도 30 °C→50 °C: 14.2초→9.8초')
+            if (ev) out[n + ' 증거'] = ev.short;
         });
         if (maxPct >= 0) out['높이 최고(%)'] = Math.round(maxPct);
         if (b2) { out['높이 도전 차이(%)'] = Math.round(b2.diff); out['높이 도전 성공'] = Math.abs(b2.diff) <= s.tolPct + 1e-9 ? 1 : 0; }
@@ -265,7 +324,7 @@
     }
 
     return {
-        DEFAULT_SETUP: DEFAULT_SETUP, mergeSetup: mergeSetup, valueKinds: valueKinds, EASY: EASY, KEY_WORDS: KEY_WORDS, easyLine: easyLine, GUESS: GUESS, BECAUSE: BECAUSE, cleanShort: cleanShort, PIECES: PIECES, NOSES: NOSES, tabletLabel: tabletLabel, vars1: vars1, vars2: vars2,
+        DEFAULT_SETUP: DEFAULT_SETUP, mergeSetup: mergeSetup, valueKinds: valueKinds, EASY: EASY, KEY_WORDS: KEY_WORDS, easyLine: easyLine, GUESS: GUESS, BECAUSE: BECAUSE, becauseFor: becauseFor, whyExample: whyExample, teamQuestion: teamQuestion, evidence: evidence, spread: spread, cleanShort: cleanShort, PIECES: PIECES, NOSES: NOSES, tabletLabel: tabletLabel, vars1: vars1, vars2: vars2,
         range: range, stepIn: stepIn, axisValue: axisValue, mean: mean, sd: sd, round: round, byValue: byValue, targetDiff: targetDiff,
         heightPct: heightPct, cmFrom: cmFrom, HAND: HAND, handPct: handPct,
         DEF: DEF, CONCEPTS: CONCEPTS, QUIZ: QUIZ, quizPoints: quizPoints, score: score, conceptChanges: conceptChanges, optText: optText, WHY: WHY,
