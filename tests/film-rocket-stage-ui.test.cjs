@@ -90,7 +90,8 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         assert.equal(await notice(A), '', '이미 넘어간 팀은 띠 없음');
         await T.waitForFunction(() => /기다리는 팀\s*0\s*\/\s*들어온 팀\s*2/.test(document.getElementById('stageWait').textContent), null, { timeout: 20000 });
         // A: 1차시 측정 화면까지 → ⏱ 초시계 시작(도는 중)
-        await next(A); await go(A, 't1-safe');
+        await next(A); await go(A, 'q-gas'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next(A);
+        await go(A, 't1-safe');
         for (const k of ['goggle', 'face', 'away', 'wait']) await A.check('[data-safe="' + k + '"]');
         await next(A); await go(A, 'q-pressure'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next(A);
         await go(A, 't1-var'); await A.click('.ev-choice[data-k="water"]'); await next(A);

@@ -176,6 +176,28 @@
     }
     function optText(list, k) { var o = (list || []).filter(function (x) { return x.k === k; })[0]; return o ? o.t : ''; }
 
+    /* 초3 쉬운 말 (2026-11-21 선생님 "초3 쉬운 말 한 줄"): 폰 화면과 발표 보기 설명 장(js/lesson-content/rocket.js)에 같은 말로
+       KEY_WORDS: 정의(📘)마다 함께 보일 쉬운 말 */
+    var EASY = {
+        '원인': '왜 그렇게 됐는지의 까닭',
+        '운동 상태': '움직이는 빠르기와 방향',
+        '시속': '한 시간 동안 가는 거리',
+        '가속도': '빨라지거나 느려지는 정도',
+        '일정한 넓이': '똑같은 크기의 넓이',
+        '이산화 탄소': '발포비타민에서 나오는 거품 속 기체',
+        '변인 통제': '한 가지만 바꾸고 나머지는 똑같이 하기',
+        '평균': '여러 번 잰 값을 모두 더해 잰 횟수로 나눈 값',
+        '반작용': '내가 밀면 나도 반대쪽으로 밀리는 것',
+        '질량': '물체에 든 양, 무거울수록 커요',
+        '%': '아이 키를 100 으로 볼 때 얼마만큼인지',
+        '정수리': '머리 꼭대기',
+        '1차시': '첫 번째 시간'
+    };
+    var KEY_WORDS = { force: ['원인', '운동 상태'], accel: ['가속도'], pressure: ['일정한 넓이'], gas: ['이산화 탄소'], control: ['변인 통제'], action: ['반작용'], mass: ['질량'] };
+    function easyLine(words) {
+        return (words || []).filter(function (w) { return EASY[w]; }).map(function (w) { return w + ' = ' + EASY[w]; }).join(' · ');
+    }
+
     // 예측과 왜 달랐을까? (고르기형)
     var WHY = [
         { k: 'speed', t: '기체가 생각보다 빨리(또는 늦게) 생겼어요', fb: '물의 온도·조각 크기가 반응 빠르기를 바꿔요. 따뜻할수록, 조각이 작을수록 기체가 빨리 생겨요.' },
@@ -185,6 +207,8 @@
         { k: 'right', t: '예측이 거의 맞았어요!', fb: '그래프를 보고 다음 조건의 시간도 예측해 보세요.' }
     ];
 
+    // 재 본 값의 가짓수 (같은 조건 반복은 하나로): '한 가지 바꿔 한 번 더' — 2 가지 이상이어야 그래프·도전으로
+    function valueKinds(trials) { var seen = {}; (trials || []).forEach(function (t) { if (t && t.value != null && isFinite(t.y != null ? t.y : t.pct)) seen[String(t.value)] = 1; }); return Object.keys(seen).length; }
     /* 선생님께 보낼 요약 (아이 키 cm·영상은 보내지 않음) */
     function summary(st, setup) {
         var s = mergeSetup(setup), sc = score(st.quiz);
@@ -197,6 +221,8 @@
         var out = { '팀 점수': sc.points, '퀴즈 맞힘': sc.correct, '열림 측정 수': t1.length + ch1.length };
         if (b1) { out['시간 도전 차이(초)'] = round(b1.diff, 1); out['시간 도전 성공'] = Math.abs(b1.diff) <= s.tolTime + 1e-9 ? 1 : 0; }
         out['로켓 발사 수'] = t2.length + ch2.length;
+        // 바꾼 조건의 값 가짓수 (1 이하 = 아직 한 가지 값으로만 잼 → 교사 발표 화면 '값 안 바꾼 팀')
+        out['1차시 값 가짓수'] = valueKinds(t1); out['2차시 값 가짓수'] = valueKinds(t2);
         if (maxPct >= 0) out['높이 최고(%)'] = Math.round(maxPct);
         if (b2) { out['높이 도전 차이(%)'] = Math.round(b2.diff); out['높이 도전 성공'] = Math.abs(b2.diff) <= s.tolPct + 1e-9 ? 1 : 0; }
         out['생각 바뀜 ✨'] = ch.filter(function (c) { return c.sparkle; }).length;
@@ -216,7 +242,7 @@
     }
 
     return {
-        DEFAULT_SETUP: DEFAULT_SETUP, mergeSetup: mergeSetup, PIECES: PIECES, NOSES: NOSES, tabletLabel: tabletLabel, vars1: vars1, vars2: vars2,
+        DEFAULT_SETUP: DEFAULT_SETUP, mergeSetup: mergeSetup, valueKinds: valueKinds, EASY: EASY, KEY_WORDS: KEY_WORDS, easyLine: easyLine, PIECES: PIECES, NOSES: NOSES, tabletLabel: tabletLabel, vars1: vars1, vars2: vars2,
         range: range, stepIn: stepIn, axisValue: axisValue, mean: mean, sd: sd, round: round, byValue: byValue, targetDiff: targetDiff,
         heightPct: heightPct, cmFrom: cmFrom, HAND: HAND, handPct: handPct,
         DEF: DEF, CONCEPTS: CONCEPTS, QUIZ: QUIZ, quizPoints: quizPoints, score: score, conceptChanges: conceptChanges, optText: optText, WHY: WHY,

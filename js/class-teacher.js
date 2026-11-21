@@ -71,6 +71,9 @@
             $('btnShowQr').hidden = sub === 'qr';
             $('btnRefresh').hidden = sub !== 'run';
             $('btnPresent').hidden = !CC.gateSteps(c.exp);
+            // 설명 화면 내용이 있는 실험이면 '🔓 모든 풀이 열기'
+            $('lessonTeach').hidden = true;
+            if (window.LessonSlides && !/:/.test(c.exp)) window.LessonSlides.load(c.exp).then(function (d) { if (d && watched() === c) $('lessonTeach').hidden = false; });
             if (!state.shown || state.shown.space !== c.space) showClass(c);
             renderWatchSel();
         }
@@ -411,6 +414,7 @@
             var done = pg && /^([a-z0-9_]+)-(done|more)$/.exec(String(pg.step || '')), ss = CC.studentState(pg, st.now);
             return { jo: t.jo, name: t.name, score: Number(sm['팀 점수']) || 0, quiz: sm['퀴즈 맞힘'], tDiff: sm['시간 도전 차이(초)'], tOk: sm['시간 도전 성공'] === 1,
                 hMax: sm['높이 최고(%)'], hDiff: sm['높이 도전 차이(%)'], hOk: sm['높이 도전 성공'] === 1, spark: sm['생각 바뀜 ✨'],
+                kinds: { t1: Number(sm['1차시 값 가짓수']) || 0, t2: Number(sm['2차시 값 가짓수']) || 0 },
                 step: !pg ? '–' : done ? CC.stepName(st.exp, done[1], st.flow) + (done[2] === 'more' ? ' ✓ 끝냄 · 더 재는 중' : ' ✓ 기다림') : CC.stepName(st.exp, pg.step, st.flow),
                 doneStage: done ? done[1] : '', at: done ? done[1] : pg ? String(pg.step || '') : '', joined: !!pg,
                 off: !!(ss.joined && ss.ago != null && ss.ago > OFF_MS), state: ss };
@@ -461,6 +465,7 @@
         state.boardRows = rows; renderWait(rows);
         $('board').innerHTML = boardTable(rows, false);
         $('boardBigBody').innerHTML = boardTable(rows, true);
+        renderPresentBar();
         var c = watched(); $('boardBigTitle').textContent = '🏆 팀 결과판' + (c && c.setup ? ' · 목표 ' + c.setup.targetTime + '초 · 아이 키 ' + (c.setup.targetPct || 100) + '%' : '');
         $('groups').innerHTML = '';
     }
@@ -525,8 +530,9 @@
     }
     function closePresent() {
         if (!pres.space) return;
+        lessonOff();   // 학생 화면의 👀 띠를 내림 (수업 문서 lesson.on = false)
         pres.space = ''; pres.ask = false; $('presentFrame').src = 'about:blank'; $('pAsk').hidden = true;
-        lesson.def = null; lessonOff();
+        lesson.def = null;
         if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () { /* 무시 */ });
     }
     function stepNames(c) { return function (k) { return CC.stepName(c.exp, k, c.flow); }; }
@@ -535,14 +541,40 @@
         var si = CC.stageInfo(c.exp, c.stage, c.flow), name = stepNames(c);
         $('pStage').innerHTML = si ? (si.all ? '✅ 모든 단계 열림' : '🔓 <b>' + esc(name(si.cur)) + '</b> 까지 열림 (' + si.n + ' / ' + si.gate.length + ')') : '';
         var j = '';
-        try { if (state.last) { var s = CC.summarize(state.last); j = c.mode === 'team' ? '👨‍👩‍👧 팀 ' + ((state.last.teams || []).length || s.joined) : '🧑‍🎓 들어온 학생 ' + s.joined + ' / ' + s.total; } } catch (e) { j = ''; }
-        $('pJoined').textContent = j;
+        try { j = presentStatus(c, si); } catch (e) { j = ''; }
+        if ($('pJoined').getAttribute('data-sig') !== j) { var wasOpen = !!$('pJoined').querySelector('details[open]'); $('pJoined').innerHTML = j; $('pJoined').setAttribute('data-sig', j); if (wasOpen && $('pJoined').querySelector('details')) $('pJoined').querySelector('details').open = true; }
         $('btnPOpen').disabled = !si || si.all || state.stageBusy;
         $('btnPOpen').textContent = si && !si.all ? '▶ 다음 단계 열기: ' + name(si.gate[si.n]) : '▶ 다음 단계 열기';
         if (pres.ask && (!si || si.all)) askOpen(false);
         var pm = $('btnPMode');
         pm.hidden = !lesson.def;
         pm.textContent = lesson.on ? '📱 학생 화면' : '📖 설명';
+    }
+    /* 발표 화면 띠의 팀(조) 상태 — 설명 장을 보는 동안에도 (하트비트·제출 요약만, 규칙·색인 그대로)
+       팀 수업: 들어온 팀 · ⏳ 기다리는 팀 · 하는 중(펼치면 이름) · 🔧 값을 한 번도 안 바꾼 팀(1·2차시)
+       조 수업: 들어온 학생 · 보낸 조 · 아직 안 보낸 조(펼치면 조 번호) */
+    function presentStatus(c, si) {
+        var st = state.last; if (!st) return '';
+        var names = function (list) { return list.map(function (x) { return '<span class="ct-pname">' + esc(x) + '</span>'; }).join(''); };
+        if (c.mode === 'team') {
+            var rows = state.boardRows || boardRows(st), joined = rows.filter(function (r) { return r.joined; });
+            var cur = si && !si.all ? si.cur : '', part = si && (si.cur === 't1' || si.cur === 't2') ? si.cur : '';
+            var wait = cur ? joined.filter(function (r) { return r.doneStage === cur; }) : [];
+            var doing = joined.filter(function (r) { return wait.indexOf(r) < 0; });
+            var still = part ? joined.filter(function (r) { return (r.kinds && r.kinds[part] || 0) < 2; }) : [];
+            var h = '👨‍👩‍👧 들어온 팀 <b>' + joined.length + '</b>' + (rows.length > joined.length ? ' / ' + rows.length : '') +
+                (cur ? ' · ⏳ 기다림 <b>' + wait.length + '</b>' : '');
+            var more = (cur && doing.length ? '<p>▶ 하는 중 ' + doing.length + ': ' + names(doing.map(function (r) { return r.name + ' · ' + r.step; })) + '</p>' : '') +
+                (still.length ? '<p>🔧 아직 한 가지 값으로만 잰 팀 ' + still.length + ': ' + names(still.map(function (r) { return r.name; })) + '</p>' : '') +
+                (joined.filter(function (r) { return r.off; }).length ? '<p>🔌 연결 끊김: ' + names(joined.filter(function (r) { return r.off; }).map(function (r) { return r.name; })) + '</p>' : '');
+            var sumTxt = [cur && doing.length ? '하는 중 ' + doing.length : '', still.length ? '🔧 값 안 바꾼 팀 ' + still.length : ''].filter(Boolean).join(' · ');
+            return h + (more ? ' <details class="ct-pmore"><summary>' + (sumTxt || '자세히') + '</summary><div>' + more + '</div></details>' : '');
+        }
+        var s = CC.summarize(st), notSent = s.groups.filter(function (g) { return !(g.sub && g.sub.rows); });
+        var joinedG = s.groups.filter(function (g) { return g.members.some(function (m) { return m.state && m.state.joined; }); });
+        // 짧게 (띠가 두 줄이 되면 발표 화면이 작아짐): 보낸 조는 누르면 아직 안 보낸 조 번호
+        return '🧑‍🎓 들어온 학생 ' + s.joined + ' / ' + s.total +
+            (joinedG.length ? ' <details class="ct-pmore"><summary>📤 ' + s.submittedGroups + '/' + s.groups.length + '조</summary><div><p>' + (notSent.length ? '아직 안 보낸 조: ' + names(notSent.map(function (g) { return g.jo + '조'; })) : '모든 조가 보냈어요') + '</p></div></details>' : '');
     }
     function askOpen(on) {
         var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow);
@@ -589,19 +621,43 @@
         lessonRender();
         return true;
     }
+    // 학생 화면에 알림(수업 문서 lesson·lessonOpen): 장을 넘길 때마다 한 번 (빠르게 여러 장을 넘기면 마지막 것만)
+    var lsync = { t: 0, last: '' };
+    function lessonSync(now) {
+        var c = watched(); if (!c || !c.space) return;
+        var s = lesson.on ? lesson.list[lesson.i] : null;
+        var L = { on: !!lesson.on, stage: lesson.on ? lesson.gate : '', i: lesson.on ? lesson.i : 0, key: s && s.key ? s.key : '', reveal: !!(lesson.on && lesson.rev) };
+        var open = s && s.key && lesson.rev ? [s.key] : [];
+        var sig = JSON.stringify([c.space, L, open]);
+        if (sig === lsync.last) return;
+        clearTimeout(lsync.t);
+        var go = function () { lsync.last = sig; CC.classLesson(c.space, L, open).then(function (r) { if (!r || !r.ok) lsync.last = ''; }); };
+        if (now || open.length) go(); else lsync.t = setTimeout(go, 400);
+    }
     function lessonRender() {
         var c = watched(), box = $('pSlides');
         $('presentPane').classList.add('ls-on');
         box.innerHTML = LSx.render(lesson.list[lesson.i], lesson.rev, { i: lesson.i, n: lesson.list.length, stageName: c ? CC.stepName(c.exp, lesson.gate, c.flow) : '' });
         LSx.fit(box);
         renderPresentBar();
+        lessonSync();
     }
     function lessonOff() {
+        var was = lesson.on;
         lesson.on = false;
         $('presentPane').classList.remove('ls-on');
         $('pSlides').innerHTML = '';
         renderPresentBar();
+        if (was) lessonSync(true);
     }
+    // 진행 화면 '🔧 선생님용': 설명 없이 진행할 때 학생 화면의 가린 답을 한꺼번에 열기
+    $('btnLessonOpenAll').addEventListener('click', async function () {
+        var c = watched(); if (!c || !LSx) return;
+        var def = await LSx.load(c.exp), keys = [];
+        if (def) Object.keys(def.stages).forEach(function (k) { def.stages[k].forEach(function (sl) { if (sl.key && keys.indexOf(sl.key) < 0) keys.push(sl.key); }); });
+        var r = await CC.classLesson(c.space, { on: false }, keys);
+        $('lessonMsg').textContent = r && r.ok ? '✅ 풀이 ' + keys.length + '개를 열었어요' : '⚠ ' + ((r && r.error) || '열지 못했어요');
+    });
     // 한 장 넘기기: 처리했으면 true, 처음·끝을 넘어가면 false
     function lessonMove(dir) {
         var s = lesson.list[lesson.i];

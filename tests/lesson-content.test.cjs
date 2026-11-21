@@ -24,6 +24,21 @@ test('설명 화면 내용 파일: 모양·단계 키', () => {
     }
 });
 
+test('로켓 설명 장: 폰 답(data-lesson-answer)과 key 짝, 초3 쉬운 말이 폰과 같은 말', () => {
+    const box = { LessonContent }; box.window = box;
+    vm.runInNewContext(fs.readFileSync(path.join(DIR, 'rocket.js'), 'utf8'), box);
+    const def = LessonContent.get('rocket'), M = require('../js/film-rocket-math.js');
+    const keys = new Set([].concat(...Object.values(def.stages)).map(s => s.key).filter(Boolean));
+    const page = fs.readFileSync(path.join(__dirname, '..', 'js', 'film-rocket.js'), 'utf8');
+    for (const k of Object.keys(M.KEY_WORDS)) assert.ok(keys.has(k), '폰 📘 정의 ' + k + ' 의 풀이 장이 있어야 해요');
+    for (const c of M.CONCEPTS) assert.ok(keys.has(c.key));
+    assert.match(page, /data-lesson-answer/);
+    const src = fs.readFileSync(path.join(DIR, 'rocket.js'), 'utf8');
+    for (const [w, m] of Object.entries(M.EASY)) assert.ok(src.includes(m), '쉬운 말 ‘' + w + '’ = ' + m + ' 이(가) 설명 장에도 같은 말로');
+    assert.deepEqual(LessonSlides.check('x', { title: 't', stages: { a: [{ kind: 'why', title: 't', body: 'b', key: 'k1' }], b: [{ kind: 'why', title: 't', body: 'b', key: 'k1' }] } }).length, 1, '한 실험 안 key 겹침');
+    assert.equal(LessonSlides.check('x', { title: 't', stages: { a: [{ kind: 'why', title: 't', body: 'b', key: 'Bad Key' }] } }).length, 1, 'key 모양');
+});
+
 test('LessonSlides: 먼저 불린 내용 파일 대기열(_wait)', () => {
     const box = {}; box.window = box;
     vm.runInNewContext(fs.readFileSync(path.join(DIR, 'rocket.js'), 'utf8'), box);

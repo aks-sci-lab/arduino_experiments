@@ -21,6 +21,8 @@
 .ls-reveal[hidden] { display: none; }
 .ls-reveal p { margin: 0 0 0.3em; }
 .ls-reveal p:last-child { margin-bottom: 0; }
+/* 초3 쉬운 말 한 줄 (로켓 등 행사형, 폰 화면과 같은 말) */
+.ls-easy { margin: 0.35em 0 0; font-size: 0.78em; color: var(--c-muted); }
 .ls-wait { margin: 0.5em 0 0; font-size: 0.7em; color: var(--c-muted); }
 .ls-vars { border-collapse: collapse; margin: 0.2em 0 0; width: 100%; }
 .ls-vars th, .ls-vars td { border: 1px solid var(--c-line); padding: 0.3em 0.55em; text-align: left; vertical-align: top; }

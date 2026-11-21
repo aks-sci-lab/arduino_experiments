@@ -105,6 +105,7 @@
         if (!/^[a-z0-9]+$/.test(String(exp || ''))) bad.push(exp + ': 실험 키는 영어 소문자·숫자');
         if (!def || typeof def.title !== 'string' || !def.title) bad.push(exp + ': title 없음');
         if (!def || !def.stages || typeof def.stages !== 'object') { bad.push(exp + ': stages 없음'); return bad; }
+        var seenKey = {};
         Object.keys(def.stages).forEach(function (sk) {
             var list = def.stages[sk];
             if (!Array.isArray(list) || !list.length) { bad.push(exp + '.' + sk + ': 장 목록이 비었어요'); return; }
@@ -114,6 +115,12 @@
                 if (!s || typeof s.title !== 'string' || !s.title.trim()) bad.push(at + ': title 없음');
                 if (s && !s.body && !s.ask && !s.vars) bad.push(at + ': body·ask·vars 중 하나는 있어야 해요');
                 if (s && s.reveal && !s.ask) bad.push(at + ': reveal 은 ask 와 함께');
+                // key: 그 장의 풀이가 학생 화면 어느 답([data-lesson-answer])과 짝인지 (영어 소문자·숫자·-, 한 실험 안에서 하나씩)
+                if (s && s.key != null) {
+                    if (typeof s.key !== 'string' || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(s.key)) bad.push(at + ': key 는 영어 소문자·숫자·- (40자까지)');
+                    else if (seenKey[s.key]) bad.push(at + ': key ' + s.key + ' 가 ' + seenKey[s.key] + ' 와 겹쳐요');
+                    else seenKey[s.key] = at;
+                }
                 if (s && s.kind === 'vars' && !(s.vars && s.vars.change && s.vars.measure && Array.isArray(s.vars.keep) && s.vars.keep.length)) bad.push(at + ': vars 는 change·keep[]·measure');
                 ['title', 'body', 'ask', 'reveal', 'note', 'img'].forEach(function (f) {
                     if (s && s[f] != null && typeof s[f] !== 'string') bad.push(at + ': ' + f + ' 는 글');
