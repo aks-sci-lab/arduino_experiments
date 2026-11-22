@@ -126,7 +126,7 @@
         if (PHONE) {
             // 폰은 계산하지 않고 원본만 저장 → 위 '📱 노트북과 연결됨' 띠의 회차 목록에서 골라 보냄
             const id = (() => { let k = 1; const ids = new Set(state.phoneRuns.map(r => r.id)); while (ids.has('b' + k)) k++; return 'b' + k; })();
-            state.phoneRuns.push({ id, mode: 'breath', at: new Date().toISOString(), ph: ph0, raw: H.pack(rec.frames), lock: rec.lock || 'unlocked', why: rec.why || '', lockLog: rec.lockLog || null, scene: rec.scene || null });
+            state.phoneRuns.push({ id, mode: 'breath', at: new Date().toISOString(), ph: ph0, raw: H.pack(rec.frames), lock: rec.lock || 'unlocked', why: rec.why || '', lockLog: rec.lockLog || null, scene: rec.scene || null, facing: rec.facing || 'environment' });
             while (state.phoneRuns.length > 10) state.phoneRuns.shift();
             save();
             showRun(false); gate();
@@ -142,7 +142,7 @@
             const metrics = B.breathMetrics(curve, ph);
             const run = {
                 id: newId(), at: new Date().toISOString(), ph, curve, metrics, profile: Object.assign({}, state.profile), consent: !!state.consent,
-                lock: rec.lock === 'locked' ? '🔒 노출 고정됨' : '⚠ 고정 안 됨' + (rec.why ? ' (' + rec.why + ')' : ''), raw: H.pack(frames)
+                lock: rec.lock === 'locked' ? '🔒 노출 고정됨' : '⚠ 고정 안 됨' + (rec.why ? ' (' + rec.why + ')' : ''), raw: H.pack(frames), facing: rec.facing || 'environment'
             };
             state.runs.push(run);
             while (state.runs.length > MAX_RUNS) state.runs.shift();
@@ -244,7 +244,7 @@
             id: 'hrb-' + DevCollect.device().slice(-6) + '-' + Math.floor(Date.parse(run.at) / 1000).toString(36) + '-' + run.id,
             measuredAt: run.at,
             summary: { '종류': '숨 참기', '변화율': m.changePct == null ? '' : m.changePct, '참은 초': m.heldSec, '안정 평균': m.restMean == null ? '' : m.restMean, '회복': m.recoverySec == null ? '' : m.recoverySec },
-            data: { kind: 'breath', csv: B.breathCsv(run), raw: run.raw ? H.toCsv(H.unpack(run.raw), { locked: /고정됨/.test(run.lock) }) : '', ph: run.ph, metrics: m, lock: run.lock,
+            data: { kind: 'breath', csv: B.breathCsv(run), raw: run.raw ? H.toCsv(H.unpack(run.raw), { locked: /고정됨/.test(run.lock) }) : '', ph: run.ph, metrics: m, lock: run.lock, facing: run.facing || '',
                 device: DevCollect.uaSummary(navigator.userAgent) }
         });
     }
@@ -254,10 +254,10 @@
     function phoneRawRuns() {
         const tm = at => R.timeText(at);
         const once = core.runs().filter(r => r.raw && !r.sim && !String(r.lock).startsWith('csv')).map(r => ({
-            id: r.id, mode: 'once', at: r.at, frames: H.unpack(r.raw), lock: r.lock, why: r.why, lockLog: r.lockLog, scene: r.scene, torch: r.torch,
+            id: r.id, mode: 'once', at: r.at, frames: H.unpack(r.raw), lock: r.lock, why: r.why, lockLog: r.lockLog, scene: r.scene, torch: r.torch, facing: r.facing || '',
             bpm: r.res && r.res.bpm, title: `❤️ 한 번 재기 · ${tm(r.at)}` }));
         const br = state.phoneRuns.map(r => ({
-            id: r.id, mode: 'breath', at: r.at, frames: H.unpack(r.raw), lock: r.lock, why: r.why, lockLog: r.lockLog, scene: r.scene, ph: r.ph,
+            id: r.id, mode: 'breath', at: r.at, frames: H.unpack(r.raw), lock: r.lock, why: r.why, lockLog: r.lockLog, scene: r.scene, ph: r.ph, facing: r.facing || '',
             held: r.ph.holdEnd - r.ph.holdStart, title: `🫁 숨 참기 ${r.ph.holdPlanned}초${r.ph.stopped ? ' (' + Math.round(r.ph.holdEnd - r.ph.holdStart) + '초에 멈춤)' : ''} · ${tm(r.at)}` }));
         return once.concat(br);
     }
@@ -277,7 +277,7 @@
                 const curve = B.breathCurve(u.frames, { lock: u.lock || 'unlocked', scene: u.scene });
                 const metrics = B.breathMetrics(curve, u.ph);
                 const run = { id: old ? old.id : newId(), at: u.at || new Date().toISOString(), ph: u.ph, curve, metrics, profile: Object.assign({}, state.profile), consent: false,
-                    lock: u.lock === 'locked' ? '🔒 노출 고정됨' : '⚠ 고정 안 됨' + (u.why ? ' (' + u.why + ')' : ''), raw: H.pack(u.frames), from: it.from, srcKey: it.key, decimate: u.decimate };
+                    lock: u.lock === 'locked' ? '🔒 노출 고정됨' : '⚠ 고정 안 됨' + (u.why ? ' (' + u.why + ')' : ''), raw: H.pack(u.frames), from: it.from, srcKey: it.key, decimate: u.decimate, facing: u.facing || '' };
                 if (old) Object.assign(old, run); else state.runs.push(run);
                 while (state.runs.length > MAX_RUNS) state.runs.shift();
                 state.runs.forEach((r, i) => { if (i < state.runs.length - KEEP_RAW) delete r.raw; });
@@ -285,7 +285,7 @@
                 got++;
             } else if (it.mode === 'once') {
                 if (core.runs().some(r => r.srcKey === it.key)) return;
-                core.addRun({ frames: u.frames, lock: u.lock || 'unlocked', why: u.why, lockLog: u.lockLog, scene: u.scene, at: u.at, torch: u.torch, from: it.from, srcKey: it.key, fromPhone: true });
+                core.addRun({ frames: u.frames, lock: u.lock || 'unlocked', why: u.why, lockLog: u.lockLog, scene: u.scene, at: u.at, torch: u.torch, facing: u.facing, from: it.from, srcKey: it.key, fromPhone: true });
                 got++;
             }
         });

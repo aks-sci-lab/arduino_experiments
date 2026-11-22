@@ -45,13 +45,13 @@
         return out;
     }
 
-    // 원본 회차 → 조 공유 자료 (kind 'raw'). meta: { mode: 'once'|'breath', at, lock, why, lockLog, scene, ph, torch, label }
+    // 원본 회차 → 조 공유 자료 (kind 'raw'). meta: { mode: 'once'|'breath', at, lock, why, lockLog, scene, ph, torch, facing('user'|'environment'), label }
     function rawPack(frames, meta) {
         meta = meta || {};
         let fr = (frames || []).filter(f => f && Number.isFinite(f.t)), k = 1;
         const make = () => ({
             kind: 'raw', v: 1, mode: meta.mode === 'breath' ? 'breath' : 'once', at: meta.at || '', lock: meta.lock || '', why: String(meta.why || '').slice(0, 200),
-            lockLog: meta.lockLog || null, scene: meta.scene || null, ph: meta.ph || null, torch: !!meta.torch, decimate: k, frames0: (frames || []).length, cols: packCols(fr)
+            lockLog: meta.lockLog || null, scene: meta.scene || null, ph: meta.ph || null, torch: !!meta.torch, facing: meta.facing === 'user' ? 'user' : (meta.facing === 'environment' ? 'environment' : ''), decimate: k, frames0: (frames || []).length, cols: packCols(fr)
         });
         let d = make();
         while (JSON.stringify(d).length > LIMIT && k < 20) { k++; fr = (frames || []).filter((_, i) => i % k === 0); d = make(); }
@@ -61,7 +61,7 @@
     function rawUnpack(d) {
         if (!d || d.kind !== 'raw' || !d.cols) return null;
         return { frames: unpackCols(d.cols), mode: d.mode === 'breath' ? 'breath' : 'once', at: d.at || '', lock: d.lock || '', why: d.why || '', lockLog: d.lockLog || null,
-            scene: d.scene || null, ph: d.ph || null, torch: !!d.torch, decimate: Number(d.decimate) || 1, frames0: Number(d.frames0) || 0 };
+            scene: d.scene || null, ph: d.ph || null, torch: !!d.torch, facing: d.facing === 'user' ? 'user' : (d.facing === 'environment' ? 'environment' : ''), decimate: Number(d.decimate) || 1, frames0: Number(d.frames0) || 0 };
     }
 
     // 폰의 회차들 → ClassShare 항목. runs: [{ id, mode, at, frames(계산 모양), lock, why, lockLog, scene, ph, title, bpm, held }]

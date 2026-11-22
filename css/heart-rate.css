@@ -86,3 +86,9 @@ body.hr-phone #br-result, body.hr-phone #br-profile-box, body.hr-phone #br-runs-
 body.hr-laptop .hr-laptop-only { display: block; }
 body.hr-laptop .hr-measure, body.hr-laptop #torch-warn { display: none !important; }
 .hr-devline { display: flex; justify-content: flex-end; margin: 0 0 var(--sp-2); }
+/* 📷 뒤 / 🤳 앞 카메라 고르기 */
+.seg#facing { display: inline-flex; gap: 0; padding: 0; }
+.seg#facing button { background: var(--c-card); color: var(--c-text); border: 1px solid var(--c-line); border-radius: 0; min-height: var(--tap); padding: 8px 12px; }
+.seg#facing button:first-child { border-radius: var(--r-ctl) 0 0 var(--r-ctl); }
+.seg#facing button:last-child { border-radius: 0 var(--r-ctl) var(--r-ctl) 0; }
+.seg#facing button[aria-pressed="true"] { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
