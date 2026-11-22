@@ -252,3 +252,28 @@ details.ct-phint:not([open]) > summary { min-height: 0; padding: 2px 0; }
 
 /* 팀 결과판 💬 생각 (예측·정리 문장) */
 .ct-board td.ct-talk { max-width: 22em; font-size: 0.9em; text-align: left; }
+
+/* 🧩 모아 보기 (프로젝터, js/class-teacher-gather.js) — 4K·노트북 모두 화면 높이에 맞춘 글자 */
+.ctg-big { font-size: clamp(1rem, 2.6vh, 6rem); }
+.ctg-big h2 { font-size: clamp(1.3rem, 4vh, 9rem); }
+.ctg-head { flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.ctg-head h2 { margin: 0; margin-right: auto; }
+.ctg-tabs { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin: 0; }
+.ctg-tabs button, .ctg-keys button { min-height: var(--tap); padding: .3em .8em; font-size: 1em; border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-card); color: var(--c-text); }
+.ctg-tabs button[aria-selected="true"], .ctg-keys button[aria-pressed="true"] { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+.ctg-big .ctg-head button#btnGatherReload { background: var(--c-secondary); }
+.ctg-body { margin-top: var(--sp-2); }
+.ctg-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18em), 1fr)); gap: var(--sp-3); }
+.ctg-pred { border: 2px solid var(--c-line); border-radius: var(--r-card); padding: .5em .8em; background: var(--c-fill); }
+.ctg-pred h3 { margin: 0 0 .3em; font-size: 1.15em; }
+.ctg-pred ul, .ctg-list { margin: 0; padding-left: 1.1em; }
+.ctg-pred li, .ctg-list li { margin: .25em 0; overflow-wrap: anywhere; }
+.ctg-n { color: var(--c-muted); font-weight: 400; }
+.ctg-why { color: var(--c-muted); font-size: .9em; }
+.ctg-ok { color: var(--c-ok-text); font-weight: 700; }
+.ctg-diff { color: var(--c-warn-text); font-weight: 700; }
+.ctg-tag { display: inline-block; padding: 0 .4em; border-radius: .3em; background: var(--c-primary-soft); }
+.ctg-wait, .ctg-empty { color: var(--c-muted); }
+.ctg-keys { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-bottom: var(--sp-2); }
+.ctg-dots { width: 100%; max-height: 70vh; display: block; }
+.ctg-teach { margin: var(--sp-1) 0 0; padding-left: 1.2em; }
