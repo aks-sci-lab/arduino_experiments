@@ -1,0 +1,52 @@
+{
+  "items": [
+    {
+      "id": "fh-x6wpht-tow58q",
+      "exp": "facehr",
+      "measuredAt": "2026-11-22T06:41:14.663Z",
+      "savedAt": "2026-11-22T06:41:34.604Z",
+      "device": "dve2x6wpht",
+      "summary": {
+        "정답 경로": "없음",
+        "시간(초)": 18.82,
+        "fps": 26.41,
+        "정답 평균": "",
+        "POS": 68.8,
+        "CHROM": 63.2,
+        "GREEN": 38.6,
+        "POS 오차": "",
+        "CHROM 오차": "",
+        "GREEN 오차": "",
+        "얼굴 찾기": "mediapipe@0.10.14",
+        "노출": "failed"
+      },
+      "csv": "face-hr/2026-11-22/fh-x6wpht-tow58q.csv",
+      "json": "face-hr/2026-11-22/fh-x6wpht-tow58q.json"
+    },
+    {
+      "id": "fh-x6wpht-tow8j4",
+      "exp": "facehr",
+      "measuredAt": "2026-11-22T07:52:16.901Z",
+      "savedAt": "2026-11-22T07:53:19.098Z",
+      "device": "dve2x6wpht",
+      "summary": {
+        "정답 경로": "없음",
+        "시간(초)": 60.17,
+        "fps": 22.1,
+        "정답 평균": "",
+        "POS": 67.1,
+        "CHROM": 72.8,
+        "GREEN": 60.3,
+        "POS 오차": "",
+        "CHROM 오차": "",
+        "GREEN 오차": "",
+        "얼굴 찾기": "mediapipe@0.10.14",
+        "노출": "failed"
+      },
+      "csv": "face-hr/2026-11-22/fh-x6wpht-tow8j4.csv",
+      "json": "face-hr/2026-11-22/fh-x6wpht-tow8j4.json"
+    }
+  ],
+  "updated": "2026-11-22T08:22:54.860Z",
+  "count": 2
+}

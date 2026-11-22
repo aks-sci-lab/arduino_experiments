@@ -1,0 +1,114 @@
+{
+  "items": [
+    {
+      "id": "hr-x6wpht-tovwdi-r23",
+      "exp": "heartrate",
+      "measuredAt": "2026-11-22T03:29:42.023Z",
+      "savedAt": "2026-11-22T03:29:42.683Z",
+      "device": "dve2x6wpht",
+      "summary": {
+        "심박수": 41.8,
+        "신뢰도": 0.5,
+        "노출": "steady",
+        "손목": "",
+        "FFT": 38,
+        "자기상관": 42,
+        "봉우리": 36
+      },
+      "csv": "heart-rate/2026-11-22/hr-x6wpht-tovwdi-r23.csv",
+      "json": "heart-rate/2026-11-22/hr-x6wpht-tovwdi-r23.json"
+    },
+    {
+      "id": "hr-x6wpht-tovwe4-r24",
+      "exp": "heartrate",
+      "measuredAt": "2026-11-22T03:30:04.257Z",
+      "savedAt": "2026-11-22T03:30:04.700Z",
+      "device": "dve2x6wpht",
+      "summary": {
+        "심박수": 53.8,
+        "신뢰도": 0.35,
+        "노출": "steady",
+        "손목": "",
+        "FFT": 54,
+        "자기상관": 43,
+        "봉우리": 50
+      },
+      "csv": "heart-rate/2026-11-22/hr-x6wpht-tovwe4-r24.csv",
+      "json": "heart-rate/2026-11-22/hr-x6wpht-tovwe4-r24.json"
+    },
+    {
+      "id": "hr-x6wpht-tovwq2-r25",
+      "exp": "heartrate",
+      "measuredAt": "2026-11-22T03:37:14.754Z",
+      "savedAt": "2026-11-22T03:37:16.136Z",
+      "device": "dve2x6wpht",
+      "summary": {
+        "심박수": 88.3,
+        "신뢰도": 0.77,
+        "노출": "steady",
+        "손목": "",
+        "FFT": 89,
+        "자기상관": 44,
+        "봉우리": 88
+      },
+      "csv": "heart-rate/2026-11-22/hr-x6wpht-tovwq2-r25.csv",
+      "json": "heart-rate/2026-11-22/hr-x6wpht-tovwq2-r25.json"
+    },
+    {
+      "id": "hr-x6wpht-tovwr6-r26",
+      "exp": "heartrate",
+      "measuredAt": "2026-11-22T03:37:54.634Z",
+      "savedAt": "2026-11-22T03:37:55.121Z",
+      "device": "dve2x6wpht",
+      "summary": {
+        "심박수": 85.3,
+        "신뢰도": 0.86,
+        "노출": "steady",
+        "손목": "",
+        "FFT": 86,
+        "자기상관": 86,
+        "봉우리": 85
+      },
+      "csv": "heart-rate/2026-11-22/hr-x6wpht-tovwr6-r26.csv",
+      "json": "heart-rate/2026-11-22/hr-x6wpht-tovwr6-r26.json"
+    },
+    {
+      "id": "hr-x6wpht-tow20n-r27",
+      "exp": "heartrate",
+      "measuredAt": "2026-11-22T05:31:35.362Z",
+      "savedAt": "2026-11-22T05:31:36.017Z",
+      "device": "dve2x6wpht",
+      "summary": {
+        "심박수": 82.1,
+        "신뢰도": 0.5,
+        "노출": "steady",
+        "손목": "",
+        "FFT": 82,
+        "자기상관": 41,
+        "봉우리": 82
+      },
+      "csv": "heart-rate/2026-11-22/hr-x6wpht-tow20n-r27.csv",
+      "json": "heart-rate/2026-11-22/hr-x6wpht-tow20n-r27.json"
+    },
+    {
+      "id": "hr-x6wpht-tow573-r28",
+      "exp": "heartrate",
+      "measuredAt": "2026-11-22T06:40:15.298Z",
+      "savedAt": "2026-11-22T06:40:16.100Z",
+      "device": "dve2x6wpht",
+      "summary": {
+        "심박수": 149.9,
+        "신뢰도": 0.61,
+        "노출": "steady",
+        "손목": "",
+        "FFT": 75,
+        "자기상관": 76,
+        "봉우리": ""
+      },
+      "csv": "heart-rate/2026-11-22/hr-x6wpht-tow573-r28.csv",
+      "json": "heart-rate/2026-11-22/hr-x6wpht-tow573-r28.json"
+    }
+  ],
+  "updated": "2026-11-22T08:22:54.860Z",
+  "count": 6
+}

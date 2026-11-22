@@ -1,0 +1,149 @@
+{
+  "id": "hr-x6wpht-tovwdi-r23",
+  "exp": "heartrate",
+  "measuredAt": "2026-11-22T03:29:42.023Z",
+  "savedAt": "2026-11-22T03:29:42.683Z",
+  "device": "dve2x6wpht",
+  "summary": {
+    "심박수": 41.8,
+    "신뢰도": 0.5,
+    "노출": "steady",
+    "손목": "",
+    "FFT": 38,
+    "자기상관": 42,
+    "봉우리": 36
+  },
+  "data": {
+    "result": {
+      "ok": true,
+      "bpm": 41.8,
+      "level": "bad",
+      "conf": 0.5,
+      "method": "자기상관",
+      "channel": "g",
+      "bpmFFT": 38.3,
+      "bpmAC": 41.8,
+      "bpmPeaks": 35.6,
+      "ibi": [
+        1404,
+        2059,
+        1463,
+        1885,
+        1419,
+        1394,
+        1379,
+        1881,
+        1875,
+        1852,
+        1955,
+        1879,
+        1873,
+        1856,
+        1478,
+        1354
+      ],
+      "cv": 0.147,
+      "dur": 28.37,
+      "fpsMean": 29.9,
+      "reasons": [
+        "아주 어두워서 신뢰도 낮음",
+        "주파수 분석과 다른 값"
+      ],
+      "mode": "steady",
+      "modeText": "노출 값이 측정 동안 바뀌지 않음 → 보정 없이 그대로 계산",
+      "doubled": false,
+      "acdc": 0.38187,
+      "alt": null,
+      "cutAt": null,
+      "doubleCheck": {
+        "switch": false,
+        "from": 41.83316446082398,
+        "f2": 1.490478515625,
+        "ratio": 0.116,
+        "snr": 7.4
+      },
+      "expLag": null,
+      "expBeta": null,
+      "quality": {
+        "covered": true,
+        "R": 5.2,
+        "G": 2.4,
+        "B": null,
+        "rg": 2.21,
+        "level": "fair"
+      },
+      "light": {
+        "level": "dark",
+        "text": "🌙 아주 어두워요 — 더 밝은 곳(창가)에서 하거나 플래시를 켜세요. 손가락 밝기가 낮아요 (빨강 5)",
+        "R": 5.2,
+        "acdc": 0.38187,
+        "exposureTime": 333.333,
+        "iso": 100
+      },
+      "exposure": {
+        "warn": false,
+        "wobble": false,
+        "available": true,
+        "text": "노출이 바뀌지 않았어요 (좋음)",
+        "varPct": 0
+      }
+    },
+    "lock": "unlocked",
+    "why": "잠갔는데 자동 노출로 돌아감",
+    "lockLog": {
+      "steps": [
+        {
+          "what": "잠그기 전",
+          "y": 38.7,
+          "r": 116.2,
+          "mode": "continuous",
+          "et": 416.2186,
+          "iso": 27
+        },
+        {
+          "what": "잠근 직후",
+          "y": 39.5,
+          "r": 117.7,
+          "mode": "none",
+          "et": 333.33333,
+          "iso": 100
+        }
+      ],
+      "before": {
+        "what": "잠그기 전",
+        "y": 38.7,
+        "r": 116.2,
+        "mode": "continuous",
+        "et": 416.2186,
+        "iso": 27
+      },
+      "target": 114,
+      "afterLock": {
+        "what": "잠근 직후",
+        "y": 39.5,
+        "r": 117.7,
+        "mode": "none",
+        "et": 333.33333,
+        "iso": 100
+      },
+      "adjusted": {
+        "what": "잠근 직후",
+        "y": 39.5,
+        "r": 117.7,
+        "mode": "none",
+        "et": 333.33333,
+        "iso": 100
+      }
+    },
+    "scene": null,
+    "torch": false,
+    "palp": null,
+    "palpBpm": null,
+    "device": "Android 10 · Chrome 157",
+    "screen": [
+      360,
+      880,
+      3
+    ]
+  }
+}

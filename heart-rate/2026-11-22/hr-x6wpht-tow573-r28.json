@@ -1,0 +1,171 @@
+{
+  "id": "hr-x6wpht-tow573-r28",
+  "exp": "heartrate",
+  "measuredAt": "2026-11-22T06:40:15.298Z",
+  "savedAt": "2026-11-22T06:40:16.100Z",
+  "device": "dve2x6wpht",
+  "summary": {
+    "심박수": 149.9,
+    "신뢰도": 0.61,
+    "노출": "steady",
+    "손목": "",
+    "FFT": 75,
+    "자기상관": 76,
+    "봉우리": ""
+  },
+  "data": {
+    "result": {
+      "ok": true,
+      "bpm": 149.9,
+      "level": "fair",
+      "conf": 0.61,
+      "method": "봉우리 간격 → 두 배 후보 검사로 바꿈",
+      "channel": "r",
+      "bpmFFT": 75.1,
+      "bpmAC": 75.8,
+      "bpmPeaks": null,
+      "ibi": [],
+      "cv": null,
+      "dur": 29.43,
+      "fpsMean": 23.8,
+      "reasons": [
+        "처음 찾은 76회/분보다 두 배인 150회/분이 더 그럴듯해 바꿨어요",
+        "어두워서 신뢰도 낮음",
+        "주파수 분석과 다른 값",
+        "처음 0.64초(손가락·노출이 자리 잡는 동안)는 빼고 계산"
+      ],
+      "mode": "steady",
+      "modeText": "노출 값이 측정 동안 바뀌지 않음 → 보정 없이 그대로 계산",
+      "doubled": true,
+      "acdc": 0.00113,
+      "alt": null,
+      "cutAt": null,
+      "doubleCheck": {
+        "switch": true,
+        "from": 76.08961221899384,
+        "f2": 2.49755859375,
+        "ratio": 0.034,
+        "snr": 65.3,
+        "cvBroad": null,
+        "altHeight": 0.96,
+        "cv2": 0.082,
+        "sineLike": true,
+        "lock": 0.98,
+        "why": "sine"
+      },
+      "expLag": null,
+      "expBeta": null,
+      "quality": {
+        "covered": true,
+        "R": 178.9,
+        "G": 19.3,
+        "B": null,
+        "rg": 9.26,
+        "level": "good"
+      },
+      "light": {
+        "level": "dim",
+        "text": "🌙 어두워요 — 더 밝은 곳(창가)에서 하거나 플래시를 켜세요. 맥파가 약해요 (AC/DC 0.11%)",
+        "R": 178.9,
+        "acdc": 0.00113,
+        "exposureTime": 333.333,
+        "iso": 182
+      },
+      "exposure": {
+        "warn": false,
+        "wobble": false,
+        "available": true,
+        "text": "노출이 바뀌지 않았어요 (좋음)",
+        "varPct": 0
+      }
+    },
+    "lock": "unlocked",
+    "why": "잠그고 밝기를 맞추는 중 크게 어두워져 바로 멈추고 자동 노출로 측정",
+    "lockLog": {
+      "steps": [
+        {
+          "what": "잠그기 전",
+          "ms": 0,
+          "y": 70.8,
+          "r": 183,
+          "mode": "continuous",
+          "et": 332.44662,
+          "iso": 48
+        },
+        {
+          "what": "잠근 직후",
+          "ms": 314,
+          "y": 55.2,
+          "r": 142.8,
+          "mode": "none",
+          "et": 332.44662,
+          "iso": 100
+        },
+        {
+          "what": "밝기 맞추기",
+          "ms": 1029,
+          "y": 11.8,
+          "r": 33.9,
+          "mode": "none",
+          "et": 333.33333,
+          "iso": 182,
+          "k": 1.82
+        },
+        {
+          "what": "자동 노출로 되돌림",
+          "ms": 1035,
+          "y": 11.8,
+          "r": 33.9,
+          "mode": "continuous",
+          "et": 333.33333,
+          "iso": 182
+        }
+      ],
+      "before": {
+        "what": "잠그기 전",
+        "ms": 0,
+        "y": 70.8,
+        "r": 183,
+        "mode": "continuous",
+        "et": 332.44662,
+        "iso": 48
+      },
+      "target": 180,
+      "afterLock": {
+        "what": "잠근 직후",
+        "ms": 314,
+        "y": 55.2,
+        "r": 142.8,
+        "mode": "none",
+        "et": 332.44662,
+        "iso": 100
+      },
+      "dropped": true,
+      "adjusted": {
+        "what": "밝기 맞추기",
+        "ms": 1029,
+        "y": 11.8,
+        "r": 33.9,
+        "mode": "none",
+        "et": 333.33333,
+        "iso": 182,
+        "k": 1.82
+      }
+    },
+    "scene": {
+      "y": 158.5,
+      "exposureTime": 332.44662,
+      "iso": 48
+    },
+    "torch": false,
+    "facing": "user",
+    "palp": null,
+    "palpBpm": null,
+    "device": "Android 10 · Chrome 157",
+    "screen": [
+      360,
+      880,
+      3
+    ]
+  }
+}
