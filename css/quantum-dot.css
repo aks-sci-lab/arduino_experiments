@@ -118,3 +118,14 @@ body.qd-phone .show-on-laptop { display: none !important; }
 /* 6-2: 가로축이 조가 바꾼 것과 다를 때 */
 .qd-xhint { display: inline-block; margin: var(--sp-1) 0; padding: var(--sp-1) var(--sp-2); background: var(--c-warn-bg); color: var(--c-warn-text); border-radius: var(--r-ctl); }
 .qd-xhint button { margin-left: var(--sp-1); }
+/* 설명 화면 답 가리기: 가린 자리에 '언제 열리는지' (공통 문구는 css/class-share.css, 단계는 data-lesson-stage, 가설연역이면 그 이름) */
+[data-lesson-answer][data-lesson-stage="purpose"].cs-ans-hide::after { content: '🔒 1. 목적 설명 뒤에 열려요'; }
+[data-lesson-answer][data-lesson-stage="theory"].cs-ans-hide::after { content: '🔒 2. 이론 설명 뒤에 열려요'; }
+[data-lesson-answer][data-lesson-stage="materials"].cs-ans-hide::after { content: '🔒 3. 준비물 설명 뒤에 열려요'; }
+[data-lesson-answer][data-lesson-stage="data"].cs-ans-hide::after { content: '🔒 5. 데이터 설명 뒤에 열려요'; }
+[data-lesson-answer][data-lesson-stage="result"].cs-ans-hide::after { content: '🔒 6. 결과 설명 뒤에 열려요'; }
+html.flow-hd [data-lesson-answer][data-lesson-stage="purpose"].cs-ans-hide::after { content: '🔒 ① 문제 인식 설명 뒤에 열려요'; }
+html.flow-hd [data-lesson-answer][data-lesson-stage="theory"].cs-ans-hide::after { content: '🔒 ② 가설 설정 설명 뒤에 열려요'; }
+html.flow-hd [data-lesson-answer][data-lesson-stage="materials"].cs-ans-hide::after { content: '🔒 ③ 탐구 설계 설명 뒤에 열려요'; }
+html.flow-hd [data-lesson-answer][data-lesson-stage="data"].cs-ans-hide::after { content: '🔒 ④ 탐구 수행 설명 뒤에 열려요'; }
+html.flow-hd [data-lesson-answer][data-lesson-stage="result"].cs-ans-hide::after { content: '🔒 ⑤ 자료 해석 설명 뒤에 열려요'; }
