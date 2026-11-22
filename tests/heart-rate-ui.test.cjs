@@ -231,8 +231,11 @@ test('심박수 한 화면: 노출 고정됨 / 잠금 확인 실패 → 노출 �
     console.log('D 측정 전:', await D.textContent('#status'));
     await D.selectOption('#dur', '15');
     await D.click('#start');
-    await D.waitForFunction(() => window.__heartRate.state().runs.length > 0, null, { timeout: 30000 });
+    // 🌙 어두우면 15초를 30초로 늘림 (선생님 실측 r27 로 정한 측정 과정)
+    await D.waitForFunction(() => /30초/.test(document.getElementById('msg').textContent), null, { timeout: 15000 });
+    await D.waitForFunction(() => window.__heartRate.state().runs.length > 0, null, { timeout: 50000 });
     const d = (await D.evaluate(() => window.__heartRate.state().runs)).pop();
+    assert.ok(d.res.dur > 27, '어두워서 30초 ' + d.res.dur);
     if (process.env.SHOT_DIR) fs.writeFileSync(process.env.SHOT_DIR + '/run-d.json', JSON.stringify(d));
     console.log('D 어두움:', d.res.bpm, d.res.level, d.res.light && d.res.light.level, d.res.light && d.res.light.text);
     assert.equal(d.res.light.level, 'dim');
