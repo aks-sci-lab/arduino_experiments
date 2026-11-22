@@ -78,6 +78,7 @@
     let rec = null;              // 지금 측정 { frames, wall, dur, torch, lock }
     let wakeLock = null;
     let lastScene = null;        // 손가락 대기 전 장면 { y, exposureTime, iso }
+    let lastDim = false;         // 손가락을 덮은 채 어두운지 (어두우면 한 번 재기를 30초로 늘림)
     // 📷 뒤 / 🤳 앞 카메라 (2026-11-22 선생님 결정 "뒤 기본 + 앞 고르기", 빛은 방 밝기만: 앞 카메라에는 플래시가 없음). 이 폰에 기억
     const FACING_KEY = 'heart-rate:facing';
     let facing = 'environment';  // 고른 쪽
@@ -205,6 +206,7 @@
         // 손가락을 덮었는데 어두우면(빨강이 낮거나 카메라가 노출을 길게 잡음) 미리 알림
         const lastF = live[live.length - 1];
         const dimNow = q.covered && lastF && (q.R < 80 || (Number(lastF.exposureTime) >= 330 && (lastF.iso == null || lastF.iso >= 1600)));
+        if (q.covered) lastDim = !!dimNow;
         // 최근 10초 실시간 추정 (그래프와 같은 프레임으로 계산, 봉우리 점·아래 글에 씀)
         if (now - lastLiveT > 1000 && live.length > 30 && live[live.length - 1].t - live[0].t >= 5 && q.covered) {
             lastLiveT = now;
@@ -268,8 +270,8 @@
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const setNow = () => { try { const g = track.getSettings(); return { mode: g.exposureMode, et: Number.isFinite(g.exposureTime) ? g.exposureTime : null, iso: Number.isFinite(g.iso) ? g.iso : null }; } catch (e) { return {}; } };
     async function lockAndVerify() {
-        const log = { steps: [] };
-        const note = (what, extra) => log.steps.push(Object.assign({ what, y: Math.round(meanY(0.3) * 10) / 10, r: Math.round(meanR(0.3) * 10) / 10 }, setNow(), extra || {}));
+        const log = { steps: [] }, t0 = performance.now();
+        const note = (what, extra) => log.steps.push(Object.assign({ what, ms: Math.round(performance.now() - t0), y: Math.round(meanY(0.3) * 10) / 10, r: Math.round(meanR(0.3) * 10) / 10 }, setNow(), extra || {}));
         const canLock = track && Array.isArray(caps.exposureMode) && caps.exposureMode.includes('manual');
         note('잠그기 전');
         log.before = log.steps[0];
@@ -280,6 +282,14 @@
         log.target = Math.round(rTarget);
         const etCap = caps.exposureTime || {}, isoCap = caps.iso || {};
         const etMax = Math.min(etCap.max || Infinity, 10000 / 30);   // 30장/초 를 지키려면 1/30초(333) 보다 길면 안 됨
+        // 어두운 곳: 자동 노출이 이미 셔터 한계(1/30초 근처)까지 열었으면 잠가도 더 밝게 못 함 → 잠그지 않고 자동 그대로
+        //  (선생님 실측 r27: 잠그기 전 셔터 41.6 ms → 잠그고 밝기 맞추다 빨강이 2.7 까지 흔들리고 결국 되돌림, 시간만 씀.
+        //   자동 노출은 측정 내내 33.3 ms·ISO 3200 으로 그대로라 '보정 없이 그대로' 계산 → 82 회/분)
+        const b0 = log.before || {};
+        //  셔터가 한계이고 손가락이 어두울 때만(빨강 < 120 또는 ISO 가 한계 근처) — 밝은 곳에서 셔터만 긴 폰은 그대로 잠금
+        const isoHigh = Number.isFinite(b0.iso) && isoCap.max && b0.iso >= 0.9 * isoCap.max;
+        const atLimit = Number.isFinite(b0.et) && b0.et >= 0.95 * etMax && (rBefore < 120 || isoHigh);
+        if (atLimit) { log.skipped = true; return { lock: 'unlocked', why: '어두워서 자동 노출이 이미 한계라 잠그지 않음(값이 그대로인지만 봄)', log, dark: true }; }
         const clampEt = v => Math.min(etMax, Math.max(etCap.min || 0, v));
         const clampIso = v => Math.min(isoCap.max || Infinity, Math.max(isoCap.min || 0, v));
         try {
@@ -314,7 +324,13 @@
             const a2 = { exposureMode: 'manual', exposureTime: et };
             if (iso != null) a2.iso = iso;
             try { await track.applyConstraints({ advanced: [a2] }); } catch (e) { break; }
-            await wait(300); note('밝기 맞추기', { k: Math.round(k * 100) / 100 });
+            await wait(300);
+            // 바꾼 직후 한두 프레임은 아직 예전 설정일 수 있음 → 크게 어두워졌으면 조금 더 기다려 다시 봄, 그래도 어두우면 바로 멈춤
+            if (H.toLinear(meanR(0.2)) < 0.5 * H.toLinear(rNow)) {
+                await wait(400);
+                if (rec && H.toLinear(meanR(0.2)) < 0.5 * H.toLinear(rNow)) { note('밝기 맞추기', { k: Math.round(k * 100) / 100 }); log.dropped = true; break; }
+            }
+            note('밝기 맞추기', { k: Math.round(k * 100) / 100 });
         }
         if (!matched && rec) {
             const rNow = meanR(0.25);
@@ -326,7 +342,7 @@
         if (!rec) return { lock: 'unlocked', why: '', log };
         if (!matched) {
             await setAuto(); note('자동 노출로 되돌림');
-            return { lock: 'unlocked', why: '잠그면 잠그기 전 밝기로 맞출 수 없어(셔터·ISO 범위 끝) 자동 노출로 측정', log };
+            return { lock: 'unlocked', why: log.dropped ? '잠그고 밝기를 맞추는 중 크게 어두워져 바로 멈추고 자동 노출로 측정' : '잠그면 잠그기 전 밝기로 맞출 수 없어(셔터·ISO 범위 끝) 자동 노출로 측정', log };
         }
         phase = 'verify';
         const seen = [];
@@ -370,6 +386,8 @@
             const v = await lockAndVerify();
             if (!rec) return;
             rec.lock = v.lock; rec.why = v.why; rec.lockLog = v.log;
+            // 🌙 어두우면 짧은 측정은 맥파가 잡음에 묻히기 쉬움 → 한 번 재기는 30초로 (선생님 실측 r27: 15초·빨강 79·ISO 3200)
+            if (!rec.breath && rec.dur < 30 && (v.dark || lastDim)) { rec.dur = 30; rec.longer = true; msg('🌙 어두워서 <b>30초</b> 재요 — 짧으면 맥파가 잡음에 묻히기 쉬워요. 가만히 있어 주세요.', 'warn'); }
             const hasExp = live.some(f => Number(f.e) > 0);
             if (v.lock === 'locked') showLock('🔒 고정됨', '밝기 그대로 계산');
             else if (hasExp) showLock('⚠ 고정 안 됨', (v.why ? v.why + ' → ' : '') + '노출 보정으로 계산');

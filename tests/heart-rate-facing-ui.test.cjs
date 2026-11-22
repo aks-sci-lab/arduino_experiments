@@ -18,7 +18,7 @@ const stat = http.createServer((req, res) => {
     });
 });
 // noFront: 앞 카메라가 없는 폰 (exact: 'user' 면 OverconstrainedError)
-const CAM = noFront => `(() => {
+const CAM = (noFront, dark) => `(() => {
     const srgb = l => { const c = Math.min(1, Math.max(0, l)); return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055); };
     window.__camAsked = [];
     navigator.mediaDevices.getUserMedia = async (cons) => {
@@ -32,14 +32,14 @@ const CAM = noFront => `(() => {
         const draw = () => {
             const t = (performance.now() - t0) / 1000, ph = (t * 72 / 60) % 1;
             const p = Math.exp(-(((ph - 0.15) / 0.09) ** 2)) + 0.35 * Math.exp(-(((ph - 0.5) / 0.08) ** 2));
-            const L = (front ? 0.35 : 0.45) * (1 - 0.05 * p), R = srgb(L), G = srgb(0.033 * L), B = srgb(0.018 * L);
+            const L = (${dark ? '0.08' : '(front ? 0.35 : 0.45)'}) * (1 - 0.05 * p), R = srgb(L), G = srgb(0.033 * L), B = srgb(0.018 * L);
             const img = c.createImageData(160, 120), d = img.data;
             for (let i = 0; i < d.length; i += 4) { d[i] = R + 3 * (Math.random() - 0.5); d[i + 1] = G + 3 * (Math.random() - 0.5); d[i + 2] = B + 3 * (Math.random() - 0.5); d[i + 3] = 255; }
             c.putImageData(img, 0, 0);
         };
         draw(); setInterval(draw, 16);
         const stream = cv.captureStream(30), tr = stream.getVideoTracks()[0];
-        let st = { exposureMode: 'continuous', exposureTime: 330, iso: 800, whiteBalanceMode: 'continuous', torch: false, facingMode: front ? 'user' : 'environment' };
+        let st = { exposureMode: 'continuous', exposureTime: ${dark ? 416 : 330}, iso: ${dark ? 3200 : 800}, whiteBalanceMode: 'continuous', torch: false, facingMode: front ? 'user' : 'environment' };
         const base = tr.getSettings.bind(tr);
         tr.getCapabilities = () => Object.assign({ exposureMode: ['continuous', 'manual'], exposureTime: { min: 1, max: 10000, step: 1 }, iso: { min: 50, max: 3200 }, whiteBalanceMode: ['continuous', 'manual'] }, front ? {} : { torch: true });
         tr.getSettings = () => Object.assign(base(), st);
@@ -133,6 +133,23 @@ test('심박수 앞 카메라 고르기: 기억·플래시 숨김·facing 기록
         const packed = await P.evaluate(r => HeartRateRaw.rawPack(HeartRateMath.unpack(r.raw), { mode: 'breath', facing: r.facing }), pr);
         assert.equal(packed.facing, 'user'); assert.equal(HeartRateRawNode().rawUnpack(packed).facing, 'user');
         console.log('④ 폰 숨 참기 회차 facing:', pr.facing);
+
+        // ---- ⑤ 어두운 방(선생님 실측 r27 흉내): 자동 노출이 이미 셔터 한계 → 잠그지 않고, 15초를 30초로 ----
+        const D = await page(devices['Pixel 7'], 'D', CAM(false, true));
+        await D.click('#cam');
+        await D.waitForFunction(() => window.__hrCore.hasCamera() && window.__hrCore.live().length > 40, null, { timeout: 15000 });
+        await D.selectOption('#dur', '15');
+        const t0 = Date.now();
+        await D.click('#start');
+        await D.waitForFunction(() => /30초/.test(document.getElementById('msg').textContent), null, { timeout: 15000 });
+        console.log('⑤ 잠금까지', ((Date.now() - t0) / 1000).toFixed(1) + '초 ·', (await D.textContent('#msg')).replace(/\s+/g, ' '));
+        assert.ok(Date.now() - t0 < 6000, '잠금 시도에 시간을 쓰지 않음');
+        await D.waitForFunction(() => window.__hrCore.runs().length === 1, null, { timeout: 50000 });
+        const dr = await D.evaluate(() => window.__hrCore.runs()[0]);
+        console.log('⑤ 어두운 회차:', dr.lock, dr.why, dr.lockLog && dr.lockLog.steps.length, dr.res.dur, dr.res.bpm);
+        assert.equal(dr.lock, 'unlocked'); assert.match(dr.why, /어두워서 자동 노출이 이미 한계/);
+        assert.equal(dr.lockLog.skipped, true); assert.equal(dr.lockLog.steps.length, 1, '잠그기 전만 (밝기 맞추기 없음)');
+        assert.ok(dr.res.dur > 27, '30초로 늘림 ' + dr.res.dur);
         assert.deepEqual(errors, []);
     } finally {
         await browser.close(); stat.close();
