@@ -264,6 +264,7 @@
 
         <!-- ===== 4. 과정 ===== -->
         <section class="step-panel" data-step="procedure" role="tabpanel" hidden>
+    <div data-rai-slot="design"></div>
             <h2>4. 과정</h2>
             <h3>① 촬영하기</h3>
             <ol>
@@ -408,6 +409,7 @@
 
         <!-- ===== 6. 결과 ===== -->
         <section class="step-panel" data-step="result" role="tabpanel" hidden>
+    <div data-rai-compare="design"></div>
             <h2>6. 결과</h2>
             <p class="box phone-only">📱 분석은 노트북의 6. 결과에서 합니다(보낸 회차가 그쪽에 들어가요). 여기서는 확인만 해도 됩니다.</p>
             <p class="box" id="result-empty">아직 결과가 없습니다. 5. 데이터에서 점을 찍고 '✓ 합성 실행'을 누르세요.</p>
@@ -463,6 +465,7 @@
 
         <!-- ===== 7. 결론 ===== -->
         <section class="step-panel" data-step="conclusion" role="tabpanel" hidden>
+    <div data-rai-compare="design"></div>
             <h2>7. 결론</h2>
             <h3>분석 질문</h3>
             <ol data-mode="free-fall">
@@ -504,6 +507,6 @@
     <script src="../js/free-fall-manual.js" defer></script>
 <link rel="stylesheet" href="../css/report-ai.css">
 <script src="../js/report-ai.js"></script>
-<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'freefall', mount: '#report-ai', contextFrom: '#fit-result, #group-results' }); });</script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'freefall', mount: '#report-ai', vars: {vars:[{key:"ball",name:"공의 무게 (공 종류)"},{key:"height",name:"떨어뜨리는 높이"},{key:"cam",name:"카메라 거리·각도"},{key:"scale",name:"기준 길이 (자)"}],choose:["ball","height"],measure:"그래프에서 구한 중력 가속도 g",predictQ:"— {var}을(를) 늘리면 구한 g 는?",predict:[{key:"up",label:"커진다"},{key:"down",label:"작아진다"},{key:"same",label:"거의 같다"},{key:"unknown",label:"잘 모르겠다"}]}, contextFrom: '#fit-result, #group-results' }); });</script>
 </body>
 </html>

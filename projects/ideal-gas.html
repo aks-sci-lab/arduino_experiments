@@ -163,6 +163,7 @@
 
     <!-- 4. 실험 과정 -->
     <section class="panel step-panel" data-step="procedure" hidden>
+    <div data-rai-slot="design"></div>
     <div class="card" data-subtabs="과정 나눠 보기">
         <h2>4. 실험 과정</h2>
 
@@ -349,6 +350,7 @@
 
     <!-- 6. 실험 결과 -->
     <section class="panel step-panel" data-step="result" hidden>
+    <div data-rai-compare="design"></div>
     <div class="card">
         <h2>6. 실험 결과</h2>
         <h3>실험 1: 압력과 부피 (보일 법칙)</h3>
@@ -395,6 +397,7 @@
 
     <!-- 7. 결론 및 검토 -->
     <section class="panel step-panel" data-step="conclusion" hidden>
+    <div data-rai-compare="design"></div>
     <div class="card">
         <h2>7. 결론 및 검토</h2>
         <h3>우리 모둠 결과 요약</h3>
@@ -492,6 +495,6 @@
 <script src="../js/ideal-gas.js"></script>
 <link rel="stylesheet" href="../css/report-ai.css">
 <script src="../js/report-ai.js"></script>
-<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'idealgas', mount: '#report-ai', contextFrom: '#concl-sum, #res-boyle, #res-gay, #res-comb' }); });</script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'idealgas', mount: '#report-ai', vars: {vars:[{key:"vol",name:"부피 (실험 1)"},{key:"temp",name:"온도 (실험 2)"},{key:"amount",name:"기체의 양 (새지 않게 밀폐)"},{key:"device",name:"용기·센서"}],choose:["vol","temp"],measure:"압력 P",predictQ:"— {var}을(를) 늘리면 압력 P 는?",predict:[{key:"up",label:"커진다"},{key:"down",label:"작아진다"},{key:"same",label:"거의 같다"},{key:"unknown",label:"잘 모르겠다"}]}, contextFrom: '#concl-sum, #res-boyle, #res-gay, #res-comb' }); });</script>
 </body>
 </html>

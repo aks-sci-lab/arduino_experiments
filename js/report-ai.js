@@ -82,7 +82,7 @@
     // ---------- 변인 카드 (바꿀 것 하나 · 재는 것 · 같게 둘 것 · 예상) ----------
     // 항목 하나(sections[key])에 글로 저장: 줄마다 '[바꿀 것] 가열 시간' 꼴, 그 밖의 줄은 그대로 남김. 보고서 탭에서 글로 고쳐도 다시 읽힘
     // cfg = { vars: [{ key, name }], choose: [바꿀 수 있는 key], measure: '재는 것', predictQ: '{var}을(를) 늘리면 …?', predict: [{ key: 'up'|'down'|'same'|…, label }] }
-    var VAR_TAGS = { change: '바꿀 것', measure: '재는 것', keep: '같게 둘 것', extra: '더 같게 둘 것', predict: '예상', reason: '까닭' };
+    var VAR_TAGS = { change: '바꿀 것', measure: '재는 것', keep: '같게 둘 것', extra: '더 같게 둘 것', predict: '예상', reason: '까닭', observed: '결과' };
     // 받침에 맞는 조사: josa('가열 시간', '을', '를') → '가열 시간을'. 괄호·기호 뒤는 그 앞 한글로 판단
     function josa(w, a, b) {
         var t = String(w || '').replace(/\s*\([^)]*\)\s*$/, ''), c = t.charCodeAt(t.length - 1);
@@ -92,12 +92,13 @@
     function varName(cfg, key) { var v = (cfg.vars || []).filter(function (x) { return x.key === key; })[0]; return v ? v.name : ''; }
     function parseVars(text, cfg) {
         cfg = cfg || {};
-        var o = { change: '', changeName: '', predict: '', predictLabel: '', reason: '', extra: '', rest: '' }, rest = [];
+        var o = { change: '', changeName: '', predict: '', predictLabel: '', reason: '', extra: '', observed: '', observedLabel: '', rest: '' }, rest = [];
         String(text || '').split('\n').forEach(function (line) {
             var m = /^\[([^\]]+)\] ?(.*)$/.exec(line), tag = m && m[1].trim(), val = m ? m[2].trim() : '';
             if (tag === VAR_TAGS.change) { o.changeName = val; (cfg.vars || []).forEach(function (v) { if (v.name === val) o.change = v.key; }); }
             else if (tag === VAR_TAGS.predict) { o.predictLabel = val; (cfg.predict || []).forEach(function (p) { if (p.label === val) o.predict = p.key; }); }
             else if (tag === VAR_TAGS.reason) o.reason = val;
+            else if (tag === VAR_TAGS.observed) { o.observedLabel = val; (cfg.predict || []).forEach(function (p) { if (p.label === val) o.observed = p.key; }); }
             else if (tag === VAR_TAGS.extra) o.extra = val;
             else if (tag === VAR_TAGS.measure || tag === VAR_TAGS.keep) { /* 화면이 다시 만듦 */ }
             else rest.push(line);
@@ -116,6 +117,8 @@
         var pl = ((cfg.predict || []).filter(function (p) { return p.key === o.predict; })[0] || {}).label || o.predictLabel || '';
         if (pl) lines.push('[' + VAR_TAGS.predict + '] ' + pl);
         if (o.reason) lines.push('[' + VAR_TAGS.reason + '] ' + o.reason);
+        var ol = ((cfg.predict || []).filter(function (p) { return p.key === o.observed; })[0] || {}).label || o.observedLabel || '';
+        if (ol) lines.push('[' + VAR_TAGS.observed + '] ' + ol);
         if (o.rest) lines.push(o.rest);
         return lines.join('\n');
     }
@@ -129,6 +132,19 @@
         });
         if (changeKey) return diff.filter(function (v) { return v.key !== changeKey; }).map(function (v) { return v.name; });
         return diff.length >= 2 ? diff.map(function (v) { return v.name; }) : [];
+    }
+
+    // 변인 카드 '골라야 다음': 바꿀 것과 예상 방향을 둘 다 골랐나 (까닭은 안 써도 됨)
+    function varsReady(o) { return !!(o && o.change && o.predict); }
+    // 실험 하나의 변인 카드 설정(opts.vars)을 보고서 항목 묶음에 넣기: 7단계 = 4. 과정의 '변인·예상' 칸, 가설연역 = ③ 탐구 설계 항목이 카드가 됨
+    var VARS_HINT = '바꿀 것은 하나만, 나머지는 같게. 재기 전에 결과를 예상해요.';
+    function withVars(list, vars, hd) {
+        var out = list.slice(), has = out.some(function (k) { return (k && k.key || k) === 'design'; });
+        if (hd) return out.map(function (k) { return (k && k.key || k) === 'design' ? Object.assign({ key: 'design', hint: VARS_HINT }, typeof k === 'object' ? k : {}, { vars: vars }) : k; });
+        if (has) return out.map(function (k) { return (k && k.key || k) === 'design' ? Object.assign({ key: 'design', name: '변인·예상', step: 'procedure', inline: true, hint: VARS_HINT }, typeof k === 'object' ? k : {}, { vars: vars }) : k; });
+        var at = out.map(function (k) { return k && k.key || k; }).indexOf('theory');
+        out.splice(at < 0 ? 0 : at + 1, 0, { key: 'design', name: '변인·예상', step: 'procedure', inline: true, vars: vars, hint: VARS_HINT });
+        return out;
     }
 
     function clip(s, n) { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n) + '…(뒤는 줄임)' : s; }
@@ -275,8 +291,8 @@
         var exp = String(opts.exp || '');
         var expName = opts.title || (CC && CC.expInfo && CC.expInfo(exp) ? CC.expInfo(exp).name : '') || exp;   // 선생님이 만든 실험은 그 실험 제목
         // 진행 방법(📋 7단계 / 🔍 가설연역, LabUI.initSteps({ flows: true }))마다 항목이 다름. 화면에는 두 묶음을 다 만들어 두고 지금 방법 것만 보임
-        var repSecs = (opts.sections || DEFAULT_SECTIONS).map(sectionInfo).filter(Boolean);
-        var hdSecs = (opts.hdSections || HD_SECTIONS).map(sectionInfo).filter(Boolean);
+        var repSecs = (opts.vars ? withVars(opts.sections || DEFAULT_SECTIONS, opts.vars, false) : (opts.sections || DEFAULT_SECTIONS)).map(sectionInfo).filter(Boolean);
+        var hdSecs = (opts.vars ? withVars(opts.hdSections || HD_SECTIONS, opts.vars, true) : (opts.hdSections || HD_SECTIONS)).map(sectionInfo).filter(Boolean);
         var all = repSecs.slice();
         hdSecs.forEach(function (s) { if (!all.some(function (x) { return x.key === s.key; })) all.push(s); });
         var flow = 'report', secs = repSecs;
@@ -440,7 +456,7 @@
                 el.querySelectorAll('textarea[data-vid]').forEach(function (t) { if (open[t.dataset.vid] != null) t.dataset.dirty = '1'; t.addEventListener('input', function () { t.dataset.dirty = '1'; }); });
             });
         }
-        function render() { renderStatus(); renderButtons(); renderSave(); renderLog(); }
+        function render() { renderStatus(); renderButtons(); renderSave(); renderLog(); if (typeof renderGate === 'function') renderGate(); }
 
         // --- 저장소 요청 ---
         function call(c, body) { return LSt.call('lab:' + c.space, Object.assign({ 'class': c.classCode }, body)); }
@@ -624,21 +640,105 @@
         function vars() { var v = varsCfg(); if (!v) return null; var o = parseVars(st.sections[v.key], v.cfg); o.key = v.key; return o; }
         function varsChanged(key) {
             var v = varsCfg(); if (!v || v.key !== key) return;
-            renderCompare();
+            renderCompare(); renderGate();
             try { document.dispatchEvent(new CustomEvent('report-ai-vars', { detail: vars() })); } catch (e) { /* 무시 */ }
         }
         function renderCompare() {
             var v = varsCfg(); if (!v) return;
             var o = vars(), cfg = v.cfg, r = null;
             try { r = cfg.result ? cfg.result(o) : null; } catch (e) { r = null; }
+            // 결과 방향: 페이지가 계산해 주면(cfg.result) 그것, 아니면 학생이 6. 결과의 그래프·표를 보고 고름(보고서에 '[결과] …' 로 저장)
+            var pick = !cfg.result, rdir = r && r.dir ? r.dir : pick ? o.observed : '';
             var pl = o.predictLabel || '', pdir = o.predict, verdict = '';
-            if (r && r.dir && pdir && pdir !== 'unknown') verdict = r.dir === pdir ? '<p class="rai-cmp-v ok">✅ 예상과 같은 방향이에요. 왜 그런지 이론으로 설명해 봐요.</p>' : '<p class="rai-cmp-v warn">🤔 예상과 달라요. 틀린 게 아니라 좋은 단서예요 — 무엇 때문일지 결론에 써 봐요.</p>';
-            document.querySelectorAll('[data-rai-compare="' + v.key + '"]').forEach(function (el) {
+            if (rdir && pdir && pdir !== 'unknown' && rdir !== 'unknown') verdict = rdir === pdir ? '<p class="rai-cmp-v ok">✅ 예상과 같은 방향이에요. 왜 그런지 이론으로 설명해 봐요.</p>' : '<p class="rai-cmp-v warn">🤔 예상과 달라요. 틀린 게 아니라 좋은 단서예요 — 무엇 때문일지 결론에 써 봐요.</p>';
+            var nm = 'rai-obs-' + esc(exp);
+            document.querySelectorAll('[data-rai-compare="' + v.key + '"]').forEach(function (el, i) {
+                var ae = document.activeElement, refocus = el.contains(ae) && ae.hasAttribute && ae.hasAttribute('data-obs') ? ae.value : null;   // 키보드로 고르는 중이면 다시 그린 뒤 같은 칸에
                 el.classList.add('card', 'rai-cmp');
+                var res = pick
+                    ? '<p class="rai-note">' + esc(cfg.observeQ || '6. 결과의 그래프·표를 보고 골라요 — ' + josa(o.changeName || '바꾼 것', '을', '를') + ' 늘렸을 때 ' + (cfg.measure || '잰 값') + '은(는)?') + '</p><div class="rai-row">' +
+                        (cfg.predict || []).map(function (p) { return '<label class="rai-pill"><input type="radio" name="' + nm + '-' + i + '" value="' + esc(p.key) + '" data-obs' + (o.observed === p.key ? ' checked' : '') + (st.submitted ? ' disabled' : '') + '> ' + esc(p.key === 'unknown' ? '아직 판단하기 어려워요' : p.label) + '</label>'; }).join('') + '</div>'
+                    : '<p>' + (r && r.text ? r.text : '<span class="rai-note">아직 결과가 없어요</span>') + '</p>';
                 el.innerHTML = '<h3>🔮 내 예상 ↔ 📊 결과</h3><div class="rai-cmp-grid">' +
-                    '<div><b>🔮 내 예상</b><p>' + (o.changeName ? esc(josa(o.changeName, '을', '를')) + ' 늘리면 → ' : '') + (pl ? '<b>' + esc(pl) + '</b>' : '<span class="rai-note">아직 안 골랐어요 (4. 과정의 변인 카드)</span>') + (o.reason ? '<br><span class="rai-note">까닭: ' + esc(o.reason) + '</span>' : '') + '</p></div>' +
-                    '<div><b>📊 결과</b><p>' + (r && r.text ? r.text : '<span class="rai-note">아직 결과가 없어요</span>') + '</p></div></div>' + verdict;
+                    '<div><b>🔮 내 예상</b><p>' + (o.changeName ? esc(josa(o.changeName, '을', '를')) + ' 늘리면 → ' : '') + (pl ? '<b>' + esc(pl) + '</b>' : '<span class="rai-note">아직 안 골랐어요 (' + esc(cardStepName()) + '의 변인 카드)</span>') + (o.reason ? '<br><span class="rai-note">까닭: ' + esc(o.reason) + '</span>' : '') + '</p></div>' +
+                    '<div><b>📊 결과</b>' + res + '</div></div>' + verdict;
+                if (refocus != null) { var rf = el.querySelector('input[data-obs][value="' + refocus + '"]'); if (rf) rf.focus(); }
+                if (pick && !el._obsBound) {
+                    el._obsBound = true;
+                    el.addEventListener('change', function (e) {
+                        var t = e.target; if (!t.hasAttribute || !t.hasAttribute('data-obs') || st.submitted) return;
+                        var cur = parseVars(st.sections[v.key], cfg); cur.observed = t.value;
+                        setText(v.key, serializeVars(cur, cfg));
+                        setTimeout(renderCompare, 0);
+                    });
+                }
             });
+        }
+        // 변인 카드가 있는 단계 이름 (7단계 '4. 과정', 가설연역 '③ 탐구 설계')
+        function cardStepName() { return flow === 'hd' ? '③ 탐구 설계' : '4. 과정'; }
+        // --- '골라야 다음' (교수 세션 공통 원칙 2): 바꿀 것·예상 방향을 고르기 전에는 카드 뒤 단계로 못 감. 까닭은 선택 ---
+        //     학생 노트북·태블릿(수업이든 수업 없이 연 화면이든). 📱 폰(측정 화면 ?role=phone·폰으로 연 화면 — 보고서는 노트북에서)·🎬 발표용(?present=1)·opts.varsGate === false 는 막지 않음
+        var GATE = opts.varsGate !== false && !/[?&]role=phone\b/.test(location.search) && !/[?&]present=1\b/.test(location.search);
+        function gateBox() { return inlineEls().filter(function (b) { return b._vars && !b.hidden; })[0] || null; }
+        function stepsApi() { return window.LabUI && LabUI.steps && LabUI.steps(); }
+        function stepOrder() { return Array.prototype.map.call(document.querySelectorAll('nav.steps button[data-step]'), function (b) { return b.dataset.step; }); }
+        // 지금 막아야 하나: 카드가 보이고, 아직 다 안 골랐고, 낸 보고서가 아님 → { box, cardStep, idx(카드 단계 순서) }
+        function gateNow() {
+            if (!GATE || st.submitted || document.documentElement.classList.contains('device-phone')) return null;
+            var box = gateBox(); if (!box || varsReady(vars())) return null;
+            var sp = stepsApi(), panel = box.closest('.step-panel');
+            if (!sp || !panel) return null;
+            var cs = sp.stepOf ? sp.stepOf(panel.dataset.step) : panel.dataset.step, ord = stepOrder();
+            return { box: box, cardStep: cs, idx: ord.indexOf(cs), ord: ord };
+        }
+        function afterCard(g, k) { var sp = stepsApi(), st2 = sp && sp.stepOf ? sp.stepOf(k) : k; return g && g.idx >= 0 && g.ord.indexOf(st2) > g.idx; }
+        function gateToast(msg) {
+            var t = document.getElementById('rai-gate-toast');
+            if (!t) { t = document.createElement('div'); t.id = 'rai-gate-toast'; t.className = 'rai-gate-toast'; t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite'); document.body.appendChild(t); }
+            t.textContent = msg; t.hidden = false;
+            clearTimeout(t._h); t._h = setTimeout(function () { t.hidden = true; }, 4000);
+        }
+        function goCard(g) {
+            var sp = stepsApi(); if (sp && sp.show) sp.show(g.box.closest('.step-panel').dataset.step);
+            gateToast('🔮 먼저 ' + cardStepName() + '의 변인 카드에서 바꿀 것과 예상 방향을 골라요 (까닭은 안 써도 돼요)');
+            g.box.classList.add('rai-vc-need');
+            if (g.box.scrollIntoView) g.box.scrollIntoView({ block: 'center' });
+            var first = g.box.querySelector(vars().change ? 'input[data-vc="predict"]' : 'input[data-vc="change"]'); if (first) try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); }
+        }
+        // 카드 뒤 단계로 가는 '다음' 단추를 끄고 한 줄 안내
+        function renderGate() {
+            var g = gateNow();
+            document.querySelectorAll('.rai-gate-note').forEach(function (n) { n.remove(); });
+            document.querySelectorAll('[data-go].rai-gated').forEach(function (b) { b.disabled = false; b.classList.remove('rai-gated'); b.removeAttribute('aria-describedby'); });
+            var box = gateBox(); if (box && (!g)) box.classList.remove('rai-vc-need');
+            if (!g) return;
+            var panel = g.box.closest('.step-panel');
+            Array.prototype.forEach.call(panel.querySelectorAll('[data-go]'), function (b) {
+                if (!afterCard(g, b.dataset.go)) return;
+                b.disabled = true; b.classList.add('rai-gated');
+                var row = b.parentNode;
+                if (!row.querySelector('.rai-gate-note')) {
+                    var n = document.createElement('p'); n.className = 'rai-gate-note'; n.id = 'rai-gate-note-' + esc(exp);
+                    n.textContent = '🔮 변인 카드에서 바꿀 것과 예상 방향을 고르면 다음으로 가요 (까닭은 안 써도 돼요)';
+                    row.parentNode.insertBefore(n, row);
+                }
+                b.setAttribute('aria-describedby', 'rai-gate-note-' + esc(exp));
+            });
+        }
+        if (GATE) {
+            // 위 단계 단추·'다음'·화살표 키로 카드 뒤 단계로 가려 하면 → 안내 + 카드로 (수업 단계 잠금은 js/class-share.js 가 먼저 막음)
+            document.addEventListener('click', function (e) {
+                var b = e.target.closest && e.target.closest('nav.steps button[data-step], [data-go]'); if (!b) return;
+                var g = gateNow(), k = b.dataset.step || b.dataset.go;
+                if (!g || !afterCard(g, k)) return;
+                e.preventDefault(); e.stopImmediatePropagation(); goCard(g);
+            }, true);
+            document.addEventListener('keydown', function (e) {
+                if (e.key !== 'ArrowRight' || !e.target.closest || !e.target.closest('nav.steps')) return;
+                var g = gateNow(); if (!g) return;
+                var sp = stepsApi(), cur = sp && sp.flowStep ? sp.flowStep() : '', i = g.ord.indexOf(cur);
+                if (i >= 0 && i + 1 < g.ord.length && g.ord.indexOf(g.ord[i + 1]) > g.idx) { e.preventDefault(); e.stopImmediatePropagation(); goCard(g); }
+            }, true);
         }
         // 💭 생각해 볼 물음: 글 또는 함수(지금 자료에 따라 물음을 돌려줌, 빈 글이면 숨김)
         function renderAsks() {
@@ -674,7 +774,7 @@
             var cur = tabs && tabs.current ? tabs.current() : run.tab;
             if (tabs && cur !== 'external' && cur !== 'submit' && keys.indexOf(cur) < 0) tabs.show(keys[0]);
             else if (tabs && cur) tabs.show(cur);
-            renderButtons(); renderCompare();
+            renderButtons(); renderCompare(); renderGate();
         }
         document.addEventListener('lab-flow', applyFlow);
         applyFlow();
@@ -685,14 +785,14 @@
         document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(true); });
         var api = { render: render, poll: poll, sync: sync, state: function () { return st; }, ctx: ctx, asks: function () { return run.asks; }, printHtml: function () { return printHtml(printData()); }, tabs: tabs, flow: function () { return flow; }, sections: function () { return secs.slice(); },
             // 변인 카드: 지금 고른 것 { change, changeName, predict, predictLabel, reason, keep, extra } · 예상 ↔ 결과 다시 그리기
-            vars: vars, renderCompare: renderCompare, renderAsks: renderAsks,
+            vars: vars, renderCompare: renderCompare, renderAsks: renderAsks, varsReady: function () { return varsReady(vars()); }, gate: function () { return !!gateNow(); },
             // 글을 밖에서 넣기(예전 칸에서 옮기기 등). 이미 낸 보고서는 고치지 않음
             setSection: function (key, text) { if (st.submitted) return false; setText(key, String(text == null ? '' : text)); return true; } };
         window.ReportAI.current = api;
         return api;
     }
 
-    return { josa: josa, parseVars: parseVars, serializeVars: serializeVars, changedVars: changedVars, PROVIDERS: PROVIDERS, SECTIONS: SECTIONS, DEFAULT_SECTIONS: DEFAULT_SECTIONS, HD_SECTIONS: HD_SECTIONS, VERDICTS: VERDICTS, BASE_RULES: BASE_RULES, LIMITS: LIMITS,
+    return { josa: josa, varsReady: varsReady, withVars: withVars, parseVars: parseVars, serializeVars: serializeVars, changedVars: changedVars, PROVIDERS: PROVIDERS, SECTIONS: SECTIONS, DEFAULT_SECTIONS: DEFAULT_SECTIONS, HD_SECTIONS: HD_SECTIONS, VERDICTS: VERDICTS, BASE_RULES: BASE_RULES, LIMITS: LIMITS,
         sectionInfo: sectionInfo, buildPrompt: buildPrompt, chatRequest: chatRequest, modelsRequest: modelsRequest, parseAnswer: parseAnswer, parseModels: parseModels,
         friendlyHttp: friendlyHttp, callAI: callAI, textOf: textOf, listModels: listModels, printHtml: printHtml, init: init };
 });

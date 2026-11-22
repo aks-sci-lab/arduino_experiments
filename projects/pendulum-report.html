@@ -87,6 +87,7 @@
 
     <!-- 4 과정 -->
     <section class="step-panel" data-step="procedure" hidden>
+    <div data-rai-slot="design"></div>
         <div class="pd-card">
             <h2>4. 과정</h2>
             <ol>
@@ -179,6 +180,7 @@
 
     <!-- 6 결과 -->
     <section class="step-panel" data-step="result" hidden>
+    <div data-rai-compare="design"></div>
         <section class="pd-card">
             <h2>6. 결과: T²–L 그래프</h2>
             <div class="dash-chart pd-fit-chart"><canvas id="fitChart" aria-label="T²–L 그래프"></canvas></div>
@@ -197,6 +199,7 @@
 
     <!-- 7 결론 -->
     <section class="step-panel" data-step="conclusion" hidden>
+    <div data-rai-compare="design"></div>
         <div class="pd-card">
             <h2>7. 결론 및 검토</h2>
             <p>생각해 볼 질문</p>
@@ -222,6 +225,6 @@
 </main>
 <link rel="stylesheet" href="../css/report-ai.css">
 <script src="../js/report-ai.js"></script>
-<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'pendulum', mount: '#report-ai', contextFrom: '#fitBox, #fitSteps' }); });</script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'pendulum', mount: '#report-ai', vars: {vars:[{key:"len",name:"줄 길이 L"},{key:"amp",name:"진폭 (처음 각도)"},{key:"mass",name:"추(폰) 무게"},{key:"hang",name:"매다는 법"}],choose:["len","amp","mass"],measure:"주기 T",predictQ:"— {var}을(를) 늘리면 주기 T 는?",predict:[{key:"up",label:"커진다"},{key:"down",label:"작아진다"},{key:"same",label:"거의 같다"},{key:"unknown",label:"잘 모르겠다"}]}, contextFrom: '#fitBox, #fitSteps' }); });</script>
 </body>
 </html>

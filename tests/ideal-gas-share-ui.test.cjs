@@ -7,6 +7,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { loadLabStore } = require('./fake-lab-store.cjs');
+const pickVars = require('./vars-pick.cjs');
 
 let chromium = null;
 try { ({ chromium } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
@@ -86,6 +87,7 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
         await ap.selectOption('#cs-cjo', '1'); await ap.selectOption('#cs-cnum', '1');
         await ap.click('#cs-cjoin');
         await ap.waitForFunction(() => /1조 1번/.test(document.getElementById('cs-cme').textContent));
+        await pickVars(ap);   // 변인 카드 '골라야 다음'
         await ap.click('nav.steps button[data-step="data"]');
         // 센서 없이 직접 입력: 실험 1 네 점
         for (const [v, p] of [[20, 101.3], [24, 84.4], [29, 69.9], [34, 59.6]]) {
@@ -108,6 +110,7 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
         await bp.waitForSelector('#cs-cpick:not([hidden])');
         await bp.selectOption('#cs-cjo', '1'); await bp.selectOption('#cs-cnum', '2');
         await bp.click('#cs-cjoin');
+        await pickVars(bp);   // 변인 카드 '골라야 다음'
         await bp.click('nav.steps button[data-step="data"]');
         await bp.waitForFunction(() => document.querySelectorAll('#boyle-body tr.ext-row').length === 4, null, { timeout: 15000 });
         assert.match(await bp.textContent('#boyle-body'), /📥 노트북 /);
@@ -163,6 +166,7 @@ test('수업 링크 없이 열면 띠·조 공유 칸·선생님께 보내기 �
         const s = await newPage(browser, app, base, 375);
         await s.page.goto(base + '/projects/ideal-gas.html');
         assert.equal(await s.page.$('.cs-bar'), null);
+        await pickVars(s.page);   // 변인 카드 '골라야 다음'
         await s.page.click('nav.steps button[data-step="data"]');
         assert.equal(await s.page.$('#cs-share'), null, '조 공유 칸 없음');
         assert.ok(await s.page.isVisible('#cs-csv') || await s.page.locator('#share-mount .cs-file').isVisible(), 'CSV 불러오기는 남음');

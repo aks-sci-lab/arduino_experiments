@@ -158,6 +158,7 @@
 
     <!-- ================= 4. 과정 ================= -->
     <section class="step-panel" data-step="procedure" hidden>
+    <div data-rai-slot="design"></div>
         <div class="card" data-subtabs="과정 나눠 보기">
             <h2>4. 실험 과정</h2>
             <h3 data-subtab="회로">① 회로 연결</h3>
@@ -286,6 +287,7 @@
 
     <!-- ================= 6. 결과 ================= -->
     <section class="step-panel" data-step="result" hidden>
+    <div data-rai-compare="design"></div>
         <div class="card">
             <h2>6. 실험 결과</h2>
             <h3 id="viewTitle">마지막 측정 그래프</h3>
@@ -327,6 +329,7 @@
 
     <!-- ================= 7. 결론 ================= -->
     <section class="step-panel" data-step="conclusion" hidden>
+    <div data-rai-compare="design"></div>
         <div class="card">
             <h2>7. 결론 및 검토</h2>
             <h3>분석 질문</h3>
@@ -902,6 +905,6 @@
 </script>
 <link rel="stylesheet" href="../css/report-ai.css">
 <script src="../js/report-ai.js"></script>
-<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'eminduction', mount: '#report-ai', contextFrom: '#results, #trials' }); });</script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'eminduction', mount: '#report-ai', vars: {vars:[{key:"speed",name:"자석을 움직이는 빠르기"},{key:"turns",name:"코일 감은 수"},{key:"magnet",name:"자석 (같은 자석·같은 극)"},{key:"path",name:"자석이 지나는 길 (코일 가운데)"}],choose:["speed","turns"],measure:"코일 전압 봉우리 크기",predictQ:"— {var}을(를) 늘리면 코일 전압 봉우리는?",predict:[{key:"up",label:"커진다"},{key:"down",label:"작아진다"},{key:"same",label:"거의 같다"},{key:"unknown",label:"잘 모르겠다"}]}, contextFrom: '#results, #trials' }); });</script>
 </body>
 </html>

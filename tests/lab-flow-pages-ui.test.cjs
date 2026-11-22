@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const M = require('../js/custom-lab-math.js');
 const { loadLabStore } = require('./fake-lab-store.cjs');
+const pickVars = require('./vars-pick.cjs');
 let chromium = null, devices = null; try { ({ chromium, devices } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
 
 const ROOT = path.join(__dirname, '..');
@@ -70,6 +71,7 @@ test('진행 방법 PR 2: 보고서 실험 7개 가설연역 + 가설·판정 �
             await P.fill('.rai-inline[data-sec="hypothesis"] textarea', '만약 A 를 늘리면 B 가 커질 것이다.');
             assert.equal(await P.isVisible('.step-panel[data-step="purpose"] .rai-inline[data-sec="problem"]'), false, name + ' 다른 단계 칸은 그 단계에서만');
             // ⑥ 보고서 AI: 가설연역 항목, 같은 글
+            await pickVars(P);   // ③ 탐구 설계 변인 카드 '골라야 다음' (말루스는 카드 없음)
             await P.click('nav.steps button[data-step="conclude"]');
             await P.waitForSelector('#rai-tabs button[data-tab="hypothesis"]:not([hidden])');
             assert.equal(await P.isVisible('#rai-tabs button[data-tab="theory"]'), false, name + ' 7단계 항목은 숨김');
@@ -89,8 +91,8 @@ test('진행 방법 PR 2: 보고서 실험 7개 가설연역 + 가설·판정 �
             // 7단계로 바꾸면 쓰기 칸 숨김, 보고서 항목 원래대로
             await P.click('.flow-pick button[data-flow="report"]');
             assert.equal((await stepKeys(P)).length, 7);
-            // 양자점은 7단계에도 '우리 생각'·변인 카드가 있음(같은 칸이 이름만 바뀜, tests/quantum-dot-scaffold-ui.test.cjs)
-            assert.deepEqual(await P.$$eval('.rai-inline:not([hidden])', a => a.map(b => b.dataset.sec).sort()), name === 'quantum-dot' ? ['design', 'problem'] : [], name + ' 7단계엔 가설연역 쓰기 칸 없음');
+            // 7단계에도 변인 카드(4. 과정, 말루스 빼고)·양자점은 '우리 생각'도 있음(같은 칸이 이름만 바뀜)
+            assert.deepEqual(await P.$$eval('.rai-inline:not([hidden])', a => a.map(b => b.dataset.sec).sort()), name === 'quantum-dot' ? ['design', 'problem'] : name === 'malus-law' ? [] : ['design'], name + ' 7단계엔 가설연역 쓰기 칸 없음(변인 카드만)');
             assert.equal(await P.isVisible('#rai-tabs button[data-tab="hypothesis"]'), false);
             await P.click('nav.steps button[data-step="conclusion"]');
             assert.equal(await P.isVisible('#rai-tabs button[data-tab="theory"]'), true);
