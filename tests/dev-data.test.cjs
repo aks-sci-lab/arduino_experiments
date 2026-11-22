@@ -109,6 +109,11 @@ test('가져오기 도구: devExport → 날짜 폴더에 CSV·JSON, index.json,
     const idx2 = JSON.parse(fs.readFileSync(path.join(out, 'heart-rate/index.json'), 'utf8'));
     assert.equal(idx2.count, 1); assert.equal(idx2.items[0].summary['손목'], 76);
     await assert.rejects(PULL.pull({ out, exportPage: async () => { throw new Error('권한 없음'); } }), /권한/);
+    // Firestore 직접 읽기 모양({ items, more }, ok 없음)도 받아야 한다 (Actions 가 매번 '알 수 없음'으로 실패하던 것)
+    const out2 = fs.mkdtempSync(path.join(os.tmpdir(), 'devpull2-'));
+    const plain = await PULL.pull({ out: out2, exportPage: async since => (since ? { items: [], more: false } : { more: false, items: [{ timestamp: '2026-11-22T01:00:00.000Z', exp: 'heartrate', id: 'r27', measuredAt: '2026-11-22T00:59:00.000Z', device: 'd1', summary: { bpm: 82 }, data: JSON.stringify({ csv: 't_s,R\n0,80\n' }) }] }) });
+    assert.equal(plain.got, 1);
+    await assert.rejects(PULL.pull({ out: out2, exportPage: async () => ({ ok: false, error: '막힘' }) }), /막힘/);
 });
 
 test('워크플로: dev-data 브랜치에만, devCollect·서비스 계정 확인, 매시간', () => {
