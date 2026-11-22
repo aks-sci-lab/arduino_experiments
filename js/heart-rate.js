@@ -286,9 +286,11 @@
         //  (선생님 실측 r27: 잠그기 전 셔터 41.6 ms → 잠그고 밝기 맞추다 빨강이 2.7 까지 흔들리고 결국 되돌림, 시간만 씀.
         //   자동 노출은 측정 내내 33.3 ms·ISO 3200 으로 그대로라 '보정 없이 그대로' 계산 → 82 회/분)
         const b0 = log.before || {};
-        //  셔터가 한계이고 손가락이 어두울 때만(빨강 < 120 또는 ISO 가 한계 근처) — 밝은 곳에서 셔터만 긴 폰은 그대로 잠금
+        //  셔터가 한계이고 손가락이 어둡고(빨강 < 120), ISO 를 더 올릴 여유가 없거나(한계 근처) 폰이 알려 준 ISO 를 믿기 어려울 때(100 미만, r27 은 27)만.
+        //  ISO 를 더 올릴 수 있으면 지금처럼 잠그고 밝기 맞추기
         const isoHigh = Number.isFinite(b0.iso) && isoCap.max && b0.iso >= 0.9 * isoCap.max;
-        const atLimit = Number.isFinite(b0.et) && b0.et >= 0.95 * etMax && (rBefore < 120 || isoHigh);
+        const isoOdd = !Number.isFinite(b0.iso) || b0.iso < 100;
+        const atLimit = Number.isFinite(b0.et) && b0.et >= 0.95 * etMax && rBefore < 120 && (isoHigh || isoOdd);
         if (atLimit) { log.skipped = true; return { lock: 'unlocked', why: '어두워서 자동 노출이 이미 한계라 잠그지 않음(값이 그대로인지만 봄)', log, dark: true }; }
         const clampEt = v => Math.min(etMax, Math.max(etCap.min || 0, v));
         const clampIso = v => Math.min(isoCap.max || Infinity, Math.max(isoCap.min || 0, v));
