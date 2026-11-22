@@ -58,3 +58,9 @@
 .rai-cmp .rai-cmp-v.warn { background: var(--c-warn-bg); color: var(--c-warn-text); }
 .rai-cmp .rai-note { color: var(--c-muted); font-size: var(--fs-sm); }
 @media (max-width: 480px) { .rai-cmp .rai-cmp-grid { grid-template-columns: 1fr; } }
+/* 변인 카드 '골라야 다음' (교수 세션 공통 원칙 2) */
+.rai-gate-note { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); background: var(--c-warn-bg); color: var(--c-warn-text); border-radius: var(--r-ctl); font-size: var(--fs-sm); }
+[data-go].rai-gated { opacity: .55; cursor: not-allowed; }
+.rai-vc.rai-vc-need { outline: 3px solid var(--c-warn-text); outline-offset: 2px; }
+.rai-gate-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 2000; max-width: calc(100vw - 32px); background: var(--c-text); color: #fff; padding: var(--sp-2) var(--sp-4); border-radius: 18px; box-shadow: var(--shadow); font-size: var(--fs-sm); text-align: center; }
+.rai-gate-toast[hidden] { display: none; }

@@ -192,6 +192,7 @@
 
     <!-- 4. 실험 과정 -->
     <section class="panel step-panel" data-step="procedure" hidden>
+    <div data-rai-slot="design"></div>
     <div class="card" data-subtabs="과정 나눠 보기">
         <h2>4. 실험 과정</h2>
 
@@ -630,6 +631,7 @@
 
     <!-- 6. 실험 결과 -->
     <section class="panel step-panel" data-step="result" hidden>
+    <div data-rai-compare="design"></div>
     <div class="card">
         <h2>6. 실험 결과</h2>
         <p class="note" style="margin:2px 0">LED 마다 구한 문턱 전압 V₀ 와 진동수 f = c / λ 로 직선 <b>V₀ = a·f + b</b> 를 최소제곱법으로 구하고, <b>h = e × a</b> 를 계산합니다.</p>
@@ -672,6 +674,7 @@
 
     <!-- 7. 결론 및 분석 -->
     <section class="panel step-panel" data-step="conclusion" hidden>
+    <div data-rai-compare="design"></div>
     <div class="card">
         <h2>7. 결론 및 분석</h2>
         <h3>우리 모둠 결과 요약</h3>
@@ -725,6 +728,6 @@
 <script src="../js/planck-led.js"></script>
 <link rel="stylesheet" href="../css/report-ai.css">
 <script src="../js/report-ai.js"></script>
-<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'planck', mount: '#report-ai', contextFrom: '#concl-sum, #results, #verdict' }); });</script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'planck', mount: '#report-ai', vars: {vars:[{key:"led",name:"빛의 진동수 (LED 색)"},{key:"battery",name:"건전지 전압"},{key:"res",name:"고정 저항"},{key:"rule",name:"문턱 전압을 정하는 방법"},{key:"meter",name:"재는 도구·연결"}],choose:["led"],measure:"문턱 전압 V₀",predictQ:"— 진동수가 큰 LED(빨강 → 파랑 쪽)일수록 문턱 전압 V₀ 는?",predict:[{key:"up",label:"커진다"},{key:"down",label:"작아진다"},{key:"same",label:"거의 같다"},{key:"unknown",label:"잘 모르겠다"}]}, contextFrom: '#concl-sum, #results, #verdict' }); });</script>
 </body>
 </html>

@@ -280,6 +280,13 @@ test('양자점 수업: 우리 생각·변인 카드 → 선생님께 저장 · 
         assert.equal(await H.page.locator('.rai-inline[data-sec="design"] textarea').count(), 0, '글 칸 대신 변인 카드');
         assert.equal(await H.page.isVisible(vc), true);
         await H.page.check(vc + ' input[data-vc="change"][value="ratio"]');
+        // 예상 방향을 고르기 전에는 ③ 뒤 단계로 못 감 → 안내 + 카드로 (골라야 다음)
+        await H.page.click('nav.steps button[data-step="conclude"]');
+        assert.equal(await H.page.isVisible(vc), true, '카드에 남음');
+        assert.match(await H.page.textContent('#rai-gate-toast'), /예상 방향을 골라요/);
+        assert.equal(await H.page.isDisabled('.step-panel[data-step="procedure"] .step-next button[data-go="perform"]'), true, '다음 단추 꺼짐');
+        await H.page.check(vc + ' input[data-vc="predict"][value="up"]');
+        assert.equal(await H.page.isDisabled('.step-panel[data-step="procedure"] .step-next button[data-go="perform"]'), false, '고르면 켜짐 (까닭은 안 써도)');
         await H.page.click('nav.steps button[data-step="conclude"]');
         await H.page.click('#rai-tabs button[data-tab="design"]');
         assert.match(await H.page.inputValue('#rai-t-design'), /^\[바꿀 것\] 재료 비율/);
@@ -308,6 +315,7 @@ test('양자점 6-2: 가로축 = 조가 바꾼 것(변인 카드 → 시료 값�
         // 변인 카드에서 재료 비율을 고르고, 가로축을 가열 시간으로 바꾸면 안내 → 되돌리기
         await P.click('nav.steps button[data-step="procedure"]');
         await P.check('.rai-vc input[data-vc="change"][value="ratio"]');
+        await P.check('.rai-vc input[data-vc="predict"][value="up"]');
         await P.click('nav.steps button[data-step="result"]');
         assert.equal(await P.inputValue('#sel-x'), 'ratio');
         await P.selectOption('#sel-x', 'heat');

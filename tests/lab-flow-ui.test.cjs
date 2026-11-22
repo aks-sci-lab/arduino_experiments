@@ -8,6 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const CC = require('../js/class-cloud.js');
 const { loadLabStore, labServer, configJs } = require('./fake-lab-store.cjs');
+const pickVars = require('./vars-pick.cjs');
 let chromium = null, devices = null; try { ({ chromium, devices } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
 const REPO = path.join(__dirname, '..');
 const CHART_STUB = 'window.Chart = class Chart { constructor(c, cfg) { this.data = (cfg && cfg.data) || { datasets: [] }; this.options = {}; } update() {} destroy() {} resize() {} };';
@@ -81,6 +82,7 @@ test('진행 방법 화면: 수업 없이 고르기·기억, 가설연역 수업
         await L.goto(ROOT + 'projects/quantum-dot.html');
         await L.waitForSelector('.flow-pick:not([hidden])');
         assert.equal((await stepKeys(L)).length, 7, '처음은 7단계');
+        await pickVars(L);   // 변인 카드 '골라야 다음'
         await L.click('nav.steps button[data-step="data"]');   // 7단계 진행 기억: 5. 데이터
         await L.click('.flow-pick button[data-flow="hd"]');
         assert.deepEqual(await stepKeys(L), HD);
