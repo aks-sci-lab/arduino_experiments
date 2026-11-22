@@ -354,7 +354,7 @@ test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 설계 → �
         await P.click('.ev-concl[data-concl="t2"] [data-dir="down"]');
         await P.click('.ev-concl[data-concl="t2"] [data-why] >> nth=0');
         const cs = await P.evaluate(() => window.__filmRocket.state().concl.t2);
-        assert.equal(cs.dir, 'down'); assert.match(cs.why, /무거워서/);
+        assert.equal(cs.dir, 'down'); assert.match(cs.why, /무거우면/, '몸체 무게 팀의 까닭 보기');
         assert.equal(await P.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '정리 문장 375px');
         await next(); await go('end-card');
         const [dl] = await Promise.all([P.waitForEvent('download'), P.click('#ev-save')]);

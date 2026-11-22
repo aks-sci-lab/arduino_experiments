@@ -283,13 +283,21 @@
         st.screen = id; st.stage = stage; save();
         app.innerHTML = '';
         var view = SCREENS[id]();
-        app.innerHTML = '<section class="ev-screen" data-screen="' + id + '">' + view.html + '</section>';
+        app.innerHTML = '<section class="ev-screen" data-screen="' + id + '">' + teamQ(id) + view.html + '</section>';
         app.setAttribute('data-screen', id);
         if (view.mount) view.mount(app.firstChild);
         renderTop();
         window.scrollTo(0, 0);
         var h = app.querySelector('h2'); if (h) { h.setAttribute('tabindex', '-1'); try { h.focus({ preventScroll: true }); } catch (e) { /* 무시 */ } }
         if (stageMoved && share) { lastStep = stepNow(); share.stepChanged(); } else beatIfChanged();
+    }
+    /* 🔎 우리 팀 물음 (2026-11-21 비계 4): 바꿀 것을 고른 뒤 측정·결과 화면 위에 이어서 (정리 문장은 카드 안에) */
+    var NO_TEAMQ = { 't1-intro': 1, 't1-again': 1, 't1-safe': 1, 't1-var': 1, 't2-intro': 1, 't2-again': 1, 't2-base': 1, 't2-var': 1 };
+    function teamQ(id) {
+        var part = /^t1-/.test(id) ? 't1' : /^t2-/.test(id) ? 't2' : '';
+        if (!part || NO_TEAMQ[id] || !st[part] || !st[part].changed) return '';
+        var q = M.teamQuestion(part, st[part].changed);
+        return q ? '<p class="ev-teamq" data-teamq="' + part + '">🔎 <b>우리 팀 물음</b> · ' + esc(q) + '</p>' : '';
     }
     function back() { var p = st.history.pop(); show(p || 'enter', { back: true }); }
     app.addEventListener('click', function (e) {
@@ -578,7 +586,7 @@
             '<div class="ev-choices">' + ['down', 'up', 'same'].map(function (k) {
                 return '<button type="button" class="ev-choice' + (g.dir === k ? ' on' : '') + '" data-dir="' + k + '">' + esc(G[k]) + '</button>';
             }).join('') + '</div>' +
-            '<label class="ev-field">왜 그렇게 생각해요? <small>(짧게, 안 써도 돼요)</small><input type="text" class="ev-why-in" maxlength="40" autocomplete="off" placeholder="예: 따뜻하면 거품이 빨리 나서" value="' + esc(g.why || '') + '"></label></div>';
+            '<label class="ev-field">왜 그렇게 생각해요? <small>(짧게, 안 써도 돼요)</small><input type="text" class="ev-why-in" maxlength="40" autocomplete="off" placeholder="' + esc(M.whyExample(part, st[part].changed)) + '" value="' + esc(g.why || '') + '"></label></div>';
     }
     function hasGuess(part) { var p = st[part]; return !!(p.changed && p.guess && p.guess.dir); }
     function mountGuess(el, part) {
@@ -638,9 +646,16 @@
     function miniTable(box, part) {
         var defs = ensureBase(part), p = st[part], d = defs[p.changed];
         var rows = M.byValue(p.trials.map(function (t) { return { value: t.value, y: part === 't1' ? t.y : t.pct }; }), d);
-        box.innerHTML = rows.length ? '<table class="ev-table"><thead><tr><th>' + esc(d.short || d.name) + '</th><th>평균</th><th>횟수</th></tr></thead><tbody>' + rows.map(function (r) {
-            return '<tr><td>' + esc(d.label(r.value)) + '</td><td>' + (part === 't1' ? fmtS(r.mean) : Math.round(r.mean) + '%') + '</td><td>' + r.n + '</td></tr>';
-        }).join('') + '</tbody></table>' : '<p class="ev-small">아직 잰 값이 없어요.</p>';
+        var f = function (v) { return part === 't1' ? fmtS(v) : Math.round(v) + '%'; }, sp = M.spread(rows);
+        box.innerHTML = rows.length ? '<table class="ev-table"><thead><tr><th>' + esc(d.short || d.name) + '</th><th>평균</th><th>↕ 범위</th><th>횟수</th></tr></thead><tbody>' + rows.map(function (r) {
+            var lo = Math.min.apply(null, r.ys), hi = Math.max.apply(null, r.ys);
+            return '<tr><td>' + esc(d.label(r.value)) + '</td><td>' + f(r.mean) + '</td><td>' + (r.n > 1 ? f(lo) + '~' + f(hi) : '–') + '</td><td>' + r.n + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+            // 차이가 흔들림보다 큰가요? (같은 조건 반복이 있을 때만)
+            (sp.verdict ? '<div class="ev-def ev-spread" data-spread="' + sp.verdict + '"><p>↕ <b>차이가 흔들림보다 큰가요?</b></p><p>' +
+                (sp.verdict === 'clear' ? '✅ 처음 값과 끝 값의 범위가 겹치지 않아요. 바꾼 조건 때문에 달라졌다고 말할 수 있어요.'
+                    : '🤔 처음 값과 끝 값의 범위가 겹쳐요. 같은 조건에서도 이만큼 흔들려서, 차이가 있다고 말하기 어려워요. 값을 더 크게 바꿔 볼까요?') + '</p></div>' : '')
+            : '<p class="ev-small">아직 잰 값이 없어요.</p>';
     }
     SCREENS['t1-cond'] = condScreen('t1', 't1-predict');
     SCREENS['t1-ch-cond'] = condScreen('t1', 't1-ch-predict', true);
@@ -839,11 +854,18 @@
             { type: 'scatter', label: '잰 값', data: pts, pointRadius: 6, backgroundColor: 'rgba(21,101,192,0.35)', borderColor: '#1565c0' },
             { type: 'line', label: '평균', data: means, borderColor: '#e65100', backgroundColor: '#e65100', pointRadius: 7, borderWidth: 3, tension: 0 }
         ];
+        // ↕ 반복 범위 막대 (2026-11-21 비계 4): 같은 조건으로 여러 번 잰 값의 가장 작은 값 ~ 가장 큰 값
+        M.spread(rows).rows.forEach(function (r, i) {
+            if (r.n < 2) return;
+            var x = M.axisValue(d, r.value);
+            ds.push({ type: 'line', label: i && ds.some(function (z) { return z.label === '반복 범위'; }) ? '' : '반복 범위', data: [{ x: x, y: r.lo }, { x: x, y: r.hi }],
+                borderColor: 'rgba(84,110,122,0.75)', borderWidth: 8, pointRadius: 0, pointStyle: 'line', tension: 0 });
+        });
         if (opt.target) ds.push({ type: 'line', label: '목표', data: [{ x: Math.min.apply(null, xs), y: target }, { x: Math.max.apply(null, xs), y: target }], borderColor: '#2e7d32', borderDash: [8, 6], pointRadius: 0, borderWidth: 2 });
         var c = new window.Chart(canvas, {
             data: { datasets: ds },
             options: { responsive: true, maintainAspectRatio: false, animation: false,
-                plugins: { legend: { labels: { font: { size: 14 } } } },
+                plugins: { legend: { labels: { font: { size: 14 }, filter: function (it) { return !!it.text; } } } },
                 scales: {
                     x: { type: 'linear', min: Math.min.apply(null, xs) - (d.cat ? 0.5 : 0), max: Math.max.apply(null, xs) + (d.cat ? 0.5 : 0), title: { display: true, text: d.short || d.name, font: { size: 15 } },
                         ticks: { font: { size: 13 }, stepSize: d.cat ? 1 : undefined, callback: function (v) { return d.cat ? (d.values[v] != null ? d.label(d.values[v]) : '') : d.label(v); } } },
@@ -887,6 +909,12 @@
     }
     // '바꿔서 다시' → 조건 화면: 지난 값 그대로는 받지 않음 ('값을 하나 바꿔요')
     function mustChange(part, from) { st[part].mustChange = from; save(); show(part + '-cond'); }
+    // 2차시 결과 안내 (2026-11-21 비계 4): 지금 바꾸는 조건 안에서만 권함 — 잠긴 조건은 권하지 않음
+    function t2Hint(high) {
+        var p = st.t2, d = ensureBase('t2')[p.changed], name = d ? d.short || d.name : '바꿀 조건';
+        if (p.changed === 'mass') return high ? '점토·클립을 하나 더 붙여 볼까요?' : massNow() > 0 ? '점토·클립을 하나 떼어 볼까요?' : '몸체 무게는 이미 0개예요. 이 높이도 좋은 결과예요!';
+        return esc(name) + ' 값을 바꿔서 다시 쏘아 볼까요?';
+    }
     function massNow() { var p = st.t2; return Number(p.changed === 'mass' ? p.value : p.base && p.base.mass) || 0; }
     SCREENS['t1-more'] = moreScreen('t1');
     SCREENS['t2-more'] = moreScreen('t2');
@@ -1066,9 +1094,7 @@
         var p = st.t2, r = st.last2 || p.trials[p.trials.length - 1], defs = ensureBase('t2'), d = defs[p.changed];
         if (!r) return { html: nav('t2-cond', '발사하러 가기 →') };
         var html = '<p class="ev-kicker">결과 · ' + esc(d ? d.label(r.value) : '') + '</p><h2>🚀 아이 키의 ' + r.pct + '%' + (r.method === 'hand' ? ' <small>(눈으로)</small>' : '') + '</h2>' + '<p class="ev-small ev-easy">🧒 % = ' + esc(M.EASY['%']) + '</p>' +
-            card('<p>' + (r.pct >= 90 && r.pct <= 110 ? '🎉 아이 키와 거의 같아요!' : r.pct > 110 ? '아이 키보다 높아요. 천장 조심! 무게를 늘려 볼까요?' :
-                    // 몸체 무게가 0개면 '무게를 줄이거나'는 할 수 없음 (가상 수업 기록)
-                    '아이 키보다 낮아요. ' + (massNow() > 0 ? '무게를 줄이거나 ' : '') + '물·발포비타민을 바꿔 볼까요?') + '</p>' +
+            card('<p>' + (r.pct >= 90 && r.pct <= 110 ? '🎉 아이 키와 거의 같아요!' : (r.pct > 110 ? '아이 키보다 높아요. 천장 조심! ' : '아이 키보다 낮아요. ') + t2Hint(r.pct > 110)) + '</p>' +
                 '<p class="ev-small">' + esc(M.DEF.design) + '</p>') +
             '<details class="ev-more"><summary>📏 아이 키(cm)로도 보기 (선택, 이 폰에만)</summary>' + stepper('child', '아이 키', st.childCm ? st.childCm + ' cm' : '넣지 않음', {}) +
             '<p class="ev-small" id="ev-cm">' + (st.childCm ? '로켓 높이 약 ' + M.cmFrom(r.pct, st.childCm) + ' cm' : '+ 를 누르면 넣어요. 선생님께는 %만 보내요.') + '</p></details>' +
@@ -1135,11 +1161,18 @@
         var html = '<h2>✍️ 우리 팀 정리 문장</h2><p>잰 것을 보고 한 문장으로 말해 봐요. <b>원인(바꾼 것) → 결과(잰 것) → 까닭</b></p>' +
             (parts.length ? parts.map(function (k) {
                 var d = ensureBase(k)[st[k].changed], G = M.GUESS[k], c = st.concl[k] || {}, g = st[k].guess;
-                return '<div class="ev-card ev-concl" data-concl="' + k + '"><p class="ev-kicker">' + (k === 't1' ? '1차시' : '2차시') + (g && G[g.dir] ? ' · 내 예측: ' + esc(G[g.dir]) : '') + '</p>' +
-                    '<p><b>' + esc(d.short || d.name) + '</b>을(를) ' + (d.cat ? '바꿨더니' : '늘렸더니') + ' ' + G.what + '</p>' +
+                var ev = M.evidence(k, st[k], st.setup), q = M.teamQuestion(k, st[k].changed), bec = M.becauseFor(k, st[k].changed);
+                var head = '<div class="ev-card ev-concl" data-concl="' + k + '"><p class="ev-kicker">' + (k === 't1' ? '1차시' : '2차시') + (g && G[g.dir] ? ' · 내 예측: ' + esc(G[g.dir]) : '') + '</p>' +
+                    (q ? '<p class="ev-teamq">🔎 <b>우리 팀 물음</b> · ' + esc(q) + '</p>' : '') +
+                    // 📏 우리 숫자 (증거, 저절로 — 아이는 고치지 않음)
+                    (ev ? '<p class="ev-evidence">📏 <b>우리 숫자</b> · ' + esc(ev.text) + '</p>' : '');
+                // 한 가지 값만 잰 차시: 결과·까닭을 고르지 않음 (결과 없는 결론 막기)
+                if (!ev || ev.one) return head + '<p class="ev-notyet">🤔 <b>아직 말할 수 없어요</b> — 값을 하나 바꿔 재야 알 수 있어요.</p>' +
+                    (stageLocked(k) ? '' : '<div class="ev-nav col"><button type="button" class="ev-next secondary" data-go="' + k + '-again">🔧 ' + esc(d.short || d.name) + ' 바꿔서 재러 가기</button></div>') + '</div>';
+                return head + '<p><b>' + esc(d.short || d.name) + '</b>을(를) ' + (d.cat ? '바꿨더니' : '늘렸더니') + ' ' + G.what + '</p>' +
                     '<div class="ev-choices">' + ['down', 'up', 'same'].map(function (x) { return '<button type="button" class="ev-choice' + (c.dir === x ? ' on' : '') + '" data-dir="' + x + '">' + esc(G[x + 'Done']) + '</button>'; }).join('') + '</div>' +
-                    '<p>왜냐하면…</p><div class="ev-choices">' + M.BECAUSE[k].map(function (t) { return '<button type="button" class="ev-choice' + (c.why === t ? ' on' : '') + '" data-why="' + esc(t) + '">' + esc(t) + '</button>'; }).join('') + '</div>' +
-                    '<label class="ev-field">직접 쓰기 <small>(짧게, 안 써도 돼요)</small><input type="text" class="ev-why-in" maxlength="40" autocomplete="off" value="' + esc(c.why && M.BECAUSE[k].indexOf(c.why) < 0 ? c.why : '') + '"></label></div>';
+                    '<p>왜냐하면…</p><div class="ev-choices">' + bec.map(function (t) { return '<button type="button" class="ev-choice' + (c.why === t ? ' on' : '') + '" data-why="' + esc(t) + '">' + esc(t) + '</button>'; }).join('') + '</div>' +
+                    '<label class="ev-field">직접 쓰기 <small>(짧게, 안 써도 돼요)</small><input type="text" class="ev-why-in" maxlength="40" autocomplete="off" value="' + esc(c.why && bec.indexOf(c.why) < 0 ? c.why : '') + '"></label></div>';
             }).join('') : card('<p>아직 바꿔서 잰 조건이 없어요. 결과 카드로 가요.</p>')) +
             nav('end-card', '결과 카드 만들기 →');
         return { html: html, mount: function (el) {
@@ -1152,7 +1185,8 @@
                     Array.prototype.forEach.call(box.querySelectorAll(b.dataset.dir ? '[data-dir]' : '[data-why]'), function (x) { x.classList.toggle('on', x === b); });
                     changed();
                 });
-                box.querySelector('.ev-why-in').addEventListener('change', function () {
+                var whyIn = box.querySelector('.ev-why-in'); if (!whyIn) return;   // 아직 말할 수 없는 차시
+                whyIn.addEventListener('change', function () {
                     var v = M.cleanShort(this.value), c = st.concl[k] = st.concl[k] || {};
                     if (v) { c.why = v; Array.prototype.forEach.call(box.querySelectorAll('[data-why]'), function (x) { x.classList.remove('on'); }); }
                     changed();
