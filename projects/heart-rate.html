@@ -31,6 +31,10 @@
     <!-- 연결·상태 띠 -->
     <div class="dash-bar hr-measure">
         <span id="status" class="dash-status" role="status" aria-live="polite">📷 카메라를 켜세요</span>
+        <div class="seg" id="facing" role="group" aria-label="쓸 카메라">
+            <button type="button" data-facing="environment" aria-pressed="true">📷 뒤</button>
+            <button type="button" data-facing="user" aria-pressed="false">🤳 앞</button>
+        </div>
         <button id="cam" class="primary">📷 카메라 켜기</button>
         <button id="start" class="good" disabled>▶ 측정 시작</button>
         <button id="stop" class="danger" hidden>■ 멈춤</button>
@@ -169,6 +173,7 @@
             <ol class="text-list">
                 <li>📷 <b>카메라 켜기</b> → 카메라 권한 허용 (https 주소에서만 됩니다).</li>
                 <li><b>검지 끝</b>으로 뒤 카메라를 살짝 눌러 <b>완전히</b> 덮습니다. 너무 세게 누르면 피가 안 통해 맥파가 약해져요. 밝은 곳(창가)이면 플래시 없이도 됩니다.</li>
+                <li>🤳 <b>앞 카메라</b>(화면 위쪽 작은 카메라)도 고를 수 있어요. 앞 카메라에는 플래시가 없어 <b>방 밝기</b>만 쓰므로, 창가나 밝은 곳에서 손가락으로 덮으세요. 고른 카메라는 이 폰에 기억되고 회차·CSV 에 남아요.</li>
                 <li>품질이 🟢 이면 ▶ <b>측정 시작</b>. 처음 3초 동안 노출을 맞추고 <b>잠근 뒤 1.5초 동안 정말 안 바뀌는지 확인</b>합니다.</li>
                 <li>측정하는 동안 말하거나 움직이지 않습니다. 폰을 책상에 놓고 손가락만 올려도 좋아요.</li>
             </ol>

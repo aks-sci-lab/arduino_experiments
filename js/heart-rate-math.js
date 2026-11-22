@@ -569,7 +569,35 @@
     //  폰이 알려 주는 노출 값이 실제와 달라(자동 노출 중 옛 값 등) 보정이 오히려 신호를 망가뜨릴 수 있음.
     //  보정 쪽을 기본으로 하되, 보정 전 쪽이 신뢰도가 0.1 넘게 높고 노출이 그 빠르기로 출렁이지 않으면 보정 전을 씀
     // lock: 'locked' | 'unlocked' | 'csv-locked' …, opts: { scene }
+    // ---------- 처음 정착 구간 (손가락을 누르고 노출이 자리 잡는 동안) ----------
+    // 선생님 실측 r27: 빨강이 처음 0.2초 117 → 1초 안에 81 로 내려와 자리 잡음 → 그 구간이 FFT·자기상관을 흐려 신뢰도 0.5 (빼면 0.8)
+    //  빨강(없으면 밝기)의 0.3초 이동평균이 '2초 뒤 중앙값'에서 10% 넘게 벗어난 마지막 때(처음 3초 안) 까지를 뺀다. 측정이 8초보다 짧으면 안 뺌
+    function settleCut(frames) {
+        const fr = (frames || []).filter(f => f && Number.isFinite(f.t));
+        if (fr.length < 30) return 0;
+        const t0 = fr[0].t, dur = fr[fr.length - 1].t - t0;
+        if (dur < 8) return 0;
+        const val = f => (Number.isFinite(f.r) ? f.r : f.y);
+        const rest = fr.filter(f => f.t - t0 >= 2).map(val).filter(Number.isFinite);
+        if (rest.length < 10) return 0;
+        const base = median(rest);
+        if (!(base > 0)) return 0;
+        let cut = 0;
+        for (let i = 0; i < fr.length && fr[i].t - t0 <= 3; i++) {
+            const w = fr.filter(f => Math.abs(f.t - fr[i].t) <= 0.15).map(val).filter(Number.isFinite);
+            if (w.length && Math.abs(mean(w) - base) > 0.1 * base) cut = fr[i].t - t0 + 0.1;
+        }
+        return cut > 0.2 ? round(Math.min(cut, 3), 2) : 0;
+    }
     function analyzeRun(lock, frames, opts) {
+        opts = opts || {};
+        const sc = opts.keepStart ? 0 : settleCut(frames);
+        if (sc > 0) { const t0 = frames[0].t; frames = frames.filter(f => f.t - t0 >= sc); }
+        const a = analyzeRun0(lock, frames, opts);
+        if (sc > 0) { a.settleCut = sc; a.reasons.push(`처음 ${sc}초(손가락·노출이 자리 잡는 동안)는 빼고 계산`); }
+        return a;
+    }
+    function analyzeRun0(lock, frames, opts) {
         opts = opts || {};
         const mode = exposureMode(lock === 'locked' || lock === 'csv-locked' ? 'locked' : 'unlocked', frames);
         const a1 = analyze(frames, { correct: mode.correct, scene: opts.scene });
@@ -702,5 +730,5 @@
             f.exposureTime == null ? null : round(f.exposureTime, 3), f.iso == null ? null : round(f.iso, 0), round(f.s, 2) || 0]);
     }
 
-    return { liftCut, analyzeRun, lightCheck, doubleCheck, toLinear, toSrgb, correctExposure, exposureVariation, exposureShare, exposureMode, pack, unpack, BAND, FS, resample, detrend, bandpass, spectrum, autocorr, findPeaks, quality, exposureCheck, analyze, palpBpm, errorPct, simulate, toCsv, parseCsv, fft, mean, median, std, round };
+    return { liftCut, settleCut, analyzeRun, lightCheck, doubleCheck, toLinear, toSrgb, correctExposure, exposureVariation, exposureShare, exposureMode, pack, unpack, BAND, FS, resample, detrend, bandpass, spectrum, autocorr, findPeaks, quality, exposureCheck, analyze, palpBpm, errorPct, simulate, toCsv, parseCsv, fft, mean, median, std, round };
 });

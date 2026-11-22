@@ -340,3 +340,27 @@ test('선생님 실측 4회차: 모두 77~79 ± 3, 절반으로 떨어지지 않
         near(c.bpm, want[r], 3, r + ' 보정 경로');
     }
 });
+
+// ---------- 선생님 실측 r27 (2026-11-22, 어두운 방·자동 노출 33.3 ms·ISO 3200, 23.9 장/초, 초록 ≈ 0) ----------
+//  처음 1초 정착(빨강 117 → 81), 8.2초쯤 기준선 계단(78.9 → 75.5), 자기상관만 보면 절반(41)으로 잡히는 자료
+test('선생님 실측 r27: 82 ± 3, 빨강, 처음 정착 구간 뺌, 절반 아님, 실제 시각 간격', () => {
+    const fs = require('node:fs'), path = require('node:path');
+    const p = H.parseCsv(fs.readFileSync(path.join(__dirname, 'fixtures', 'heart-rate', 'r27-dim-auto.csv'), 'utf8'));
+    const a = H.analyzeRun('csv', p.frames);
+    near(a.bpm, 82, 3, 'r27');
+    assert.equal(a.channel, 'r', '초록이 0 이라 빨강');
+    assert.ok(a.settleCut > 0.3 && a.settleCut < 2, '정착 구간 ' + a.settleCut);
+    assert.ok(a.reasons.some(x => /자리 잡는 동안/.test(x)));
+    assert.ok(a.conf >= 0.7, '정착 구간을 빼면 신뢰도가 오름 ' + a.conf);
+    assert.ok(Math.abs(a.fpsMean - 23.9) < 1, '실제 시각 간격 ' + a.fpsMean);
+    assert.equal(a.mode.mode, 'steady', '노출이 그대로라 보정 없음');
+    assert.ok(a.bpm > 60, '절반(41)이 아님');
+    // 정착 구간을 빼지 않던 예전 계산과 비교 (신뢰도가 낮았음)
+    const old = H.analyzeRun('csv', p.frames, { keepStart: true });
+    near(old.bpm, 82, 3, 'r27 예전'); assert.ok(old.conf < a.conf, '예전 신뢰도 ' + old.conf);
+    // 기준선 계단 하나가 가짜 봉우리를 만들지 않음: FFT·봉우리 둘 다 82 근처
+    near(a.bpmFFT, 82, 4, 'FFT'); near(a.bpmPeaks, 82, 4, '봉우리');
+    // 정착 구간: 짧은 측정(8초 미만)은 빼지 않음, 평평하면 0
+    assert.equal(H.settleCut(p.frames.filter(f => f.t < 6)), 0);
+    assert.equal(H.settleCut(H.simulate({ bpm: 70, dur: 20 })), 0);
+});

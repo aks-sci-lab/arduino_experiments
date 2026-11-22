@@ -134,6 +134,7 @@
             `# 지표: 안정 평균 ${m.restMean} · 숨 참기 마지막 10초 ${m.holdLastMean} · 변화율 ${m.changePct}% · 가장 낮은 값 ${m.low ? m.low.bpm + '(숨 참기 시작 뒤 ' + m.low.t + '초)' : '-'} · 회복 시간 ${m.recoveryText} · 참은 초 ${m.heldSec} · 뺀 창 ${m.dropped}/${m.total}`,
             `# 선택 항목: 운동 습관 ${pf.exercise || '안 씀'} · 키 ${pf.height || '안 씀'} · 몸무게 ${pf.weight || '안 씀'} · 수업 분석 동의 ${run.consent ? '예' : '아니오'}`,
             '# 노출: ' + (run.lock || ''),
+            ...(run.facing ? ['# 카메라: ' + (run.facing === 'user' ? '앞' : '뒤') + ' (' + run.facing + ')'] : []),
             't_s,phase,bpm,conf,used'
         ];
         (run.curve || []).forEach(p => lines.push([p.t, phaseOf(p.t, ph), p.bpm == null ? '' : p.bpm, p.conf, p.ok ? 1 : 0].map(q).join(',')));
