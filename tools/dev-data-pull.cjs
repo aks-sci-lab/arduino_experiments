@@ -60,7 +60,7 @@ function firestoreExporter(serviceAccountJson) {
         if (since) q = q.where('timestamp', '>', admin.firestore.Timestamp.fromDate(new Date(since)));
         const snap = await q.limit(41).get();
         const docs = snap.docs.slice(0, 40);
-        return { more: snap.docs.length > 40, items: docs.map(d => {
+        return { ok: true, more: snap.docs.length > 40, items: docs.map(d => {
             const x = d.data(), t = x.timestamp && x.timestamp.toDate ? x.timestamp.toDate().toISOString() : String(x.timestamp || '');
             return { timestamp: t, exp: x.exp, id: x.id, measuredAt: x.measuredAt, device: x.device, summary: x.summary || {}, data: String(x.data || '') };
         }) };
@@ -77,7 +77,8 @@ async function pull(o) {
     let since = state.since || '', got = 0;
     for (let round = 0; round < 50; round++) {
         const r = await exportPage(since);
-        if (!r || !r.ok) throw new Error('devExport 실패: ' + ((r && r.error) || '알 수 없음'));
+        // ok 가 없는 쪽(Firestore 직접 읽기)도 받는다 — 2026-11-19~22 매번 '알 수 없음'으로 실패하던 까닭
+        if (!r || r.ok === false || !Array.isArray(r.items)) throw new Error('devExport 실패: ' + ((r && r.error) || '알 수 없음'));
         for (const it of r.items || []) {
             const { folder, entry } = saveItem(out, it);
             const idx = indexes[folder] || (indexes[folder] = readJson(path.join(out, folder, 'index.json'), { items: [] }));
