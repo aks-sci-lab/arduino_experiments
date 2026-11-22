@@ -55,12 +55,22 @@ description: 센서 기반 실험실에 새 실험 페이지(또는 기존 실�
 - 모든 문서에 `expireAt`(+183일), `firestore.rules` 에 규칙(목록 조회 막기·크기·필드), `firestore.indexes.json` 에 `expireAt` 색인(**무료 요금제라 `ttl: false`**), `tools/firestore-cleanup.cjs` 의 목록에 추가
 - 규칙 시험은 에뮬레이터로(아래 `pr-verify` 스킬 참고), PR 제목에 "(규칙 바뀜)"
 
-## 7. 메인 카드·문서
+## 7. 수업 설명 장·과학 내용 문장 점검
+
+- 새 수업은 교사 🎬 발표 보기에 띄울 설명 장 `js/lesson-content/<exp>.js`(`LessonContent.add`)를 함께 만든다. 물음 ❓ 먼저·풀이는 다음 키, 학생 화면의 답 자리는 `data-lesson-answer="장 key"`, 선생님 말은 `note`(🔧 선생님용 접기). 기준: `js/lesson-content/qdot.js`·`rocket.js`
+- 화면 글·설명 장·보고서 AI 안내에서 **과학 내용 문장 세 가지**를 찾아 고친다(교수 세션 공통 원칙 10, `docs/virtual-class/professor/common.md`)
+  - (가) **설명 가설을 사실처럼** 쓴 문장 → '~라고 생각해요', '한 가지 설명은', '우리 실험으로 확인해 볼 것' (예: '가열하면 조각이 자라고' → 가설)
+  - (나) **근사를 정확한 것처럼** 쓴 문장 → '대략', '~일 때만', 범위·조건을 붙임 (예: 분광기 ±5~10 nm 는 분광기를 쓴 경우만, 보정 밝기는 '대략·포화되지 않을 때', LED 문턱 전압 ≈ 띠 틈)
+  - (다) **출처 없는 '문헌에서는'·이름이 틀린 값** → 출처를 적거나 빼고, 이름을 바로잡음 (예: 형광등 611 nm 는 수은선이 아니라 형광체 선)
+- 대상 나이에 맞는 쉬운 말이 다음 학년에서 틀린 말이 되지 않는지도 본다(예: '질량 = 무거울수록 커요'는 초등에는 알맞지만 중2 에게는 무게와 구분)
+- 답이 설명·이론 글에 먼저 보이지 않는지(학생이 예측하기 전에 결과를 알려 주지 않기)
+
+## 8. 메인 카드·문서
 
 - `index.html` 실험 목록에 고르기 카드 `<a class="pick-card" href="projects/…"><span class="ic">…</span><b>…</b><small>…</small></a>`
 - `AGENTS.md`: 구조 표 한 줄 + 진행 기록 한 줄만(다른 세션과 충돌 줄이기)
 
-## 8. 시험
+## 9. 시험
 
 - 계산: `tests/<이름>-math.test.cjs`(알려진 답이 나오는지 — 예: 가짜 스펙트럼 봉우리 450 nm ±5)
 - 화면: `tests/<이름>-ui.test.cjs` — `loadLabStore()`(`tests/fake-lab-store.cjs`), `ctx.addInitScript(() => { window.LAB_STORE_FAKE_URL = 'https://script.google.com/macros/s/FAKE_LAB_STORE/exec'; })` 를 라우트보다 먼저, `script.google.com` 요청을 `await app.post/get` 으로 돌림
