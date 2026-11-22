@@ -123,6 +123,8 @@
                 <div class="ct-row"><button id="btnSetupSave" class="good">💾 설정 저장</button></div><p id="setupMsg" class="note" role="status" aria-live="polite"></p>
                 <p class="note">가족 화면은 도전 화면을 열 때 새 목표를 받아요.</p></details>
         </section>
+        <!-- 🧩 모아 보기: 조별 예상·우리 생각·결론 주장·보낸 숫자 (js/class-teacher-gather.js) -->
+        <section class="ct-card" id="gatherCard" hidden></section>
         <!-- 💡 플랑크 상수 수업이면 조별 V₀–f·h (예전 Apps Script 웹앱의 선생님 화면, js/class-teacher-planck.js) -->
         <section class="ct-card" id="planckCard" hidden></section>
         <div id="groups" class="ct-groups"></div>
@@ -279,6 +281,7 @@
 </main>
 
 <!-- 팀 결과판 크게 보기 (프로젝터) -->
+<div id="gatherBig" class="ct-boardbig ctg-big" hidden role="dialog" aria-label="모아 보기"></div>
 <div id="boardBig" class="ct-boardbig" hidden role="dialog" aria-label="팀 결과판 크게 보기">
     <div class="ct-row"><h2 id="boardBigTitle">🏆 팀 결과판</h2><button id="btnBoardClose">닫기</button></div>
     <div id="boardBigWait" class="ct-stage-wait" hidden></div>
@@ -301,6 +304,7 @@
 <script src="../js/planck-math.js"></script>
 <script src="../js/planck-cloud.js"></script>
 <script src="../js/class-teacher-planck.js"></script>
+<script src="../js/class-teacher-gather.js"></script>
 <script src="../js/report-ai.js"></script>
 <script src="../js/class-teacher-ai.js"></script>
 <script>
