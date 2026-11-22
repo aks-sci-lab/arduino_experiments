@@ -2,6 +2,7 @@
 // 화면 시험은 Playwright 가 없으면 건너뛴다. 가짜 보드: tests/fake-pico-serial.cjs(USB), 페이지 안 가짜 블루투스(판 응답).
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const pickVars = require('./vars-pick.cjs');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -265,7 +266,7 @@ test('센서 페이지 연결 때 예전 판이면 한 줄 안내 (환경·조�
                 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
                 await page.addInitScript(fakePicoBle, { answer });
                 await page.goto(base + url);
-                if (tab) await page.click(tab);
+                if (tab) { await pickVars(page); await page.click(tab); }   // 이상기체: 변인 카드 '골라야 다음'
                 await page.waitForSelector(button + ':visible', { timeout: 10000 }).catch(e => { throw new Error(url + ' ' + errors.join(' | ') + ' ' + e.message); });
                 await page.click(button);
                 await page.waitForFunction(() => window.__cmds && window.__cmds.some(c => c.startsWith('START') || c.startsWith('SET_')), null, { timeout: 10000 });

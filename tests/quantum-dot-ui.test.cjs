@@ -8,6 +8,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { loadLabStore } = require('./fake-lab-store.cjs');
+const pickVars = require('./vars-pick.cjs');
 
 let chromium = null, devices = null;
 try { ({ chromium, devices } = require('playwright')); } catch (e) { /* 없으면 건너뜀 */ }
@@ -202,6 +203,7 @@ test('📱 폰 측정 · 노트북 분석: 노트북 QR → 폰(iPhone 13)에서
         // ---- 노트북: 🆕 알림 → 6. 결과 표·그래프 ----
         await L.waitForSelector('#phone-note:not([hidden])', { timeout: 20000 });
         assert.match(await L.textContent('#phone-note'), /폰에서 새 시료 1개/);
+        await pickVars(L); await L.click('nav.steps button[data-step="data"]');   // 변인 카드 '골라야 다음'
         await L.click('#phone-note [data-go=result]');
         await L.waitForFunction(() => /불러온 값 1개/.test(document.getElementById('cnt').textContent));
         const body = await L.textContent('#tbody');
@@ -258,6 +260,7 @@ test('태블릿은 측정·분석 둘 다, 노트북 375px 가로 스크롤 없�
         await T.waitForFunction(() => /기록/.test(document.getElementById('color-msg').textContent));
         await T.click('#qdTabs button[data-tab=save]');
         await T.click('#btn-save');
+        await pickVars(T);   // 태블릿도 분석 쪽은 '골라야 다음'
         await T.click('nav.steps button[data-step="result"]');
         assert.match(await T.textContent('#cnt'), /^\(1개\)$/);
         assert.match(await T.textContent('#tbody'), /이 기기[\s\S]*시료 1/);
