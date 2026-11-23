@@ -53,21 +53,119 @@
     window.addEventListener('hashchange', route);
     window.addEventListener('popstate', route);
     // 📋 진행 상황 팝업: 발표 보기를 떠나지 않고 진행 화면(#runPane)을 그 위에 띄움 (같은 요소를 옮겨 실시간 갱신 그대로, 닫으면 제자리)
-    var runHome = null;
+    var runHome = null, teachHome = [];
     function runPop(on) {
         var pane = $('runPane'), pop = $('runPop');
         if (on) {
             if (!pop.hidden) return;
             runHome = { p: pane.parentNode, n: pane.nextSibling };
             $('runPopBody').appendChild(pane); pane.hidden = false; pop.hidden = false;
+            pane.classList.add('in-pop');
+            // 🔧 선생님용(풀이 열기·예비 실험 값)은 팝업 안 '🔧 선생님용' 탭으로 옮김 (닫으면 제자리)
+            teachHome = ['lessonTeach', 'setupTeach'].map(function (id) { var el = $(id); if (!el) return null; var h = { el: el, p: el.parentNode, n: el.nextSibling }; $('rpTeach').appendChild(el); return h; }).filter(Boolean);
+            Array.prototype.forEach.call(document.querySelectorAll('#runPane .ct-rp'), function (el) { el.hidden = false; });
+            if (!pane.getAttribute('data-rptab')) pane.setAttribute('data-rptab', '');
+            renderPop();
             try { $('btnRunPopClose').focus(); } catch (e) { /* 무시 */ }
         } else {
             if (pop.hidden) return;
             pop.hidden = true;
+            pane.classList.remove('in-pop');
+            Array.prototype.forEach.call(document.querySelectorAll('#runPane .ct-rp'), function (el) { el.hidden = true; });
+            teachHome.forEach(function (h) { h.p.insertBefore(h.el, h.n); }); teachHome = [];
             if (runHome) runHome.p.insertBefore(pane, runHome.n);
             runHome = null; pane.hidden = state.sub !== 'run';
         }
     }
+    /* ---------- 📋 진행 상황 팝업 재배치 (2026-11-23 선생님 "팝업창에서도 정보의 중요성을 판단해서 화면 재배치", 고른 것 '한 화면 두 칸')
+       ① 다음으로 넘어가도 되나 → 맨 위 요약 한 줄 ② 누구를 도와야 하나 → ⚠ 챙길 팀·조(이름과 함께) ③ 반 전체 → 팀·조마다 작은 칸(챙길 팀이 앞)
+       ④ 단계 조작 → 오른쪽(#stageCard 를 그대로) ⑤ 🏆 결과판·📤 제출·🧩 → 작은 탭 ⑥ 🔧 선생님용 → 탭. 아직 0 인 숫자는 값이 생길 때만 ---------- */
+    function popOpen() { return !$('runPop').hidden; }
+    function renderPop() {
+        if (!popOpen()) return;
+        var c = watched(), st = state.last; if (!c) return;
+        var team = c.mode === 'team', si = CC.stageInfo(c.exp, c.stage, c.flow);
+        $('rpCareH').textContent = team ? '⚠ 챙길 팀' : '⚠ 챙길 조·학생';
+        $('rpCellsH').textContent = team ? '👥 팀별 지금' : '👥 조별 지금';
+        var care = [], cells = [], sum = [];
+        var chip = function (cls, t) { return '<span class="ct-rp-c ' + cls + '">' + t + '</span>'; };
+        if (!st) { $('rpSum').textContent = '⏳ 진행 자료를 받는 중…'; $('rpCare').innerHTML = ''; $('rpCells').innerHTML = ''; }
+        else if (team) {
+            var rows = state.boardRows || boardRows(st), joined = rows.filter(function (r) { return r.joined; });
+            var cur = si && !si.all ? si.cur : '', part = si && (si.cur === 't1' || si.cur === 't2') ? si.cur : '';
+            var wait = cur ? joined.filter(function (r) { return r.doneStage === cur; }) : [];
+            var behind = joined.filter(function (r) { return r.behind; }), off = joined.filter(function (r) { return r.off; });
+            var still = part ? joined.filter(function (r) { return (r.kinds && r.kinds[part] || 0) < 2; }) : [];
+            var idle = joined.filter(function (r) { return !r.off && r.state && r.state.idle; });
+            sum.push('들어옴 <b>' + joined.length + ' / ' + rows.length + '</b>');
+            if (cur) { sum.push('⏳ 끝내고 기다림 <b>' + wait.length + '</b>'); sum.push('하는 중 <b>' + (joined.length - wait.length) + '</b>'); }
+            if (behind.length) sum.push('↩ 앞 단계 <b>' + behind.length + '</b>');
+            if (off.length) sum.push('🔌 끊김 <b>' + off.length + '</b>');
+            var tOk = rows.filter(function (r) { return r.tOk; }).length, hOk = rows.filter(function (r) { return r.hOk; }).length;
+            if (tOk) sum.push('⏱ 시간 도전 성공 <b>' + tOk + '</b>'); if (hOk) sum.push('🎯 높이 도전 성공 <b>' + hOk + '</b>');
+            var why = {};
+            behind.forEach(function (r) { (why[r.jo] = why[r.jo] || []).push('↩ 앞 단계 (' + esc(r.step) + ')'); });
+            off.forEach(function (r) { (why[r.jo] = why[r.jo] || []).push('🔌 끊김 ' + esc(CC.agoText(r.state.ago))); });
+            still.forEach(function (r) { (why[r.jo] = why[r.jo] || []).push('🔧 값 안 바꿈'); });
+            idle.forEach(function (r) { (why[r.jo] = why[r.jo] || []).push('💤 5분+'); });
+            care = rows.filter(function (r) { return why[r.jo]; }).map(function (r) { return '<li><b>' + esc(r.name) + '</b> ' + why[r.jo].join(' · ') + '</li>'; });
+            cells = rows.slice().sort(function (a, b) { return (why[b.jo] ? 1 : 0) - (why[a.jo] ? 1 : 0); }).map(function (r) {
+                return '<div class="ct-rp-cell' + (why[r.jo] ? ' care' : '') + (r.joined ? '' : ' empty') + '"><b>' + esc(r.name) + '</b><span>' + (r.joined ? esc(r.step) : '아직 안 들어옴') + '</span>' +
+                    (r.points != null ? '<span class="note">잰 것 ' + esc(r.points) + '</span>' : '') + '</div>';
+            });
+        } else {
+            var s = CC.summarize(st), curI = si && !si.all ? si.gate.indexOf(si.cur) : -1, idleN = 0;
+            sum.push('들어온 학생 <b>' + s.joined + ' / ' + s.total + '</b>');
+            sum.push('하는 중 <b>' + s.active + '</b>');
+            if (s.idle) sum.push('💤 5분+ <b>' + s.idle + '</b>');
+            sum.push('📤 제출한 조 <b>' + s.submittedGroups + ' / ' + s.groups.length + '</b>');
+            var gWhy = {};
+            s.groups.forEach(function (g) {
+                g.members.forEach(function (m) {
+                    if (!m.state || !m.state.joined || !m.st) return;
+                    var k = si ? si.gate.indexOf(m.st.step) : -1;
+                    if (m.state.idle) { idleN++; (gWhy[g.jo] = gWhy[g.jo] || []).push('💤 ' + m.num + '번'); }
+                    else if (curI > 0 && k >= 0 && k < curI) (gWhy[g.jo] = gWhy[g.jo] || []).push('↩ ' + m.num + '번 (' + esc(CC.stepName(st.exp, m.st.step, st.flow)) + ')');
+                });
+                if (!g.members.some(function (m) { return m.state && m.state.joined; })) (gWhy[g.jo] = gWhy[g.jo] || []).push('아직 아무도 안 들어옴');
+            });
+            care = s.groups.filter(function (g) { return gWhy[g.jo]; }).map(function (g) { return '<li><b>' + esc(g.jo) + '조</b> ' + gWhy[g.jo].join(' · ') + '</li>'; });
+            cells = s.groups.slice().sort(function (a, b) { return (gWhy[b.jo] ? 1 : 0) - (gWhy[a.jo] ? 1 : 0); }).map(function (g) {
+                var j = g.members.filter(function (m) { return m.state && m.state.joined; }), steps = {};
+                j.forEach(function (m) { var k = CC.stepName(st.exp, m.st.step, st.flow); steps[k] = (steps[k] || 0) + 1; });
+                var top = Object.keys(steps).sort(function (a, b) { return steps[b] - steps[a]; })[0] || '';
+                var pts = j.reduce(function (n, m) { return n + (Number(m.st.points) || 0); }, 0);
+                return '<button type="button" class="ct-rp-cell' + (gWhy[g.jo] ? ' care' : '') + (j.length ? '' : ' empty') + '" data-rpjo="' + esc(g.jo) + '"><b>' + esc(g.jo) + '조</b><span>' + j.length + ' / ' + g.members.length + '명' + (top ? ' · ' + esc(top) : '') + '</span>' +
+                    '<span class="note">' + (pts ? '점 ' + pts + ' · ' : '') + (g.sub && g.sub.rows ? '📤 보냄' : '아직 안 보냄') + '</span></button>';
+            });
+        }
+        if (st) {
+            $('rpSum').innerHTML = sum.join(' <span class="ct-rp-dot">·</span> ');
+            $('rpCare').innerHTML = care.length ? '<ul>' + care.join('') + '</ul>' : '<p class="note">✅ 지금 챙길 ' + (team ? '팀' : '조') + '이 없어요</p>';
+            $('rpCells').innerHTML = cells.join('');
+        }
+        // 작은 탭: 팀 수업 = 🏆 결과판 · 🔧 선생님용 / 조 수업 = 📤 제출(조별 카드) · 🧩 모아 보기 · 🔬(있으면) · 🔧 선생님용
+        var tabs = team ? [['board', '🏆 결과판']] : [['sub', '📤 제출']];
+        if (!team && !$('gatherCard').hidden) tabs.push(['gather', '🧩 모아 보기']);
+        if (!$('planckCard').hidden) tabs.push(['planck', '🔬 결과']);
+        if ($('rpTeach').children.length) tabs.push(['teach', '🔧 선생님용']);
+        var cur2 = $('runPane').getAttribute('data-rptab') || '';
+        if (cur2 && !tabs.some(function (t) { return t[0] === cur2; })) { cur2 = ''; $('runPane').setAttribute('data-rptab', ''); }
+        var html = tabs.map(function (t) { return '<button type="button" data-rptab="' + t[0] + '" aria-pressed="' + (cur2 === t[0]) + '">' + t[1] + '</button>'; }).join('');
+        if ($('rpTabs').innerHTML !== html) $('rpTabs').innerHTML = html;
+    }
+    $('rpTabs').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-rptab]'); if (!b) return;
+        var pane = $('runPane'), k = pane.getAttribute('data-rptab') === b.dataset.rptab ? '' : b.dataset.rptab;   // 다시 누르면 접음
+        pane.setAttribute('data-rptab', k); renderPop();
+    });
+    // 조 칸을 누르면 📤 제출 탭(조별 카드)에서 그 조
+    $('rpCells').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-rpjo]'); if (!b) return;
+        $('runPane').setAttribute('data-rptab', 'sub'); renderPop();
+        var sec = Array.prototype.filter.call(document.querySelectorAll('#groups .ct-group'), function (g) { var h = g.querySelector('h3 span'); return h && h.textContent === b.dataset.rpjo + '조'; })[0];
+        if (sec) { sec.classList.add('ct-rp-hl'); setTimeout(function () { sec.classList.remove('ct-rp-hl'); }, 1600); try { sec.scrollIntoView({ block: 'nearest' }); } catch (x) { /* 무시 */ } }
+    });
     function renderSub() {
         var ok = !!(state.user && state.user.google), main = ok && state.view === 'main', sub = state.sub, c = watched();
         if (sub !== 'list' && !c) sub = 'list';
@@ -422,6 +520,7 @@
         $('btnStageAll').disabled = si.all || state.stageBusy;
         renderPresentBar();
         renderWait(state.last && state.last.mode === 'team' ? state.boardRows : null);
+        renderPop();
     }
     async function setStage(to) {
         var c = watched(); if (!c) return;
@@ -447,6 +546,8 @@
         var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow); if (!si || si.all) return;
         var nx = si.gate[si.n], from = state.sub;
         setStage(si.n + 1).then(function (ok) {
+            // 📋 진행 상황 팝업(발표 보기 위)에서 열었으면: 발표 화면도 그 단계 설명 첫 장부터 (띠의 ▶ 다음 단계와 같게)
+            if (ok && from === 'present' && state.sub === 'present' && watched() === c && pres.space) { lessonStart(nx, 0); return; }
             if (!ok || from !== 'run' || state.sub !== 'run' || watched() !== c) return;
             hasSlides(c, nx).then(function (yes) { if (yes && state.sub === 'run' && watched() === c) go(c.space, 'present'); });
         });
@@ -485,7 +586,7 @@
                     return e || g || r || w ? n + ': ' + (e ? '🔧 ' + e + ' · ' : '') + (g ? '예측 ' + g : '') + (g && r ? ' → ' : '') + (r ? '결과 ' + r : '') + (w ? ' · 왜냐하면 ' + w : '') : '';
                 }).filter(Boolean),
                 step: !pg ? '–' : done ? CC.stepName(st.exp, done[1], st.flow) + (done[2] === 'more' ? ' ✓ 끝냄 · 더 재는 중' : ' ✓ 기다림') : CC.stepName(st.exp, pg.step, st.flow),
-                doneStage: done ? done[1] : '', at: done ? done[1] : pg ? String(pg.step || '') : '', joined: !!pg,
+                doneStage: done ? done[1] : '', at: done ? done[1] : pg ? String(pg.step || '') : '', joined: !!pg, points: pg && pg.points != null ? pg.points : null,
                 off: !!(ss.joined && ss.ago != null && ss.ago > OFF_MS), state: ss };
         }).sort(function (a, b) { return b.score - a.score || a.jo - b.jo; });
     }
@@ -1074,7 +1175,7 @@
     });
     function render(st) {
         renderPresentBar();
-        if (st.mode === 'team') return renderBoard(st);
+        if (st.mode === 'team') { renderBoard(st); renderPop(); return; }
         var s = CC.summarize(st);
         $('watchSum').innerHTML =
             '<div>들어온 학생<b>' + s.joined + ' / ' + s.total + '</b></div>' +
@@ -1093,6 +1194,7 @@
                 }).join('') + '</section>';
         }).join('');
         if (state.detail) showDetail(state.detail.jo, state.detail.num);
+        renderPop();
     }
     function showDetail(jo, num) {
         var st = state.last; if (!st) return;
