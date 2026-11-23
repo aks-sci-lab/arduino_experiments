@@ -161,7 +161,7 @@
         LS.isTeacher().then(function (yes) {
             if (!yes || state.user !== u) return;
             $('devBox').hidden = false;
-            $('devQr').innerHTML = qrSvg(location.href.split('#')[0].split('?')[0]) || '';
+            paintQr($('devQr'), location.href.split('#')[0].split('?')[0], 'M');
         }, function () { /* 확인 못 하면 숨김 */ });
     }
 
@@ -282,6 +282,27 @@
         var qr = window.qrcode(0, level || 'M'); qr.addData(text); qr.make();
         return qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true });
     }
+    /* QR 그리기: QR 도구(qrcode-generator, defer)가 아직 안 불러졌으면 '⏳' 만 두고, 불러지면 다시 그림
+       (예전에는 도구보다 화면이 먼저 그려지면 '불러오지 못했어요' 글이 남아 큰 QR 이 안 나왔음 — 4K 시험에서 가끔 실패) */
+    var qrWait = { els: [], tries: 0, t: 0, failed: false };
+    function paintQr(el, text, level, fail) {
+        if (!el) return;
+        var svg = qrSvg(text, level);
+        qrWait.els = qrWait.els.filter(function (x) { return x.el !== el; });
+        if (svg) { el.innerHTML = svg; return; }
+        if (qrWait.failed) { el.innerHTML = fail || ''; return; }
+        el.innerHTML = fail ? '<p class="note">⏳ QR 을 만드는 중…</p>' : '';
+        qrWait.els.push({ el: el, text: text, level: level, fail: fail });
+        if (!qrWait.t) qrWait.t = setTimeout(qrRetry, 150);
+    }
+    function qrRetry() {
+        qrWait.t = 0;
+        var ready = typeof window.qrcode === 'function';
+        if (!ready && ++qrWait.tries < 80) { qrWait.t = setTimeout(qrRetry, 150); return; }   // 12초까지 기다림
+        if (!ready) qrWait.failed = true;
+        var list = qrWait.els; qrWait.els = [];
+        list.forEach(function (x) { paintQr(x.el, x.text, x.level, x.fail); });
+    }
     function expireNote(c) { var t = CC.expireText(c.expireAt); return t ? '🗓 이 수업의 학생 자료는 ' + t + '에 저절로 지워져요. 그 전에 ⚙ 설정 → 📥 자료 내려받기에서 받아 두세요.' : ''; }
     function showClass(c) {
         var link = studentLink(c), e = CC.expInfo(c.exp);
@@ -289,8 +310,8 @@
         $('outCode').textContent = c.classCode;
         $('outLink').href = link; $('outLink').textContent = link;
         $('outExpire').textContent = expireNote(c);
-        $('qr').innerHTML = qrSvg(link) || '<p class="note">QR 을 만드는 도구를 불러오지 못했어요(인터넷 확인). 학생은 메인 페이지 → 학생으로 시작에서 수업 코드를 넣어도 돼요.</p>';
-        $('cornerQrImg').innerHTML = qrSvg(link, 'H') || '';
+        paintQr($('qr'), link, 'M', '<p class="note">QR 을 만드는 도구를 불러오지 못했어요(인터넷 확인). 학생은 메인 페이지 → 학생으로 시작에서 수업 코드를 넣어도 돼요.</p>');
+        paintQr($('cornerQrImg'), link, 'H');
         $('cornerCode').textContent = c.classCode;
         state.shown = c;
     }
@@ -300,7 +321,7 @@
     });
     $('btnBig').addEventListener('click', function () {
         var c = state.shown; if (!c) return;
-        $('bigQrImg').innerHTML = qrSvg(studentLink(c)) || '';
+        paintQr($('bigQrImg'), studentLink(c), 'M');
         $('bigQrCode').textContent = '수업 코드 ' + c.classCode;
         $('bigQr').hidden = false; $('btnBigClose').focus();
     });

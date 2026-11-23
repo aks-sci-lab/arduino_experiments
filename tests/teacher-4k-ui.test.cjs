@@ -48,7 +48,8 @@ test('교사 화면 4K: 발표 글자·먼저 내리기·큰 QR 한 화면·결�
         const open = async (c, w, h) => {
             await T.setViewportSize({ width: w, height: h });
             await T.goto(ORIGIN + '/projects/class-teacher.html#class=' + c.space); await T.reload();
-            await T.waitForSelector('#classOut:not([hidden])'); await T.waitForTimeout(300);
+            await T.waitForSelector('#classOut:not([hidden])'); await T.waitForSelector('#qr svg');   // QR 그림이 다 그려진 뒤에 잼
+            await T.waitForTimeout(300);
         };
         const frame = () => T.frames().find(f => /present=1/.test(f.url()));
         // 함께 보는 화면에서 보이면 안 되는 교사용 글
