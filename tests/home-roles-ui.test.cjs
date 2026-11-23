@@ -120,8 +120,22 @@ test('메인 화면: 역할 고르기 → 학생(코드·수업 없이) / 교사
         for (const h of ['environment-lab', 'arduino-nano-lab', 'em-induction', 'ideal-gas']) assert.doesNotMatch(await CP.textContent('a.pick-card[href="projects/' + h + '.html"]'), /⚠/, h);
         assert.match(await CP.textContent('a.pick-card[href="projects/malus-law.html"]'), /측정은 폰으로/);
         assert.equal(await CP.getAttribute('#pendulumCard', 'href'), 'projects/pendulum-report.html');
+        // 로그인은 맨 위 줄(header) 안 (2026-11-23 "로그인 기능도 맨 위로")
+        assert.equal(await CP.isVisible('header #homeAuth #signInBtn'), true, '구글 로그인 단추는 맨 위 줄에');
         await CP.click('#adminBox summary');
         await CP.waitForSelector('#devLinks:not([hidden])');
+        // 24인치(1920×1080): 보고서 실험 9개가 한 줄, 행사·센서·도구 7개가 다음 한 줄, 모두 첫 화면 안
+        await CP.click('#adminBox summary');
+        await CP.setViewportSize({ width: 1920, height: 1080 });
+        const rows = await CP.evaluate(() => {
+            const tops = sel => [...new Set([...document.querySelectorAll(sel)].map(a => Math.round(a.getBoundingClientRect().top)))];
+            const all = [...document.querySelectorAll('#labsList .pick-card')].filter(a => !a.closest('#customSection'));
+            return { report: tops('.report-grid > .pick-card'), split: tops('.home-split .pick-card'), bottom: Math.max(...all.map(a => a.getBoundingClientRect().bottom)) };
+        });
+        assert.equal(rows.report.length, 1, '보고서 실험 한 줄: ' + rows.report);
+        assert.equal(rows.split.length, 1, '행사·센서·도구 한 줄: ' + rows.split);
+        assert.ok(rows.bottom <= 1080, '카드가 모두 첫 화면 안: ' + rows.bottom);
+        assert.equal(await CP.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '1920 가로 스크롤');
         // 일반 구글 계정: 개발 도구 링크 없음
         const G = await browser.newContext({ viewport: { width: 1280, height: 800 } });
         await G.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API) }));

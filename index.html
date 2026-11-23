@@ -132,10 +132,46 @@
         .home-head .auth-btn { display: inline-flex; align-items: center; min-height: var(--tap); }
         .group-title { font-size: var(--fs-h2); margin: var(--sp-4) 0 var(--sp-2); }
         .group-title small { font-weight: 400; color: var(--c-muted); font-size: var(--fs-sm); margin-left: var(--sp-1); }
+        /* 맨 위 줄: 제목 | 로그인 상태 · 역할 바꾸기 */
+        .home-head-right { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-2); }
+        .home-auth { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+        .home-auth[hidden] { display: none; }
+        .home-auth .user-status { font-size: var(--fs-sm); font-weight: 600; flex-wrap: wrap; }
+        .home-auth .role-badge { font-size: .75rem; }
+        /* 교사 첫 줄: 수업 진행 화면 · QR · 사이트 관리 (가로로 낮게) */
+        .home-actions { display: grid; gap: var(--sp-2); grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: var(--sp-3); }
+        .home-actions[hidden] { display: none; }
+        .home-actions .pick-card { display: grid; grid-template-columns: auto 1fr; column-gap: var(--sp-3); align-items: center; align-content: center; min-height: 76px; padding: var(--sp-2) var(--sp-3); }
+        .home-actions .pick-card .ic { grid-row: span 2; font-size: 2rem; margin: 0; }
+        .home-actions .act-main { border: 2px solid var(--c-primary); background: var(--c-primary-soft); }
+        .home-actions .admin-box { grid-column: 1 / -1; margin: 0; }
+        .admin-box .note { margin: 0 0 var(--sp-2); }
+        @media (max-width: 639px) {
+            .home-head-right { width: 100%; justify-content: flex-start; }
+            .home-head-right .auth-btn { width: auto; flex: 0 0 auto; }
+            .home-actions { grid-template-columns: minmax(0, 1fr); }
+        }
+        @media (min-width: 900px) {
+            .home-actions { grid-template-columns: 1.2fr 1fr 1.2fr; align-items: start; }
+            .home-actions .admin-box { grid-column: auto; min-height: 76px; }
+        }
+        /* 노트북(1000~1699, 125% 배율 1536 포함): 보고서 실험 5칸(5+4), 행사 1 + 센서 4 = 5칸 한 줄, 수업 도구는 다음 줄 */
+        .home-head { margin-bottom: var(--sp-2); }
         @media (min-width: 1000px) {
-            .home-split { display: grid; grid-template-columns: 4fr 2fr; gap: var(--sp-3); }
-            .home-split > section:first-child .pick-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-            .home-split > section:last-child .pick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .container { max-width: 1840px; width: calc(100% - 32px); padding: 20px 28px; }
+            .report-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+            .home-split { display: grid; grid-template-columns: 1fr 4fr; column-gap: var(--sp-3); }
+            .split-event .pick-grid { grid-template-columns: minmax(0, 1fr); }
+            .split-sensor .pick-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            .split-tools { grid-column: 1 / -1; }
+            .split-tools .pick-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        }
+        /* 큰 모니터(1700 이상, 24인치 1920 · 100% 배율): 폭을 넓혀 보고서 실험 9칸 한 줄 + 행사·센서·도구 7칸 한 줄 */
+        @media (min-width: 1700px) {
+            .report-grid { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+            .home-split { grid-template-columns: 1fr 4fr 2fr; }
+            .split-tools { grid-column: auto; }
+            .split-tools .pick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         .home-help summary::before { content: "▸"; margin-right: var(--sp-2); color: var(--c-muted); }
         .home-help[open] summary::before { content: "▾"; }
@@ -176,9 +212,17 @@
 <body>
     <div class="container">
 
+        <!-- 맨 위 줄: 제목 · (교사) 구글 로그인 상태 · 역할 바꾸기 (2026-11-23 선생님 "로그인 기능도 맨 위로") -->
         <header class="home-head">
             <h1>센서 기반 실험실</h1>
-            <button type="button" id="roleSwitch" class="auth-btn btn-mode" hidden>🔄 역할 바꾸기</button>
+            <div class="home-head-right">
+                <div class="home-auth" id="homeAuth" hidden>
+                    <span id="userInfo" class="user-status">🔒 로그인 안 됨</span>
+                    <button id="signInBtn" class="auth-btn btn-google" onclick="signInWithGoogle()">🔐 구글 로그인</button>
+                    <button id="signOutBtn" class="auth-btn btn-logout" onclick="signOut()" style="display:none;">로그아웃</button>
+                </div>
+                <button type="button" id="roleSwitch" class="auth-btn btn-mode" hidden>🔄 역할 바꾸기</button>
+            </div>
         </header>
         <main id="homeMain">
 
@@ -208,23 +252,15 @@
         </section>
 
         <!-- 교사: 수업 진행 화면 · QR · 사이트 관리 (+ 아래 실험 목록) -->
-        <section id="homeTeacher" hidden>
-            <div class="pick-grid role-pick">
-                <a class="pick-card" href="projects/class-teacher.html"><span class="ic" aria-hidden="true">🏫</span><b>수업 진행 화면</b><small>수업 만들기 · QR · 단계 열기 · 결과판</small></a>
+        <section id="homeTeacher" class="home-actions" hidden>
+                <a class="pick-card act-main" href="projects/class-teacher.html"><span class="ic" aria-hidden="true">🏫</span><b>수업 진행 화면</b><small>수업 만들기 · QR · 단계 열기 · 결과판</small></a>
                 <a class="pick-card" href="qr.html"><span class="ic" aria-hidden="true">📱</span><b>QR 코드로 휴대폰에서 열기</b><small>실험 페이지 QR</small></a>
-            </div>
         <!-- (개발용 도구 링크 #devLinks 는 사이트 관리 교사 계정으로 로그인했을 때만 — firestore.rules isTeacher 와 같은 기준) -->
-        <!-- 구글 로그인 및 사용자 인증 상태 바: 사이트 관리(선생님)용. 새 실험 만들기·기록 보기에 쓴다 -->
+        <!-- 사이트 관리 도구 (로그인은 맨 위 줄로 옮김): 교사용/학생용 모드 · 개발 도구 -->
         <details class="home-help admin-box" id="adminBox">
-        <summary id="adminSum">🔐 사이트 관리 (선생님) · 구글 로그인</summary>
-        <div class="auth-bar">
-            <div id="userInfo" class="user-status">🔒 구글 로그인이 필요합니다</div>
-            <div style="display:flex; gap:8px; align-items:center;">
-                <button id="modeToggleBtn" class="auth-btn btn-mode" onclick="toggleViewMode()" style="display:none;">🎓 학생용 모드로 전환</button>
-                <button id="signInBtn" class="auth-btn btn-google" onclick="signInWithGoogle()">구글 로그인</button>
-                <button id="signOutBtn" class="auth-btn btn-logout" onclick="signOut()" style="display:none;">로그아웃</button>
-            </div>
-        </div>
+        <summary id="adminSum">🛠 사이트 관리 (선생님)</summary>
+        <p id="adminNote" class="note">맨 위 <b>🔐 구글 로그인</b> 뒤에 새 실험 만들기 · 예전 기록 보기를 쓸 수 있어요.</p>
+        <button id="modeToggleBtn" class="auth-btn btn-mode" onclick="toggleViewMode()" style="display:none;">🎓 학생용 모드로 전환</button>
         <p class="note dev-links" id="devLinks" hidden>🛠 개발용 도구 (선생님 전용, 실험 목록에 없음): <a href="projects/ble-explorer.html">블루투스 센서 해석 도구</a> — 시판 무선 센서가 보내는 바이트를 기록해 해석 규칙을 찾아요 (PC 크롬·엣지, 안드로이드 크롬) · <a href="projects/face-hr-lab.html">🙂 얼굴 심박(rPPG) 개발</a></p>
         </details>
         </section>
@@ -240,7 +276,7 @@
         <p class="note">수행할 실험을 고르세요. 카드 아래 작은 표시는 필요한 기기예요 (⚠ 는 이 기기·브라우저에서 안 되는 것).</p>
         <div id="labsList">
             <h2 class="group-title">📋 보고서 순서로 하는 실험 <small>목적 → 결론 7단계</small></h2>
-            <div class="pick-grid">
+            <div class="pick-grid report-grid">
                 <a class="pick-card" href="projects/planck-led.html" data-needs="pico-opt"><span class="ic" aria-hidden="true">💡</span><b>LED 로 플랑크 상수 측정</b><span class="subj">물리</span><small>멀티미터 · 블루투스 전류 센서</small></a>
                 <a class="pick-card" href="projects/ideal-gas.html" data-needs="pico"><span class="ic" aria-hidden="true">🎈</span><b>이상기체 상태 방정식 검증</b><span class="subj">물리·화학</span><small>감압 용기 + 환경 센서</small></a>
                 <a class="pick-card" href="projects/malus-law.html" data-needs="camera"><span class="ic" aria-hidden="true">🕶️</span><b>말루스 법칙 실험</b><span class="subj">물리</span><small>스마트폰 카메라</small></a>
@@ -252,14 +288,15 @@
                 <a class="pick-card" id="pendulumCard" href="projects/pendulum-report.html" data-needs="phone" data-phone-href="projects/pendulum-measure.html"><span class="ic" aria-hidden="true">⏱️</span><b>스마트폰 진자</b><span class="subj">물리</span><small>폰으로 재고, 노트북으로 분석 (폰에서 열면 측정 화면)</small></a>
             </div>
 
-            <h2 class="group-title">🎉 행사 · 체험 교실 <small>한 화면에 한 가지 일, 큰 단추</small></h2>
+            <!-- 넓은 화면: 행사(1칸) · 센서 묶음(4칸) · 수업 도구(2칸)를 한 줄에 나란히 (노트북은 행사+센서 한 줄, 수업 도구 다음 줄) -->
+            <div class="home-split">
+            <section class="split-event">
+            <h2 class="group-title">🎉 행사 · 체험 <small>큰 단추</small></h2>
             <div class="pick-grid">
                 <a class="pick-card" href="projects/film-rocket.html" data-needs="phone1"><span class="ic" aria-hidden="true">🚀</span><b>필름통 로켓 (가족 행사)</b><small>열리는 시간 맞추기·아이 키만큼 로켓 (팀 이름으로 입장)</small></a>
             </div>
-
-            <!-- 넓은 화면: 센서 묶음(4칸)과 수업 도구(2칸)를 한 줄에 나란히 -->
-            <div class="home-split">
-            <section>
+            </section>
+            <section class="split-sensor">
             <h2 class="group-title">📡 센서 값 바로 보기 <small>연결 → 숫자 → 그래프</small></h2>
             <div class="pick-grid">
                 <a class="pick-card" href="projects/environment-lab.html" data-needs="pico"><span class="ic" aria-hidden="true">🌡️</span><b>환경 센서 측정</b><small>온도·습도·기압·VOC·조도·자외선</small></a>
@@ -268,7 +305,7 @@
                 <a class="pick-card" href="projects/phone-accelerometer.html" data-needs="phone"><span class="ic" aria-hidden="true">📱</span><b>스마트폰 가속도 센서 실험</b><small>폰 안의 가속도 센서</small></a>
             </div>
             </section>
-            <section>
+            <section class="split-tools">
             <h2 class="group-title">🧰 수업 도구</h2>
             <div class="pick-grid">
                 <a class="pick-card" href="walk-run-detector/index.html"><span class="ic" aria-hidden="true">🏃</span><b>걷기·뛰기 판정</b><span class="subj">정보</span><small>데이터로 학습하는 머신러닝</small></a>
@@ -357,6 +394,7 @@
             $('homeTabs').hidden = r !== 'teacher';
             if (r !== 'teacher' && window.homeTabs) window.homeTabs.show('labs');
             $('roleSwitch').hidden = !r;
+            $('homeAuth').hidden = r !== 'teacher';   // 구글 로그인은 교사 화면 맨 위 줄에만
             $('homeLabs').hidden = !(r === 'teacher' || (r === 'student' && solo));
             $('soloBtn').setAttribute('aria-expanded', String(solo));
             $('soloBtn').textContent = solo ? '▲ 실험 목록 접기' : '🧪 수업 없이 실험해 보기';
@@ -464,7 +502,9 @@
         function updateUIForUser() {
             if (window.homeDev) { window.homeDev.fb = !!currentUser && isTeacherUser; window.homeDev.show(); }
             const adminSum = document.getElementById('adminSum');
-            if (adminSum) adminSum.textContent = currentUser ? '🔐 사이트 관리 (선생님) · 로그인됨' : '🔐 사이트 관리 (선생님) · 구글 로그인';
+            if (adminSum) adminSum.textContent = currentUser ? '🛠 사이트 관리 (선생님) · 로그인됨' : '🛠 사이트 관리 (선생님) · 로그인 필요';
+            const adminNote = document.getElementById('adminNote');
+            if (adminNote) adminNote.hidden = !!currentUser;
             const userInfo = document.getElementById('userInfo');
             const signInBtn = document.getElementById('signInBtn');
             const signOutBtn = document.getElementById('signOutBtn');
@@ -504,7 +544,7 @@
                 }
             } else {
                 modeToggleBtn.style.display = 'none';
-                userInfo.textContent = '🔒 구글 로그인이 필요합니다';
+                userInfo.textContent = '🔒 로그인 안 됨';
                 signInBtn.style.display = 'inline-block';
                 signOutBtn.style.display = 'none';
                 if (expList) expList.style.display = 'none';

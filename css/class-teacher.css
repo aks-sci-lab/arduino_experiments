@@ -349,3 +349,8 @@ body.ct-presenting .ct-present.phone .ct-pframe iframe { max-width: 100%; }
 .ct-present .ct-pbar .ct-pbtns > button { min-width: 44px; }
 /* 폰 틀은 테두리까지 칸 안에 (아래 띠에 가려지지 않게) */
 body.ct-presenting .ct-present.phone .ct-pframe iframe { box-sizing: border-box; }
+/* 큰 모니터(1700 이상, 24인치 1920): 수업 목록 화면은 넓게 쓰고 수업 카드를 2칸으로 (2026-11-23 선생님 "24인치 모니터에서 화면 배치가 비효율적") */
+@media (min-width: 1700px) {
+    .ct-wrap:has(#viewList:not([hidden])) { max-width: 1840px; }
+    .ct-classes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
