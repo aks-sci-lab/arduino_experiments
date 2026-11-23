@@ -199,7 +199,7 @@ test('화면: 교사 수업 만들기 → 학생 2명 같은 조 보내기·자�
         assert.equal(await b.page.isVisible('#incomingCard'), true);
 
         // ---------- 교사: 진행 보기 ----------
-        await t.page.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); });
+        await t.page.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) { const m = /class=([a-z0-9]{24})/.exec(location.hash); location.hash = '#class=' + m[1] + '&view=run'; } });
         await t.page.waitForFunction(() => /7 결론|5 데이터/.test(document.getElementById('groups').textContent), null, { timeout: 15000 });
         const g = await t.page.textContent('#groups');
         assert.match(g, /7 결론|5 데이터/);

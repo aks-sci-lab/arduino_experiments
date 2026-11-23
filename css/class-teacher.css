@@ -185,6 +185,12 @@ body.ct-presenting .ct-wrap { max-width: none; padding-top: var(--sp-2); padding
 .ct-pmore p { margin: 2px 0; }
 .ct-pname { display: inline-block; margin: 2px 6px 2px 0; padding: 0 6px; border-radius: 6px; background: var(--c-fill); }
 .ct-pbtns { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-left: auto; }
+/* 발표 보기가 수업 첫 화면 (2026-11-23): 띠 단추는 한 줄 (넓은 화면·4K 에서는 줄바꿈 없이, 단계 이름은 줄여 보임) */
+@media (min-width: 1000px) {
+    .ct-pbtns { flex-wrap: nowrap; }
+    .ct-pbtns > button { white-space: nowrap; }
+    #btnPOpen { max-width: 22em; overflow: hidden; text-overflow: ellipsis; }
+}
 .ct-pask { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 2px solid var(--c-success); border-radius: var(--r-card); background: var(--c-ok-bg); font-size: 1.1rem; }
 .ct-pask[hidden] { display: none; }
 .ct-pframe { margin-top: var(--sp-2); }

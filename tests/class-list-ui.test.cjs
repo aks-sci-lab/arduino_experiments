@@ -62,8 +62,11 @@ test('교사 수업 목록 → 큰 QR → 진행 보기(오른쪽 위 QR) → �
         const qrW = await T.evaluate(() => document.getElementById('qr').getBoundingClientRect().width);
         assert.ok(qrW >= 400, '첫 화면 QR 크게: ' + qrW);
         assert.equal(await T.isVisible('#cornerQr'), false, '첫 화면에는 오른쪽 위 QR 없음');
-        // 다음 → 진행 보기: 오른쪽 위 QR
-        await T.click('#btnToRun');
+        // 다음 → 🎬 발표 보기가 수업 첫 화면 (2026-11-23) → '📋 진행 화면': 오른쪽 위 QR
+        assert.match(await T.textContent('#btnToRun'), /발표 보기/);
+        await T.click('#btnToRun'); await T.waitForSelector('#presentPane:not([hidden])');
+        assert.match(T.url(), /view=present/);
+        await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
         await T.waitForSelector('#stageCard:not([hidden])');
         assert.match(T.url(), /view=run/);
         assert.equal(await T.isVisible('#cornerQr'), true);
@@ -81,11 +84,12 @@ test('교사 수업 목록 → 큰 QR → 진행 보기(오른쪽 위 QR) → �
         await T.waitForSelector('#stageCard:not([hidden])');
         assert.match(await T.textContent('#classTitle'), /탄소 양자점/);
         assert.equal(await T.isVisible('#classOut'), false, '주소로 바로 연 진행 화면에 큰 QR 이 겹쳐 나오지 않음');
-        // 뒤로 가기 → 큰 QR → 목록
+        // 뒤로 가기 → 발표 보기 → 큰 QR → 목록
+        await T.goBack(); await T.waitForSelector('#presentPane:not([hidden])');
         await T.goBack(); await T.waitForSelector('#classOut:not([hidden])');
         await T.goBack(); await T.waitForSelector('#viewList:not([hidden])');
         // 수업 마치기 → 목록에 ✅ (아래 '마친 수업') → 되돌리기
-        await T.click('#classList button[data-open="' + a.space + '"]'); await T.click('#btnToRun');
+        await T.click('#classList button[data-open="' + a.space + '"]'); await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
         await T.click('#btnDone');
         await T.waitForFunction(() => /마친 수업으로 표시/.test(document.getElementById('doneMsg').textContent));
         assert.match(await T.textContent('#btnDone'), /다시 진행 중/);
@@ -96,14 +100,14 @@ test('교사 수업 목록 → 큰 QR → 진행 보기(오른쪽 위 QR) → �
         await T.click('#doneSum');
         assert.match(await T.textContent('#doneList'), /말루스[\s\S]*✅ 마침/);
         assert.equal(app.db.docs.get('labClasses/' + a.space).done, true);
-        await T.click('#doneList button[data-open="' + a.space + '"]'); await T.click('#btnToRun');
+        await T.click('#doneList button[data-open="' + a.space + '"]'); await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
         await T.click('#btnDone');
         await T.waitForFunction(() => /다시 진행 중인 수업/.test(document.getElementById('doneMsg').textContent));
         await T.click('#btnToList');
         assert.equal(await T.locator('#classList .ct-cls').count(), 3);
         assert.equal(await T.isVisible('#doneBox'), false);
         // 팀 결과판 크게 보기에도 QR
-        await T.click('#classList button[data-open="' + c.space + '"]'); await T.click('#btnToRun');
+        await T.click('#classList button[data-open="' + c.space + '"]'); await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
         await T.click('#btnBoardBig');
         assert.equal(await T.isVisible('#boardBigQr svg'), true);
         await T.click('#btnBoardClose');
@@ -115,7 +119,7 @@ test('교사 수업 목록 → 큰 QR → 진행 보기(오른쪽 위 QR) → �
         await layout(N, '목록 375');
         await N.click('#classList button[data-open="' + b.space + '"]');
         await layout(N, 'QR 375');
-        await N.click('#btnToRun');
+        await N.click('#btnToRun'); await N.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await N.isVisible('#btnPExit')) await N.click('#btnPExit'); await N.waitForSelector('#runPane:not([hidden])');
         await N.waitForSelector('#stageCard:not([hidden])');
         assert.equal(await N.isVisible('#cornerQrImg'), false, '폰 폭에서는 접힘');
         assert.equal(await N.isVisible('#cornerQr'), true);

@@ -71,6 +71,7 @@
             $('btnShowQr').hidden = sub === 'qr';
             $('btnRefresh').hidden = sub !== 'run';
             $('btnPresent').hidden = !CC.gateSteps(c.exp);
+            $('btnToRun').textContent = firstSub(c) === 'present' ? '다음 → 🎬 발표 보기' : '다음 → 진행 보기';
             // 설명 화면 내용이 있는 실험이면 '🔓 모든 풀이 열기'
             $('lessonTeach').hidden = true;
             if (window.LessonSlides && !/:/.test(c.exp)) window.LessonSlides.load(c.exp).then(function (d) { if (d && watched() === c) $('lessonTeach').hidden = false; });
@@ -83,7 +84,9 @@
     function isLive() { return state.sub === 'run' || state.sub === 'present'; }
     $('btnToList').addEventListener('click', function () { $('doneMsg').textContent = ''; go('', 'list'); });
     $('btnShowQr').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'qr'); });
-    $('btnToRun').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'run'); });
+    // 큰 QR → '다음 →' (2026-11-23 선생님 '발표 보기를 첫 화면으로'): 단계 열기가 있는 실험은 🎬 발표 보기(그 단계 설명 장부터), 없으면 진행 화면
+    function firstSub(c) { return c && CC.gateSteps(c.exp) ? 'present' : 'run'; }
+    $('btnToRun').addEventListener('click', function () { var c = watched(); if (c) go(c.space, firstSub(c)); });
     $('btnPresent').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'present'); });
     $('btnDone').addEventListener('click', async function () {
         var c = watched(); if (!c) return;
@@ -381,13 +384,27 @@
         $('stageMsg').className = 'note'; $('stageMsg').textContent = '⏳ 학생 화면에 알리는 중…';
         var r = await CC.classStage(c.space, to >= si.gate.length ? CC.STAGE_ALL : to);
         state.stageBusy = false;
-        if (!r.ok) { $('stageMsg').className = 'note err'; $('stageMsg').textContent = '⚠️ ' + r.error; renderStage(); return; }
+        if (!r.ok) { $('stageMsg').className = 'note err'; $('stageMsg').textContent = '⚠️ ' + r.error; renderStage(); return false; }
         c.stage = r.stage;
         var n = CC.stageInfo(c.exp, c.stage, c.flow);
         $('stageMsg').textContent = '✅ ' + (n.all ? '모든 단계를 열었어요' : '‘' + CC.stepName(c.exp, n.cur, c.flow) + '’ 까지 열었어요') + '. 학생 화면이 저절로 바뀌어요.';
         renderStage();
+        return true;
     }
-    $('btnStageNext').addEventListener('click', function () { var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow); if (si && !si.all) setStage(si.n + 1); });
+    /* 단계를 열면 설명부터 (2026-11-23 선생님 '열면 설명부터'): 진행 화면에서 '▶ 다음 단계 열기' 로 열었고 그 단계 설명 장이 있으면
+       🎬 발표 보기로 넘어가 그 단계 첫 장 (발표 보기를 열면 가장 뒤에 연 단계 설명부터 — lessonLoad). '◀ 하나 되돌리기'·'모두 열기' 는 진행 화면 그대로 */
+    function hasSlides(c, gate) {
+        if (!LSx || /:/.test(c.exp)) return Promise.resolve(false);
+        return LSx.load(c.exp).then(function (def) { return !!(def && LSx.slidesFor(def, gate, c.flow).length); }).catch(function () { return false; });
+    }
+    $('btnStageNext').addEventListener('click', function () {
+        var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow); if (!si || si.all) return;
+        var nx = si.gate[si.n], from = state.sub;
+        setStage(si.n + 1).then(function (ok) {
+            if (!ok || from !== 'run' || state.sub !== 'run' || watched() !== c) return;
+            hasSlides(c, nx).then(function (yes) { if (yes && state.sub === 'run' && watched() === c) go(c.space, 'present'); });
+        });
+    });
     $('btnStagePrev').addEventListener('click', function () {
         var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow); if (!si || si.n <= 1) return;
         if (!confirm('학생 화면에서 마지막 단계를 다시 잠글까요? (그 단계에 있던 학생은 앞 단계로 돌아가요)')) return;
@@ -524,6 +541,12 @@
     var pres = { space: '', ask: false };
     function frameDoc() { try { var f = $('presentFrame'); return f && f.contentDocument && f.contentDocument.body ? f.contentDocument : null; } catch (e) { return null; } }
     function shown(el) { return !!(el && el.getClientRects().length); }
+    // 발표 틀 주소 바꾸기: src 를 바꾸면 브라우저 뒤로 가기 기록에 쌓여 '뒤로' 가 틀 안에서만 돎 → replace 로 (2026-11-23 발표 보기가 첫 화면)
+    function setFrame(url) {
+        var f = $('presentFrame');
+        try { if (f.contentWindow) { f.contentWindow.location.replace(url); return; } } catch (e) { /* 아래로 */ }
+        f.src = url;
+    }
     function isPhoneFrame(c) { return c.mode === 'team' || c.exp === 'rocket'; }
     function openPresent(c) {
         $('presentPane').classList.toggle('phone', isPhoneFrame(c));
@@ -531,7 +554,7 @@
             pres.space = c.space; pres.ask = false;
             var u = new URL(studentLink(c));
             u.searchParams.set('present', '1');
-            $('presentFrame').src = u.href;
+            setFrame(u.href);
             lessonLoad(c);
         }
         renderPresentBar();
@@ -539,7 +562,7 @@
     function closePresent() {
         if (!pres.space) return;
         lessonOff();   // 학생 화면의 👀 띠를 내림 (수업 문서 lesson.on = false)
-        pres.space = ''; pres.ask = false; $('presentFrame').src = 'about:blank'; $('pAsk').hidden = true;
+        pres.space = ''; pres.ask = false; setFrame('about:blank'); $('pAsk').hidden = true;
         lesson.def = null;
         if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () { /* 무시 */ });
     }

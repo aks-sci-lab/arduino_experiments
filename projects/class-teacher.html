@@ -54,7 +54,7 @@
             </div>
             <div class="ct-row">
                 <button id="btnRefresh" class="secondary">🔄 새로 보기</button>
-                <button id="btnPresent" class="good">🎬 발표 보기 (학생 화면)</button>
+                <button id="btnPresent" class="good">🎬 발표 보기</button>
                 <button id="btnShowQr" class="secondary">📱 QR 화면</button>
                 <button id="btnDone" class="secondary">✅ 수업 마치기</button>
             </div>
@@ -108,7 +108,7 @@
             </div>
             <p id="stageMsg" class="note" role="status" aria-live="polite"></p>
             <details class="ct-teach" id="lessonTeach" hidden><summary>🔧 선생님용: 📖 설명 화면의 풀이</summary>
-                <p class="note">학생 화면의 답(📘 정의 등)은 🎬 발표 보기에서 그 장의 풀이를 열 때까지 가려져요. 설명 없이 진행하려면 한꺼번에 열 수 있어요.</p>
+                <p class="note">수업은 🎬 발표 보기(설명 장)부터 시작하고, 여기서 ‘▶ 다음 단계 열기’를 눌러도 발표 보기로 넘어가 그 단계 설명 첫 장이 떠요. 학생 화면의 답(📘 정의 등)은 발표 보기에서 그 장의 풀이를 열 때까지 가려져요. 설명 없이 진행하려면 한꺼번에 열 수 있어요.</p>
                 <button id="btnLessonOpenAll" class="secondary">🔓 모든 풀이 열기</button> <span id="lessonMsg" class="note" role="status"></span>
             </details>
         </section>
@@ -146,7 +146,7 @@
                     <button id="btnPMode" class="secondary" hidden>📱 학생 화면</button>
                     <button id="btnPOpen" class="good">▶ 다음 단계 열기</button>
                     <button id="btnPFull" class="secondary">⛶ 전체 화면</button>
-                    <button id="btnPExit" class="secondary">✕ 진행 화면으로</button>
+                    <button id="btnPExit" class="secondary" title="단계 열기·결과판·모아 보기·QR·수업 마치기">📋 진행 화면</button>
                 </span>
             </div>
             <div id="pAsk" class="ct-pask" role="alertdialog" aria-labelledby="pAskText" hidden>
