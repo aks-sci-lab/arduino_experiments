@@ -57,3 +57,10 @@ button.le-pick { font: inherit; cursor: pointer; text-align: center; }
 .le-check { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: var(--tap); }
 .le-prevbox { position: relative; width: 100%; overflow: hidden; border: 1px solid var(--c-line); border-radius: 6px; background: var(--c-bg); }
 .le-prevbox iframe { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; pointer-events: none; }
+/* 그림 바꾸기 (②) */
+.le-imgfield .le-row { margin: var(--sp-1) 0 0; }
+.le-thumb { display: block; width: 100%; max-width: 260px; }
+.le-thumb img, .le-thumb svg { display: block; width: 100%; height: auto; max-height: 180px; object-fit: contain; border: 1px solid var(--c-line); border-radius: 6px; background: var(--c-card); }
+.le-file { position: relative; display: inline-flex; align-items: center; overflow: hidden; }
+.le-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.le-file:focus-within { outline: 3px solid var(--c-primary); outline-offset: 2px; }
