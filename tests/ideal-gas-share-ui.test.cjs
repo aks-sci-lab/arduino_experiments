@@ -74,7 +74,7 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
         assert.equal(await tp.textContent('#expNote'), '');
         await tp.click('#btnCreate');
         await tp.waitForFunction(() => /만들었어요/.test(document.getElementById('createMsg').textContent));
-        await tp.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); }); await tp.click('#btnStageAll'); await tp.waitForFunction(() => /모든 단계를 열었어요/.test(document.getElementById('stageMsg').textContent));
+        await tp.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) { const m = /class=([a-z0-9]{24})/.exec(location.hash); location.hash = '#class=' + m[1] + '&view=run'; } }); await tp.click('#btnStageAll'); await tp.waitForFunction(() => /모든 단계를 열었어요/.test(document.getElementById('stageMsg').textContent));
         const link = await tp.getAttribute('#outLink', 'href');
         assert.match(link, /projects\/ideal-gas\.html\?c=2-\d{4}/);
         const studentUrl = link.replace(/^https?:\/\/[^/]+/, base);
@@ -141,7 +141,7 @@ test('교사 수업 → 학생 2명 같은 조 → 보내기·자동 불러오�
         assert.match(rows[0]._space, /^c[a-z0-9]{23}$/, '수업 공간에 저장');
 
         /* ---------- 선생님 진행 보기: 단계·점 수·제출 ---------- */
-        await tp.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); });
+        await tp.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) { const m = /class=([a-z0-9]{24})/.exec(location.hash); location.hash = '#class=' + m[1] + '&view=run'; } });
         // 학생 화면은 단계 알림을 5초에 한 번까지만 보내므로, 교사 화면이 몇 번 새로 볼 때까지 기다린다
         await tp.waitForFunction(() => /2번7 결론/.test(document.getElementById('groups').textContent), null, { timeout: 30000 });
         const g = await tp.textContent('#groups');

@@ -33,7 +33,8 @@ test('로켓: 예측을 골라야 다음·늦게 고른 팀 5점', { skip: !chro
     const go = (pg, id) => pg.waitForSelector('#ev-app[data-screen="' + id + '"]', { timeout: 15000 });
     const join = async (pg, c, team) => {
         await pg.goto(ROOT + 'projects/film-rocket.html?c=' + c.classCode + '&s=' + c.space); await go(pg, 'enter');
-        await pg.fill('#ev-name', team); await pg.click('#ev-start'); await go(pg, 'think-intro');
+        await pg.fill('#ev-name', team); await pg.click('#ev-start');
+        await pg.waitForFunction(() => /^(think-intro|q-gas)$/.test(document.getElementById('ev-app').getAttribute('data-screen')), null, { timeout: 15000 });   // 응답 장을 띄운 반은 q-gas
     };
     const quiz = async (pg) => { await pg.evaluate(() => window.__filmRocket.show('q-gas')); await go(pg, 'q-gas'); };
     try {

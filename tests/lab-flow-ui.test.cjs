@@ -140,7 +140,7 @@ test('진행 방법 화면: 수업 없이 고르기·기억, 가설연역 수업
         await T.click('#btnCreate');
         await T.waitForSelector('#viewMain:not([hidden]) #classOut:not([hidden])');
         assert.match(await T.textContent('#outTitle'), /가설연역/);
-        await T.click('#btnToRun');
+        await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
         assert.match(await T.textContent('#stageNow'), /① 문제 인식.*\(1 \/ 6\)/);
         assert.match(await T.textContent('#btnStageNext'), /② 가설 설정/);
         const link = await T.getAttribute('#outLink', 'href');
@@ -166,6 +166,8 @@ test('진행 방법 화면: 수업 없이 고르기·기억, 가설연역 수업
         await layout(S1, '학생 폰 가설연역');
         await T.click('#btnStageNext');
         await T.waitForFunction(() => /② 가설 설정.*까지 열었어요/.test(document.getElementById('stageMsg').textContent));
+        // 단계를 열면 설명부터 (2026-11-23): 🎬 발표 보기로 넘어감
+        await T.waitForSelector('#presentPane:not([hidden])');
         for (const S of P) await S.waitForFunction(() => { const b = document.querySelector('nav.steps button[aria-selected="true"]'); return b && b.dataset.step === 'hypothesis'; }, null, { timeout: 15000 });
         assert.equal(await S1.isVisible('nav.steps button[data-step="design"].cs-locked'), true, '③ 은 아직 잠김');
         // 진행 보기의 '보고 있는 단계' 이름 (학생 화면은 패널 키 theory 를 보냄)
@@ -173,8 +175,7 @@ test('진행 방법 화면: 수업 없이 고르기·기억, 가설연역 수업
         const status = await app.post({ action: 'classStatus', space });
         assert.equal(status.flow, 'hd');
         assert.equal(CC.stepName(status.exp, status.students.find(x => x.jo === 1).step, status.flow), '② 가설 설정');
-        // 발표 보기도 6단계
-        await T.click('#btnPresent');
+        // 발표 보기도 6단계 (단계를 열어 이미 발표 보기)
         await T.waitForSelector('#presentPane:not([hidden])');
         await T.waitForFunction(() => { const d = document.getElementById('presentFrame').contentDocument; return d && d.querySelector('nav.steps button[data-step="design"].cs-locked'); }, null, { timeout: 15000 });
         assert.match(await T.textContent('#pStage'), /② 가설 설정.*\(2 \/ 6\)/);
