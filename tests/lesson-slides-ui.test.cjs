@@ -3,6 +3,7 @@
 //  7단계(퀀텀닷, 시험용 내용): 다음 단계로 넘어갈 때 그 단계 설명부터, 단계 첫 화면에서 ← 는 설명 마지막 장
 //  내용 파일이 없는 실험(말루스)은 지금처럼 학생 화면만, 4K(3840×2160 배율 100·150·200%)에서 글이 넘치지 않음
 const test = require('node:test');
+const toStudent = async P => { for (let i = 0; i < 80 && await P.evaluate(() => !!document.querySelector('#presentPane.ls-on .ls-slide')); i++) { await P.keyboard.press('ArrowRight'); await P.waitForTimeout(40); } };   // 설명 장을 끝까지 넘겨 학생 화면으로 ('📱 학생 크게' 단추는 2026-11-23 뺌)
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const { loadLabStore, labServer, configJs } = require('./fake-lab-store.cjs');
@@ -50,7 +51,7 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         let s = await slide(T);
         assert.match(s.title, /필름통 로켓/, '생각 열기 첫 장');
         assert.equal(s.frame, 'block', '설명 옆에 학생 화면 (나란히 보기)');
-        assert.match(await T.textContent('#btnPMode'), /📱 학생/);
+        assert.equal(await T.isVisible('#btnPMode'), false, '설명 장을 띄운 동안 📱 학생 크게 단추 없음');
         assert.equal(await T.isVisible('#cornerQr'), false, '오른쪽 위 QR 없음 — 띠의 📱 QR');
         assert.equal(await T.isVisible('#btnPQr'), true);
         assert.equal(await T.isVisible('.ls-note summary'), true, '선생님용은 접기');
@@ -101,7 +102,7 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         assert.equal((await slide(T)).kind, 'vars');
         assert.match(await T.textContent('.ls-vars'), /바꿀 것.*같게 할 것.*잴 것/s);
         // 📱 학생 화면 단추 → 1차시 첫 화면, 📖 설명 단추 → 1차시 설명 첫 장
-        await T.click('#btnPMode');
+        await toStudent(T);
         assert.equal(await slide(T), null);
         await T.waitForFunction(() => document.getElementById('presentFrame').contentDocument.getElementById('ev-app').getAttribute('data-screen') === 't1-intro', null, { timeout: 15000 });
         await T.click('#btnPMode');
@@ -136,7 +137,7 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         await T.waitForFunction(() => { const d = document.getElementById('presentFrame').contentDocument; return d && d.querySelector('nav.steps button[aria-selected="true"]'); }, null, { timeout: 15000 });
         // 발표를 열면 가장 뒤에 연 단계(이론)의 설명부터 → 📱 학생 화면도 이론
         assert.equal((await slide(T)).title, '이론 설명 1');
-        await T.click('#btnPMode');
+        await toStudent(T);
         assert.equal(await sel(), 'theory');
         await T.evaluate(() => document.getElementById('presentFrame').contentDocument.querySelector('nav.steps button[data-step="purpose"]').click());
         // 목적에서 → 끝까지 → 이론 설명부터 (학생 화면은 아직 목적)
@@ -158,7 +159,7 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         assert.equal((await slide(T)).title, '이론 설명 1');
         await T.keyboard.press('ArrowLeft');
         assert.equal((await slide(T)).title, '이론 설명 1', '첫 장에서 ← 는 그대로');
-        await T.click('#btnPMode');
+        await toStudent(T);
         assert.equal(await slide(T), null);
         assert.equal(await sel(), 'theory');
         // 이론 다음(준비물)은 잠김 → '열까요?' → 내용 없는 단계(준비물)는 바로 학생 화면
