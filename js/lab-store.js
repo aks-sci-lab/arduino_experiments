@@ -14,6 +14,7 @@
      labClassCodes/{수업 코드}              학생이 메인 화면에서 수업 코드만 넣었을 때 공간 찾기
      devlog/{실험~id}                       개발 데이터 (선생님 기기)
      lessonEdits/{교사 uid}/exps/{실험}     선생님이 고친 수업 설명 자료 (그 교사만 읽고 씀, 교사 자료라 expireAt 없음 — projects/lesson-editor.html)
+     lessonEdits/{교사 uid}/imgs/{그림 id}  그 자료에 바꿔 넣은 그림 하나 (줄인 data URL, 본인만, expireAt 없음)
      labClasses/{공간}/aiAsk/{a…}           보고서 AI 질문 하나 (학생 익명 uid 가 만들고, 켜 둔 교사 화면이 답을 씀 — 키는 교사 브라우저에만, js/report-ai.js)
      labClasses/{공간}/reports/{조코드~uid} 학생 보고서 글 (기기마다 하나, 최종 제출 뒤에는 학생이 못 고침)
      labClasses/{공간}/aiDesk/status        교사 화면 AI 켜짐 신호 (학생 화면이 '선생님 화면 켜짐'을 보여 줌)
@@ -60,6 +61,9 @@
     // 📖 선생님이 고친 수업 자료 (firestore.rules lessonEdits 와 같게): 실험 키·장 자리·새 장 key·장 종류·크기
     var LESSON_EXP_RE = /^[a-z0-9]{1,20}$/, LESSON_REF_RE = /^(k:[a-z0-9][a-z0-9-]{0,39}|s:[a-z0-9_-]{1,20}:\d{1,3})$/, LESSON_NEW_KEY_RE = /^my-[a-z0-9-]{1,36}$/;
     var LESSON_KINDS = ['why', 'concept', 'vars', 'how', 'ask', 'safety'];
+    // 내가 바꾼 그림 (lessonEdits/{uid}/imgs/{id}): 선생님 기기에서 줄인 WebP·JPEG·PNG data URL, 300KB(글자로 약 41만 자) 아래, 한 실험 40장
+    var LESSON_IMG_REF_RE = /^my-img:i[a-z0-9]{15}$/, LESSON_IMG_ID_RE = /^i[a-z0-9]{15}$/, LESSON_IMG_DATA_RE = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+\/=]+$/;
+    var LESSON_IMG = { CHARS: 410000, PER_EXP: 40, SIDE: 4000 };
     var LESSON_EDIT = { STAGES: 20, SLIDES: 60, FIELD: { title: 200, body: 6000, ask: 1500, reveal: 6000, note: 3000 }, VAR: 300, KEEP: 8, BYTES: 600000 };
     function cleanTeamName(v) {
         var s = String(v == null ? '' : v);
@@ -401,6 +405,8 @@
             var o = {};
             var fields = function (src, dst) {
                 Object.keys(LESSON_EDIT.FIELD).forEach(function (f) { if (typeof src[f] === 'string') dst[f] = block(src[f], LESSON_EDIT.FIELD[f]); });
+                // 그림: 'my-img:<id>'(내 계정 그림 문서) 또는 ''(빼기, 기본 장만)
+                ['img', 'revealImg'].forEach(function (f) { if (typeof src[f] === 'string' && (LESSON_IMG_REF_RE.test(src[f]) || (src[f] === '' && dst !== o))) dst[f] = src[f]; });
                 if (src.vars && typeof src.vars === 'object') {
                     dst.vars = { change: text(src.vars.change, LESSON_EDIT.VAR), measure: text(src.vars.measure, LESSON_EDIT.VAR), predict: text(src.vars.predict, LESSON_EDIT.VAR),
                         keep: (Array.isArray(src.vars.keep) ? src.vars.keep : []).slice(0, LESSON_EDIT.KEEP).map(function (k) { return text(k, LESSON_EDIT.VAR); }) };
@@ -436,12 +442,49 @@
             });
             if (JSON.stringify(stages).length > LESSON_EDIT.BYTES) fail('고친 자료가 너무 커요. 긴 글을 줄여 주세요.');
             await db.set(lessonEditPath(auth, exp), { v: 1, exp: exp, stages: stages, updatedAt: db.stamp() });
-            return { ok: true };
+            // 저장한 자료에서 더 쓰지 않는 그림은 지움 (올리고 저장하지 않은 그림·바꾼 그림의 옛 것)
+            var used = refsOf(stages), imgs = await db.query(lessonImgColl(auth), [['exp', exp]]), gone = 0;
+            for (var i = 0; i < imgs.length; i++) if (!used[imgs[i].id]) { await db.del(lessonImgColl(auth) + '/' + imgs[i].id); gone++; }
+            return { ok: true, imagesRemoved: gone };
         }
         async function lessonEditReset(b, auth) {
             needGoogle(auth);
-            await db.del(lessonEditPath(auth, lessonExp(b)));
-            return { ok: true };
+            var exp = lessonExp(b);
+            await db.del(lessonEditPath(auth, exp));
+            // 그 실험에 올린 그림도 함께 지움
+            var imgs = await db.query(lessonImgColl(auth), [['exp', exp]]);
+            for (var i = 0; i < imgs.length; i++) await db.del(lessonImgColl(auth) + '/' + imgs[i].id);
+            return { ok: true, images: imgs.length };
+        }
+        // ---------- 내가 바꾼 그림 ----------
+        function lessonImgColl(auth) { return 'lessonEdits/' + auth.uid + '/imgs'; }
+        function refsOf(stages) {
+            var ids = {};
+            Object.keys(stages || {}).forEach(function (k) { (stages[k] || []).forEach(function (x) {
+                [x, x && x.set].forEach(function (o) { if (o) ['img', 'revealImg'].forEach(function (f) { if (LESSON_IMG_REF_RE.test(String(o[f] || ''))) ids[o[f].slice(7)] = 1; }); });
+            }); });
+            return ids;
+        }
+        async function lessonImgSave(b, auth) {
+            needGoogle(auth);
+            var exp = lessonExp(b), data = String(b.data || '');
+            if (!LESSON_IMG_DATA_RE.test(data)) fail('그림은 WebP·JPEG·PNG 만 올릴 수 있어요.');
+            if (data.length > LESSON_IMG.CHARS) fail('그림이 너무 커요 (300KB 아래로 줄여 주세요).');
+            var w = Math.round(Number(b.w)), h = Math.round(Number(b.h));
+            if (!(w >= 1 && w <= LESSON_IMG.SIDE && h >= 1 && h <= LESSON_IMG.SIDE)) fail('그림 크기가 올바르지 않습니다.');
+            var have = await db.query(lessonImgColl(auth), [['exp', exp]]);
+            if (have.length >= LESSON_IMG.PER_EXP) fail('한 실험에 그림은 ' + LESSON_IMG.PER_EXP + '장까지예요. 안 쓰는 그림은 저장할 때 저절로 지워져요.');
+            var id = 'i' + randomChars(15);
+            await db.set(lessonImgColl(auth) + '/' + id, { exp: exp, data: data, w: w, h: h, createdAt: db.stamp() });
+            return { ok: true, id: id, ref: 'my-img:' + id };
+        }
+        async function lessonImgGet(b, auth) {
+            needGoogle(auth);
+            var id = String(b.id || '');
+            if (!LESSON_IMG_ID_RE.test(id)) fail('그림 번호가 올바르지 않습니다.');
+            var d = await db.get(lessonImgColl(auth) + '/' + id);
+            if (!d) return { ok: false, error: '그 그림을 찾지 못했습니다.' };
+            return { ok: true, id: id, data: String(d.data || ''), w: d.w, h: d.h, exp: d.exp };
         }
         // 어느 실험에 고친 자료가 있는지 (편집 화면의 실험 고르기 카드에 '✏️ 고침' 표시)
         async function lessonEditList(b, auth) {
@@ -857,6 +900,8 @@
                 if (a === 'lessonEditSave') return await lessonEditSave(body, auth);
                 if (a === 'lessonEditReset') return await lessonEditReset(body, auth);
                 if (a === 'lessonEditList') return await lessonEditList(body, auth);
+                if (a === 'lessonImgSave') return await lessonImgSave(body, auth);
+                if (a === 'lessonImgGet') return await lessonImgGet(body, auth);
                 if (a === 'classStatus') return await classStatus(body, auth);
                 if (a === 'classExport') return await classExport(body, auth);
                 if (a === 'myClasses') return await myClasses(body, auth);
