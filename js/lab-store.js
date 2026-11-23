@@ -13,6 +13,7 @@
      labClasses/{공간}/progress/{조-번호}   학생 진행 (하트비트, 그 자리의 📱 폰 측정 화면은 {조-번호-p}, uid = 쓴 기기)
      labClassCodes/{수업 코드}              학생이 메인 화면에서 수업 코드만 넣었을 때 공간 찾기
      devlog/{실험~id}                       개발 데이터 (선생님 기기)
+     lessonEdits/{교사 uid}/exps/{실험}     선생님이 고친 수업 설명 자료 (그 교사만 읽고 씀, 교사 자료라 expireAt 없음 — projects/lesson-editor.html)
      labClasses/{공간}/aiAsk/{a…}           보고서 AI 질문 하나 (학생 익명 uid 가 만들고, 켜 둔 교사 화면이 답을 씀 — 키는 교사 브라우저에만, js/report-ai.js)
      labClasses/{공간}/reports/{조코드~uid} 학생 보고서 글 (기기마다 하나, 최종 제출 뒤에는 학생이 못 고침)
      labClasses/{공간}/aiDesk/status        교사 화면 AI 켜짐 신호 (학생 화면이 '선생님 화면 켜짐'을 보여 줌)
@@ -56,6 +57,10 @@
     // 🎬 설명 화면: 장의 key(학생 화면 답 [data-lesson-answer] 와 짝), 단계 키, 풀이를 연 key 목록 최대 수 (firestore.rules 와 같게)
     var LESSON_KEY_RE = /^[a-z0-9][a-z0-9-]{0,39}$/, STAGE_KEY_RE = /^[a-z0-9_-]{1,20}$/, LESSON_OPEN_MAX = 200;
     var TEAM_EXPS = { rocket: 1 };
+    // 📖 선생님이 고친 수업 자료 (firestore.rules lessonEdits 와 같게): 실험 키·장 자리·새 장 key·장 종류·크기
+    var LESSON_EXP_RE = /^[a-z0-9]{1,20}$/, LESSON_REF_RE = /^(k:[a-z0-9][a-z0-9-]{0,39}|s:[a-z0-9_-]{1,20}:\d{1,3})$/, LESSON_NEW_KEY_RE = /^my-[a-z0-9-]{1,36}$/;
+    var LESSON_KINDS = ['why', 'concept', 'vars', 'how', 'ask', 'safety'];
+    var LESSON_EDIT = { STAGES: 20, SLIDES: 60, FIELD: { title: 200, body: 6000, ask: 1500, reveal: 6000, note: 3000 }, VAR: 300, KEEP: 8, BYTES: 600000 };
     function cleanTeamName(v) {
         var s = String(v == null ? '' : v);
         if (s.normalize) s = s.normalize('NFC');
@@ -384,6 +389,65 @@
             var done = b.done === true || b.done === 'true';
             await db.update('labClasses/' + c.space, { done: done, doneAt: done ? db.stamp() : null });
             return { ok: true, done: done };
+        }
+        /* ---------- 📖 선생님이 고친 수업 자료 (projects/lesson-editor.html, 그리는 쪽 js/lesson-slides.js applyEdit) ----------
+           lessonEdits/{교사 uid}/exps/{실험}: 그 교사 본인만 읽고 씀(규칙), 학생은 읽지 않음. 교사 자료라 expireAt 없음(정리 작업 대상 아님).
+           여기서는 모양·길이만 거름 — 화면에 그릴 때 js/lesson-slides.js 가 허용 태그만 남김(규칙으로 바로 쓴 글도 그렇게) */
+        function needGoogle(auth) { if (!auth || !auth.google || !auth.uid) fail('선생님 구글 로그인이 필요합니다.'); }
+        function lessonEditPath(auth, exp) { return 'lessonEdits/' + auth.uid + '/exps/' + exp; }
+        function lessonExp(b) { var e = String(b.exp || ''); if (!LESSON_EXP_RE.test(e)) fail('실험 이름이 올바르지 않습니다.'); return e; }
+        function cleanLessonEntry(x) {
+            if (!x || typeof x !== 'object') return null;
+            var o = {};
+            var fields = function (src, dst) {
+                Object.keys(LESSON_EDIT.FIELD).forEach(function (f) { if (typeof src[f] === 'string') dst[f] = block(src[f], LESSON_EDIT.FIELD[f]); });
+                if (src.vars && typeof src.vars === 'object') {
+                    dst.vars = { change: text(src.vars.change, LESSON_EDIT.VAR), measure: text(src.vars.measure, LESSON_EDIT.VAR), predict: text(src.vars.predict, LESSON_EDIT.VAR),
+                        keep: (Array.isArray(src.vars.keep) ? src.vars.keep : []).slice(0, LESSON_EDIT.KEEP).map(function (k) { return text(k, LESSON_EDIT.VAR); }) };
+                }
+            };
+            if (x.add != null) {
+                if (!LESSON_NEW_KEY_RE.test(String(x.add)) || LESSON_KINDS.indexOf(String(x.kind)) < 0) return null;
+                o.add = String(x.add); o.kind = String(x.kind); fields(x, o);
+                return o;
+            }
+            if (!LESSON_REF_RE.test(String(x.ref || ''))) return null;
+            o.ref = String(x.ref);
+            if (x.of != null) o.of = text(x.of, LESSON_EDIT.FIELD.title);
+            if (x.hide === true) o.hide = true;
+            if (x.set && typeof x.set === 'object') { o.set = {}; fields(x.set, o.set); if (!Object.keys(o.set).length) delete o.set; }
+            return o;
+        }
+        async function lessonEditGet(b, auth) {
+            needGoogle(auth);
+            var d = await db.get(lessonEditPath(auth, lessonExp(b)));
+            return { ok: true, edit: d ? { v: 1, exp: d.exp, stages: d.stages || {}, updatedAt: iso(d.updatedAt) } : null };
+        }
+        async function lessonEditSave(b, auth) {
+            needGoogle(auth);
+            var exp = lessonExp(b), e = b.edit && typeof b.edit === 'object' ? b.edit : null;
+            if (!e || !e.stages || typeof e.stages !== 'object' || Array.isArray(e.stages)) fail('고친 자료 모양이 올바르지 않습니다.');
+            var stages = {}, keys = Object.keys(e.stages);
+            if (keys.length > LESSON_EDIT.STAGES) fail('단계가 너무 많습니다.');
+            keys.forEach(function (sk) {
+                if (!STAGE_KEY_RE.test(sk) || !Array.isArray(e.stages[sk])) return;
+                if (e.stages[sk].length > LESSON_EDIT.SLIDES) fail('한 단계의 장은 ' + LESSON_EDIT.SLIDES + '장까지예요.');
+                stages[sk] = e.stages[sk].map(cleanLessonEntry).filter(Boolean);
+            });
+            if (JSON.stringify(stages).length > LESSON_EDIT.BYTES) fail('고친 자료가 너무 커요. 긴 글을 줄여 주세요.');
+            await db.set(lessonEditPath(auth, exp), { v: 1, exp: exp, stages: stages, updatedAt: db.stamp() });
+            return { ok: true };
+        }
+        async function lessonEditReset(b, auth) {
+            needGoogle(auth);
+            await db.del(lessonEditPath(auth, lessonExp(b)));
+            return { ok: true };
+        }
+        // 어느 실험에 고친 자료가 있는지 (편집 화면의 실험 고르기 카드에 '✏️ 고침' 표시)
+        async function lessonEditList(b, auth) {
+            needGoogle(auth);
+            var rows = await db.query('lessonEdits/' + auth.uid + '/exps', []);
+            return { ok: true, edits: rows.map(function (r) { return { exp: r.id, updatedAt: iso(r.data.updatedAt) }; }) };
         }
         // 교사: 행사 설정만 고치기 (예비 실험 값·목표)
         async function classSetup(b, auth) {
@@ -789,6 +853,10 @@
                 if (a === 'classStage') return await classStage(body, auth);
                 if (a === 'classDone') return await classDone(body, auth);
                 if (a === 'classLesson') return await classLesson(body, auth);
+                if (a === 'lessonEditGet') return await lessonEditGet(body, auth);
+                if (a === 'lessonEditSave') return await lessonEditSave(body, auth);
+                if (a === 'lessonEditReset') return await lessonEditReset(body, auth);
+                if (a === 'lessonEditList') return await lessonEditList(body, auth);
                 if (a === 'classStatus') return await classStatus(body, auth);
                 if (a === 'classExport') return await classExport(body, auth);
                 if (a === 'myClasses') return await myClasses(body, auth);

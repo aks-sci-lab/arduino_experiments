@@ -134,9 +134,155 @@
         });
         return bad;
     }
+    /* ---------- 📖 선생님이 고친 수업 자료 (2026-11-23 선생님 "수업 자료는 내가 편집할 수 있게 편집모드도", 편집 화면 projects/lesson-editor.html) ----------
+       교사 구글 계정에 실험마다 하나 (Firestore lessonEdits/{uid}/exps/{exp}, js/lab-store.js lessonEdit…). 모양:
+         { v: 1, exp, stages: { 단계 키: [항목, …] } }
+         항목 = 기본 장 { ref: 'k:<key>' | 's:<단계>:<순서>', of: 원래 제목(글만), hide: true(숨김), set: { title, body, ask, reveal, note, vars } }
+              | 새 장   { add: 'my-…'(새 key), kind, title, body, ask, reveal, note, vars }
+       · 기본 장의 key 는 그대로 (학생 화면 답 가리기·로켓 응답이 key 에 묶임), 새 장은 'my-' 로 시작하는 새 key
+       · 고친 목록에 없는 기본 장(나중에 내용 파일에 더해진 장)은 그 단계 끝에 붙임 — 새 내용을 조용히 잃지 않게
+       · 받은 글은 허용 태그만 남김(sanitize): 굵게·기울임·밑줄·목록·문단·줄바꿈·작은 글씨·첨자·표·class(영어 소문자·숫자·-)만, 나머지 태그·속성은 버림 */
+    var EDIT_FIELDS = { title: 200, body: 6000, ask: 1500, reveal: 6000, note: 3000 };
+    var VAR_MAX = 300, KEEP_MAX = 8;
+    var ALLOW_TAGS = { p: 1, br: 1, b: 1, strong: 1, i: 1, em: 1, u: 1, ul: 1, ol: 1, li: 1, small: 1, sub: 1, sup: 1, span: 1, mark: 1, table: 1, thead: 1, tbody: 1, tr: 1, th: 1, td: 1 };
+    var VOID_TAGS = { br: 1 };
+    function sanitize(html, max) {
+        var s = String(html == null ? '' : html);
+        // 내용까지 버릴 것: 스크립트·스타일·주석 등
+        s = s.replace(/<!--[\s\S]*?(-->|$)/g, '').replace(/<(script|style|iframe|object|embed|svg|math|template|textarea|select|noscript)\b[\s\S]*?(<\/\1\s*>|$)/gi, '');
+        var out = '', re = /<\/?[a-zA-Z][^>]*>?/g, last = 0, m;
+        function textPart(t) { return t.replace(/&(?!(#\d{1,7}|#x[0-9a-f]{1,6}|[a-z][a-z0-9]{1,30});)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        while ((m = re.exec(s))) {
+            out += textPart(s.slice(last, m.index));
+            last = re.lastIndex;
+            var t = /^<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>?$/.exec(m[0]);
+            if (!t) continue;
+            var close = t[1] === '/', name = t[2].toLowerCase();
+            if (name === 'div') name = 'p';   // 글 고치기 칸(contenteditable)이 줄마다 div 를 만듦
+            if (!ALLOW_TAGS[name]) continue;
+            if (close) { if (!VOID_TAGS[name]) out += '</' + name + '>'; continue; }
+            var cls = /\sclass\s*=\s*("([^"]*)"|'([^']*)')/i.exec(t[3]), cv = cls ? (cls[2] != null ? cls[2] : cls[3]) : '';
+            out += '<' + name + (cv && /^[a-z0-9 _-]{1,60}$/.test(cv) ? ' class="' + cv + '"' : '') + '>';
+        }
+        out += textPart(s.slice(last));
+        out = out.replace(/<p>\s*(<br>)?\s*<\/p>/g, '').trim();
+        if (max && out.length > max) out = out.slice(0, max).replace(/<[^>]*$/, '');
+        return out;
+    }
+    function plain(html) { return String(html == null ? '' : html).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
+    function cleanVars(v) {
+        if (!v || typeof v !== 'object') return null;
+        var keep = (Array.isArray(v.keep) ? v.keep : []).map(function (x) { return sanitize(x, VAR_MAX); }).filter(Boolean).slice(0, KEEP_MAX);
+        return { change: sanitize(v.change, VAR_MAX), keep: keep, measure: sanitize(v.measure, VAR_MAX), predict: sanitize(v.predict, VAR_MAX) };
+    }
+    // 장 하나의 자리 이름 (key 가 있으면 key, 없으면 단계·순서)
+    function refOf(stage, slide, i) { return slide && slide.key ? 'k:' + slide.key : 's:' + stage + ':' + i; }
+    var NEW_KEY_RE = /^my-[a-z0-9-]{1,36}$/;
+    function newSlide(e) {
+        if (!e || !NEW_KEY_RE.test(String(e.add || '')) || !KINDS[e.kind]) return null;
+        var s = { kind: e.kind, key: e.add, title: sanitize(e.title, EDIT_FIELDS.title) || '(제목 없음)', mine: true };
+        ['body', 'ask', 'reveal', 'note'].forEach(function (f) { var v = sanitize(e[f], EDIT_FIELDS[f]); if (v) s[f] = v; });
+        if (!s.ask) delete s.reveal;
+        if (e.kind === 'vars') { s.vars = cleanVars(e.vars); if (!s.vars || !s.vars.change) { s.kind = 'concept'; delete s.vars; } }
+        if (!s.body && !s.ask && !s.vars) s.body = '';
+        return s;
+    }
+    function mergeSlide(base, set) {
+        var s = {}; Object.keys(base).forEach(function (k) { s[k] = base[k]; });
+        if (!set || typeof set !== 'object') return s;
+        Object.keys(EDIT_FIELDS).forEach(function (f) {
+            if (typeof set[f] !== 'string') return;
+            var v = sanitize(set[f], EDIT_FIELDS[f]);
+            if (v) s[f] = v; else if (f !== 'title') delete s[f];
+        });
+        if (!s.ask) { delete s.reveal; delete s.revealImg; }
+        if (set.vars && base.kind === 'vars') { var cv = cleanVars(set.vars); if (cv && cv.change) s.vars = cv; }
+        s.edited = true;
+        return s;
+    }
+    /* 기본 내용 + 고친 자료 → 단계마다 항목 목록 (편집 화면이 그대로 씀)
+       항목 = { ref, base(기본 장), hide, set } | { add, kind, title, … }(새 장). stageKeys: 기본 단계 다음에 고친 자료에만 있는 단계 */
+    function resolveEdit(def, edit) {
+        var st = (def && def.stages) || {}, es = edit && edit.stages && typeof edit.stages === 'object' ? edit.stages : {};
+        var keys = Object.keys(st), out = {};
+        Object.keys(es).forEach(function (k) { if (keys.indexOf(k) < 0 && /^[a-z0-9_-]{1,20}$/.test(k)) keys.push(k); });
+        keys.forEach(function (sk) {
+            var base = (st[sk] || []).map(function (s, i) { return { s: s, ref: refOf(sk, s, i), t: plain(s.title), used: false }; });
+            var list = es[sk], res = [];
+            if (Array.isArray(list)) list.forEach(function (e) {
+                if (!e || typeof e !== 'object') return;
+                if (e.add) { if (NEW_KEY_RE.test(String(e.add)) && KINDS[e.kind]) res.push(copy(e)); return; }
+                var of = e.of == null ? null : plain(e.of), free = base.filter(function (b) { return !b.used; });
+                // 같은 자리 + 같은 제목 → 같은 제목 → (key 자리면) 같은 key — 내용 파일이 나중에 바뀌어도 되도록
+                var b = free.filter(function (x) { return x.ref === e.ref && (of == null || x.t === of); })[0] ||
+                        (of ? free.filter(function (x) { return x.t === of; })[0] : null) ||
+                        (/^k:/.test(String(e.ref)) ? free.filter(function (x) { return x.ref === e.ref; })[0] : null);
+                if (!b) return;
+                b.used = true;
+                res.push({ ref: b.ref, base: b.s, hide: e.hide === true, set: e.set && typeof e.set === 'object' ? copy(e.set) : {} });
+            });
+            base.forEach(function (b) { if (!b.used) res.push({ ref: b.ref, base: b.s, hide: false, set: {} }); });
+            out[sk] = res;
+        });
+        return { stageKeys: keys, stages: out };
+    }
+    function copy(o) { return JSON.parse(JSON.stringify(o)); }
+    // 항목 하나 → 그릴 장 (숨긴 장은 null)
+    function entrySlide(e) { return e.base ? (e.hide ? null : mergeSlide(e.base, e.set)) : newSlide(e); }
+    function applyEdit(def, edit) {
+        if (!edit || !edit.stages || typeof edit.stages !== 'object') return def;
+        var R = resolveEdit(def, edit), out = { title: (def && def.title) || '', stages: {}, edited: true };
+        var hidden = [];
+        R.stageKeys.forEach(function (sk) {
+            var list = R.stages[sk].map(entrySlide).filter(Boolean);
+            if (list.length) out.stages[sk] = list;
+            R.stages[sk].forEach(function (e) { if (e.base && e.hide && e.base.key) hidden.push(e.base); });
+        });
+        // 숨긴 장 중 key 가 있는 장 (학생 화면 답과 묶임): 띄우지는 않지만 교사 화면 '🔓 모든 풀이 열기'가 그 key 도 열게 (단계 키 '_hidden' 은 어느 단계도 아님)
+        if (hidden.length) out.stages._hidden = hidden;
+        return out;
+    }
+    // 편집 화면의 항목 목록 → 저장할 고친 자료 (기본 장은 바꾼 칸만, 원래 제목을 함께 — 자리가 바뀌어도 찾게)
+    function toEdit(exp, stages) {
+        var out = { v: 1, exp: exp, stages: {} };
+        Object.keys(stages).forEach(function (sk) {
+            out.stages[sk] = stages[sk].map(function (e) {
+                if (!e.base) {
+                    var n = { add: e.add, kind: e.kind };
+                    ['title', 'body', 'ask', 'reveal', 'note'].forEach(function (f) { var v = sanitize(e[f], EDIT_FIELDS[f]); if (v) n[f] = v; });
+                    if (e.kind === 'vars' && e.vars) n.vars = cleanVars(e.vars);
+                    return n;
+                }
+                var o = { ref: e.ref, of: plain(e.base.title) };
+                if (e.hide) o.hide = true;
+                var set = {};
+                Object.keys(EDIT_FIELDS).forEach(function (f) {
+                    if (typeof e.set[f] !== 'string') return;
+                    var v = sanitize(e.set[f], EDIT_FIELDS[f]);
+                    if (v !== sanitize(e.base[f] || '', EDIT_FIELDS[f])) set[f] = v;
+                });
+                if (e.set.vars && e.base.vars) { var cv = cleanVars(e.set.vars); if (JSON.stringify(cv) !== JSON.stringify(cleanVars(e.base.vars))) set.vars = cv; }
+                if (Object.keys(set).length) o.set = set;
+                return o;
+            });
+        });
+        return out;
+    }
+
     // 내용 파일 불러오기 (없으면 null, 아무것도 깨지지 않게)
     var loading = {};
+    /* 발표 보기가 부르는 곳: 기본 내용 + (구글 로그인한 선생님이면) 내 고친 자료를 덮어 씀.
+       LessonSlides.noEdits = true 면 기본만 (편집 화면이 기본을 따로 볼 때) */
     function load(exp, base) {
+        return loadBase(exp, base).then(function (def) {
+            var LS = root && root.LabStore;
+            if (!LS || LessonSlides.noEdits || !/^[a-z0-9]+$/.test(String(exp || ''))) return def;
+            return Promise.resolve(LS.currentUser()).then(function (u) {
+                return u && u.google ? LS.call('lab:', { action: 'lessonEditGet', exp: exp }, 8000) : null;
+            }).then(function (r) { return r && r.ok && r.edit ? applyEdit(def, r.edit) : def; }, function () { return def; });
+        });
+    }
+    function loadBase(exp, base) {
         if (!/^[a-z0-9]+$/.test(String(exp || '')) || typeof document === 'undefined') return Promise.resolve(null);
         if (DB[exp]) return Promise.resolve(DB[exp]);
         if (loading[exp]) return loading[exp];
@@ -149,6 +295,7 @@
         });
         return loading[exp];
     }
-    var LessonSlides = { KINDS: KINDS, slidesFor: slidesFor, gateOf: gateOf, firstPanel: firstPanel, render: render, fit: fit, check: check, load: load };
+    var LessonSlides = { KINDS: KINDS, slidesFor: slidesFor, gateOf: gateOf, firstPanel: firstPanel, render: render, fit: fit, check: check, load: load, loadBase: loadBase,
+        sanitize: sanitize, plain: plain, applyEdit: applyEdit, resolveEdit: resolveEdit, entrySlide: entrySlide, toEdit: toEdit, refOf: refOf, EDIT_FIELDS: EDIT_FIELDS, NEW_KEY_RE: NEW_KEY_RE };
     return { LessonContent: LessonContent, LessonSlides: LessonSlides };
 });
