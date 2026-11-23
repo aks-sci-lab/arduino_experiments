@@ -2,6 +2,7 @@
 //  "도전하면 저절로 수집으로 하고, 웹앱 스마트폰으로 촬영시 얼굴이 있으면 인식해서 자동으로 캐릭터로 가리도록", 수업을 마치면 지움,
 //  "결과판에서 최고 높이는 필요 없어") — Playwright, 가짜 저장소, 크롬 가짜 카메라(자홍색 네모 = 가짜 얼굴이 움직이는 영상), 가짜 얼굴 찾기
 //  ① 얼굴 찾기가 되는 폰: 도전 녹화 → 보낸 사진에 '얼굴'(자홍색)이 하나도 없고 캐릭터(노란 원)가 있음, 영상도 감
+//  ①' 보내기 전 팀이 확인 (2026-11-23 선생님 결정): 확인 화면 → '✅ 보내기' 를 누를 때만 보냄, '🙈 보내지 않기' → 결과판 '📷 안 보냄'
 //  ② 얼굴 찾기를 못 불러온 폰: 아무것도 보내지 않음 → 결과판 '📷 없음(얼굴 가리기 못 함)'
 //  ③ 결과판: 최고 높이 칸 없음, 📷 ▶ 는 누를 때만 읽어 크게, 4K·375px
 //  ④ 수업 마치기 → 도전 장면 모두 지움
@@ -91,7 +92,6 @@ test('로켓 도전 장면: 얼굴을 캐릭터로 가려 보냄·못 가리면 
         await P.waitForTimeout(600);
         await P.click('.ev-frames [data-f="-1"]'); await P.waitForTimeout(300);
         await P.click('#ev-pick');
-        await go(P, 't1-ch-result');
         return tip;
     };
     try {
@@ -100,12 +100,25 @@ test('로켓 도전 장면: 얼굴을 캐릭터로 가려 보냄·못 가리면 
         // ---- 팀 A: 얼굴 찾기 됨 ----
         const A = await ctx(devices['iPhone 13'], 'A', { face: true });
         await A.goto(famUrl); await go(A, 'enter');
-        assert.match(await A.textContent('.ev-screen'), /도전 장면은 얼굴을 캐릭터로 가려 선생님 화면에 보내요\. 수업이 끝나면 지워져요\./, '입장 화면 안내');
+        assert.match(await A.textContent('.ev-screen'), /도전 장면은 얼굴을 캐릭터로 가리고, 팀이 확인한 뒤에만 선생님께 보내요\. 수업이 끝나면 지워져요\./, '입장 화면 안내');
         await A.fill('#ev-name', '별빛가족'); await A.click('#ev-start'); await go(A, 'think-intro');
         await A.evaluate(() => window.__filmRocket.show('t1-challenge'));
         await A.waitForFunction(() => window.FilmRocketFace.state() === 'ok', null, { timeout: 15000 });
         assert.match(await A.evaluate(() => window.__faceModel), /vendor\/mediapipe\/blaze_face_short_range\.tflite$/, '모델은 사이트에 둔 파일');
-        assert.match(await challengeT1(A), /얼굴은 캐릭터로 가려져요 · 도전 장면을 선생님께 보내요/, '카메라 아래 한 줄');
+        assert.match(await challengeT1(A), /얼굴은 캐릭터로 가려져요 · 도전 장면은 확인한 뒤 선생님께 보내요/, '카메라 아래 한 줄');
+        // 확인 화면: 가린 사진·영상을 크게, 누르기 전에는 아무것도 안 보냄
+        await go(A, 't1-ch-check');
+        await A.waitForSelector('#ev-chk-img', { timeout: 40000 });
+        await A.waitForSelector('#ev-chk-send:not([disabled])');
+        assert.equal(await A.locator('#ev-chk-vid').count(), 1, '영상도 확인');
+        assert.equal(mediaDocs().length, 0, '확인 전에는 서버에 없음');
+        assert.match(await A.textContent('.ev-screen'), /얼굴이 다 가려졌나요/);
+        const ib = await A.evaluate(() => { const r = document.getElementById('ev-chk-img').getBoundingClientRect(); return r.width / innerWidth; });
+        assert.ok(ib > 0.5, '사진을 크게: ' + ib);
+        assert.equal(await A.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '확인 화면 375px');
+        if (SHOTS) await A.screenshot({ path: path.join(SHOTS, 'phone-media-check.png') });
+        await A.click('#ev-chk-send');
+        await go(A, 't1-ch-result');
         await A.waitForFunction(() => /보냈어요/.test((document.getElementById('ev-media-t1') || {}).textContent || ''), null, { timeout: 40000 });
         assert.ok(await A.evaluate(() => window.__faceCalls) > 5, '녹화 동안 얼굴 찾기를 여러 번');
         assert.equal(await A.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '375px 가로 스크롤 없음');
@@ -138,14 +151,32 @@ test('로켓 도전 장면: 얼굴을 캐릭터로 가려 보냄·못 가리면 
         await B.evaluate(() => window.__filmRocket.show('t1-challenge'));
         await B.waitForFunction(() => window.FilmRocketFace.state() === 'fail', null, { timeout: 30000 });
         assert.match(await challengeT1(B), /얼굴 가리기를 쓸 수 없어요 · 도전 장면은 보내지 않아요/, '못 쓰면 미리 알림');
+        await go(B, 't1-ch-result');   // 못 가린 녹화는 확인 화면도 없이 결과로
         await B.waitForFunction(() => /보내지 않았어요/.test((document.getElementById('ev-media-t1') || {}).textContent || ''), null, { timeout: 15000 });
         assert.equal(mediaDocs().filter(d => d.jo === 2).length, 0, '얼굴을 못 가린 팀은 서버에 아무것도 없음');
         assert.equal(await B.evaluate(() => window.__filmRocket.state().media.t1), 'x');
 
+        // ---- 팀 C: 얼굴 찾기는 되지만 팀이 확인하고 '🙈 보내지 않기' ----
+        const C2 = await ctx(devices['iPhone 13'], 'C', { face: true });
+        await C2.goto(famUrl); await go(C2, 'enter');
+        await C2.fill('#ev-name', '해님가족'); await C2.click('#ev-start'); await go(C2, 'think-intro');
+        await C2.evaluate(() => window.__filmRocket.show('t1-challenge'));
+        await C2.waitForFunction(() => window.FilmRocketFace.state() === 'ok', null, { timeout: 15000 });
+        await challengeT1(C2);
+        await go(C2, 't1-ch-check');
+        await C2.waitForSelector('#ev-chk-img', { timeout: 40000 });
+        await C2.click('#ev-chk-skip');
+        await go(C2, 't1-ch-result');
+        assert.match(await C2.textContent('#ev-media-t1'), /보내지 않았어요/);
+        assert.equal(await C2.evaluate(() => window.__filmRocket.state().media.t1), 'n');
+        await C2.waitForTimeout(1500);
+        assert.equal(mediaDocs().filter(d => d.jo === 3).length, 0, '보내지 않기 → 서버에 없음');
+        assert.equal(app.items('rocket').filter(x => /"challenge":\[\{/.test(x.data || '') ).length >= 1, true, '도전 결과 숫자는 보냄');
+
         // ---- 교사 결과판: 최고 높이 칸 없음, 📷 ▶ 는 누를 때만 읽음 ----
         const T = await ctx({ viewport: { width: 3840, height: 2160 } }, 'T', { teacher: true });
         await T.goto(ROOT + 'projects/class-teacher.html#class=' + c.space + '&view=run');
-        await T.waitForFunction(() => document.querySelectorAll('#board [data-media]').length >= 2 && /📷 없음\(얼굴 가리기 못 함\)/.test(document.getElementById('board').textContent), null, { timeout: 30000 });
+        await T.waitForFunction(() => document.querySelectorAll('#board [data-media]').length >= 2 && /📷 없음\(얼굴 가리기 못 함\)/.test(document.getElementById('board').textContent) && /해님가족[\s\S]*📷 안 보냄|📷 안 보냄[\s\S]*해님가족/.test(document.getElementById('board').textContent), null, { timeout: 30000 });
         const head = await T.textContent('#board thead');
         assert.doesNotMatch(head, /최고 높이/, '최고 높이 칸 뺌');
         assert.match(head, /⏱ 시간 도전[\s\S]*🎯 높이 도전/);

@@ -99,6 +99,7 @@ test('선생님께 보낼 요약·자료: 가장 가까운 도전, 최고 %, 아
     assert.equal(s['도전 장면'], undefined, '도전 장면을 안 보냈으면 칸 없음');
     assert.equal(M.summary(Object.assign({}, st, { media: { t1: 'v', t2: 'x' } }), {})['도전 장면'], 'vx');
     assert.equal(M.summary(Object.assign({}, st, { media: { t2: 'p' } }), {})['도전 장면'], '-p');
+    assert.equal(M.summary(Object.assign({}, st, { media: { t1: 'n', t2: 'q' } }), {})['도전 장면'], 'n-', '팀이 안 보냄 = n, 모르는 글자는 -');
     assert.ok(Object.keys(M.summary(Object.assign({}, st, { media: { t1: 'v', t2: 'v' } }), {})).length <= 20, '요약 칸 20개 안');
     assert.equal(s['높이 도전 차이(%)'], -8); assert.equal(s['높이 도전 성공'], 1);
     assert.equal(s['열림 측정 수'], 4); assert.equal(s['로켓 발사 수'], 3);

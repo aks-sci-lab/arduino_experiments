@@ -165,7 +165,7 @@
     function beatIfChanged() { var s = stepNow(); if (share && st.team && s !== lastStep) { lastStep = s; share.stepChanged(); } }
     // 측정 중(🎥 녹화·⏱ 초시계·장면 고르기·세 곳 누르기, 👀 눈으로 고르기 전)이면 화면을 바꾸지 않음
     // (촬영 안내 t2-film 은 아직 발사 전이라 막지 않음. 눈으로 고르기 화면은 고르면 바로 결과로 넘어가고 ← 뒤로도 있음)
-    function busy() { return /measure$|^t2-hand$/.test(st.screen) && app.getAttribute('data-screen') === st.screen; }
+    function busy() { return /measure$|^t2-hand$|-ch-check$/.test(st.screen) && app.getAttribute('data-screen') === st.screen; }
     // 측정 화면은 처음부터 다시 (조건 화면으로), 나머지는 그 화면 그대로
     function resumeId(id) { return /measure$/.test(id) ? id.replace(/measure$/, 'cond') : id; }
     // 선생님이 내 단계보다 뒤 단계를 열었을 때 위에 늘 보이는 띠
@@ -490,7 +490,7 @@
     // ===== 🎯 도전 장면 사진·영상 (2026-11-23 선생님 결정: 도전하면 저절로 모음, 얼굴은 캐릭터로 가림, 수업을 마치면 지움) =====
     // 수업(팀 이름 입장) 팀 폰만. 녹화 캔버스에서 얼굴을 찾아 덮고(js/film-rocket-face.js), 그 녹화에서 사진 한 장·앞뒤 3초 영상을 만들어 보냄.
     // 얼굴 찾기를 못 불러왔거나 녹화 중 멈춘 영상은 보내지 않음(st.media 에 'x' → 결과판 '📷 없음(얼굴 가리기 못 함)'). 아이 키 cm 는 여전히 안 보냄
-    var FACE = window.FilmRocketFace, media = { msg: {}, busy: {} };
+    var FACE = window.FilmRocketFace, media = { msg: {}, busy: {}, pending: {} };
     function mediaOn() { return !!(CLASS && !PAST && !PRESENT && share && FACE && V && V.photo && V.cut && CC && CC.mediaSave); }
     function camOpts() {
         var o = { clock: true };
@@ -504,7 +504,7 @@
         var ch = el.dataset.ch === '1';
         var tick = function () {
             var s = FACE.state();
-            el.textContent = s === 'ok' ? '🙂 얼굴은 캐릭터로 가려져요' + (ch ? ' · 도전 장면을 선생님께 보내요' : '')
+            el.textContent = s === 'ok' ? '🙂 얼굴은 캐릭터로 가려져요' + (ch ? ' · 도전 장면은 확인한 뒤 선생님께 보내요' : '')
                 : s === 'fail' ? '📷 얼굴 가리기를 쓸 수 없어요' + (ch ? ' · 도전 장면은 보내지 않아요 (이 폰에만)' : '')
                 : '⏳ 얼굴 가리기 준비 중… (준비되기 전에 찍으면 도전 장면은 보내지 않아요)';
             el.className = 'ev-small ev-face ' + (s === 'ok' ? 'on' : s === 'fail' ? 'off' : 'wait');
@@ -516,22 +516,73 @@
         var el = document.getElementById('ev-media-' + part); if (el) { el.textContent = text; el.hidden = !text; }
     }
     function mediaLine(part) { return mediaOn() ? '<p class="ev-small ev-media-msg" id="ev-media-' + part + '" role="status"' + (media.msg[part] ? '' : ' hidden') + '>' + esc(media.msg[part] || '') + '</p>' : ''; }
-    async function sendScene(part, clip, at) {
-        if (!mediaOn() || !clip || media.busy[part]) return;
+    // 도전을 기록한 뒤: 얼굴을 가린 녹화면 사진·영상을 만들고 '🎯 도전 장면 확인' 화면으로 (2026-11-23 선생님 결정 '보내기 전 팀이 확인')
+    // → 팀이 '✅ 얼굴이 다 가려졌어요' 를 누를 때만 보냄. 못 가린 녹화는 만들지도 않음. 이 폰에만 있는 동안(media.pending)은 새로고침하면 사라짐 = 안 보냄
+    function sendScene(part, clip, at) {
+        if (!mediaOn() || !clip) return;
         st.media = st.media || {};
         if (!clip.masked) {   // 얼굴을 가리지 못한 녹화 → 사진·영상을 만들지도 보내지도 않음
             st.media[part] = 'x'; changed();
             mediaSet(part, '📷 얼굴을 가리는 기능을 쓸 수 없어 도전 장면은 보내지 않았어요 (영상은 이 폰에만)');
             return;
         }
+        if (media.busy[part]) return;
+        var pend = media.pending[part] = { ready: false, ph: null, vd: null, err: '' };
+        pend.made = (async function () {
+            try {
+                pend.ph = await V.photo(clip, at, { side: 640, maxChars: 210000 });
+                pend.vd = await V.cut(clip, at - 3, at + 3, { side: 360, maxChars: 820000 });
+                if (!pend.ph) pend.err = '사진을 만들지 못했어요';
+            } catch (e) { pend.err = (e && e.message) || String(e); }
+            pend.ready = true;
+        })();
+        show(part + '-ch-check');
+    }
+    function checkScreen(part) {
+        return function () {
+            var pend = media.pending[part];
+            if (!pend) return { html: '<p class="ev-kicker">🎯 도전 장면 확인</p><p>확인할 장면이 없어요. 도전 장면은 보내지 않았어요.</p>' + nav(part + '-ch-result', '도전 결과 보기 →') };
+            var html = '<p class="ev-kicker">🎯 도전 장면 확인</p><h2>얼굴이 다 가려졌나요?</h2>' +
+                '<p>선생님 화면에 보낼 사진과 영상이에요. 사람 얼굴이 모두 캐릭터로 가려졌는지 가족이 함께 봐요.</p>' +
+                '<div id="ev-chk" class="ev-chk"><p class="ev-msg" role="status">⏳ 장면을 만드는 중…</p></div>' +
+                '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-chk-send" disabled>✅ 얼굴이 다 가려졌어요 — 선생님께 보내기</button>' +
+                '<button type="button" class="ev-next danger" id="ev-chk-skip">🙈 가려지지 않은 얼굴이 있어요 — 보내지 않기</button></div>';
+            return { html: html, mount: function () {
+                var box = $('#ev-chk'), send = $('#ev-chk-send'), alive = true;
+                cleanup.push(function () { alive = false; });
+                pend.made.then(function () {
+                    if (!alive) return;
+                    if (!pend.ph) { box.innerHTML = '<p class="ev-no">⚠ 도전 장면을 만들지 못했어요 (' + esc(pend.err) + '). 보내지 않아요.</p>'; return; }
+                    box.innerHTML = '<img id="ev-chk-img" class="ev-chk-img" alt="보낼 사진 (얼굴은 캐릭터로 가림)">' +
+                        (pend.vd ? '<p class="ev-small">▶ 영상도 끝까지 봐요 (앞뒤 3초)</p><video id="ev-chk-vid" class="ev-chk-img" controls muted playsinline preload="auto"></video>' : '');
+                    $('#ev-chk-img').src = pend.ph.data;
+                    if (pend.vd) $('#ev-chk-vid').src = pend.vd.data;
+                    send.disabled = false;
+                });
+                send.addEventListener('click', function () {
+                    if (!pend.ph) return;
+                    delete media.pending[part];
+                    uploadScene(part, pend.ph, pend.vd);
+                    show(part + '-ch-result');
+                });
+                $('#ev-chk-skip').addEventListener('click', function () {
+                    delete media.pending[part];
+                    st.media[part] = 'n'; changed();
+                    mediaSet(part, '🙈 도전 장면은 보내지 않았어요 (도전 결과 숫자는 보냈어요)');
+                    show(part + '-ch-result');
+                });
+            } };
+        };
+    }
+    SCREENS['t1-ch-check'] = checkScreen('t1');
+    SCREENS['t2-ch-check'] = checkScreen('t2');
+    async function uploadScene(part, ph, vd) {
         var info = share.classInfo(), me = share.me();
         if (!info || !info.space || !me) { mediaSet(part, '📷 선생님 수업에 연결되지 않아 도전 장면은 보내지 않았어요'); return; }
         media.busy[part] = true;
         mediaSet(part, '📤 도전 장면(얼굴은 캐릭터로 가림)을 선생님께 보내는 중…');
         var url = 'lab:' + info.space, sent = 0, err = '';
         try {
-            var ph = await V.photo(clip, at, { side: 640, maxChars: 210000 });
-            var vd = await V.cut(clip, at - 3, at + 3, { side: 360, maxChars: 820000 });
             var put = async function (kind, x) {
                 for (var i = 0; i < 2; i++) {
                     var r = await CC.mediaSave(url, { classCode: CLASS, jo: me.jo, part: part, kind: kind, data: x.data });
@@ -542,9 +593,8 @@
                 }
                 return false;
             };
-            if (ph && await put('photo', ph)) sent = 1;
+            if (await put('photo', ph)) sent = 1;
             if (sent && vd && await put('video', vd)) sent = 2;
-            if (!ph) err = '사진을 만들지 못했어요';
         } catch (e) { err = (e && e.message) || String(e); }
         media.busy[part] = false;
         if (sent) { st.media[part] = sent === 2 ? 'v' : 'p'; changed(); }
@@ -566,7 +616,7 @@
         html += '<h2>팀 이름을 정해요</h2>' +
             '<p>가족이 함께 정한 <b>별명</b>이나 <b>가족 이름</b>으로 해요. <span class="ev-small">(실명·학번은 쓰지 않아요)</span></p>' +
             '<label class="ev-field">팀 이름 (12글자까지)<input type="text" id="ev-name" maxlength="12" autocomplete="off" placeholder="예: 별빛 가족" value="' + esc(st.team ? st.team.name : '') + '"></label>' +
-            (CLASS ? '<p class="ev-small ev-media-note">📷 도전 장면은 얼굴을 캐릭터로 가려 선생님 화면에 보내요. 수업이 끝나면 지워져요.</p>' : '') +
+            (CLASS ? '<p class="ev-small ev-media-note">📷 도전 장면은 얼굴을 캐릭터로 가리고, 팀이 확인한 뒤에만 선생님께 보내요. 수업이 끝나면 지워져요.</p>' : '') +
             '<div class="ev-chips">' + ['별빛 가족', '로켓 탐험대', '무지개 팀', '번개 가족'].map(function (n) { return '<button type="button" class="ev-chip" data-name="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') + '</div>' +
             '<p id="ev-enter-msg" class="ev-msg" role="status" aria-live="polite">' + (st.team && st.team.problem ? '⚠ ' + esc(st.team.problem) : share && share.classFailed() && !isNetErr(share.classFailed()) ? '⚠ ' + esc(share.classFailed().error) : waiting ? '⏳ 선생님 수업에 연결하는 중…' : !CLASS ? 'ℹ️ 선생님 QR 로 들어오지 않았어요. 결과는 이 폰에만 저장돼요.' : '') + '</p>' +
             '<div class="ev-nav"><button type="button" class="ev-next good" id="ev-start">시작하기 →</button></div>' + pastBox();

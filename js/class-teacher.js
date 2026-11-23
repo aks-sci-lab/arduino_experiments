@@ -511,10 +511,11 @@
             behind.map(function (r) { return '<span class="ct-behind-team">' + esc(r.name) + ' · ' + esc(r.step) + '</span>'; }).join('') + '</details>';
         els.forEach(function (e) { e.innerHTML = html; e.hidden = false; e.classList.toggle('all', all); });
     }
-    // 🎯 도전 장면 단추 (팀 폰이 얼굴을 캐릭터로 가려 보낸 사진·앞뒤 3초 영상). 요약 '도전 장면' = 차시마다 v(사진+영상)·p(사진)·x(얼굴 가리기 못 함)·-(없음)
+    // 🎯 도전 장면 단추 (팀 폰이 얼굴을 캐릭터로 가려 보낸 사진·앞뒤 3초 영상). 요약 '도전 장면' = 차시마다 v(사진+영상)·p(사진)·x(얼굴 가리기 못 함)·n(팀이 확인하고 안 보냄)·-(없음)
     function mediaBtns(r, part) {
         var k = (r.media || '').charAt(part === 't1' ? 0 : 1);
         if (k === 'x') return ' <span class="ct-media-no">📷 없음(얼굴 가리기 못 함)</span>';
+        if (k === 'n') return ' <span class="ct-media-no">📷 안 보냄</span>';   // 팀이 확인 화면에서 '가려지지 않은 얼굴이 있어요'
         if (k !== 'v' && k !== 'p') return '';
         var b = function (kind, ic, label) { return '<button type="button" class="ct-media-btn" data-media="' + r.jo + '~' + part + '~' + kind + '" data-team="' + esc(r.name) + '" aria-label="' + esc(r.name) + ' ' + label + '">' + ic + '</button>'; };
         return ' <span class="ct-media">' + b('photo', '📷', '도전 사진') + (k === 'v' ? b('video', '▶', '도전 영상') : '') + '</span>';

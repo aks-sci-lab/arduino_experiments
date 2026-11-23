@@ -177,3 +177,6 @@ html.ev-answering .ev-wrap { min-height: var(--ev-vh, 100vh); box-sizing: border
 .ev-face.on { color: var(--c-success); }
 .ev-face.off { color: var(--c-danger); }
 .ev-media-msg { margin-top: var(--sp-2); }
+/* 🎯 도전 장면 확인 (보내기 전 팀이 봄): 사진·영상을 화면 폭에 크게 */
+.ev-chk { display: grid; gap: var(--sp-2); margin: var(--sp-3) 0; }
+.ev-chk-img { width: 100%; max-height: 30vh; object-fit: contain; border-radius: 12px; background: #000; }
