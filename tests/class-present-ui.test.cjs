@@ -116,7 +116,7 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         await T.setViewportSize({ width: 1920, height: 1080 });
         await noHScroll(T, '발표 1920');
         const fb = await T.locator('#presentFrame').boundingBox();
-        assert.ok(fb.width > 1800, '설명 장이 없는 실험은 학생 화면만 크게: ' + fb.width);
+        assert.ok(fb.width > 1600, '설명 장이 없는 실험은 학생 화면만 크게 (왼쪽 위 QR 칸만 빼고): ' + fb.width);
         await T.click('#btnPQr'); assert.equal(await T.isVisible('#bigQr'), true, '띠의 📱 QR → 크게'); await T.keyboard.press('Escape');
         assert.equal(await T.isVisible('#bigQr'), false, 'Esc 로 닫기');
         // ✕ 진행 화면으로

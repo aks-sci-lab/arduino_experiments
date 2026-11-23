@@ -354,3 +354,26 @@ body.ct-presenting .ct-present.phone .ct-pframe iframe { box-sizing: border-box;
     .ct-wrap:has(#viewList:not([hidden])) { max-width: 1840px; }
     .ct-classes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* ===== 2026-11-23 선생님 "이부분 비율 조절해서 최적화해", "큐알코드는 왼쪽 위에 계속 배치" =====
+   · 왼쪽 위 작은 QR·수업 코드(--rail 칸, 설명 장·학생 화면을 가리지 않음, 누르면 크게)
+   · 학생 화면 칸 폭(--fw)은 js/class-teacher.js 가 계산: 로켓 = 칸 높이 × 폰 9 : 19.5, 7단계 = 폭의 26 % (작은 노트북 34 %) (남는 폭은 설명 장) */
+.ct-pframe { --rail: clamp(150px, 13vh, 340px); --fw: 35%; grid-template-columns: var(--rail) minmax(0, 1fr); }
+.ct-pframe > * { grid-column: 2; }
+.ct-present.lay-side.ls-on .ct-pframe, .ct-present.lay-side.pp-panel .ct-pframe { grid-template-columns: var(--rail) minmax(0, 1fr) var(--fw); }
+.ct-present.lay-side.ls-on .ct-pframe iframe, .ct-present.lay-side.pp-panel .ct-pframe iframe { grid-column: 3; }
+.ct-pqr { grid-column: 1 !important; align-self: start; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; box-sizing: border-box;
+    padding: 6px; background: #fff; color: var(--c-text); border: 1px solid var(--c-line); border-radius: var(--r-card); cursor: pointer; font: inherit; min-height: 0; }
+.ct-pqr-img { display: block; width: 100%; aspect-ratio: 1; }
+.ct-pqr-img svg { width: 100%; height: 100%; display: block; }
+.ct-pqr b { font-size: clamp(.95rem, 1.9vh, 2.6rem); letter-spacing: .03em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.ct-pqr small { font-size: clamp(.7rem, 1.2vh, 1.6rem); color: var(--c-muted); line-height: 1.2; text-align: center; }
+/* 폰 틀: 실제 폰 비율 (테두리까지), 나란히면 칸 폭 = 틀 폭 */
+body.ct-presenting .ct-present.phone .ct-pframe iframe { aspect-ratio: 9 / 19.5; box-sizing: border-box; }
+.ct-present.phone.lay-side.ls-on .ct-pframe iframe, .ct-present.phone.lay-side.pp-panel .ct-pframe iframe { width: 100%; height: auto; max-height: 100%; align-self: start; justify-self: stretch; }
+@media (max-width: 899px) {
+    .ct-pframe, .ct-present.lay-side.ls-on .ct-pframe, .ct-present.lay-side.pp-panel .ct-pframe { grid-template-columns: minmax(0, 1fr); }
+    .ct-pframe > * { grid-column: 1; }
+    .ct-pqr { display: none !important; }
+}
+.ct-present button.ct-pqr, .ct-present button.ct-pqr:hover { padding: 6px; background: #fff; color: var(--c-text); border: 1px solid var(--c-line); }
+.ct-present button.ct-pqr b { color: var(--c-primary); }
