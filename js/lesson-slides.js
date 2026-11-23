@@ -81,7 +81,7 @@
             h += '<ol class="ls-choices">' + r.choices.map(function (c, i) {
                 var ok = revealed && r.answer === i;
                 return '<li' + (ok ? ' class="ok"' : '') + '><span class="ls-abc">' + ABC[i] + '</span><span class="ls-ctext">' + esc(c) + (ok ? ' ✅' : '') + '</span>' +
-                    (answers ? '<span class="ls-bar" style="--w:' + Math.round(cnt[i] / max * 100) + '%"></span><b class="ls-cnt">' + cnt[i] + '</b>' : '') + '</li>';
+                    (answers ? '<span class="ls-rbar" style="--w:' + Math.round(cnt[i] / max * 100) + '%"></span><b class="ls-cnt">' + cnt[i] + '</b>' : '') + '</li>';
             }).join('') + '</ol>';
         } else if (answers) {
             h += n ? '<ul class="ls-texts">' + list.slice(-30).map(function (a) { return '<li>' + esc(a.text) + '</li>'; }).join('') + '</ul>' : '';
