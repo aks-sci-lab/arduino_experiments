@@ -156,3 +156,8 @@ html.ev-answering .ev-screen .ev-nav:not(.ev-follow-only) { display: none !impor
 .ev-wait h2 { font-size: 2rem; }
 .ev-wait-sub { font-size: 1.3rem; font-weight: 700; margin: 0; }
 .ev-wait-team { font-size: 1.6rem; margin-top: var(--sp-4); }
+/* 🎯 도전 장면: 카메라 아래 얼굴 가리기 한 줄·결과 화면의 보낸 결과 */
+.ev-face { font-weight: 700; padding: var(--sp-1) var(--sp-2); border-radius: 8px; background: var(--c-bg); }
+.ev-face.on { color: var(--c-success); }
+.ev-face.off { color: var(--c-danger); }
+.ev-media-msg { margin-top: var(--sp-2); }

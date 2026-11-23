@@ -272,6 +272,7 @@
     }
     function show(id, opt) {
         cleanup.forEach(function (f) { try { f(); } catch (e) { /* 무시 */ } }); cleanup = [];
+        if (/challenge|-ch-|^t2-(film|safe|measure)$/.test(String(id)) && mediaOn()) FACE.load();   // 도전 전에 얼굴 찾기를 미리 받아 둠
         if (!SCREENS[id]) id = 'enter';
         markDone(id);
         if (id !== 'wait' && id !== 'sent' && stageLocked(stageOf(id))) {   // 잠긴 단계: 화면 자리는 기억하고 잠금 안내만
@@ -431,6 +432,70 @@
             '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : '') + '</b></p></div>' };
     };
 
+    // ===== 🎯 도전 장면 사진·영상 (2026-11-23 선생님 결정: 도전하면 저절로 모음, 얼굴은 캐릭터로 가림, 수업을 마치면 지움) =====
+    // 수업(팀 이름 입장) 팀 폰만. 녹화 캔버스에서 얼굴을 찾아 덮고(js/film-rocket-face.js), 그 녹화에서 사진 한 장·앞뒤 3초 영상을 만들어 보냄.
+    // 얼굴 찾기를 못 불러왔거나 녹화 중 멈춘 영상은 보내지 않음(st.media 에 'x' → 결과판 '📷 없음(얼굴 가리기 못 함)'). 아이 키 cm 는 여전히 안 보냄
+    var FACE = window.FilmRocketFace, media = { msg: {}, busy: {} };
+    function mediaOn() { return !!(CLASS && !PAST && !PRESENT && share && FACE && V && V.photo && V.cut && CC && CC.mediaSave); }
+    function camOpts() {
+        var o = { clock: true };
+        if (mediaOn()) { FACE.load(); var me = share.me(); o.mask = FACE.masker(FACE.emojiFor(me && me.jo)); }
+        return o;
+    }
+    // 카메라 화면 아래 한 줄: 얼굴 가리기 켜짐/준비 중/못 씀 (도전이면 보내는지도)
+    function faceTip(challenge) { return mediaOn() ? '<p class="ev-small ev-face" id="ev-face" data-ch="' + (challenge ? 1 : 0) + '" role="status"></p>' : ''; }
+    function watchFace() {
+        var el = document.getElementById('ev-face'); if (!el) return;
+        var ch = el.dataset.ch === '1';
+        var tick = function () {
+            var s = FACE.state();
+            el.textContent = s === 'ok' ? '🙂 얼굴은 캐릭터로 가려져요' + (ch ? ' · 도전 장면을 선생님께 보내요' : '')
+                : s === 'fail' ? '📷 얼굴 가리기를 쓸 수 없어요' + (ch ? ' · 도전 장면은 보내지 않아요 (이 폰에만)' : '')
+                : '⏳ 얼굴 가리기 준비 중… (준비되기 전에 찍으면 도전 장면은 보내지 않아요)';
+            el.className = 'ev-small ev-face ' + (s === 'ok' ? 'on' : s === 'fail' ? 'off' : 'wait');
+        };
+        tick(); var t = setInterval(tick, 500); cleanup.push(function () { clearInterval(t); });
+    }
+    function mediaSet(part, text) {
+        media.msg[part] = text;
+        var el = document.getElementById('ev-media-' + part); if (el) { el.textContent = text; el.hidden = !text; }
+    }
+    function mediaLine(part) { return mediaOn() ? '<p class="ev-small ev-media-msg" id="ev-media-' + part + '" role="status"' + (media.msg[part] ? '' : ' hidden') + '>' + esc(media.msg[part] || '') + '</p>' : ''; }
+    async function sendScene(part, clip, at) {
+        if (!mediaOn() || !clip || media.busy[part]) return;
+        st.media = st.media || {};
+        if (!clip.masked) {   // 얼굴을 가리지 못한 녹화 → 사진·영상을 만들지도 보내지도 않음
+            st.media[part] = 'x'; changed();
+            mediaSet(part, '📷 얼굴을 가리는 기능을 쓸 수 없어 도전 장면은 보내지 않았어요 (영상은 이 폰에만)');
+            return;
+        }
+        var info = share.classInfo(), me = share.me();
+        if (!info || !info.space || !me) { mediaSet(part, '📷 선생님 수업에 연결되지 않아 도전 장면은 보내지 않았어요'); return; }
+        media.busy[part] = true;
+        mediaSet(part, '📤 도전 장면(얼굴은 캐릭터로 가림)을 선생님께 보내는 중…');
+        var url = 'lab:' + info.space, sent = 0, err = '';
+        try {
+            var ph = await V.photo(clip, at, { side: 640, maxChars: 210000 });
+            var vd = await V.cut(clip, at - 3, at + 3, { side: 360, maxChars: 820000 });
+            var put = async function (kind, x) {
+                for (var i = 0; i < 2; i++) {
+                    var r = await CC.mediaSave(url, { classCode: CLASS, jo: me.jo, part: part, kind: kind, data: x.data });
+                    if (r && r.ok) return true;
+                    err = (r && r.error) || '알 수 없는 문제';
+                    if (!(r && r.network)) return false;
+                    await new Promise(function (res) { setTimeout(res, 3000); });
+                }
+                return false;
+            };
+            if (ph && await put('photo', ph)) sent = 1;
+            if (sent && vd && await put('video', vd)) sent = 2;
+            if (!ph) err = '사진을 만들지 못했어요';
+        } catch (e) { err = (e && e.message) || String(e); }
+        media.busy[part] = false;
+        if (sent) { st.media[part] = sent === 2 ? 'v' : 'p'; changed(); }
+        mediaSet(part, sent ? '✅ 도전 장면(얼굴은 캐릭터로 가림)을 선생님께 보냈어요' + (sent === 1 ? ' · 사진만' : '') : '⚠ 도전 장면을 보내지 못했어요 (' + err + ')');
+    }
+
     // ===== 0 입장 =====
     SCREENS.enter = function () {
         var me = share && share.me(), info = share && share.classInfo();
@@ -446,6 +511,7 @@
         html += '<h2>팀 이름을 정해요</h2>' +
             '<p>가족이 함께 정한 <b>별명</b>이나 <b>가족 이름</b>으로 해요. <span class="ev-small">(실명·학번은 쓰지 않아요)</span></p>' +
             '<label class="ev-field">팀 이름 (12글자까지)<input type="text" id="ev-name" maxlength="12" autocomplete="off" placeholder="예: 별빛 가족" value="' + esc(st.team ? st.team.name : '') + '"></label>' +
+            (CLASS ? '<p class="ev-small ev-media-note">📷 도전 장면은 얼굴을 캐릭터로 가려 선생님 화면에 보내요. 수업이 끝나면 지워져요.</p>' : '') +
             '<div class="ev-chips">' + ['별빛 가족', '로켓 탐험대', '무지개 팀', '번개 가족'].map(function (n) { return '<button type="button" class="ev-chip" data-name="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') + '</div>' +
             '<p id="ev-enter-msg" class="ev-msg" role="status" aria-live="polite">' + (st.team && st.team.problem ? '⚠ ' + esc(st.team.problem) : share && share.classFailed() && !isNetErr(share.classFailed()) ? '⚠ ' + esc(share.classFailed().error) : waiting ? '⏳ 선생님 수업에 연결하는 중…' : !CLASS ? 'ℹ️ 선생님 QR 로 들어오지 않았어요. 결과는 이 폰에만 저장돼요.' : '') + '</p>' +
             '<div class="ev-nav"><button type="button" class="ev-next good" id="ev-start">시작하기 →</button></div>' + pastBox();
@@ -797,12 +863,12 @@
     function recordTime(box, challenge) {
         var msg = $('#ev-m-msg');
         box.innerHTML = '<canvas id="ev-cam" class="ev-cam" aria-label="카메라 화면"></canvas>' +
-            '<p class="ev-small">필름통과 뚜껑이 화면에 잘 보이게 폰을 세워 두세요.</p>' +
+            '<p class="ev-small">필름통과 뚜껑이 화면에 잘 보이게 폰을 세워 두세요.</p>' + faceTip(challenge) +
             '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-r1">● 녹화 시작</button>' +
             '<button type="button" class="ev-next warn" id="ev-r2" hidden>▶ 뚜껑 닫는 순간 누르기 (시계 시작)</button>' +
             '<button type="button" class="ev-next danger" id="ev-r3" hidden>■ ‘펑’ 뒤에 녹화 끝</button></div>';
-        var cam = V.camera($('#ev-cam'), { clock: true });
-        cleanup.push(function () { cam.close(); });
+        var cam = V.camera($('#ev-cam'), camOpts());
+        cleanup.push(function () { cam.close(); }); watchFace();
         msg.textContent = '⏳ 카메라를 켜는 중…';
         cam.open().then(function () { msg.textContent = ''; }, function (e) {
             msg.textContent = '⚠ 카메라를 쓸 수 없어요 (' + (e && e.name || e) + '). 초시계로 재요.';
@@ -818,7 +884,11 @@
             this.disabled = true;
             var clip = await cam.stop(); cam.close();
             if (!clip || !clip.blob.size) { msg.textContent = '⚠ 녹화가 비었어요. 초시계로 재요.'; stopwatch(box, challenge); return; }
-            pickScene(box, clip, 'time', function (sec) { saveTime(sec, 'video', challenge); });
+            pickScene(box, clip, 'time', function (sec, pl) {
+                var at = pl.time();
+                saveTime(sec, 'video', challenge);
+                if (challenge) sendScene('t1', clip, at);   // 🎯 도전이면 그 장면 사진·앞뒤 3초 영상을 선생님께 (얼굴을 가린 녹화만)
+            });
         });
     }
     /* 영상 장면 고르기: mode 'time'(‘펑’ 장면 → 시계 값), 'top'(가장 높이 오른 장면 → 세 점 누르기) */
@@ -860,7 +930,7 @@
             if (needStart && startAt == null) { startAt = pl.time(); label(); show2(); return; }
             var sec = needStart ? pl.time() - startAt : pl.clockAt();
             if (!(sec > 0)) { msg.textContent = '⚠ 시간이 0 초예요. ‘펑’ 장면을 더 뒤에서 찾아요.'; return; }
-            done(Math.round(sec * 100) / 100);
+            done(Math.round(sec * 100) / 100, pl);
         });
     }
     function stopwatch(box, challenge) {
@@ -1038,7 +1108,7 @@
         var r = st.t1.challenge[st.t1.challenge.length - 1], s = setup();
         if (!r) return { html: nav('t1-challenge', '도전하러 가기 →') };
         var html = '<p class="ev-kicker">🎯 도전 결과</p><h2>' + (r.ok ? '🎉 성공!' : '목표와 ' + diffText('t1', r.diff)) + '</h2>' +
-            card('<p>목표 <b>' + esc(s.targetTime) + '초</b> → 실제 <b>' + fmtS(r.y) + '</b></p><p class="ev-big">목표와 ' + (Math.round(Math.abs(r.diff) * 10) / 10) + '초 차이</p>') +
+            card('<p>목표 <b>' + esc(s.targetTime) + '초</b> → 실제 <b>' + fmtS(r.y) + '</b></p><p class="ev-big">목표와 ' + (Math.round(Math.abs(r.diff) * 10) / 10) + '초 차이</p>') + mediaLine('t1') +
             '<div class="ev-nav col"><button type="button" class="ev-next ' + (r.ok ? 'secondary' : 'good') + '" data-go="t1-ch-cond">🔁 다시 도전</button>' +
             '<button type="button" class="ev-next ' + (r.ok ? 'good' : 'secondary') + '" data-go="t2-intro">2차시로 →</button></div>';
         return { html: html };
@@ -1100,10 +1170,10 @@
         return { html: html, mount: function (el) {
             var box = el.querySelector('#ev-m-box'), msg = $('#ev-m-msg');
             if (!(V && V.supported())) { box.innerHTML = '<p>이 폰은 녹화가 안 돼요.</p><div class="ev-nav col"><button type="button" class="ev-next good" data-go="t2-hand">👀 눈으로 보고 고르기</button></div>'; return; }
-            box.innerHTML = '<canvas id="ev-cam" class="ev-cam tall" aria-label="카메라 화면"></canvas><p class="ev-small">아이 발끝~머리끝과 발사대가 다 보이게, 폰을 세로로!</p>' +
+            box.innerHTML = '<canvas id="ev-cam" class="ev-cam tall" aria-label="카메라 화면"></canvas><p class="ev-small">아이 발끝~머리끝과 발사대가 다 보이게, 폰을 세로로!</p>' + faceTip(st.t2.ch) +
                 '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-r1">● 녹화 시작</button><button type="button" class="ev-next danger" id="ev-r3" hidden>■ 로켓이 떨어지면 녹화 끝</button></div>';
-            var cam = V.camera($('#ev-cam'), { clock: true });
-            cleanup.push(function () { cam.close(); });
+            var cam = V.camera($('#ev-cam'), camOpts());
+            cleanup.push(function () { cam.close(); }); watchFace();
             msg.textContent = '⏳ 카메라를 켜는 중…';
             cam.open().then(function () { msg.textContent = ''; }, function (e) {
                 msg.textContent = '⚠ 카메라를 쓸 수 없어요 (' + (e && e.name || e) + ').';
@@ -1117,10 +1187,11 @@
                 this.disabled = true;
                 var clip = await cam.stop(); cam.close();
                 if (!clip || !clip.blob.size) { msg.textContent = '⚠ 녹화가 비었어요. 다시 찍거나 눈으로 골라요.'; return; }
-                pickScene(box, clip, 'top', function (pl) { markHeight(box, pl); });
+                pickScene(box, clip, 'top', function (pl) { scene2 = { clip: clip, at: pl.time() }; markHeight(box, pl); });
             });
         } };
     };
+    var scene2 = null;   // 2차시 고른 장면 (도전이면 기록할 때 선생님께 보냄)
     // 세 곳 누르기: ① 아이 발끝 ② 아이 정수리 ③ 로켓 꼭대기
     function markHeight(box, pl) {
         var msg = $('#ev-m-msg'), pts = [];
@@ -1173,6 +1244,8 @@
         if (p.ch) { var d = M.targetDiff(o.pct, s.targetPct, s.tolPct); rec.diff = Math.round(d.diff); rec.ok = o.hand ? o.hand === 'same' : d.ok; p.challenge.push(rec); }
         else p.trials.push(rec);
         st.last2 = rec; changed();
+        var sc = o.method === 'video' ? scene2 : null; scene2 = null;
+        if (p.ch && sc) sendScene('t2', sc.clip, sc.at);
         show(p.ch ? 't2-ch-result' : 't2-result');
     }
     SCREENS['t2-result'] = function () {
@@ -1216,7 +1289,7 @@
         var r = st.t2.challenge[st.t2.challenge.length - 1], s = setup();
         if (!r) return { html: nav('t2-challenge', '도전하러 가기 →') };
         var html = '<p class="ev-kicker">🎯 도전 결과</p><h2>' + (r.ok ? '🎉 성공!' : '목표와 ' + diffText('t2', r.diff)) + '</h2>' +
-            card('<p>목표 <b>' + esc(s.targetPct) + '%</b> → 실제 <b>' + r.pct + '%</b>' + (r.method === 'hand' ? ' (눈으로)' : '') + '</p><p class="ev-big">목표와 ' + Math.round(Math.abs(r.diff)) + '% 차이</p>') +
+            card('<p>목표 <b>' + esc(s.targetPct) + '%</b> → 실제 <b>' + r.pct + '%</b>' + (r.method === 'hand' ? ' (눈으로)' : '') + '</p><p class="ev-big">목표와 ' + Math.round(Math.abs(r.diff)) + '% 차이</p>') + mediaLine('t2') +
             '<div class="ev-nav col"><button type="button" class="ev-next ' + (r.ok ? 'secondary' : 'good') + '" data-go="t2-ch-cond">🔁 다시 도전</button>' +
             '<button type="button" class="ev-next ' + (r.ok ? 'good' : 'secondary') + '" id="ev-end">정리로 →</button></div>';
         return { html: html, mount: function () { $('#ev-end').addEventListener('click', function () { st.t2.ch = false; save(); show('end-intro'); }); } };
@@ -1312,10 +1385,12 @@
         g.font = 'bold 64px system-ui, sans-serif'; g.fillText('🚀 필름통 로켓 결과 카드', W / 2, 70);
         g.font = '40px system-ui, sans-serif'; g.fillText(new Date().toLocaleDateString('ko-KR') + ' · 가족과 함께하는 과학실험교실', W / 2, 160);
         g.font = 'bold 76px system-ui, sans-serif'; g.fillStyle = '#ffeb3b'; g.fillText(st.team ? st.team.name : '우리 팀', W / 2, 240);
+        // 가장 높이 오른 % (결과 카드는 이 폰에서 셈 — 선생님 결과판에서는 2026-11-23 뺌)
+        var maxPct = (st.t2.trials || []).concat(st.t2.challenge || []).reduce(function (m, t) { return isFinite(t.pct) && t.pct > m ? t.pct : m; }, -1);
         var rows = [
             ['⭐ 팀 점수', sc.points + '점 (퀴즈 ' + sc.correct + '개 맞힘)'],
             ['⏱ 열리는 시간 도전', sum['시간 도전 차이(초)'] != null ? '목표 ' + s.targetTime + '초와 ' + Math.abs(sum['시간 도전 차이(초)']) + '초 차이' + (sum['시간 도전 성공'] ? ' 🎉' : '') : '도전 기록 없음'],
-            ['🚀 가장 높이', sum['높이 최고(%)'] != null ? '아이 키의 ' + sum['높이 최고(%)'] + '%' : '기록 없음'],
+            ['🚀 가장 높이', maxPct >= 0 ? '아이 키의 ' + Math.round(maxPct) + '%' : '기록 없음'],
             ['🎯 높이 도전', sum['높이 도전 차이(%)'] != null ? '목표와 ' + Math.abs(sum['높이 도전 차이(%)']) + '% 차이' + (sum['높이 도전 성공'] ? ' 🎉' : '') : '도전 기록 없음'],
             ['✨ 바뀐 생각', sum['생각 바뀜 ✨'] + '개']
         ];

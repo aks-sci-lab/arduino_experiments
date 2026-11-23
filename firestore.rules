@@ -207,6 +207,29 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isOwner(space);
     }
+    // ----- 🎯 도전 장면 사진·영상 (필름통 로켓 팀 수업, 2026-11-23, js/lab-store.js mediaSave) -----
+    // 팀 폰이 얼굴을 캐릭터로 가린 녹화(js/film-rocket-face.js)에서 만든 사진 한 장·앞뒤 3초 영상. 문서 = {조}~{t1|t2}~{photo|video}.
+    // 그 팀 자리(teams/{조})를 잡은 폰(uid)만 만들고 고침(다시 도전하면 덮어씀). 주인 교사만 읽고 지움 — 다른 팀·학생은 못 읽음.
+    // 수업을 마치면 교사 화면이 지우고, 늦어도 7일 뒤 정리 작업이 지움(expireAt 8일 안)
+    match /labClasses/{space}/media/{mid} {
+      allow get, list: if isOwner(space);
+      allow create, update: if signedIn() && mid.matches('^[0-9]{1,2}~t[12]~(photo|video)$') &&
+                            get(/databases/$(database)/documents/labClasses/$(space)).data.mode == 'team' &&
+                            get(/databases/$(database)/documents/labClasses/$(space)/teams/$(mid.split('~')[0])).data.uid == request.auth.uid &&
+                            request.resource.data.keys().hasOnly(['jo', 'part', 'kind', 'data', 'masked', 'uid', 'at', 'expireAt']) &&
+                            request.resource.data.uid == request.auth.uid && request.resource.data.masked == true &&
+                            request.resource.data.jo is int && string(request.resource.data.jo) == mid.split('~')[0] &&
+                            request.resource.data.part == mid.split('~')[1] && request.resource.data.kind == mid.split('~')[2] &&
+                            request.resource.data.data is string &&
+                            ((request.resource.data.kind == 'photo' && request.resource.data.data.size() <= 220000 &&
+                              request.resource.data.data.matches('^data:image/(jpeg|webp);base64,[A-Za-z0-9+/=]+$')) ||
+                             (request.resource.data.kind == 'video' && request.resource.data.data.size() <= 900000 &&
+                              request.resource.data.data.matches('^data:video/(webm|mp4);base64,[A-Za-z0-9+/=]+$'))) &&
+                            request.resource.data.at == request.time &&
+                            request.resource.data.expireAt is timestamp && request.resource.data.expireAt > request.time &&
+                            request.resource.data.expireAt < request.time + duration.value(8, 'd');
+      allow delete: if isOwner(space);
+    }
     // 학생 진행(하트비트): 수업이 있을 때 누구나(익명 학생) 쓰기, 읽기는 수업 주인만
     // 학생 자리 진행 신호: '조-번호'(노트북·수업 QR 로 연 기기), '조-번호-p'(그 자리의 📱 폰 측정 화면, 2026-11-21 따로 둠).
     // uid = 쓴 기기(있으면 자기 uid 만). 지우기는 수업 주인, 또는 그 문서를 마지막에 쓴 기기 자신(조·번호를 바꿀 때 옛 자리 치우기)만

@@ -95,7 +95,11 @@ test('선생님께 보낼 요약·자료: 가장 가까운 도전, 최고 %, 아
     const s = M.summary(st, { tolTime: 1, tolPct: 10 });
     assert.equal(s['팀 점수'], 10);
     assert.equal(s['시간 도전 차이(초)'], -0.8); assert.equal(s['시간 도전 성공'], 1);
-    assert.equal(s['높이 최고(%)'], 130);
+    assert.equal(s['높이 최고(%)'], undefined, '결과판에서 뺀 최고 높이는 요약에도 없음');
+    assert.equal(s['도전 장면'], undefined, '도전 장면을 안 보냈으면 칸 없음');
+    assert.equal(M.summary(Object.assign({}, st, { media: { t1: 'v', t2: 'x' } }), {})['도전 장면'], 'vx');
+    assert.equal(M.summary(Object.assign({}, st, { media: { t2: 'p' } }), {})['도전 장면'], '-p');
+    assert.ok(Object.keys(M.summary(Object.assign({}, st, { media: { t1: 'v', t2: 'v' } }), {})).length <= 20, '요약 칸 20개 안');
     assert.equal(s['높이 도전 차이(%)'], -8); assert.equal(s['높이 도전 성공'], 1);
     assert.equal(s['열림 측정 수'], 4); assert.equal(s['로켓 발사 수'], 3);
     assert.equal(s['생각 바뀜 ✨'], 1);
