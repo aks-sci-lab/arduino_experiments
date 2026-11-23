@@ -156,3 +156,7 @@ html.ev-answering .ev-screen .ev-nav:not(.ev-follow-only) { display: none !impor
 .ev-wait h2 { font-size: 2rem; }
 .ev-wait-sub { font-size: 1.3rem; font-weight: 700; margin: 0; }
 .ev-wait-team { font-size: 1.6rem; margin-top: var(--sp-4); }
+/* 📊 우리 팀 결과 보기 (대기 화면 아래 접기, 2026-11-23) */
+.ev-myres { margin-top: var(--sp-3); }
+.ev-myres-part h3 { margin: var(--sp-2) 0 var(--sp-1); font-size: 1.05rem; }
+.ev-chart.small { height: clamp(180px, 30vh, 260px); }

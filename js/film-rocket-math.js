@@ -238,7 +238,7 @@
     };
     function teamQuestion(part, k) { return (QUESTION[part] && QUESTION[part][k]) || ''; }
     /* 📏 우리 숫자 (정리 문장의 증거): 바꾼 조건의 값마다 평균 → { labels, means, text, short }
-       part 't1' 은 열리는 시간(초), 't2' 는 아이 키의 %. 한 가지 값뿐이면 one: true */
+       part 't1' 은 열리는 시간(초), 't2' 는 아이 키의 %. 한 가지 값뿐이면 one: true, 같은 조건 반복이 하나도 없으면 norep: true */
     function evidence(part, p, setup) {
         var defs = part === 't2' ? vars2(setup) : vars1(setup), d = p && defs[p.changed];
         if (!d) return null;
@@ -252,7 +252,9 @@
             : name + '을(를) ' + labels.join(' → ') + ' 로 바꿨더니 평균 ' + means.join(' → ');
         // 선생님 결과판용 (40자 안): 처음·끝 값만
         var short = one ? name + ' ' + labels[0] + ': ' + means[0] : name + ' ' + d.label(first.value) + '→' + d.label(last.value) + ': ' + unit(first.mean) + '→' + unit(last.mean);
-        return { one: one, labels: labels, means: means, text: text, short: cleanShort(short), rows: rows };
+        // 값은 두 가지 넘는데 같은 조건 반복이 하나도 없으면 흔들림을 몰라 아직 말할 수 없음 (2026-11-23 가상 수업 4차: 2차시를 값마다 1발씩만 쏴도 결론이 열림)
+        var norep = !one && !rows.some(function (r) { return r.n >= 2; });
+        return { one: one, norep: norep, labels: labels, means: means, text: text, short: cleanShort(short), rows: rows };
     }
     /* 반복 흔들림: 같은 조건 반복의 가장 작은 값~가장 큰 값. 처음·끝 값의 범위가 겹치면 '흔들림 안' */
     function spread(rows) {
@@ -296,7 +298,7 @@
             if (p.guess && G.word[p.guess.dir]) out[n + ' 예측'] = cleanShort(G.word[p.guess.dir] + (p.guess.why ? '(' + p.guess.why + ')' : ''));
             var c = st.concl && st.concl[k], ev = p.changed && p.trials && p.trials.length ? evidence(k, p, s) : null;
             // 한 가지 값만 잰 차시는 결과를 말할 수 없음 (결과 없는 결론 막기)
-            if (ev && ev.one) out[n + ' 결과'] = '아직 말할 수 없음';
+            if (ev && (ev.one || ev.norep)) out[n + ' 결과'] = '아직 말할 수 없음';
             else {
                 if (c && G.word[c.dir]) out[n + ' 결과'] = G.word[c.dir];
                 if (c && c.why) out[n + ' 까닭'] = cleanShort(c.why);

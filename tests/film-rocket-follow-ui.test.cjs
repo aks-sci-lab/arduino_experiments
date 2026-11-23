@@ -93,7 +93,6 @@ test('로켓 폰은 응답만: 대기 → 응답 장 → 보냄 → 대기, 새�
         // A: 조건 → 예측 → ⏱ 초시계 시작 (도는 중)
         await A.evaluate(() => { const s = window.__filmRocket.state(); s.t1.safe = { goggle: true, face: true, away: true, wait: true }; s.t1.changed = 'water'; s.t1.guess = { dir: 'up' }; window.__filmRocket.show('t1-cond'); });
         await go(A, 't1-cond');
-        await A.locator('.ev-screen .ev-next:not([disabled])[data-go]').last().click(); await go(A, 't1-predict');
         await A.locator('.ev-screen .ev-next:not([disabled])[data-go]').last().click(); await go(A, 't1-measure');
         await A.click('#ev-m-sw'); await A.click('#ev-sw1');
         if (SHOTS) await A.screenshot({ path: path.join(SHOTS, 'phone-3-measure.png') });

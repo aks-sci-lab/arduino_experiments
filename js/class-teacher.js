@@ -163,7 +163,7 @@
     // ----- 가족 행사 (팀 이름으로 입장): 예비 실험 값 -----
     var SETUP_FIELDS = [
         ['h', '💧 물의 양 (mL)'], ['waterMin', '최소', 5], ['waterMax', '최대', 20], ['waterStep', '간격', 5], ['waterBase', '기본(같게 할 값)', 10],
-        ['h', '💊 발포비타민 양 (¼ 알 단위: 2 = ½ 알)'], ['tabletMin', '최소', 1], ['tabletMax', '최대', 4], ['tabletBase', '기본', 2],
+        ['h', '💊 발포비타민 양 (알)'], ['tabletMin', '최소', 1, 'tablet'], ['tabletMax', '최대', 4, 'tablet'], ['tabletBase', '기본', 2, 'tablet'],
         ['h', '🌡 물의 온도 (°C)'], ['tempMin', '최소', 10], ['tempMax', '최대', 40], ['tempStep', '간격', 10], ['tempBase', '기본', 20],
         ['pieces'],
         ['h', '🎯 1차시 (열리는 시간)'], ['targetTime', '목표 시간 (초)', 15], ['tolTime', '‘맞췄다’ 허용 오차 (초)', 2], ['repeats', '같은 조건 반복 횟수', 3],
@@ -178,6 +178,13 @@
             if (f[0] === 'pieces') return '<h4>🔪 조각 크기 (고를 수 있는 것 · 기본)</h4><div class="ct-pieces">' + Object.keys(PIECE_NAMES).map(function (k) {
                 return '<label><input type="checkbox" data-piece="' + k + '"' + (pieces.indexOf(k) >= 0 ? ' checked' : '') + '> ' + PIECE_NAMES[k] + '</label>';
             }).join('') + '<label>기본 <select data-piecebase>' + Object.keys(PIECE_NAMES).map(function (k) { return '<option value="' + k + '"' + (k === base ? ' selected' : '') + '>' + PIECE_NAMES[k] + '</option>'; }).join('') + '</select></label></div>';
+            // 발포비타민 양은 저장값이 ¼ 알 단위(2 = ½ 알)라 숫자 대신 폰과 같은 이름으로 고름 (2026-11-23 가상 수업 4차: 교사 '2 → 4' 가 폰에 '½ 알 → 1 알')
+            if (f[3] === 'tablet') {
+                var cur = Number(v[f[0]] != null ? v[f[0]] : f[2]), lab = window.FilmRocketMath && window.FilmRocketMath.tabletLabel;
+                return '<label class="ct-field">' + esc(f[1]) + ' <select data-setup="' + f[0] + '" id="' + prefix + f[0] + '">' + [1, 2, 3, 4, 5, 6, 7, 8].map(function (q) {
+                    return '<option value="' + q + '"' + (q === cur ? ' selected' : '') + '>' + esc(lab ? lab(q) : q + '/4 알') + '</option>';
+                }).join('') + '</select></label>';
+            }
             return '<label class="ct-field">' + esc(f[1]) + ' <input type="number" step="any" inputmode="decimal" data-setup="' + f[0] + '" id="' + prefix + f[0] + '" value="' + esc(v[f[0]] != null ? v[f[0]] : f[2]) + '"></label>';
         }).join('') + '</div>';
     }
@@ -823,7 +830,7 @@
     var ans = { space: '', data: {}, busy: false, t: 0, at: 0 };
     function answerSlide() {
         var c = watched(), sl = lesson.on && lesson.list[lesson.i];
-        return c && sl && sl.mode === 'phone' && sl.key && !/^do-/.test(sl.key) && CTA && CTA.supports(c.exp) && state.sub === 'present' ? sl : null;   // 측정 장(do-t1·do-t2)은 모을 답이 없음
+        return c && sl && sl.mode === 'phone' && sl.key && !/^(do|ch)-/.test(sl.key) && CTA && CTA.supports(c.exp) && state.sub === 'present' ? sl : null;   // 측정 장(do-t1·do-t2)·도전 장(ch-t1·ch-t2)은 모을 답이 없음
     }
     function answersHtml() {
         var c = watched(), sl = answerSlide(); if (!sl) return '';

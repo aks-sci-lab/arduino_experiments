@@ -86,7 +86,7 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         assert.equal(await A.getAttribute('#ev-app', 'data-screen'), 't1-cond', '같은 값이면 넘어가지 않음');
         assert.match(await A.textContent('#ev-must'), /값을 하나 바꿔요/);
         await A.click('.ev-stepper:not(.locked) [data-pm="1"]');
-        await next(A); await go(A, 't1-predict');
+        await next(A); await go(A, 't1-measure');
         assert.equal(await A.evaluate(() => window.__filmRocket.state().t1.mustChange), null);
         // 안내 화면: 다음 단계(2차시)가 잠겨 있으면 그리로 가는 단추 없음
         await A.evaluate(() => window.__filmRocket.show('t1-more')); await go(A, 't1-more');
@@ -105,7 +105,11 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         await go(A, 't2-result');
         assert.match(await A.textContent('.ev-screen'), /아이 키보다 낮아요/);
         assert.doesNotMatch(await A.textContent('.ev-screen'), /무게를 줄이거나/);
-        assert.match(await A.textContent('.ev-more-hint'), /값을 하나 바꿔 한 번 더 쏘아요/, '2차시는 첫 발에도 바로 안내');
+        // 2026-11-23 가상 수업 4차: 첫 발 뒤에는 '같은 조건으로 한 번 더' 가 먼저, 같은 조건을 다 쏜 뒤에 '값을 하나 바꿔' 안내
+        assert.equal(await A.isVisible('#ev-again2'), true, '2차시 첫 발 뒤 같은 조건 반복');
+        await A.evaluate(() => { const s = window.__filmRocket.state(); s.t2.trials.push({ value: 10, pct: 62, method: 'hand' }, { value: 10, pct: 58, method: 'hand' }); s.last2 = s.t2.trials[2]; window.__filmRocket.show('t2-result'); });
+        await A.waitForSelector('.ev-more-hint');
+        assert.match(await A.textContent('.ev-more-hint'), /값을 하나 바꿔 한 번 더 쏘아요/, '같은 조건을 다 쏘면 바로 안내');
         assert.equal(await A.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '375px');
         // 요약 → 교사 결과판 💬 생각
         await A.evaluate(() => window.__filmRocket.sendNow());

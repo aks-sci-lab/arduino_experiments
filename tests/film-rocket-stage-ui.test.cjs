@@ -104,7 +104,7 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         await next(A); await go(A, 'q-pressure'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next(A);
         await go(A, 't1-var'); await A.click('.ev-choice[data-k="water"]'); await A.click('[data-guess] [data-dir="up"]'); await next(A);
         await go(A, 'q-control'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next(A);
-        await go(A, 't1-cond'); await next(A); await go(A, 't1-predict'); await next(A); await go(A, 't1-measure');
+        await go(A, 't1-cond'); await next(A); await go(A, 't1-measure');
         await A.click('#ev-m-sw'); await A.click('#ev-sw1');
 
         // ① 2차시 열기 → A(초시계 도는 중)·B(1차시 첫 화면) 그대로, 위에 띠
