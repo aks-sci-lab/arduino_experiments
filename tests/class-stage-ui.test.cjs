@@ -140,10 +140,12 @@ test('선생님이 여는 단계: 교사 진행 화면 → 학생 폰 둘 저절
         assert.match(await F.textContent('.ev-screen'), /아직 잠겨 있어요/);
         await layout(F, '로켓 잠금 화면', 56);
         await T.click('#btnStageNext');
+        // 단계를 열면 설명부터 (2026-11-23): 진행 화면에서 열어도 🎬 발표 보기로 넘어가 그 단계 첫 장('기체' 응답 장)
+        //  → 팀 폰은 그 답 칸(q-gas, 📱 폰은 응답만) → '📋 진행 화면'(설명을 닫음)으로 돌아오면 폰은 하던 곳(1차시 첫 화면)
+        await T.waitForSelector('#presentPane:not([hidden])'); await T.waitForSelector('#pSlides .ls-slide');
+        await F.waitForSelector('[data-screen="q-gas"]', { timeout: 15000 });
+        await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
         await F.waitForSelector('[data-screen="t1-intro"]', { timeout: 15000 });
-        // 단계를 열면 설명부터 (2026-11-23): 진행 화면에서 열어도 🎬 발표 보기로 넘어가 그 단계 첫 장 → '📋 진행 화면' 으로 돌아옴
-        await T.waitForSelector('#presentPane:not([hidden])'); await T.waitForSelector('#pSlides .ls-slide'); await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
-        assert.match(await F.textContent('#ev-flash'), /1차시/);
         assert.equal(await F.isVisible('.ev-stage.locked[data-stage="t2"]'), true);
         // 결과판은 그대로 진행 화면에
         await T.waitForSelector('#boardCard:not([hidden])');

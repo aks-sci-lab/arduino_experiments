@@ -65,6 +65,7 @@
             // 설명 화면 풀이가 열리면(2026-11-21 '점수 퀴즈 정답 표시도 풀이 뒤로') 퀴즈 화면의 ⭕·📘·점수를 다시 그림
             onLesson: function () {
                 if (PRESENT) return;
+                if (followApply()) return;   // 폰은 응답만 (선생님이 띄운 장에 맞춤)
                 if (/^(q-|end-(force|accel|pressure)$)/.test(st.screen) && app.getAttribute('data-screen') === st.screen) show(st.screen, { back: true }); else renderTop();
             },
             onStage: function (open, o) {
@@ -78,6 +79,12 @@
                 //  하는 중인 팀은 그대로 두고 위 띠 '선생님이 ○○ 단계를 열었어요 · 끝나면 넘어가요'(renderTop) → 그 단계를 마치면 잠김 화면 없이 바로.
                 //  되돌리기(◀): 그 단계에 들어가 있던 팀은 잠김 안내(측정 중이면 측정을 마칠 때까지 그대로), '돌아가기'는 마지막으로 하던 화면으로
                 st.gate = { open: open ? open.slice() : null }; save();
+                // 📱 폰은 응답만: 띄운 장에 맞춤 (기다리던 팀의 '하던 곳'은 새로 열린 단계 첫 화면)
+                if (following()) {
+                    if (app.getAttribute('data-screen') === 'locked' && !stageLocked(stageOf(st.lastReal || st.screen))) st.lastReal = resumeId(st.lastReal || st.screen);
+                    lastOpenN = open ? open.length : STAGES.length;
+                    followApply(); beatIfChanged(); return;
+                }
                 var n = open ? open.length : STAGES.length, shrank = lastOpenN != null && n < lastOpenN;
                 lastOpenN = n;
                 if (shrank) { var fl = $('#ev-flash'); if (fl) fl.hidden = true; }
@@ -219,7 +226,7 @@
 
     // ---------- 화면 틀 ----------
     var app = $('#ev-app'), cleanup = [];
-    function stageOf(id) { return /^t1|^q-pressure|^q-control|^q-gas/.test(id) ? 't1' : /^t2|^q-action|^q-mass/.test(id) ? 't2' : /^end/.test(id) ? 'end' : /^think/.test(id) ? 'think' : 'enter'; }
+    function stageOf(id) { if (id === 'wait' || id === 'sent') return st.stage && st.stage !== 'enter' ? st.stage : 'think'; return /^t1|^q-pressure|^q-control|^q-gas/.test(id) ? 't1' : /^t2|^q-action|^q-mass/.test(id) ? 't2' : /^end/.test(id) ? 'end' : /^think/.test(id) ? 'think' : 'enter'; }
     // ----- 선생님이 연 단계 -----
     // null = 모두 열림 (수업 없이·예전 수업). 수업이면 마지막으로 받은 값을 폰에 기억해 두고 처음부터 씀 (인터넷이 끊긴 채 새로고침해도 잠금 유지)
     var stageOpen = CLASS && !PRESENT && st.gate && Array.isArray(st.gate.open) ? st.gate.open.slice() : null;
@@ -267,7 +274,8 @@
         cleanup.forEach(function (f) { try { f(); } catch (e) { /* 무시 */ } }); cleanup = [];
         if (!SCREENS[id]) id = 'enter';
         markDone(id);
-        if (stageLocked(stageOf(id))) {   // 잠긴 단계: 화면 자리는 기억하고 잠금 안내만
+        if (id !== 'wait' && id !== 'sent' && stageLocked(stageOf(id))) {   // 잠긴 단계: 화면 자리는 기억하고 잠금 안내만
+            if (!(opt && opt.follow)) st.lastReal = id;   // 팀이 가려던 곳 (열리면·설명을 닫으면 그리로)
             if (!(opt && opt.back) && st.screen !== id && st.screen !== 'enter') { st.history.push(st.screen); if (st.history.length > 40) st.history.shift(); }
             st.screen = id; st.stage = stageOf(id); save();
             app.innerHTML = '<section class="ev-screen" data-screen="locked">' + lockScreen(stageOf(id)).html + '</section>';
@@ -278,6 +286,16 @@
         // 한 가지 바꿔 한 번 더 (2026-11-21 선생님): 바꾼 조건을 한 가지 값으로만 쟀으면 그래프·도전으로 가지 않고 '하나만 바꿔 한 번 더' 안내
         var need = NEED_KINDS[id];
         if (need && !PAST && M.valueKinds(st[need].trials) < 2) id = need + '-more';
+        // 📱 폰은 응답만 (2026-11-23): 선생님이 띄운 장의 답 칸·측정만, 그 밖에는 👀 대기
+        // 하던 곳은 팀이 스스로 간 화면으로 기억 (선생님이 장을 닫으면 그리로): 장에 맞춰 띄운 화면은 기억하지 않음
+        if (!(opt && opt.follow) && id !== 'wait' && id !== 'sent' && !(st.forced && id === st.screen)) st.lastReal = id;
+        var asked = id;
+        id = followRedirect(id, opt);
+        var fr = following() && followTarget().free;
+        if (fr && id !== 'wait' && id !== 'sent') st.lastReal = id;
+        // 장에 맞춰 띄운 화면(👀·✅·답 칸) = forced → 선생님이 장을 닫으면 하던 곳으로 돌아감
+        st.forced = !!(following() && !fr && (id !== asked || (opt && opt.follow) || (st.forced && id === st.screen)));
+        followClass();
         if (!(opt && opt.back) && st.screen !== id) { st.history.push(st.screen); if (st.history.length > 40) st.history.shift(); }
         var stage = stageOf(id), stageMoved = stage !== st.stage;
         st.screen = id; st.stage = stage; save();
@@ -290,6 +308,64 @@
         window.scrollTo(0, 0);
         var h = app.querySelector('h2'); if (h) { h.setAttribute('tabindex', '-1'); try { h.focus({ preventScroll: true }); } catch (e) { /* 무시 */ } }
         if (stageMoved && share) { lastStep = stepNow(); share.stepChanged(); } else beatIfChanged();
+    }
+    /* ---------- 📱 폰은 응답만 (2026-11-23 선생님 "학생용 화면은 응답을 수집하기 위함이지 정보를 제공하기 위함이 아니야",
+       "최대한 화면을 보고 수업에 참여하고 응답할 때만 스마트폰") ----------
+       수업(?c=)이고 선생님이 🎬 발표 보기 설명 화면을 쓰는 동안(수업 문서 lesson.on)만:
+       · 응답 장(key: 처음 생각 force·accel·pressure / 퀴즈 gas·control·action·mass / 다시 풀기 end-think / 정리 문장 end-cause) → 그 답 칸만, 답하면 '✅ 보냈어요'
+       · 측정 장(key do-t1·do-t2) → 그 차시 측정 화면들(바꿀 것·예측·재기·결과·그래프·도전)
+       · 그 밖의 장 → '👀 앞 화면을 봐요' + 팀 이름
+       · 측정 중(busy)에는 장이 바뀌어도 그대로, 끝나면 띄운 장에 맞춤
+       수업 없이 연 화면·지난 기록·설명 화면을 안 쓰는 반·선생님이 설명을 닫은 동안(📱 학생 화면)은 지금처럼 폰 혼자 */
+    var DO_PART = { 'do-t1': 't1', 'do-t2': 't2' };
+    function lessonNow() { return share && share.lessonNow ? share.lessonNow() : { on: false }; }
+    function following() { return !!(CLASS && !PRESENT && !PAST && share && st.team && !st.team.pending && lessonNow().on); }
+    function conceptOf(k) { return M.CONCEPTS.filter(function (c) { return c.key === k; })[0] || null; }
+    // 띄운 장 → 폰 화면 (측정 장이면 { free: 't1' })
+    function followTarget() {
+        var k = lessonNow().key || '';
+        if (DO_PART[k]) return { free: DO_PART[k] };
+        if (conceptOf(k)) return st.think.first[k] ? 'sent' : 'think-' + k;
+        if (M.QUIZ[k] && SCREENS['q-' + k]) return 'q-' + k;
+        if (k === 'end-think') {
+            for (var i = 0; i < M.CONCEPTS.length; i++) { var z = st.quiz['end_' + M.CONCEPTS[i].key]; if (!(z && z.tries)) return 'end-' + M.CONCEPTS[i].key; }
+            return 'sent';
+        }
+        if (k === 'end-cause') return st.sentKeys && st.sentKeys['end-cause'] ? 'sent' : 'end-sentence';
+        return 'wait';
+    }
+    // 측정 장: 그 차시에서 하던 화면, 처음이면 안전 확인부터 (소개·설명 글은 앞 화면에서)
+    function doEntry(part) {
+        var last = st.lastReal;
+        if (last && stageOf(last) === part && !/-intro$/.test(last) && SCREENS[last]) return resumeId(last);
+        if (part === 't1') { var sf = st.t1.safe || {}; return sf.goggle && sf.face && sf.away && sf.wait ? (st.t1.changed ? 't1-again' : 't1-var') : 't1-safe'; }
+        return st.t2.changed ? 't2-again' : 't2-base';
+    }
+    function followRedirect(id, opt) {
+        if (!following() || id === 'enter' || id === 'locked') return id;
+        if (busy() && /measure$|^t2-hand$/.test(id) && !(opt && opt.follow)) return id;   // 측정 화면을 다시 그리는 것은 그대로 (측정을 마치고 결과로 가면 띄운 장에 맞춤)
+        var t = followTarget();
+        if (t.free) return stageOf(id) === t.free && id !== t.free + '-intro' ? id : doEntry(t.free);
+        return t;
+    }
+    // 선생님이 장을 넘기면: 측정 중이 아니면 그 장에 맞춤, 설명을 닫으면 하던 화면으로 → 처리했으면 true
+    function followApply() {
+        if (PRESENT || PAST || !CLASS || !st.team) return false;
+        if (!following()) {
+            followClass();
+            if (st.screen === 'wait' || st.screen === 'sent' || st.forced) { st.forced = false; show(st.lastReal && SCREENS[st.lastReal] ? resumeId(st.lastReal) : backTarget(), { back: true }); return true; }
+            return false;
+        }
+        if (busy()) { renderTop(); return true; }
+        var t = followTarget(), to = t.free ? (stageOf(st.screen) === t.free && !st.forced && st.screen !== t.free + '-intro' && st.screen !== 'wait' && st.screen !== 'sent' ? st.screen : doEntry(t.free)) : t;
+        if (to !== 'wait' && to !== 'sent' && stageLocked(stageOf(to))) to = 'wait';   // 아직 안 연 단계의 장이면 대기 (단계가 열리면 onStage 가 다시 맞춤)
+        show(to, { back: true, follow: true });
+        return true;
+    }
+    function followClass() {
+        var f = following(), t = f ? followTarget() : null;
+        document.documentElement.classList.toggle('ev-following', f);
+        document.documentElement.classList.toggle('ev-answering', !!(f && t && !t.free));
     }
     /* 🔎 우리 팀 물음 (2026-11-21 비계 4): 바꿀 것을 고른 뒤 측정·결과 화면 위에 이어서 (정리 문장은 카드 안에) */
     var NO_TEAMQ = { 't1-intro': 1, 't1-again': 1, 't1-safe': 1, 't1-var': 1, 't2-intro': 1, 't2-again': 1, 't2-base': 1, 't2-var': 1 };
@@ -345,6 +421,14 @@
     }
 
     var SCREENS = {};
+    SCREENS['wait'] = function () {
+        return { html: '<div class="ev-hero ev-wait"><div class="ev-hero-ic" aria-hidden="true">👀</div><h2>앞 화면을 봐요</h2>' +
+            '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : '') + '</b></p></div>' };
+    };
+    SCREENS['sent'] = function () {
+        return { html: '<div class="ev-hero ev-wait"><div class="ev-hero-ic" aria-hidden="true">✅</div><h2>보냈어요</h2><p class="ev-wait-sub">앞 화면을 봐요</p>' +
+            '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : '') + '</b></p></div>' };
+    };
 
     // ===== 0 입장 =====
     SCREENS.enter = function () {
@@ -1174,8 +1258,12 @@
                     '<p>왜냐하면…</p><div class="ev-choices">' + bec.map(function (t) { return '<button type="button" class="ev-choice' + (c.why === t ? ' on' : '') + '" data-why="' + esc(t) + '">' + esc(t) + '</button>'; }).join('') + '</div>' +
                     '<label class="ev-field">직접 쓰기 <small>(짧게, 안 써도 돼요)</small><input type="text" class="ev-why-in" maxlength="40" autocomplete="off" value="' + esc(c.why && bec.indexOf(c.why) < 0 ? c.why : '') + '"></label></div>';
             }).join('') : card('<p>아직 바꿔서 잰 조건이 없어요. 결과 카드로 가요.</p>')) +
+            // 응답 장(정리 문장)을 띄운 동안: '다 했어요' → ✅ 보냈어요 (다음 단추 흐름은 숨김)
+            (following() ? '<div class="ev-follow-only ev-nav col"><button type="button" class="ev-next good" id="ev-concl-send">✅ 다 했어요 · 보내기</button></div>' : '') +
             nav('end-card', '결과 카드 만들기 →');
         return { html: html, mount: function (el) {
+            var snd = el.querySelector('#ev-concl-send');
+            if (snd) snd.addEventListener('click', function () { st.sentKeys = st.sentKeys || {}; st.sentKeys['end-cause'] = true; changed(); show('sent', { follow: true }); });
             Array.prototype.forEach.call(el.querySelectorAll('[data-concl]'), function (box) {
                 var k = box.dataset.concl;
                 box.addEventListener('click', function (e) {
@@ -1245,7 +1333,7 @@
 
     // ---------- 시작 ----------
     initShare();
-    var startScreen = PRESENT ? 'think-intro' : PAST ? 'enter' : st.team ? st.screen : 'enter';   // 지난 기록은 먼저 요약(우리 팀·결과 카드·그래프)
+    var startScreen = PRESENT ? 'think-intro' : PAST ? 'enter' : st.team ? (st.screen === 'wait' || st.screen === 'sent' ? (st.lastReal || 'think-intro') : st.screen) : 'enter';   // 지난 기록은 먼저 요약(우리 팀·결과 카드·그래프)
     if (startScreen !== 'enter' && /measure$/.test(startScreen)) startScreen = startScreen.replace(/measure$/, 'cond');   // 카메라 화면 가운데서 새로고침했으면 조건 화면부터
     st.lastScreen = st.screen;
     show(startScreen === 'enter' && st.team ? 'enter' : startScreen, { back: true });

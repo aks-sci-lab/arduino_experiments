@@ -571,7 +571,7 @@
         // 수업 문서 lesson.on 이면 위에 '👀 앞 화면을 봐요' 띠 + <html class="cs-look">.
         // 이 수업이 설명 화면을 한 번이라도 썼으면(lesson 칸이 있으면) 학생 화면의 [data-lesson-answer="key"] 는 key 가 lessonOpen 에 들어올 때까지 가림.
         // 설명 화면을 안 쓴 수업·수업 없이 연 화면·발표용(iframe) 은 그대로 다 보임
-        var look = { used: false, on: false, open: [], band: null, obs: null, raf: 0 };
+        var look = { used: false, on: false, open: [], band: null, obs: null, raf: 0, key: '', reveal: false, stage: '' };
         function hideAnswers() {
             look.raf = 0;
             Array.prototype.forEach.call(document.querySelectorAll('[data-lesson-answer]'), function (el) {
@@ -582,8 +582,10 @@
         }
         function applyLesson(d) {
             if (PRESENT || !CLASS || !d) return;
-            var before = JSON.stringify([look.used, look.open, look.on, look.mode]);
+            var before = JSON.stringify([look.used, look.open, look.on, look.mode, look.key, look.reveal, look.stage]);
             look.used = !!d.lesson; look.on = !!(d.lesson && d.lesson.on); look.mode = d.lesson && d.lesson.mode === 'phone' ? 'phone' : 'look';
+            // 지금 띄운 장 (2026-11-23 행사형 '폰은 응답만': 실험 페이지가 그 장의 답 칸·측정만 보이게)
+            look.key = d.lesson && look.on ? String(d.lesson.key || '') : ''; look.reveal = !!(d.lesson && look.on && d.lesson.reveal); look.stage = d.lesson && look.on ? String(d.lesson.stage || '') : '';
             look.open = Array.isArray(d.lessonOpen) ? d.lessonOpen.map(String) : [];
             if (cls.info) { cls.info.lesson = d.lesson || null; cls.info.lessonOpen = look.open; }
             try { document.documentElement.classList.toggle('cs-look', look.on); } catch (e) { /* 무시 */ }
@@ -599,7 +601,7 @@
             }
             hideAnswers();
             // 실험 페이지가 스스로 가리는 것(행사형 점수 퀴즈의 ⭕·점수)은 opts.onLesson 으로 알림
-            if (before !== JSON.stringify([look.used, look.open, look.on, look.mode]) && typeof opts.onLesson === 'function') { try { opts.onLesson({ used: look.used, on: look.on, mode: look.mode, open: look.open.slice() }); } catch (e) { /* 실험 쪽 오류 */ } }
+            if (before !== JSON.stringify([look.used, look.open, look.on, look.mode, look.key, look.reveal, look.stage]) && typeof opts.onLesson === 'function') { try { opts.onLesson({ used: look.used, on: look.on, mode: look.mode, open: look.open.slice(), key: look.key, reveal: look.reveal, stage: look.stage }); } catch (e) { /* 실험 쪽 오류 */ } }
             // 화면을 새로 그려도(행사형은 화면마다 다시 그림) 답 가리기가 이어지게
             if (look.used && !look.obs && window.MutationObserver) {
                 look.obs = new MutationObserver(function () { if (!look.raf) look.raf = (window.requestAnimationFrame || setTimeout)(hideAnswers); });
@@ -899,7 +901,9 @@
             // 이 수업이 설명 화면을 쓰고, 그 key 의 풀이를 아직 안 열었으면 true (실험 페이지가 답·정답 표시를 미룰 때)
             lessonHidden: function (key) { return !PRESENT && !!CLASS && look.used && look.open.indexOf(String(key)) < 0; },
             // 이 수업이 설명 화면을 쓰는지 (풀이가 이미 열린 뒤 고른 퀴즈 점수를 낮출 때)
-            lessonUsed: function () { return !PRESENT && !!CLASS && look.used; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
+            lessonUsed: function () { return !PRESENT && !!CLASS && look.used; },
+            // 지금 선생님이 띄운 설명 장 { on, key, mode, reveal, stage } (설명 화면을 안 쓰는 수업·수업 없이 연 화면은 on: false)
+            lessonNow: function () { var u = !PRESENT && !!CLASS && look.used; return { on: u && look.on, key: u ? look.key : '', mode: look.mode, reveal: u && look.reveal, stage: u ? look.stage : '' }; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
             openPhone: openPhone, phoneLink: phoneLink, phoneCard: phoneCard,
             // 실험이 측정 하나를 저장했을 때 부른다: 폰 화면(또는 autoSendOnSave)이면 바로 보내기
             // 폰은 기본으로 회차 목록에 쌓기만 하고(고른 회차 보내기), autoSendOnSave: true 면 바로 보낸다

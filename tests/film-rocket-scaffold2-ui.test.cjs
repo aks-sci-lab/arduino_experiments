@@ -41,7 +41,9 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         Object.assign(doc(), { lesson: { on: true, stage: 't1', i: 0, key: 'gas', reveal: false, mode: 'phone' }, lessonOpen: [] });
         const A = await ctx(devices['iPhone 13'], 'A');
         await A.goto(ROOT + 'projects/film-rocket.html?c=' + c.classCode + '&s=' + c.space); await go(A, 'enter');
-        await A.fill('#ev-name', '별빛가족'); await A.click('#ev-start'); await go(A, 'think-intro');
+        await A.fill('#ev-name', '별빛가족'); await A.click('#ev-start');
+        // 설명 화면이 '기체' 응답 장을 띄운 반 → 폰은 그 답 칸(q-gas)으로 (2026-11-23 폰은 응답만)
+        await go(A, 'q-gas');
         // ③ 'phone' 장: 띠가 '✍️ 내 화면에서 해요'
         await A.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return b && !b.hidden; }, null, { timeout: 15000 });
         assert.match(await A.textContent('.cs-look-band'), /내 화면에서 해요 — 다 하면 앞 화면을 봐요/);
@@ -61,6 +63,9 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         assert.match(await A.textContent('#ev-score'), /⭐ 10점/);
         assert.match(await A.textContent('.cs-look-band'), /앞 화면을 봐요/);
         // ④ 🔮 예측: 바꿀 것을 고르면 예측 고르기·까닭 칸
+        // 선생님이 설명을 닫음(📱 학생 화면) → 폰 혼자 흐름
+        Object.assign(doc(), { lesson: { on: false, stage: 't1', i: 0, key: '', reveal: false, mode: 'look' } });
+        await A.waitForFunction(() => !document.documentElement.classList.contains('ev-following'), null, { timeout: 15000 });
         await A.evaluate(() => window.__filmRocket.show('t1-var')); await go(A, 't1-var');
         await A.click('.ev-choice[data-k="temp"]');
         await A.waitForSelector('[data-guess="t1"]');

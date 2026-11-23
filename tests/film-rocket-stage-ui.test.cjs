@@ -50,7 +50,13 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         const T = await ctx({ viewport: { width: 1920, height: 1080 } }, 'T', true);
         await T.goto(ROOT + 'projects/class-teacher.html#class=' + c.space + '&view=run');
         // 단계를 열면 🎬 발표 보기로 넘어가 그 단계 설명부터 (2026-11-23) → 이 시험은 진행 화면을 보므로 '📋 진행 화면' 으로 돌아옴
-        const toRun = async () => { await T.waitForSelector('#presentPane:not([hidden])'); await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])'); };
+        const toRun = async () => {
+            await T.waitForSelector('#presentPane:not([hidden])'); await T.waitForSelector('#pSlides .ls-slide'); await T.waitForTimeout(600);
+            await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+            const d = () => app.db.docs.get('labClasses/' + c.space);
+            for (let k = 0; k < 50 && d().lesson && d().lesson.on; k++) await T.waitForTimeout(100);
+            delete d().lesson; d().lessonOpen = [];
+        };   // 이 시험은 설명 화면을 안 쓰는 반의 단계 열기 (폰 혼자 흐름)
         await T.waitForSelector('#stageCard:not([hidden])');
         const join = async (name, team) => {
             const P = await ctx(devices['iPhone 13'], name);

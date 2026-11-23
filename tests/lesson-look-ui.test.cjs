@@ -53,35 +53,43 @@ test('설명 화면 ↔ 학생 폰: 👀 띠·답 가리기·풀이 열기, 설�
         assert.equal(app.db.docs.get('labClasses/' + c.space).lesson.on, true);
         // 발표 띠에 팀 상태 (들어온 팀)
         await T.waitForFunction(() => /👨‍👩‍👧 1팀/.test(document.getElementById('pJoined').textContent), null, { timeout: 15000 });
-        // 폰: 처음 생각을 고르면 📘 정의는 가림 (설명 화면을 쓰는 반)
-        await next(A); await go(A, 'think-force'); await A.click('.ev-choice[data-k="have"]');
-        await A.waitForSelector('[data-lesson-answer="force"]', { state: 'attached' });
-        await A.waitForFunction(() => document.querySelector('[data-lesson-answer]').classList.contains('cs-ans-hide'), null, { timeout: 10000 });
-        const box = await A.locator('[data-lesson-answer="force"]').boundingBox();
-        assert.ok(box && box.height >= 40, '가린 자리에 🔒 안내');
-        assert.equal(await A.evaluate(() => getComputedStyle(document.querySelector('[data-lesson-answer] .ev-def p')).visibility), 'hidden', '정의 글은 안 보임');
-        assert.equal(await A.isDisabled('.ev-screen .ev-next'), false, '답을 가려도 다음으로는 갈 수 있음');
-        // 교사: 힘 장 → 풀이 열기 → 폰에 정의가 보임
+        // 📱 폰은 응답만 (2026-11-23): 설명 장('왜')을 띄우면 폰은 👀 대기 + 팀 이름
+        await go(A, 'wait');
+        assert.match(await A.textContent('.ev-screen'), /앞 화면을 봐요[\s\S]*별빛가족/);
+        assert.equal(await A.isVisible('#ev-stages'), false, '단계 탭도 숨김');
+        // 교사: 힘 장(응답 장, mode 'phone') → 폰은 저절로 그 답 칸, 띠 '✍️ 내 화면에서 해요', 다음 단추 흐름 없음
         await T.keyboard.press('ArrowRight');
         assert.match((await slide(T)).title, /힘/);
-        // 폰에서 고르는 장(mode 'phone'): 풀이 전에는 폰 띠가 '✍️ 내 화면에서 해요'
+        await go(A, 'think-force');
         await A.waitForFunction(() => /내 화면에서 해요 — 다 하면 앞 화면을 봐요/.test((document.querySelector('.cs-look-band') || {}).textContent || ''), null, { timeout: 15000 });
         assert.equal(app.db.docs.get('labClasses/' + c.space).lesson.mode, 'phone');
+        assert.equal(await A.locator('.ev-screen .ev-nav').evaluateAll(els => els.filter(e => e.offsetParent).length), 0, '응답 장에서는 다음 단추 없음');
+        // 답하면 '✅ 보냈어요 · 앞 화면을 봐요'
+        await A.click('.ev-choice[data-k="have"]');
+        await go(A, 'sent');
+        assert.match(await A.textContent('.ev-screen'), /보냈어요[\s\S]*앞 화면을 봐요/);
+        // 풀이 → 띠 '👀', 폰은 그대로 ✅
         await T.keyboard.press('ArrowRight');
         assert.equal((await slide(T)).rev, '1');
         await A.waitForFunction(() => /앞 화면을 봐요/.test((document.querySelector('.cs-look-band') || {}).textContent || ''), null, { timeout: 15000 });
-        await A.waitForFunction(() => !document.querySelector('[data-lesson-answer="force"]').classList.contains('cs-ans-hide'), null, { timeout: 15000 });
-        assert.match(await A.textContent('[data-lesson-answer="force"]'), /운동 상태를 바꾸는 원인/);
-        assert.match(await A.textContent('[data-lesson-answer="force"]'), /쉬운 말 · 원인 = 왜 그렇게 됐는지의 까닭/, '초3 쉬운 말');
         assert.deepEqual(app.db.docs.get('labClasses/' + c.space).lessonOpen, ['force']);
-        // 아직 안 연 '가속도' 는 그대로 가림
-        await next(A); await go(A, 'think-accel'); await A.click('.ev-choice[data-k="fast"]');
-        await A.waitForFunction(() => document.querySelector('[data-lesson-answer="accel"]').classList.contains('cs-ans-hide'), null, { timeout: 10000 });
-        // 📱 학생 화면으로 넘기면 폰의 띠가 내려감
+        assert.equal(await A.getAttribute('#ev-app', 'data-screen'), 'sent');
+        // 📱 학생 화면으로 넘기면(설명을 닫음) 폰의 띠가 내려가고 하던 곳으로 → 혼자 흐름에서는 연 풀이만 보임
         await T.click('#btnPMode');
         await A.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return b && b.hidden; }, null, { timeout: 15000 });
         assert.equal(await A.evaluate(() => document.documentElement.classList.contains('cs-look')), false);
-        assert.equal(await A.evaluate(() => document.querySelector('[data-lesson-answer="accel"]').classList.contains('cs-ans-hide')), true, '띠가 내려가도 안 연 답은 가림');
+        await go(A, 'think-intro');
+        await next(A); await go(A, 'think-force');
+        await A.waitForFunction(() => !document.querySelector('[data-lesson-answer="force"]').classList.contains('cs-ans-hide'), null, { timeout: 15000 });
+        assert.match(await A.textContent('[data-lesson-answer="force"]'), /운동 상태를 바꾸는 원인/);
+        assert.match(await A.textContent('[data-lesson-answer="force"]'), /쉬운 말 · 원인 = 왜 그렇게 됐는지의 까닭/, '초3 쉬운 말');
+        // 아직 안 연 '가속도' 는 가림
+        await next(A); await go(A, 'think-accel'); await A.click('.ev-choice[data-k="fast"]');
+        await A.waitForFunction(() => document.querySelector('[data-lesson-answer="accel"]').classList.contains('cs-ans-hide'), null, { timeout: 10000 });
+        const box = await A.locator('[data-lesson-answer="accel"]').boundingBox();
+        assert.ok(box && box.height >= 40, '가린 자리에 🔒 안내');
+        assert.equal(await A.evaluate(() => getComputedStyle(document.querySelector('[data-lesson-answer] .ev-def p')).visibility), 'hidden', '정의 글은 안 보임');
+        assert.equal(await A.isDisabled('.ev-screen .ev-next'), false, '답을 가려도 다음으로는 갈 수 있음');
         // 진행 화면 '🔓 모든 풀이 열기'
         await T.click('#btnPExit'); await T.waitForSelector('#stageCard:not([hidden])');
         await T.waitForSelector('#lessonTeach:not([hidden])');

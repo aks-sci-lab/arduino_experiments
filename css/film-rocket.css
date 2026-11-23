@@ -148,3 +148,11 @@
 .ev-evidence { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); border-radius: 10px; background: var(--c-primary-soft); font-weight: 700; line-height: 1.45; }
 .ev-notyet { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); border-radius: 10px; border: 2px dashed var(--c-warn-text); background: var(--c-warn-bg); font-weight: 700; }
 .ev-spread[data-spread="overlap"] { border-left-color: var(--c-warn-text); background: var(--c-warn-bg); }
+/* 📱 폰은 응답만 (2026-11-23): 선생님이 설명 화면을 띄운 동안 — 단계 탭·띠는 숨기고, 응답 장이면 다음 단추 흐름도 숨김 */
+html.ev-following #ev-stages, html.ev-following #ev-notice { display: none !important; }
+html.ev-answering .ev-screen .ev-nav:not(.ev-follow-only) { display: none !important; }
+.ev-wait { padding-top: 12vh; }
+.ev-wait .ev-hero-ic { font-size: 5rem; }
+.ev-wait h2 { font-size: 2rem; }
+.ev-wait-sub { font-size: 1.3rem; font-weight: 700; margin: 0; }
+.ev-wait-team { font-size: 1.6rem; margin-top: var(--sp-4); }
