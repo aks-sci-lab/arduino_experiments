@@ -633,7 +633,8 @@
             var close = function () { box.hidden = true; document.getElementById('ctMediaBody').innerHTML = ''; };
             box.addEventListener('click', function (e) { if (e.target === box || e.target.id === 'ctMediaClose') close(); });
             // 크게 본 동안에는 발표 보기 넘기기 키(→·Space 등)가 장을 넘기지 않게
-            document.addEventListener('keydown', function (e) { if (box.hidden) return; if (e.key === 'Escape') { e.preventDefault(); close(); } if (e.key !== 'Tab') e.stopPropagation(); }, true);
+            // window 의 잡기 단계(가장 먼저)에서 받아 '📋 진행 상황' 팝업·발표 보기의 Esc·넘기기가 함께 움직이지 않게 (Esc 는 사진만 닫음)
+            window.addEventListener('keydown', function (e) { if (box.hidden) return; if (e.key === 'Escape') { e.preventDefault(); close(); } if (e.key !== 'Tab') e.stopImmediatePropagation(); }, true);
         }
         var body = document.getElementById('ctMediaBody');
         document.getElementById('ctMediaTitle').textContent = (btn.dataset.team || '') + ' · ' + (m[2] === 't1' ? '⏱ 시간 도전' : '🎯 높이 도전') + ' ' + (m[3] === 'photo' ? '사진' : '영상');

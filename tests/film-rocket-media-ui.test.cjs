@@ -200,6 +200,23 @@ test('로켓 도전 장면: 얼굴을 캐릭터로 가려 보냄·못 가리면 
         await T.setViewportSize({ width: 1280, height: 720 }); await T.waitForTimeout(300);
         assert.equal(await T.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '1280 가로 스크롤 없음');
 
+        // ---- 🎬 발표 보기 '📋 진행 상황' 팝업의 결과판에도 최고 높이 칸 없음, 📷 ▶ 그대로 ----
+        await T.setViewportSize({ width: 1920, height: 1080 });
+        await T.goto(ROOT + 'projects/class-teacher.html#class=' + c.space + '&view=present');
+        await T.waitForSelector('#btnPExit');
+        await T.click('#btnPExit'); await T.waitForSelector('#runPop:not([hidden]) #rpSum:not([hidden])');
+        await T.click('#rpTabs [data-rptab="board"]');   // 팝업 작은 탭 🏆 결과판
+        await T.waitForFunction(() => [...document.querySelectorAll('#runPop [data-media]')].filter(b => b.getClientRects().length).length >= 2, null, { timeout: 30000 });
+        const popHead = await T.evaluate(() => [...document.querySelectorAll('#runPop thead')].map(e => e.textContent).join(' '));
+        assert.doesNotMatch(popHead, /최고 높이/, '팝업 결과판에도 최고 높이 칸 없음');
+        assert.match(await T.evaluate(() => document.getElementById('runPop').textContent), /📷 안 보냄/);
+        await T.locator('#runPop [data-media="1~t1~photo"]:visible').first().click();
+        await T.waitForSelector('#ctMediaBody img', { timeout: 15000 });
+        assert.ok(await T.evaluate(() => { const m = document.getElementById('ctMedia'), p = document.getElementById('runPop'); return getComputedStyle(m).zIndex * 1 >= (getComputedStyle(p).zIndex * 1 || 0) && document.elementFromPoint(innerWidth / 2, innerHeight / 2).closest('#ctMedia'); }), '팝업 위에 크게');
+        await T.keyboard.press('Escape');
+        assert.equal(await T.isVisible('#ctMedia'), false, 'Esc 는 사진만 닫음');
+        assert.equal(await T.isVisible('#runPop'), true, '진행 상황 팝업은 그대로');
+
         // ---- 수업 마치기 → 도전 장면 모두 지움 ----
         const done = await app.post({ action: 'classDone', space: c.space, done: true });
         assert.equal(done.ok, true); assert.equal(done.mediaDeleted, 2);
