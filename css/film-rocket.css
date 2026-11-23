@@ -179,4 +179,7 @@ html.ev-answering .ev-wrap { min-height: var(--ev-vh, 100vh); box-sizing: border
 .ev-media-msg { margin-top: var(--sp-2); }
 /* 🎯 도전 장면 확인 (보내기 전 팀이 봄): 사진·영상을 화면 폭에 크게 */
 .ev-chk { display: grid; gap: var(--sp-2); margin: var(--sp-3) 0; }
-.ev-chk-img { width: 100%; max-height: 30vh; object-fit: contain; border-radius: 12px; background: #000; }
+.ev-chk.two { grid-template-columns: 1fr 1fr; }
+.ev-chk figure { margin: 0; min-width: 0; }
+.ev-chk figcaption { font-size: .9rem; color: var(--c-muted); text-align: center; margin-top: 2px; }
+.ev-chk-img { display: block; width: 100%; height: 16vh; object-fit: contain; border-radius: 12px; background: #000; }

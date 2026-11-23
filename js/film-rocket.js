@@ -543,7 +543,7 @@
             var pend = media.pending[part];
             if (!pend) return { html: '<p class="ev-kicker">🎯 도전 장면 확인</p><p>확인할 장면이 없어요. 도전 장면은 보내지 않았어요.</p>' + nav(part + '-ch-result', '도전 결과 보기 →') };
             var html = '<p class="ev-kicker">🎯 도전 장면 확인</p><h2>얼굴이 다 가려졌나요?</h2>' +
-                '<p>선생님 화면에 보낼 사진과 영상이에요. 사람 얼굴이 모두 캐릭터로 가려졌는지 가족이 함께 봐요.</p>' +
+                '<p>선생님께 보낼 장면이에요. 얼굴이 모두 캐릭터로 가려졌는지 함께 봐요.</p>' +
                 '<div id="ev-chk" class="ev-chk"><p class="ev-msg" role="status">⏳ 장면을 만드는 중…</p></div>' +
                 '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-chk-send" disabled>✅ 얼굴이 다 가려졌어요 — 선생님께 보내기</button>' +
                 '<button type="button" class="ev-next danger" id="ev-chk-skip">🙈 가려지지 않은 얼굴이 있어요 — 보내지 않기</button></div>';
@@ -553,8 +553,10 @@
                 pend.made.then(function () {
                     if (!alive) return;
                     if (!pend.ph) { box.innerHTML = '<p class="ev-no">⚠ 도전 장면을 만들지 못했어요 (' + esc(pend.err) + '). 보내지 않아요.</p>'; return; }
-                    box.innerHTML = '<img id="ev-chk-img" class="ev-chk-img" alt="보낼 사진 (얼굴은 캐릭터로 가림)">' +
-                        (pend.vd ? '<p class="ev-small">▶ 영상도 끝까지 봐요 (앞뒤 3초)</p><video id="ev-chk-vid" class="ev-chk-img" controls muted playsinline preload="auto"></video>' : '');
+                    // 사진 | 영상 두 칸 (한 화면에 단추까지 보이게)
+                    box.innerHTML = '<figure><img id="ev-chk-img" class="ev-chk-img" alt="보낼 사진 (얼굴은 캐릭터로 가림)"><figcaption>📷 사진</figcaption></figure>' +
+                        (pend.vd ? '<figure><video id="ev-chk-vid" class="ev-chk-img" controls muted playsinline preload="auto"></video><figcaption>▶ 영상 (앞뒤 3초, 끝까지 봐요)</figcaption></figure>' : '');
+                    box.classList.toggle('two', !!pend.vd);
                     $('#ev-chk-img').src = pend.ph.data;
                     if (pend.vd) $('#ev-chk-vid').src = pend.vd.data;
                     send.disabled = false;

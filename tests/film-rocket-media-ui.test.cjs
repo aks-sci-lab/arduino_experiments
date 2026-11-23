@@ -114,7 +114,8 @@ test('로켓 도전 장면: 얼굴을 캐릭터로 가려 보냄·못 가리면 
         assert.equal(mediaDocs().length, 0, '확인 전에는 서버에 없음');
         assert.match(await A.textContent('.ev-screen'), /얼굴이 다 가려졌나요/);
         const ib = await A.evaluate(() => { const r = document.getElementById('ev-chk-img').getBoundingClientRect(); return r.width / innerWidth; });
-        assert.ok(ib > 0.5, '사진을 크게: ' + ib);
+        assert.ok(ib > 0.4, '사진을 크게: ' + ib);
+        assert.ok(await A.evaluate(() => document.getElementById('ev-chk-skip').getBoundingClientRect().bottom <= innerHeight), '두 단추가 한 화면에');
         assert.equal(await A.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '확인 화면 375px');
         if (SHOTS) await A.screenshot({ path: path.join(SHOTS, 'phone-media-check.png') });
         await A.click('#ev-chk-send');
