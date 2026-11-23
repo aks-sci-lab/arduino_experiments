@@ -18,14 +18,14 @@ test('QR 도구가 늦게 와도 QR 이 그려짐, 끝내 못 받으면 안내',
     await new Promise(r => api.listen(0, r)); await new Promise(r => stat.listen(0, r));
     const API = 'http://127.0.0.1:' + api.address().port + '/exec', ROOT = 'http://127.0.0.1:' + stat.address().port + '/';
     const browser = await chromium.launch(), errors = [];
-    // qr: 'late' = 수업 목록을 받은 뒤 2초 늦게, 'none' = 끝내 못 받음
+    // qr: 'late' = 6초 늦게 (수업 목록·큰 QR 화면이 먼저 뜸), 'none' = 끝내 못 받음
     const ctx = async (qr) => {
         const c = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
         await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API) }));
         await c.route(/cdn\.jsdelivr|cdnjs/, async r => {
             if (!/qrcode/.test(r.request().url())) return r.fulfill({ contentType: 'text/javascript', body: '' });
             if (qr === 'none') return r.abort();
-            await new Promise(res => setTimeout(res, 2000));
+            await new Promise(res => setTimeout(res, 6000));
             return r.fulfill({ contentType: 'text/javascript', body: QR });
         });
         await c.route(/gstatic/, r => r.abort());
