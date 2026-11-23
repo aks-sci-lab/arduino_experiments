@@ -392,7 +392,7 @@
         if (!PRESENT || !document.body) return;
         var W = window.innerWidth || 0, H = window.innerHeight || 0, big = root.classList.contains('big-view');
         if (!W || !H) return;
-        var z = document.body.classList.contains('ev-body') ? Math.min(W / 400, H / 820) : Math.min(H * 0.002, W / 760);
+        var z = document.body.classList.contains('ev-body') ? Math.min(W / 400, H / 820) : Math.min(H * 0.002, W / (H > W * 1.2 ? 560 : 760));   // 세로로 긴 틀(교사 발표 보기의 나란히 학생 화면)은 좁은 화면 배치로 글자를 더 크게
         if (big) z = Math.min(z * 1.25, document.body.classList.contains('ev-body') ? z * 1.25 : W / 600);
         z = Math.max(1, Math.min(6, z));
         var v = String(Math.round(z * 100) / 100);

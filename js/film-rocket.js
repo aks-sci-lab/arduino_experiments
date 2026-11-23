@@ -64,12 +64,12 @@
             gateDom: false,
             // 설명 화면 풀이가 열리면(2026-11-21 '점수 퀴즈 정답 표시도 풀이 뒤로') 퀴즈 화면의 ⭕·📘·점수를 다시 그림
             onLesson: function () {
-                if (PRESENT) return;
-                if (followApply()) return;   // 폰은 응답만 (선생님이 띄운 장에 맞춤)
+                if (followApply()) return;   // 발표용(나란히 보기)도 폰이 보는 화면을 그대로 보임   // 폰은 응답만 (선생님이 띄운 장에 맞춤)
                 if (/^(q-|end-(force|accel|pressure)$)/.test(st.screen) && app.getAttribute('data-screen') === st.screen) show(st.screen, { back: true }); else renderTop();
             },
             onStage: function (open, o) {
                 stageOpen = open;
+                if (PRESENT && following()) { followApply(); return; }   // 나란히 보기: 띄운 장에 맞춤 (단계가 열리면 다시)
                 if (PRESENT) {   // 발표용: 새로 열린 단계(처음엔 열린 마지막 단계)의 첫 화면
                     var to = o && o.moved && o.moved.to ? o.moved.to : open && open.length ? open[open.length - 1] : null;
                     if (to && STAGE_START[to] && stageOf(st.screen) !== to) show(STAGE_START[to]); else renderTop();
@@ -319,7 +319,8 @@
        수업 없이 연 화면·지난 기록·설명 화면을 안 쓰는 반·선생님이 설명을 닫은 동안(📱 학생 화면)은 지금처럼 폰 혼자 */
     var DO_PART = { 'do-t1': 't1', 'do-t2': 't2' };
     function lessonNow() { return share && share.lessonNow ? share.lessonNow() : { on: false }; }
-    function following() { return !!(CLASS && !PRESENT && !PAST && share && st.team && !st.team.pending && lessonNow().on); }
+    // 발표용(교사 🎬 발표 보기의 옆 학생 화면, 2026-11-23 나란히 보기)도 같은 규칙으로 '폰이 지금 보는 화면'을 보임 (팀 없이, 저장·보내기 없음)
+    function following() { return !!(CLASS && !PAST && share && lessonNow().on && (PRESENT || (st.team && !st.team.pending))); }
     function conceptOf(k) { return M.CONCEPTS.filter(function (c) { return c.key === k; })[0] || null; }
     // 띄운 장 → 폰 화면 (측정 장이면 { free: 't1' })
     function followTarget() {
@@ -350,7 +351,7 @@
     }
     // 선생님이 장을 넘기면: 측정 중이 아니면 그 장에 맞춤, 설명을 닫으면 하던 화면으로 → 처리했으면 true
     function followApply() {
-        if (PRESENT || PAST || !CLASS || !st.team) return false;
+        if (PAST || !CLASS || (!PRESENT && !st.team)) return false;
         if (!following()) {
             followClass();
             if (st.screen === 'wait' || st.screen === 'sent' || st.forced) { st.forced = false; show(st.lastReal && SCREENS[st.lastReal] ? resumeId(st.lastReal) : backTarget(), { back: true }); return true; }
@@ -423,7 +424,7 @@
     var SCREENS = {};
     SCREENS['wait'] = function () {
         return { html: '<div class="ev-hero ev-wait"><div class="ev-hero-ic" aria-hidden="true">👀</div><h2>앞 화면을 봐요</h2>' +
-            '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : '') + '</b></p></div>' };
+            '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : PRESENT ? '팀 이름' : '') + '</b></p></div>' };
     };
     SCREENS['sent'] = function () {
         return { html: '<div class="ev-hero ev-wait"><div class="ev-hero-ic" aria-hidden="true">✅</div><h2>보냈어요</h2><p class="ev-wait-sub">앞 화면을 봐요</p>' +
