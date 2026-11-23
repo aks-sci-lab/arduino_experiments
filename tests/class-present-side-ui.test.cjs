@@ -55,6 +55,14 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         assert.equal(r.scroll, 0, label + ' 가로 스크롤');
         assert.ok(r.bottom <= r.vh + 1, label + ' 띠가 화면 안: ' + JSON.stringify(r));
     };
+    // 왼쪽 위 작은 QR·수업 코드: 늘 보이고, 설명 장·학생 화면과 겹치지 않음, 찍을 수 있는 크기(화면 높이의 12 % 이상)
+    const qrTopLeft = async (T, label) => {
+        const q = await box(T, '#pQr'), img = await box(T, '#pQrImg'), d = await box(T, '#pSlides') || await box(T, '#pPanel'), f = await box(T, '#presentFrame'), vh = T.viewportSize().height;
+        assert.ok(q && q.x < T.viewportSize().width * 0.03 && q.y < vh * 0.05, label + ' QR 왼쪽 위: ' + JSON.stringify(q));
+        assert.ok(img.width >= vh * 0.12, label + ' QR 크기: ' + Math.round(img.width));
+        for (const o of [d, f]) if (o) assert.ok(q.x + q.width <= o.x + 1 || q.y + q.height <= o.y + 1, label + ' QR 이 가리지 않음');
+        assert.match(await T.textContent('#pQrCode'), /^\d+-\d{4}$/, label + ' 수업 코드');
+    };
     try {
         // ---------- 로켓 (팀 수업) ----------
         const c = await app.post({ action: 'createClass', ban: 4, mode: 'team', nTeams: 3, exp: 'rocket', stage: 1 });
@@ -85,6 +93,13 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
             const dd = await box(T, '#pSlides'), ff = await box(T, '#presentFrame');
             assert.ok(dd && ff && dd.x + dd.width <= ff.x + 1, w + ' 나란히');
             assert.ok(ff.height >= h * 0.6, w + ' 폰 틀 높이: ' + Math.round(ff.height));
+            // 폰 틀 = 실제 폰 비율 9 : 19.5, 안쪽 답 칸 화면은 틀을 채움 (아래 빈 곳 25 % 미만)
+            assert.ok(Math.abs(ff.width / ff.height - 9 / 19.5) < 0.02, w + ' 폰 비율: ' + Math.round(ff.width) + '×' + Math.round(ff.height));
+            await T.waitForTimeout(250);
+            const fill = await T.evaluate(() => { const f = document.getElementById('presentFrame'), win = f.contentWindow, d = f.contentDocument; let m = 0;
+                [...d.body.children].forEach(el => { if (el.tagName !== 'SCRIPT' && el.getClientRects().length) m = Math.max(m, el.getBoundingClientRect().bottom); }); return m / win.innerHeight; });
+            assert.ok(fill >= 0.75, w + ' 폰 틀 안 채움: ' + fill.toFixed(2));
+            await qrTopLeft(T, '로켓 ' + w);
         }
         await T.setViewportSize({ width: 1920, height: 1080 });
         // 🔓 풀이 (띠 단추) → 풀이 열림, 단추는 '✅ 풀이 열림'
@@ -94,7 +109,7 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         // ⬜ 설명만 → 학생 화면 접힘, ⇔ 나란히 → 다시 옆에
         await T.click('#btnPLayout');
         assert.equal(await box(T, '#presentFrame'), null, '⬜ 설명만');
-        assert.ok((await box(T, '#pSlides')).width > 1700, '설명 장 크게');
+        assert.ok((await box(T, '#pSlides')).width > 1500, '설명 장 크게');
         assert.match(await T.textContent('#btnPLayout'), /나란히/);
         await T.click('#btnPLayout');
         assert.ok(await box(T, '#presentFrame'), '⇔ 나란히');
@@ -109,6 +124,8 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         await T.click('#btnPGather');
         assert.equal(await T.isVisible('#pPanel'), false, '다시 누르면 설명 장으로');
         assert.ok(await slideTitle(T), '설명 장 그대로');
+        // 왼쪽 위 QR 을 눌러도 크게
+        await T.click('#pQr'); assert.equal(await T.isVisible('#bigQr'), true); await T.keyboard.press('Escape');
         // 📱 QR (띠) → 크게, Esc 로 닫기
         await T.click('#btnPQr');
         assert.equal(await T.isVisible('#bigQr'), true);
@@ -160,7 +177,9 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         await T.waitForFunction(() => { const e = document.getElementById('presentFrame').contentDocument.querySelector('[data-lesson-answer="qd-measure"]'); return e && !e.classList.contains('cs-ans-hide'); }, null, { timeout: 15000 });
         assert.equal(await hidden(), false, '풀이를 열면 학생 화면의 답도 열림');
         if (SHOTS) for (const [w, h] of SIZES) { await T.setViewportSize({ width: w, height: h }); await T.waitForTimeout(250); await T.screenshot({ path: path.join(SHOTS, 'qdot-side-' + w + 'x' + h + '.png') }); }
-        for (const [w, h] of SIZES) { await T.setViewportSize({ width: w, height: h }); await T.waitForTimeout(150); await barOneLine(T, '양자점 ' + w + '×' + h); }
+        for (const [w, h] of SIZES) { await T.setViewportSize({ width: w, height: h }); await T.waitForTimeout(150); await barOneLine(T, '양자점 ' + w + '×' + h); await qrTopLeft(T, '양자점 ' + w);
+            const dd = await box(T, '#pSlides'), ff = await box(T, '#presentFrame');
+            assert.ok(ff.height >= h * 0.8, w + ' 7단계 학생 화면은 칸 높이를 다 씀'); assert.ok(dd.width >= ff.width, w + ' 설명 장이 더 넓음'); }
         await T.setViewportSize({ width: 1920, height: 1080 });
         // 단계를 열면 설명 첫 장 + 학생 화면도 그 단계로
         await T.click('#btnPOpen'); await T.click('#btnPAskYes');
@@ -177,7 +196,7 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         assert.equal(await T.isVisible('#btnPLayout'), false);
         assert.equal(await T.isVisible('#btnPMode'), false);
         f = await box(T, '#presentFrame');
-        assert.ok(f.width > 1800, '학생 화면만 크게: ' + f.width);
+        assert.ok(f.width > 1600, '학생 화면만 크게 (왼쪽 위 QR 칸만 빼고): ' + f.width);
         await barOneLine(T, '말루스 1920');
         assert.deepEqual(errors, []);
     } finally { await browser.close(); api.close(); stat.close(); }

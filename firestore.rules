@@ -305,6 +305,18 @@ service cloud.firestore {
                             request.resource.data.stages is map && request.resource.data.stages.size() <= 20 &&
                             request.resource.data.updatedAt == request.time;
     }
+    // 그 자료에 바꿔 넣은 그림 하나 (② 2026-11-23): 선생님 기기에서 줄인 WebP·JPEG·PNG data URL(약 300KB 아래), 본인만. SVG·주소는 받지 않음
+    match /lessonEdits/{uid}/imgs/{id} {
+      allow read, delete: if isGoogle() && request.auth.uid == uid;
+      allow create: if isGoogle() && request.auth.uid == uid && id.matches('^i[a-z0-9]{15}$') &&
+                    request.resource.data.keys().hasOnly(['exp', 'data', 'w', 'h', 'createdAt']) &&
+                    request.resource.data.exp is string && request.resource.data.exp.matches('^[a-z0-9]{1,20}$') &&
+                    request.resource.data.data is string && request.resource.data.data.size() <= 410000 &&
+                    request.resource.data.data.matches('^data:image/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+$') &&
+                    request.resource.data.w is int && request.resource.data.w >= 1 && request.resource.data.w <= 4000 &&
+                    request.resource.data.h is int && request.resource.data.h >= 1 && request.resource.data.h <= 4000 &&
+                    request.resource.data.createdAt == request.time;
+    }
     match /labClassCodes/{code} {
       // 찾기 기간(joinUntil, 만든 뒤 2일 또는 주인이 다시 연 뒤 2일)이 지나면 못 읽음: 코드를 훑어 공간 id 를 알아내지 못하게
       allow get: if signedIn() && code.matches('^[0-9]{1,2}-[0-9]{4}$') && resource.data.joinUntil > request.time;

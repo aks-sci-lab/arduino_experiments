@@ -548,6 +548,30 @@
         if (typeof lesson !== 'undefined' && lesson.on && LSx) LSx.fit($('pSlides'));
     }
     applyLayout();
+    /* 학생 화면 칸 비율 (2026-11-23 선생님 "이부분 비율 조절해서 최적화해"): 칸 높이에 맞춘 실제 기기 비율, 남는 폭은 설명 장으로
+       · 행사형(로켓) = 폰 9 : 19.5 (틀 테두리까지), 안쪽은 틀을 채우게 키움 (js/lab-ui.js presentFit, iframe data-fit="phone")
+       · 7단계 = 칸 높이를 다 쓰는 세로 칸(폭의 26 %, 1600 폭 아래는 34 %)에 노트북 화면을 좁은 배치로 — 16 : 10 노트북 틀은 위아래가 비고 글자가 너무 작아 쓰지 않음 */
+    var PHONE_AR = 9 / 19.5, STEP_W = 0.26, STEP_W_SMALL = 0.34;
+    function sizeFrame() {
+        var pane = $('presentPane'), box = pane.querySelector('.ct-pframe'), f = $('presentFrame');
+        if (!box || pane.hidden) return;
+        var r = box.getBoundingClientRect(); if (!r.height) return;
+        var phone = pane.classList.contains('phone'), fw;
+        if (phone) fw = Math.round(r.height * PHONE_AR);
+        else fw = Math.round(r.width * (window.innerWidth < 1600 ? STEP_W_SMALL : STEP_W));   // 작은 노트북 화면은 학생 화면이 너무 좁지 않게 조금 더
+        var v = fw + 'px';
+        if (box.style.getPropertyValue('--fw') !== v) box.style.setProperty('--fw', v);
+        var fit = phone ? 'phone' : '';
+        if ((f.getAttribute('data-fit') || '') !== fit) {
+            if (fit) f.setAttribute('data-fit', fit); else f.removeAttribute('data-fit');
+            try { f.contentWindow.dispatchEvent(new Event('resize')); } catch (e) { /* 무시 */ }
+        }
+    }
+    if (window.ResizeObserver) new ResizeObserver(sizeFrame).observe(document.querySelector('#presentPane .ct-pframe'));
+    if (window.MutationObserver) new MutationObserver(sizeFrame).observe($('presentPane'), { attributes: true, attributeFilter: ['class', 'hidden'] });
+    window.addEventListener('resize', sizeFrame);
+    // 왼쪽 위 작은 QR (늦게 온 팀·조가 찍음) — 누르면 크게
+    $('pQr').addEventListener('click', function () { $('btnBig').click(); });
     function frameDoc() { try { var f = $('presentFrame'); return f && f.contentDocument && f.contentDocument.body ? f.contentDocument : null; } catch (e) { return null; } }
     function shown(el) { return !!(el && el.getClientRects().length); }
     // 발표 틀 주소 바꾸기: src 를 바꾸면 브라우저 뒤로 가기 기록에 쌓여 '뒤로' 가 틀 안에서만 돎 → replace 로 (2026-11-23 발표 보기가 첫 화면)
@@ -565,7 +589,10 @@
             u.searchParams.set('present', '1');
             setFrame(u.href);
             lessonLoad(c);
+            $('pQrImg').innerHTML = qrSvg(studentLink(c), 'H') || '';
+            $('pQrCode').textContent = c.classCode;
         }
+        sizeFrame();
         renderPresentBar();
     }
     function closePresent() {
