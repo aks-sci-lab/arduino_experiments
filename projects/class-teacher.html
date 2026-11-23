@@ -95,6 +95,15 @@
         </section>
 
         <div id="runPane" hidden>
+        <!-- 📋 진행 상황 팝업 안에서만 보이는 칸 (2026-11-23 선생님 "팝업창에서도 정보의 중요성을 판단해서 화면 재배치", 고른 것 '한 화면 두 칸'):
+             ① 맨 위 요약 한 줄 ② ⚠ 챙길 팀·조 ③ 팀·조마다 작은 칸 ④ 오른쪽 단계 조작(#stageCard) ⑤ 🏆 결과판·📤 제출 작은 탭 ⑥ 🔧 선생님용 — 팝업 밖 진행 화면은 그대로 -->
+        <p id="rpSum" class="ct-rp ct-rp-sum" role="status" aria-live="polite" hidden></p>
+        <div id="rpLeft" class="ct-rp ct-rp-left" hidden>
+            <h3 id="rpCareH" class="ct-rp-h">⚠ 챙길 팀</h3><div id="rpCare" class="ct-rp-care"></div>
+            <h3 id="rpCellsH" class="ct-rp-h">👥 팀별 지금</h3><div id="rpCells" class="ct-rp-cells"></div>
+        </div>
+        <nav id="rpTabs" class="ct-rp ct-rp-tabs" aria-label="진행 상황 자세히" hidden></nav>
+        <div id="rpTeach" class="ct-rp ct-rp-teach" hidden></div>
         <!-- 학생에게 여는 단계 -->
         <section class="ct-card ct-stage" id="stageCard" hidden>
             <p class="note">학생 화면에서 지금 열린 단계</p>
@@ -119,7 +128,7 @@
         <section class="ct-card" id="boardCard" hidden>
             <div class="ct-row"><h2 style="margin:0">🏆 팀 결과판</h2><button id="btnBoardBig" class="good">🖥 크게 보기 (프로젝터)</button></div>
             <div id="board"></div>
-            <details class="ct-key ct-teach"><summary>🔧 선생님용: 🧪 예비 실험 값·목표 고치기</summary><div id="teamSetupEdit"></div>
+            <details class="ct-key ct-teach" id="setupTeach"><summary>🔧 선생님용: 🧪 예비 실험 값·목표 고치기</summary><div id="teamSetupEdit"></div>
                 <div class="ct-row"><button id="btnSetupSave" class="good">💾 설정 저장</button></div><p id="setupMsg" class="note" role="status" aria-live="polite"></p>
                 <p class="note">가족 화면은 도전 화면을 열 때 새 목표를 받아요.</p></details>
         </section>

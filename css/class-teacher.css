@@ -386,6 +386,83 @@ body.ct-presenting .ct-present.phone .ct-pframe iframe { aspect-ratio: 9 / 19.5;
 .ct-board-present .ct-board { font-size: 1.15em; }
 .ct-board-present .ct-board td.ct-talk { max-width: none; min-width: 40%; width: 55%; font-size: 1em; color: var(--c-text); line-height: 1.45; }
 .ct-board-present .ct-board td.ct-talk div + div { margin-top: .35em; }
+/* ===== 📋 진행 상황 팝업 재배치 (2026-11-23 '한 화면 두 칸'): 팝업 안에서만 — 팝업 밖 진행 화면은 그대로 =====
+   맨 위 요약 한 줄 | 왼쪽 ⚠ 챙길 팀 + 팀별 작은 칸 · 오른쪽 단계 조작 | 아래 작은 탭(🏆·📤·🧩·🔧) → 고른 탭 내용. 팝업은 스크롤 없이 한 화면 */
+.ct-rp[hidden] { display: none !important; }
+.ct-runpop .ct-runpop-box { height: 94vh; }
+.ct-runpop .ct-runpop-body { flex: 1 1 auto; display: flex; overflow: hidden; padding: var(--sp-2) var(--sp-3) var(--sp-3); }
+#runPane.in-pop { flex: 1 1 auto; min-width: 0; min-height: 0; display: grid; gap: var(--sp-2) var(--sp-3);
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 28%); grid-template-rows: auto minmax(0, 1fr) auto 0;
+    grid-template-areas: "sum sum" "left stage" "tabs tabs" "panel panel"; }
+#runPane.in-pop:not([data-rptab=""]) { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+/* 탭 내용은 필요한 만큼만 (화면 높이의 40 % 까지, 넘치면 그 안에서 내림) — 위쪽 챙길 팀·단계 조작이 먼저 자리를 가짐 */
+#runPane.in-pop > #boardCard, #runPane.in-pop > #gatherCard, #runPane.in-pop > #planckCard, #runPane.in-pop > #groups, #runPane.in-pop > #rpTeach, #runPane.in-pop > #detail { max-height: 40vh; }
+#runPane.in-pop > * { grid-area: panel; min-width: 0; min-height: 0; margin: 0; }
+#runPane.in-pop #watchSum { display: none; }
+.ct-rp-sum { grid-area: sum !important; font-size: 1.15rem; padding: var(--sp-2) var(--sp-3); background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); }
+.ct-rp-dot { color: var(--c-muted); }
+.ct-rp-left { grid-area: left !important; overflow: auto; background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-2) var(--sp-3); }
+.ct-rp-h { margin: var(--sp-1) 0; font-size: 1rem; }
+.ct-rp-care ul { margin: 0 0 var(--sp-2); padding-left: 1.2em; }
+.ct-rp-care li { margin: 2px 0; }
+.ct-rp-cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--sp-1); }
+.ct-rp-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; padding: 6px 10px; border: 1px solid var(--c-line); border-radius: 10px; background: var(--c-fill); color: var(--c-text); font: inherit; font-size: .9rem; min-height: 44px; }
+button.ct-rp-cell { cursor: pointer; }
+.ct-rp-cell.care { border: 2px solid var(--c-warn-text); background: var(--c-warn-bg); }
+.ct-rp-cell.empty { opacity: .65; }
+.ct-rp-cell .note { font-size: .8rem; }
+#runPane.in-pop #stageCard { grid-area: stage; overflow: auto; padding: var(--sp-2) var(--sp-3); }
+#runPane.in-pop #stageCard > .note:first-child, #runPane.in-pop #stageWait { display: none !important; }
+#runPane.in-pop .ct-stage-now { font-size: 1.1rem; margin: 0 0 var(--sp-1); }
+#runPane.in-pop .ct-stage-steps { display: flex; flex-wrap: wrap; gap: 4px; padding: 0; margin: 0 0 var(--sp-2); list-style: none; }
+#runPane.in-pop .ct-stage-steps li { padding: 2px 8px; border-radius: 999px; background: var(--c-fill); font-size: .85rem; }
+#runPane.in-pop .ct-stage-steps li.cur { background: var(--c-primary); color: #fff; }
+#runPane.in-pop #stageCard .ct-row { flex-direction: column; align-items: stretch; gap: var(--sp-1); }
+#runPane.in-pop #stageCard .ct-row button { width: 100%; }
+.ct-rp-tabs { grid-area: tabs !important; display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.ct-rp-tabs button { min-height: 44px; padding: 0 1em; border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-card); color: var(--c-text); font: inherit; }
+.ct-rp-tabs button[aria-pressed="true"] { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+#runPane.in-pop #boardCard, #runPane.in-pop #gatherCard, #runPane.in-pop #planckCard, #runPane.in-pop #groups, #runPane.in-pop #rpTeach { overflow: auto; }
+#runPane.in-pop:not([data-rptab="board"]) #boardCard,
+#runPane.in-pop:not([data-rptab="sub"]) #groups,
+#runPane.in-pop:not([data-rptab="sub"]) #detail,
+#runPane.in-pop:not([data-rptab="gather"]) #gatherCard,
+#runPane.in-pop:not([data-rptab="planck"]) #planckCard,
+#runPane.in-pop:not([data-rptab="teach"]) #rpTeach { display: none !important; }
+#runPane.in-pop #detail { align-self: start; justify-self: end; width: min(28rem, 48%); max-height: 100%; overflow: auto; box-sizing: border-box; z-index: 2; box-shadow: 0 6px 24px rgba(0,0,0,.2); }
+#runPane.in-pop #boardCard #btnBoardBig { display: none; }
+.ct-rp-teach { background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-2) var(--sp-3); }
+.ct-rp-teach details { margin: 0 0 var(--sp-2); }
+.ct-group.ct-rp-hl { outline: 3px solid var(--c-primary); }
+@media (max-width: 899px) {
+    #runPane.in-pop { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto minmax(0, 1fr); grid-template-areas: "sum" "stage" "left" "tabs" "panel"; overflow: auto; }
+    .ct-runpop .ct-runpop-body { overflow: auto; }
+}
+/* 진행 상황 팝업: 단계 단추는 '▶ 다음 단계' 한 줄 + '되돌리기 · 모두 열기' 한 줄 */
+#runPane.in-pop #stageCard .ct-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-1); }
+#runPane.in-pop #stageCard #btnStageNext { grid-column: 1 / -1; }
+#runPane.in-pop #stageCard .ct-row button { min-height: 44px; padding: 4px 8px; font-size: .9rem; }
+#runPane.in-pop #stageMsg { font-size: .8rem; margin: 4px 0 0; }
+@media (max-height: 900px) {
+    #runPane.in-pop > #boardCard, #runPane.in-pop > #gatherCard, #runPane.in-pop > #planckCard, #runPane.in-pop > #groups, #runPane.in-pop > #rpTeach, #runPane.in-pop > #detail { max-height: 32vh; }
+    .ct-rp-sum { padding: 4px var(--sp-2); }
+}
+#rpCells button.ct-rp-cell, #rpCells button.ct-rp-cell:hover { background: var(--c-fill); color: var(--c-text); border: 1px solid var(--c-line); }
+#rpCells button.ct-rp-cell.care, #rpCells button.ct-rp-cell.care:hover { background: var(--c-warn-bg); border: 2px solid var(--c-warn-text); }
+#rpCells button.ct-rp-cell:focus-visible { outline: 3px solid var(--c-primary); outline-offset: 1px; }
+@media (max-height: 900px) {
+    /* 낮은 화면: 단계 칩은 열린 것 + 바로 다음 잠긴 것만 */
+    #runPane.in-pop .ct-stage-steps li.lock ~ li.lock { display: none; }
+    #runPane.in-pop .ct-stage-steps li { font-size: .75rem; padding: 1px 6px; }
+}
+@media (max-height: 780px) {
+    #runPane.in-pop > #boardCard, #runPane.in-pop > #gatherCard, #runPane.in-pop > #planckCard, #runPane.in-pop > #groups, #runPane.in-pop > #rpTeach, #runPane.in-pop > #detail { max-height: 26vh; }
+    #runPane.in-pop .ct-stage-now { font-size: 1rem; }
+    #runPane.in-pop #stageCard { padding: 6px var(--sp-2); }
+}
+/* 4K: 글자가 화면 높이에 맞춰 커지므로 팝업 폭도 함께 (1600px 고정이면 칸이 좁아짐) */
+.ct-runpop .ct-runpop-box { width: min(94vw, max(1600px, 165vh)); }
+#runPane.in-pop #stageCard .ct-row button, .ct-rp-tabs button { min-height: max(44px, 2.4rem); }
 /* 🎯 도전 장면 (필름통 로켓 결과판): 📷 ▶ 단추 → 누를 때만 읽어 크게 */
 .ct-media { display: inline-flex; gap: 4px; vertical-align: middle; }
 .ct-media-btn { min-height: 0; min-width: 2.2em; padding: 2px 6px; font-size: .95em; line-height: 1.2; background: var(--c-card, #fff); color: var(--c-primary); border: 1px solid var(--c-primary); border-radius: 6px; }
