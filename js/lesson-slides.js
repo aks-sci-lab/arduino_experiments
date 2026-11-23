@@ -178,11 +178,42 @@
     // 장 하나의 자리 이름 (key 가 있으면 key, 없으면 단계·순서)
     function refOf(stage, slide, i) { return slide && slide.key ? 'k:' + slide.key : 's:' + stage + ':' + i; }
     var NEW_KEY_RE = /^my-[a-z0-9-]{1,36}$/;
+    /* 내가 바꾼 그림 (② 2026-11-23): 장에는 'my-img:<그림 id>' 만, 그림은 내 계정 문서 lessonEdits/{uid}/imgs/{id} 에 data URL 로
+       (선생님 기기에서 긴 변 1280px·WebP/JPEG·300KB 아래로 줄여 캔버스로 다시 그린 것 — SVG·다른 주소는 받지 않음).
+       그릴 때는 resolveImgs 가 data URL 로 바꿔 넣음 (못 읽은 그림은 뺌) */
+    var IMG_REF_RE = /^my-img:i[a-z0-9]{15}$/, IMG_DATA_RE = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+\/=]+$/;
+    function imgIds(def) {
+        var out = [];
+        if (def && def.stages) Object.keys(def.stages).forEach(function (k) { def.stages[k].forEach(function (s) {
+            ['img', 'revealImg'].forEach(function (f) { if (IMG_REF_RE.test(String(s[f] || ''))) { var id = s[f].slice(7); if (out.indexOf(id) < 0) out.push(id); } });
+        }); });
+        return out;
+    }
+    // map: { 그림 id: data URL } → 장의 'my-img:' 를 data URL 로 (모양이 틀리거나 없는 그림은 뺌). 장 하나에도 씀
+    function imgSlide(s, map) {
+        var o = s;
+        ['img', 'revealImg'].forEach(function (f) {
+            if (!IMG_REF_RE.test(String(s[f] || ''))) return;
+            if (o === s) { o = {}; Object.keys(s).forEach(function (k) { o[k] = s[k]; }); }
+            var d = map && map[s[f].slice(7)];
+            if (typeof d === 'string' && IMG_DATA_RE.test(d)) o[f] = d; else delete o[f];
+        });
+        return o;
+    }
+    function resolveImgs(def, map) {
+        if (!def || !def.stages) return def;
+        var out = {}; Object.keys(def).forEach(function (k) { out[k] = def[k]; });
+        out.stages = {};
+        Object.keys(def.stages).forEach(function (k) { out.stages[k] = def.stages[k].map(function (s) { return imgSlide(s, map); }); });
+        return out;
+    }
     function newSlide(e) {
         if (!e || !NEW_KEY_RE.test(String(e.add || '')) || !KINDS[e.kind]) return null;
         var s = { kind: e.kind, key: e.add, title: sanitize(e.title, EDIT_FIELDS.title) || '(제목 없음)', mine: true };
         ['body', 'ask', 'reveal', 'note'].forEach(function (f) { var v = sanitize(e[f], EDIT_FIELDS[f]); if (v) s[f] = v; });
         if (!s.ask) delete s.reveal;
+        ['img', 'revealImg'].forEach(function (f) { if (IMG_REF_RE.test(String(e[f] || ''))) s[f] = e[f]; });
+        if (!s.reveal) delete s.revealImg;
         if (e.kind === 'vars') { s.vars = cleanVars(e.vars); if (!s.vars || !s.vars.change) { s.kind = 'concept'; delete s.vars; } }
         if (!s.body && !s.ask && !s.vars) s.body = '';
         return s;
@@ -194,6 +225,11 @@
             if (typeof set[f] !== 'string') return;
             var v = sanitize(set[f], EDIT_FIELDS[f]);
             if (v) s[f] = v; else if (f !== 'title') delete s[f];
+        });
+        // 그림: 'my-img:<id>' (내 계정 그림 문서) 또는 '' (그림 빼기). 다른 주소는 받지 않음
+        ['img', 'revealImg'].forEach(function (f) {
+            if (typeof set[f] !== 'string') return;
+            if (set[f] === '') delete s[f]; else if (IMG_REF_RE.test(set[f])) s[f] = set[f];
         });
         if (!s.ask) { delete s.reveal; delete s.revealImg; }
         if (set.vars && base.kind === 'vars') { var cv = cleanVars(set.vars); if (cv && cv.change) s.vars = cv; }
@@ -251,6 +287,7 @@
                     var n = { add: e.add, kind: e.kind };
                     ['title', 'body', 'ask', 'reveal', 'note'].forEach(function (f) { var v = sanitize(e[f], EDIT_FIELDS[f]); if (v) n[f] = v; });
                     if (e.kind === 'vars' && e.vars) n.vars = cleanVars(e.vars);
+                    ['img', 'revealImg'].forEach(function (f) { if (IMG_REF_RE.test(String(e[f] || ''))) n[f] = e[f]; });
                     return n;
                 }
                 var o = { ref: e.ref, of: plain(e.base.title) };
@@ -260,6 +297,9 @@
                     if (typeof e.set[f] !== 'string') return;
                     var v = sanitize(e.set[f], EDIT_FIELDS[f]);
                     if (v !== sanitize(e.base[f] || '', EDIT_FIELDS[f])) set[f] = v;
+                });
+                ['img', 'revealImg'].forEach(function (f) {
+                    if (typeof e.set[f] === 'string' && (e.set[f] === '' || IMG_REF_RE.test(e.set[f])) && e.set[f] !== (e.base[f] || '')) set[f] = e.set[f];
                 });
                 if (e.set.vars && e.base.vars) { var cv = cleanVars(e.set.vars); if (JSON.stringify(cv) !== JSON.stringify(cleanVars(e.base.vars))) set.vars = cv; }
                 if (Object.keys(set).length) o.set = set;
@@ -279,7 +319,15 @@
             if (!LS || LessonSlides.noEdits || !/^[a-z0-9]+$/.test(String(exp || ''))) return def;
             return Promise.resolve(LS.currentUser()).then(function (u) {
                 return u && u.google ? LS.call('lab:', { action: 'lessonEditGet', exp: exp }, 8000) : null;
-            }).then(function (r) { return r && r.ok && r.edit ? applyEdit(def, r.edit) : def; }, function () { return def; });
+            }).then(function (r) {
+                if (!(r && r.ok && r.edit)) return def;
+                var m = applyEdit(def, r.edit), ids = imgIds(m);
+                if (!ids.length) return m;
+                // 내가 바꾼 그림: 그림마다 문서 하나 (발표 보기를 열 때 한 번씩)
+                return Promise.all(ids.map(function (id) {
+                    return LS.call('lab:', { action: 'lessonImgGet', id: id }, 15000).then(function (x) { return x && x.ok ? x.data : ''; }, function () { return ''; });
+                })).then(function (datas) { var map = {}; ids.forEach(function (id, i) { map[id] = datas[i]; }); return resolveImgs(m, map); });
+            }, function () { return def; });
         });
     }
     function loadBase(exp, base) {
@@ -296,6 +344,6 @@
         return loading[exp];
     }
     var LessonSlides = { KINDS: KINDS, slidesFor: slidesFor, gateOf: gateOf, firstPanel: firstPanel, render: render, fit: fit, check: check, load: load, loadBase: loadBase,
-        sanitize: sanitize, plain: plain, applyEdit: applyEdit, resolveEdit: resolveEdit, entrySlide: entrySlide, toEdit: toEdit, refOf: refOf, EDIT_FIELDS: EDIT_FIELDS, NEW_KEY_RE: NEW_KEY_RE };
+        sanitize: sanitize, plain: plain, applyEdit: applyEdit, resolveEdit: resolveEdit, entrySlide: entrySlide, toEdit: toEdit, refOf: refOf, imgIds: imgIds, imgSlide: imgSlide, resolveImgs: resolveImgs, IMG_REF_RE: IMG_REF_RE, IMG_DATA_RE: IMG_DATA_RE, EDIT_FIELDS: EDIT_FIELDS, NEW_KEY_RE: NEW_KEY_RE };
     return { LessonContent: LessonContent, LessonSlides: LessonSlides };
 });

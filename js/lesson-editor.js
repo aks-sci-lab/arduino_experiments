@@ -14,7 +14,7 @@
         { f: 'reveal', name: '💡 풀이 (한 번 더 넘기면 보임)', needs: 'ask' },
         { f: 'note', name: '🔧 선생님용 (발표 화면에서 접혀 있음)' }
     ];
-    var st = { user: null, exp: '', def: null, keys: [], stages: {}, stage: '', sel: 0, dirty: false, edits: {}, size: '1280' };
+    var st = { user: null, exp: '', def: null, keys: [], stages: {}, stage: '', sel: 0, dirty: false, edits: {}, size: '1280', imgs: {} };
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function call(body) { return Store.call('lab:', body); }
@@ -92,6 +92,13 @@
             keys.forEach(function (k) { st.stages[k] = R.stages[k] || []; });
             var first = keys.filter(function (k) { return st.stages[k].length; })[0] || keys[0];
             drawStages(); pickStage(first, 0);
+            // 내가 바꾼 그림 불러오기 (미리보기·고치기 칸 작은 그림)
+            st.imgs = {};
+            var ids = [];
+            keys.forEach(function (k) { st.stages[k].forEach(function (e) { ['img', 'revealImg'].forEach(function (f) { var v = String(val(e, f) || ''); if (LS.IMG_REF_RE.test(v) && ids.indexOf(v.slice(7)) < 0) ids.push(v.slice(7)); }); }); });
+            ids.forEach(function (id) {
+                call({ action: 'lessonImgGet', id: id }).then(function (x) { if (x && x.ok && st.exp === exp) { st.imgs[id] = x.data; drawForm(); preview(); } });
+            });
         });
     }
     $('btnBack').addEventListener('click', showPick);
@@ -123,6 +130,7 @@
         if (!e.base) return false;
         return Object.keys(e.set).some(function (f) {
             if (f === 'vars') return JSON.stringify(e.set.vars) !== JSON.stringify(e.base.vars);
+            if (f === 'img' || f === 'revealImg') return e.set[f] !== (e.base[f] || '');
             return LS.sanitize(e.set[f]) !== LS.sanitize(e.base[f] || '');
         });
     }
@@ -177,6 +185,8 @@
                 '<div class="le-rich" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="lbl-' + F.f + '" data-f="' + F.f + '"' + (F.needs && !LS.plain(val(e, F.needs)) ? ' data-off="1"' : '') + '>' + LS.sanitize(v) + '</div>' +
                 (F.needs ? '<small class="note">물음이 있어야 풀이가 나와요.</small>' : '') + '</div>';
         });
+        h += imgField(e, 'img', '🖼 그림');
+        if (LS.plain(val(e, 'ask'))) h += imgField(e, 'revealImg', '🖼 풀이를 연 뒤 그림 (없으면 위 그림)');
         if (k === 'vars') {
             var vv = (e.base ? (e.set.vars || e.base.vars) : e.vars) || { change: '', keep: [], measure: '', predict: '' };
             h += '<fieldset class="le-vars"><legend>⚖️ 변인 표</legend>' +
@@ -188,6 +198,64 @@
         h += '<div class="le-row">' + (e.base ? '<button type="button" class="le-btn secondary" id="btnUndoSlide"' + (isEdited(e) ? '' : ' disabled') + '>↩ 이 장 원래대로</button>' : '<button type="button" class="le-btn danger" id="btnDelSlide">🗑 이 장 지우기</button>') + '</div>';
         box.innerHTML = h;
     }
+    // ---------- 그림 바꾸기 (② 선생님 기기에서 긴 변 1280px·WebP(안 되면 JPEG)·300KB 아래로 줄여 내 계정에) ----------
+    function imgSrc(v) {
+        v = String(v || '');
+        if (LS.IMG_REF_RE.test(v)) return st.imgs[v.slice(7)] || '';
+        return v;
+    }
+    function thumb(v) {
+        var s = imgSrc(v);
+        if (!s) return String(v || '') && LS.IMG_REF_RE.test(v) ? '<span class="note">⏳ 그림을 불러오는 중…</span>' : '<span class="note">그림 없음</span>';
+        if (/^<svg[\s>]/i.test(s)) return '<span class="le-thumb">' + s + '</span>';   // 기본 내용 파일의 그림 (저장소 글)
+        return '<span class="le-thumb"><img src="' + esc(s) + '" alt=""></span>';
+    }
+    function imgField(e, f, name) {
+        var v = val(e, f), changed = e.base ? typeof e.set[f] === 'string' : !!e[f];
+        return '<div class="le-field le-imgfield"><span class="le-fname">' + name + '</span>' + thumb(v) +
+            '<span class="le-row"><label class="le-btn secondary le-file">📷 그림 바꾸기<input type="file" accept="image/png,image/jpeg,image/webp" data-img="' + f + '"></label>' +
+            (v ? '<button type="button" class="le-btn secondary" data-imgop="none" data-for="' + f + '">그림 빼기</button>' : '') +
+            (e.base && changed ? '<button type="button" class="le-btn secondary" data-imgop="undo" data-for="' + f + '">↩ 원래 그림</button>' : '') + '</span>' +
+            '<small class="note" data-imgmsg="' + f + '" role="status"></small></div>';
+    }
+    // 그림 줄이기: 캔버스로 다시 그려(SVG·글자 속 스크립트가 따라오지 않게) 긴 변 1280px, WebP → JPEG, 품질을 낮추며 300KB 아래로
+    var IMG_MAX_CHARS = 400000;
+    function shrink(file) {
+        return new Promise(function (res, rej) {
+            if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { rej(new Error('사진·PNG·JPEG·WebP 그림만 올릴 수 있어요.')); return; }
+            var url = URL.createObjectURL(file), im = new Image();
+            im.onload = function () {
+                URL.revokeObjectURL(url);
+                var side = 1280, out = null;
+                for (var round = 0; round < 4 && !out; round++, side = Math.round(side * 0.75)) {
+                    var sc = Math.min(1, side / Math.max(im.naturalWidth, im.naturalHeight)), w = Math.max(1, Math.round(im.naturalWidth * sc)), h = Math.max(1, Math.round(im.naturalHeight * sc));
+                    var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+                    var g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(im, 0, 0, w, h);
+                    var types = ['image/webp', 'image/jpeg'];
+                    for (var t = 0; t < types.length && !out; t++) for (var q = 0.85; q >= 0.4 && !out; q -= 0.15) {
+                        var d = cv.toDataURL(types[t], q);
+                        if (d.indexOf('data:' + types[t]) === 0 && d.length <= IMG_MAX_CHARS) out = { data: d, w: w, h: h };
+                    }
+                }
+                if (out) res(out); else rej(new Error('그림을 300KB 아래로 줄이지 못했어요.'));
+            };
+            im.onerror = function () { URL.revokeObjectURL(url); rej(new Error('그림을 읽지 못했어요.')); };
+            im.src = url;
+        });
+    }
+    function setImg(e, f, v) { if (e.base) e.set[f] = v; else if (v) e[f] = v; else delete e[f]; }
+    $('slideForm').addEventListener('change', function (ev) {
+        var inp = ev.target.closest('input[data-img]'); if (!inp || !inp.files || !inp.files[0]) return;
+        var e = cur(), f = inp.dataset.img, msg = $('slideForm').querySelector('[data-imgmsg="' + f + '"]'), exp = st.exp;
+        msg.textContent = '⏳ 그림을 줄여 올리는 중…';
+        shrink(inp.files[0]).then(function (o) {
+            return call({ action: 'lessonImgSave', exp: exp, data: o.data, w: o.w, h: o.h }).then(function (r) {
+                if (!r || !r.ok) throw new Error((r && r.error) || '올리지 못했어요');
+                st.imgs[r.id] = o.data;
+                if (cur() === e) { setImg(e, f, r.ref); setDirty(true); drawForm(); preview(); var m2 = $('slideForm').querySelector('[data-imgmsg="' + f + '"]'); if (m2) m2.textContent = '✅ 그림을 바꿨어요 (' + o.w + '×' + o.h + ', ' + Math.round(o.data.length * 0.75 / 1024) + 'KB) — 💾 저장해야 남아요'; }
+            });
+        }).catch(function (err) { if (msg.isConnected) msg.textContent = '⚠ ' + (err && err.message || err); });
+    });
     function textOf(el) { return el.tagName === 'DIV' ? el.innerHTML : el.value; }
     function onField(el) {
         var e = cur(); if (!e) return;
@@ -231,6 +299,13 @@
             if (ed) { ed.focus(); document.execCommand(b.dataset.cmd, false, null); onField(ed); }
             return;
         }
+        if (b.dataset.imgop) {
+            var ei = cur(), fi = b.dataset.for;
+            if (b.dataset.imgop === 'none') setImg(ei, fi, '');
+            else delete ei.set[fi];
+            setDirty(true); drawList(); drawForm(); preview();
+            return;
+        }
         if (b.id === 'btnUndoSlide') { var e = cur(); e.set = {}; setDirty(true); drawList(); drawForm(); preview(); }
         if (b.id === 'btnDelSlide' && confirm('이 장을 지울까요?')) {
             var list = st.stages[st.stage]; list.splice(st.sel, 1); st.sel = Math.max(0, Math.min(st.sel, list.length - 1));
@@ -267,6 +342,7 @@
             var visible = st.stages[st.stage].filter(function (x) { return !x.hide; });
             var slide = LS.entrySlide(e.hide ? Object.assign({}, e, { hide: false }) : e);
             if (!slide) { deck.innerHTML = ''; return; }
+            slide = LS.imgSlide(slide, st.imgs);
             var rev = $('prevReveal').checked && !!slide.reveal;
             deck.innerHTML = LS.render(slide, rev, { i: Math.max(0, visible.indexOf(e)), n: visible.length || 1, stageName: stageName(st.stage) });
             if (e.hide) deck.firstChild.insertAdjacentHTML('afterbegin', '<p class="ls-wait">🙈 숨긴 장 — 발표 보기에는 나오지 않아요</p>');
