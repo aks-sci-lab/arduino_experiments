@@ -44,6 +44,7 @@ test('그림 바꾸기 → 줄여 저장 → 발표 보기 → 되돌리기', { 
         const msg = await T.textContent('[data-imgmsg="img"]');
         assert.match(msg, /1280×853/, '긴 변 1280: ' + msg);
         assert.ok(Number(/(\d+)KB/.exec(msg)[1]) <= 300, '300KB 아래: ' + msg);
+        await T.waitForFunction(() => document.getElementById('prevFrame').contentDocument.querySelector('.ls-fig img'));
         const pv = await T.evaluate(() => { const i = document.getElementById('prevFrame').contentDocument.querySelector('.ls-fig img'); return i ? i.getAttribute('src').slice(0, 23) : ''; });
         assert.match(pv, /^data:image\/(webp|jpeg)/, '미리보기에 줄인 그림');
         assert.equal(imgsOf().length, 1, '올리면 바로 내 계정 그림 문서');
