@@ -52,7 +52,7 @@ test('설명 화면 ↔ 학생 폰: 👀 띠·답 가리기·풀이 열기, 설�
         assert.equal(await A.evaluate(() => document.documentElement.classList.contains('cs-look')), true);
         assert.equal(app.db.docs.get('labClasses/' + c.space).lesson.on, true);
         // 발표 띠에 팀 상태 (들어온 팀)
-        await T.waitForFunction(() => /들어온 팀\s*1/.test(document.getElementById('pJoined').textContent), null, { timeout: 15000 });
+        await T.waitForFunction(() => /👨‍👩‍👧 1팀/.test(document.getElementById('pJoined').textContent), null, { timeout: 15000 });
         // 폰: 처음 생각을 고르면 📘 정의는 가림 (설명 화면을 쓰는 반)
         await next(A); await go(A, 'think-force'); await A.click('.ev-choice[data-k="have"]');
         await A.waitForSelector('[data-lesson-answer="force"]', { state: 'attached' });

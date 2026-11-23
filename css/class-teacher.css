@@ -189,7 +189,7 @@ body.ct-presenting .ct-wrap { max-width: none; padding-top: var(--sp-2); padding
 @media (min-width: 1000px) {
     .ct-pbtns { flex-wrap: nowrap; }
     .ct-pbtns > button { white-space: nowrap; }
-    #btnPOpen { max-width: 22em; overflow: hidden; text-overflow: ellipsis; }
+    #btnPOpen { max-width: 16em; overflow: hidden; text-overflow: ellipsis; }
 }
 .ct-pask { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 2px solid var(--c-success); border-radius: var(--r-card); background: var(--c-ok-bg); font-size: 1.1rem; }
 .ct-pask[hidden] { display: none; }
@@ -283,3 +283,39 @@ details.ct-phint:not([open]) > summary { min-height: 0; padding: 2px 0; }
 .ctg-keys { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-bottom: var(--sp-2); }
 .ctg-dots { width: 100%; max-height: 70vh; display: block; }
 .ctg-teach { margin: var(--sp-1) 0 0; padding-left: 1.2em; }
+/* 2026-11-23 프로젝터 = 정보의 중심: 교사 조작 띠는 발표 화면 맨 아래 얇게, 🏆 결과판·🧩 모아 보기를 발표 화면에 띄움 */
+.ct-present .ct-pbar { margin-top: var(--sp-2); padding: 4px var(--sp-2); gap: 4px var(--sp-2); font-size: .92rem; }
+.ct-present .ct-pbar .ct-pbtns > button { min-height: 44px; padding: 0 .7em; }
+.ct-present .ct-pbtns > button.on { outline: 3px solid var(--c-primary); outline-offset: -3px; }
+.ct-present .ct-pframe { margin-top: 0; }
+.ct-present.pp-panel .ls-deck, .ct-present.pp-panel .ct-pframe iframe { display: none !important; }
+.ct-ppanel { height: 100%; box-sizing: border-box; overflow: auto; background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-3); font-size: 1.15rem; }
+.ct-ppanel[hidden] { display: none; }
+.ct-ppanel .ct-ppanel-h { margin: 0 0 var(--sp-2); }
+.ct-ppanel #gatherCard { border: 0; padding: 0; margin: 0; }
+.ct-ptalk { display: grid; grid-template-columns: repeat(auto-fill, minmax(22em, 1fr)); gap: var(--sp-2); }
+.ct-ptalk-card { border: 1px solid var(--c-line); border-radius: 10px; padding: var(--sp-2) var(--sp-3); background: var(--c-fill); }
+.ct-ptalk-card p { margin: 4px 0 0; }
+/* 📱 응답 장: 팀 답 모음 (설명 장 안, 글자는 장과 같이 --ls-scale 로 줄어듦) */
+.ls-answers { margin-top: .5em; padding: .4em .6em; border: 2px dashed var(--c-primary); border-radius: .4em; }
+.ls-ans-head { margin: 0 0 .3em; font-size: .8em; }
+.ls-ans-left { color: var(--c-muted); }
+.ls-ans-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6em; }
+.ls-ans-title { margin: 0 0 .15em; font-weight: 700; font-size: .75em; }
+.ls-bar { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; align-items: center; gap: .4em; font-size: .7em; margin: .12em 0; }
+.ls-ans-cols .ls-bar { grid-template-columns: minmax(0, 1fr) 3em auto; font-size: .55em; }
+.ls-bar-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-bar-track { height: .9em; border-radius: .45em; background: var(--c-fill); overflow: hidden; }
+.ls-bar-fill { display: block; height: 100%; background: var(--c-primary); }
+.ls-bar.ok .ls-bar-fill { background: var(--c-success); }
+.ls-bar.ok .ls-bar-t { font-weight: 700; color: var(--c-success); }
+.ls-bar-n { min-width: 1.4em; text-align: right; }
+.ls-ans-list { margin: 0; padding-left: 1.1em; font-size: .7em; }
+@media (min-width: 1000px) {
+    .ct-present .ct-pbar { flex-wrap: nowrap; }
+    .ct-present .ct-pstage, .ct-present .ct-pjoined { flex: 0 1 auto; min-width: 4em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ct-present .ct-pjoined:has(details[open]) { overflow: visible; }
+    .ct-present .ct-pbtns { flex: 0 0 auto; }
+}
+/* 띠가 맨 아래라 펼친 팀 이름은 위로 */
+.ct-present .ct-pbar .ct-pmore[open] > div { top: auto; bottom: 100%; margin: 0 0 4px; }

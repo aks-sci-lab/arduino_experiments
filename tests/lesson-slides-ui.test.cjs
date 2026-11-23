@@ -50,7 +50,7 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         let s = await slide(T);
         assert.match(s.title, /필름통 로켓/, '생각 열기 첫 장');
         assert.equal(s.frame, 'none', '설명 동안 학생 화면은 숨김');
-        assert.match(await T.textContent('#btnPMode'), /학생 화면/);
+        assert.match(await T.textContent('#btnPMode'), /📱 학생/);
         assert.equal(await T.isVisible('#cornerQr'), true, '오른쪽 위 QR 그대로');
         assert.equal(await T.isVisible('.ls-note summary'), true, '선생님용은 접기');
         assert.equal(await T.isVisible('.ls-note div'), false, '선생님 말은 바로 안 보임');
