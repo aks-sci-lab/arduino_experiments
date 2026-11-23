@@ -153,10 +153,9 @@
                 <span class="ct-pbtns">
                     <button id="btnPPrev" class="secondary" aria-label="이전" title="이전 (←)">◀</button>
                     <button id="btnPNext" class="secondary" aria-label="다음" title="다음 (→)">▶</button>
-                    <button id="btnPReveal" class="secondary" title="이 장의 풀이 열기 (→ 와 같아요)" hidden>🔓 풀이</button>
+                    <span class="ct-pslot ct-pslot-rev"><button id="btnPReveal" class="secondary" title="이 장의 풀이 열기 (→ 와 같아요)" hidden>🔓 풀이</button></span>
                     <span class="ct-psep" aria-hidden="true"></span>
-                    <button id="btnPLayout" class="secondary" hidden>⇔ 나란히</button>
-                    <button id="btnPMode" class="secondary" hidden>📱 학생</button>
+                    <span class="ct-pslot ct-pslot-lay"><button id="btnPLayout" class="secondary" hidden>⇔ 나란히</button><button id="btnPMode" class="secondary" hidden>📖 설명</button></span>
                     <span class="ct-psep" aria-hidden="true"></span>
                     <button id="btnPOpen" class="good">▶ 다음 단계</button>
                     <button id="btnPBack" class="secondary" title="마지막으로 연 단계를 다시 잠그기" aria-label="단계 하나 되돌리기">↩</button>
@@ -166,7 +165,7 @@
                     <button id="btnPQr" class="secondary" title="학생 연결 QR 크게 (늦게 온 팀·조, Esc 로 닫기)">📱 QR</button>
                     <button id="btnPFull" class="secondary" aria-label="전체 화면" title="전체 화면">⛶</button>
                     <button id="btnPExit" class="secondary" title="진행 상황을 팝업으로 보기 (단계 목록·팀·조 상태·학생 자세히) — 발표 화면은 그대로" aria-haspopup="dialog">📋 진행 상황</button>
-                    <details class="ct-pmore ct-pkeys"><summary aria-label="넘기는 키 안내" title="넘기는 키 안내">❔</summary><div><p id="pHint" class="note">→ · PageDown · Space = 다음 장(물음이면 풀이), 학생 화면에서는 아래로 한 화면, 끝이면 다음 탭 · ← · PageUp = 반대로 (발표용 리모컨도 돼요). 단계 끝에서 한 번 더 누르면 다음 단계를 열지 물어요(여는 것은 Enter 나 ‘열기’ 단추로만, → 를 또 눌러도 열리지 않아요). 설명 장이 있는 실험은 단계마다 설명부터 나오고, 학생 화면이 옆에서 함께 따라가요(⇔ 나란히 / ⬜ 설명만 / 📱 학생 크게). 물음(❓)은 한 번 더 넘겨야 풀이가 열려요. ‘📱 지금 폰으로 답해요’ 장에는 팀 답이 모여요(정답 표시는 풀이를 연 뒤).</p></div></details>
+                    <details class="ct-pmore ct-pkeys"><summary aria-label="넘기는 키 안내" title="넘기는 키 안내">❔</summary><div><p id="pHint" class="note">→ · PageDown · Space = 다음 장(물음이면 풀이), 학생 화면에서는 아래로 한 화면, 끝이면 다음 탭 · ← · PageUp = 반대로 (발표용 리모컨도 돼요). 단계 끝에서 한 번 더 누르면 다음 단계를 열지 물어요(여는 것은 Enter 나 ‘열기’ 단추로만, → 를 또 눌러도 열리지 않아요). 설명 장이 있는 실험은 단계마다 설명부터 나오고, 학생 화면이 옆에서 함께 따라가요(⇔ 나란히 / ⬜ 설명만, 마지막 장 다음은 학생 화면만 · 📖 설명 으로 다시). 물음(❓)은 한 번 더 넘겨야 풀이가 열려요. ‘📱 지금 폰으로 답해요’ 장에는 팀 답이 모여요(정답 표시는 풀이를 연 뒤).</p></div></details>
                 </span>
             </div>
         </section>
