@@ -134,8 +134,12 @@ service cloud.firestore {
     // 🎬 발표 보기 설명 장 상태 (주인 교사만 씀, js/lab-store.js classLesson): 학생 화면이 '👀 앞을 봐요' 띠·답 가리기에 씀
     //  바뀐 칸만 검사 (예전 lesson.at 은 그때 시각이라, 단계 열기·수업 마치기처럼 lesson 을 안 건드리는 쓰기를 막지 않게)
     function okLesson(d, changed) {
-      return (!changed.hasAny(['lesson']) || (d.lesson is map && d.lesson.keys().hasOnly(['on', 'stage', 'i', 'key', 'reveal', 'mode', 'at']) &&
+      return (!changed.hasAny(['lesson']) || (d.lesson is map && d.lesson.keys().hasOnly(['on', 'stage', 'i', 'key', 'reveal', 'mode', 'at', 'q']) &&
                (!('mode' in d.lesson) || d.lesson.mode in ['look', 'phone']) &&
+               // 📱 응답 물음 (③): 띄운 물음 글·고를 답 2~6개 (정답은 넣지 않음)
+               (!('q' in d.lesson) || (d.lesson.q is map && d.lesson.q.keys().hasOnly(['type', 'text', 'choices']) && d.lesson.q.type in ['pick', 'text'] &&
+                 d.lesson.q.text is string && d.lesson.q.text.size() >= 1 && d.lesson.q.text.size() <= 300 &&
+                 (!('choices' in d.lesson.q) || (d.lesson.q.choices is list && d.lesson.q.choices.size() >= 2 && d.lesson.q.choices.size() <= 6)))) &&
                d.lesson.on is bool && d.lesson.reveal is bool && d.lesson.i is int && d.lesson.i >= 0 && d.lesson.i < 200 &&
                d.lesson.stage is string && d.lesson.stage.size() <= 20 && d.lesson.key is string && d.lesson.key.size() <= 40 && d.lesson.at == request.time)) &&
              // lessonOpen: 목록·200개까지 (원소 모양 ^[a-z0-9][a-z0-9-]{0,39}$ 은 js/lab-store.js classLesson 이 거름 — 규칙에서는 목록 원소를 하나씩 볼 수 없음)
@@ -216,6 +220,25 @@ service cloud.firestore {
                             request.resource.data.lastSeen == request.time && okExpire(request.resource.data);
       allow delete: if signedIn() && (classOwner(space) == request.auth.uid ||
                        (('uid' in resource.data) && resource.data.uid == request.auth.uid));
+    }
+    // ----- 📱 응답 물음의 답 (③ 2026-11-23, js/lab-store.js answerSave): 학생 기기마다 한 물음에 문서 하나 ({장 key}~{조-번호}[-p]) -----
+    // 교사가 그 물음을 지금 띄웠을 때(수업 문서 lesson.on·key·q)만 쓰고, 자기(uid) 문서만 고침(2초에 한 번까지). 남의 답은 못 읽음, 주인 교사만 모두 읽음
+    function liveLesson(space) { return get(/databases/$(database)/documents/labClasses/$(space)).data.lesson; }
+    match /labClasses/{space}/answers/{aid} {
+      allow get: if signedIn() && (classOwner(space) == request.auth.uid || resource.data.uid == request.auth.uid);
+      allow list: if signedIn() && classOwner(space) == request.auth.uid;
+      allow create, update: if signedIn() && aid.matches('^my-[a-z0-9-]{1,36}~[0-9]{1,2}-[0-9]{1,2}(-p)?$') &&
+                            request.resource.data.keys().hasOnly(['key', 'jo', 'num', 'choice', 'text', 'uid', 'at', 'expireAt']) &&
+                            request.resource.data.uid == request.auth.uid && aid.split('~')[0] == request.resource.data.key &&
+                            request.resource.data.jo is int && request.resource.data.num is int &&
+                            aid.split('~')[1].split('-')[0] == string(request.resource.data.jo) && aid.split('~')[1].split('-')[1] == string(request.resource.data.num) &&
+                            liveLesson(space).on == true && liveLesson(space).key == request.resource.data.key && ('q' in liveLesson(space)) &&
+                            (('choice' in request.resource.data) != ('text' in request.resource.data)) &&
+                            (!('choice' in request.resource.data) || (request.resource.data.choice is int && request.resource.data.choice >= 0 && request.resource.data.choice < 6)) &&
+                            (!('text' in request.resource.data) || (request.resource.data.text is string && request.resource.data.text.size() >= 1 && request.resource.data.text.size() <= 100)) &&
+                            request.resource.data.at == request.time && okExpire(request.resource.data) &&
+                            (resource == null || (resource.data.uid == request.auth.uid && request.time > resource.data.at + duration.value(2, 's')));
+      allow delete: if signedIn() && classOwner(space) == request.auth.uid;
     }
     // ----- 보고서 AI 피드백 (2026-11-19, js/report-ai.js) -----
     // 학생(익명)이 질문을 만들면, 켜 둔 교사 화면이 선생님 키로 AI 를 불러 답을 씀. API 키는 교사 브라우저에만 있고 여기엔 오지 않음.

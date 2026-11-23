@@ -600,6 +600,7 @@
                 look.band.classList.toggle('phone', look.mode === 'phone');
             }
             hideAnswers();
+            respCard(d.lesson);
             // 실험 페이지가 스스로 가리는 것(행사형 점수 퀴즈의 ⭕·점수)은 opts.onLesson 으로 알림
             if (before !== JSON.stringify([look.used, look.open, look.on, look.mode, look.key, look.reveal, look.stage]) && typeof opts.onLesson === 'function') { try { opts.onLesson({ used: look.used, on: look.on, mode: look.mode, open: look.open.slice(), key: look.key, reveal: look.reveal, stage: look.stage }); } catch (e) { /* 실험 쪽 오류 */ } }
             // 화면을 새로 그려도(행사형은 화면마다 다시 그림) 답 가리기가 이어지게
@@ -607,6 +608,63 @@
                 look.obs = new MutationObserver(function () { if (!look.raf) look.raf = (window.requestAnimationFrame || setTimeout)(hideAnswers); });
                 look.obs.observe(document.body, { childList: true, subtree: true });
             }
+        }
+        /* 📱 선생님이 만든 응답 물음 (③ 2026-11-23): 교사가 띄운 물음(수업 문서 lesson.q)의 답 칸 — 고르기(2~6개) 또는 짧은 글(100자).
+           기기마다 답 하나(labClasses/{수업}/answers/{key~조-번호[-p]}), 다시 고르면 고쳐 씀. 발표용(iframe)·자리를 안 고른 화면은 띄우지 않음. 물음·답 글은 esc */
+        var rsp = { el: null, key: '', mine: null, busy: false, msg: '' };
+        function respCard(L) {
+            var q = L && L.on && L.q && /^my-/.test(String(L.key || '')) ? L.q : null;
+            if (!q || PRESENT || !cls.me) { if (rsp.el) rsp.el.hidden = true; rsp.key = ''; return; }
+            if (!rsp.el) {
+                rsp.el = document.createElement('section'); rsp.el.className = 'cs-card cs-resp'; rsp.el.setAttribute('aria-live', 'polite');
+                if (look.band && look.band.parentNode) look.band.parentNode.insertBefore(rsp.el, look.band.nextSibling); else document.body.insertBefore(rsp.el, document.body.firstChild);
+                rsp.el.addEventListener('click', function (e) {
+                    var b = e.target.closest('button'); if (!b || rsp.busy) return;
+                    if (b.hasAttribute('data-ch')) respSend({ choice: Number(b.getAttribute('data-ch')) });
+                    else if (b.hasAttribute('data-send')) { var t = rsp.el.querySelector('textarea'); respSend({ text: t ? t.value : '' }); }
+                });
+            }
+            var first = rsp.key !== L.key || rsp.qsig !== JSON.stringify(q);
+            if (first) {
+                rsp.key = L.key; rsp.qsig = JSON.stringify(q); rsp.mine = null; rsp.msg = '';
+                CC.answerMine(srv().url, { classCode: CLASS, jo: cls.me.jo, num: cls.me.num, phone: !!PHONE, key: L.key })
+                    .then(function (r) { if (r && r.ok && r.answer && rsp.key === L.key) { rsp.mine = r.answer; respDraw(q); } });
+                try { window.scrollTo(0, 0); } catch (e) { /* 무시 */ }
+            }
+            rsp.el.hidden = false;
+            rsp.q = q;
+            respDraw(q, first);
+        }
+        function respDraw(q, fresh) {
+            var m = rsp.mine, h = '<h2 class="cs-resp-q">📱 ' + esc(q.text) + '</h2>';
+            if (q.type === 'pick') {
+                h += '<div class="cs-resp-choices">' + q.choices.map(function (c, i) {
+                    var on = m && m.choice === i;
+                    return '<button type="button" data-ch="' + i + '" aria-pressed="' + !!on + '"' + (rsp.busy ? ' disabled' : '') + '><b>' + 'ABCDEF'[i] + '</b> ' + esc(c) + (on ? ' ✔' : '') + '</button>';
+                }).join('') + '</div>';
+            } else {
+                var keep = rsp.el.querySelector('textarea');
+                var val = keep && !fresh ? keep.value : (m && m.text) || '';
+                h += '<label class="cs-resp-tl">내 답 (100자까지)<textarea maxlength="100" rows="2">' + esc(val) + '</textarea></label>' +
+                    '<button type="button" class="cs-btn" data-send="1"' + (rsp.busy ? ' disabled' : '') + '>' + (m ? '✏️ 고쳐 보내기' : '📤 보내기') + '</button>';
+            }
+            h += '<p class="cs-note" role="status">' + esc(rsp.msg || (m ? '✅ 보냈어요 — 바꾸고 싶으면 다시 골라도 돼요' : '답을 고르면 바로 선생님 화면에 모여요 (이름은 나오지 않아요)')) + '</p>';
+            var focus = document.activeElement && rsp.el.contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA';
+            rsp.el.innerHTML = h;
+            if (focus) { var ta = rsp.el.querySelector('textarea'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }
+        }
+        function respSend(a) {
+            if (!rsp.key || !cls.me) return;
+            if (a.text != null && !String(a.text).trim()) { rsp.msg = '답을 적어 주세요'; respDraw(rsp.q); return; }
+            var key = rsp.key;
+            rsp.busy = true; rsp.msg = '⏳ 보내는 중…'; respDraw(rsp.q);
+            CC.answerSave(srv().url, Object.assign({ classCode: CLASS, jo: cls.me.jo, num: cls.me.num, phone: !!PHONE, key: key }, a)).then(function (r) {
+                rsp.busy = false;
+                if (rsp.key !== key) return;
+                if (r && r.ok) { rsp.mine = a.choice != null ? { choice: a.choice } : { text: String(a.text).trim().slice(0, 100) }; rsp.msg = ''; }
+                else rsp.msg = '⚠ ' + ((r && r.error) || '보내지 못했어요. 다시 눌러 주세요');
+                respDraw(rsp.q);
+            });
         }
         function stageChanged(stage, setup, doc) {
             if (!cls.info) return;
