@@ -108,6 +108,7 @@ test('응답 물음 만들기 → 띄우기 → 학생 답 → 프로젝터 모�
         await P.waitForSelector('#pSlides .ls-reveal');
         await P.waitForSelector('#pSlides .ls-choices li.ok');
         assert.match(await P.textContent('#pSlides .ls-choices li.ok'), /붉어진다 ✅/);
+        if (process.env.ANS_SHOTS) { await P.screenshot({ path: process.env.ANS_SHOTS + '/ans-proj.png' }); await S1.screenshot({ path: process.env.ANS_SHOTS + '/ans-phone.png' }); }
         assert.deepEqual(await counts(), [0, 2, 0], '풀이를 연 뒤에도 수는 그대로');
 
         // 5) 다음 장 = 짧은 글 물음 → 학생 화면 답 칸이 바뀜, 받은 글은 esc

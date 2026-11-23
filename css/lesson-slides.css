@@ -53,7 +53,7 @@
 .ls-choices li.ok { border: 2px solid var(--c-success); background: var(--c-ok-bg); }
 .ls-abc { position: relative; z-index: 1; flex: 0 0 auto; font-weight: 700; color: var(--c-primary); }
 .ls-ctext { flex: 1 1 auto; position: relative; z-index: 1; }
-.ls-bar { position: absolute; left: 0; top: 0; bottom: 0; width: var(--w, 0%); background: var(--c-primary-soft); z-index: 0; }
+.ls-rbar { position: absolute; left: 0; top: 0; bottom: 0; width: var(--w, 0%); background: var(--c-primary-soft); z-index: 0; }
 .ls-cnt { position: relative; z-index: 1; min-width: 1.6em; text-align: right; }
 .ls-texts { margin: 0; padding-left: 1.2em; columns: 2; font-size: 0.85em; }
 .ls-rnote { margin: 0.35em 0 0; font-size: 0.7em; color: var(--c-muted); }
