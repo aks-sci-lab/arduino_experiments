@@ -49,6 +49,14 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         const famUrl = ROOT + 'projects/film-rocket.html?c=' + c.classCode + '&s=' + c.space;
         const T = await ctx({ viewport: { width: 1920, height: 1080 } }, 'T', true);
         await T.goto(ROOT + 'projects/class-teacher.html#class=' + c.space + '&view=run');
+        // 단계를 열면 🎬 발표 보기로 넘어가 그 단계 설명부터 (2026-11-23) → 이 시험은 진행 화면을 보므로 '📋 진행 화면' 으로 돌아옴
+        const toRun = async () => {
+            await T.waitForSelector('#presentPane:not([hidden])'); await T.waitForSelector('#pSlides .ls-slide'); await T.waitForTimeout(600);
+            await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+            const d = () => app.db.docs.get('labClasses/' + c.space);
+            for (let k = 0; k < 50 && d().lesson && d().lesson.on; k++) await T.waitForTimeout(100);
+            delete d().lesson; d().lessonOpen = [];
+        };   // 이 시험은 설명 화면을 안 쓰는 반의 단계 열기 (폰 혼자 흐름)
         await T.waitForSelector('#stageCard:not([hidden])');
         const join = async (name, team) => {
             const P = await ctx(devices['iPhone 13'], name);
@@ -85,7 +93,7 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         await T.click('#btnBoardClose');
 
         // ② 1차시 열기 → 기다리던 두 팀 모두 1차시 첫 화면
-        await T.click('#btnStageNext');
+        await T.click('#btnStageNext'); await toRun();
         await go(A, 't1-intro'); await go(B, 't1-intro');
         assert.equal(await notice(A), '', '이미 넘어간 팀은 띠 없음');
         await T.waitForFunction(() => /기다리는 팀\s*0\s*\/\s*들어온 팀\s*2/.test(document.getElementById('stageWait').textContent), null, { timeout: 20000 });
@@ -100,7 +108,7 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         await A.click('#ev-m-sw'); await A.click('#ev-sw1');
 
         // ① 2차시 열기 → A(초시계 도는 중)·B(1차시 첫 화면) 그대로, 위에 띠
-        await T.click('#btnStageNext');
+        await T.click('#btnStageNext'); await toRun();
         await A.waitForFunction(() => { const n = document.getElementById('ev-notice'); return n && !n.hidden; }, null, { timeout: 15000 });
         assert.match(await notice(A), /선생님이 ‘2차시’ 단계를 열었어요/);
         // ① 측정 중에는 띠 단추를 누를 수 없음
@@ -141,7 +149,7 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         assert.equal(await backBtn.getAttribute('data-go'), 't1-result', '돌아가기 = 마지막으로 하던 화면');
         assert.match(await backBtn.textContent(), /1차시/);
         // 다시 2차시를 열면 하던 곳(q-action)으로
-        await T.click('#btnStageNext');
+        await T.click('#btnStageNext'); await toRun();
         await go(A, 'q-action');
 
         // 한 단계 넘게 뒤처진 팀: '모두 열기' 뒤에도 B 는 1차시 그대로 이어 감, 띠는 '정리 단계까지'

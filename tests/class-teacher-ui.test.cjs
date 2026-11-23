@@ -90,7 +90,7 @@ test('교사 화면: 로그인 → 수업 → 학생·폰 → 진행 보기 → 
         await A.waitForFunction(() => /📱 폰/.test(document.body.textContent), null, { timeout: 15000 });
 
         // ---- 교사 진행 보기 ----
-        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); });
+        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) { const m = /class=([a-z0-9]{24})/.exec(location.hash); location.hash = '#class=' + m[1] + '&view=run'; } });
         await T.waitForFunction(() => /제출: 1개/.test(document.getElementById('groups').textContent), null, { timeout: 15000 });
         const groupsText = await T.textContent('#groups');
         assert.match(groupsText, /1조/); assert.match(groupsText, /2회 · 손에 들고/);

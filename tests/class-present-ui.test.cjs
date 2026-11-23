@@ -68,7 +68,7 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         await S.selectOption('#cs-cjo', '1'); await S.selectOption('#cs-cnum', '1'); await S.click('#cs-cjoin');
         await S.waitForSelector('nav.steps button[data-step="theory"].cs-locked');
         await T.click('#btnRefresh').catch(() => {});   // (발표 화면에서는 숨겨진 단추 — 실시간으로 바뀜)
-        await T.waitForFunction(() => /들어온 학생 1 \/ 4/.test(document.getElementById('pJoined').textContent), null, { timeout: 15000 });
+        await T.waitForFunction(() => /🧑‍🎓 1 \/ 4명/.test(document.getElementById('pJoined').textContent), null, { timeout: 15000 });
 
         // → : 글자를 화면 높이에 맞춰 키워 1단계가 한 화면보다 길면 먼저 아래로 내려감 → 끝에 닿으면 다음 단계 열기 확인 → Enter
         const press = async (key, until, max) => { for (let i = 0; i < (max || 25); i++) { if (await until()) return i; await T.keyboard.press(key); await T.waitForTimeout(80); } return await until() ? max : -1; };
@@ -107,7 +107,7 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         // 발표용은 학생으로 참여하지 않음: 진행 자료(하트비트)는 학생 한 명뿐, 카메라 요청 없음
         const prog = [...app.db.docs.keys()].filter(k => k.startsWith('labClasses/' + q.space + '/progress/'));
         assert.equal(prog.length, 1, '들어온 학생 수 그대로: ' + prog.join(', '));
-        assert.match(await T.textContent('#pJoined'), /들어온 학생 1 \/ 4/);
+        assert.match(await T.textContent('#pJoined'), /🧑‍🎓 1 \/ 4명/);
         assert.equal(await F().evaluate(() => window.__gum), 0, '발표용은 카메라 권한을 묻지 않음');
         await noHScroll(T, '발표 1280');
 

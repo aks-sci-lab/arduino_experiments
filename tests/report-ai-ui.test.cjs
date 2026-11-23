@@ -66,7 +66,7 @@ test('보고서 AI: 교사 키 → 학생 질문 → 답 → 꺼짐 안내 → �
         assert.match(await T.textContent('#preview'), /AI 질문 조마다 2번/);
         await T.click('#btnCreate');
         await T.waitForSelector('#classOut:not([hidden])');
-        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); }); await T.click('#btnStageAll'); await T.waitForFunction(() => /모든 단계를 열었어요/.test(document.getElementById('stageMsg').textContent));
+        await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) { const m = /class=([a-z0-9]{24})/.exec(location.hash); location.hash = '#class=' + m[1] + '&view=run'; } }); await T.click('#btnStageAll'); await T.waitForFunction(() => /모든 단계를 열었어요/.test(document.getElementById('stageMsg').textContent));
         const link = await T.getAttribute('#outLink', 'href');
         const space = /[?&]s=(c[a-z0-9]{23})/.exec(link)[1];
         assert.equal(app.db.docs.get('labClasses/' + space).aiLimit, 2);
@@ -235,7 +235,7 @@ test('보고서 AI: 가짜 조 코드·수업 전체 상한·한 기기가 조�
         await T.click('#btnLogin'); await T.waitForSelector('#btnSettings:not([hidden])'); await T.evaluate(() => { const b = document.getElementById('btnSettings'); if (!b.hidden) b.click(); }); await T.click('#ctTabs button[data-tab="make"]');
         // 수업 하나: 조 2개, 조마다 한도 1 → 수업 전체 상한 2
         await T.fill('#inBan', '3'); await T.fill('#inN', '4'); await T.fill('#inSize', '2'); await T.fill('#inAiLimit', '1');
-        await T.selectOption('#inExp', 'malus'); await T.click('#btnCreate'); await T.waitForSelector('#classOut:not([hidden])'); await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) r.click(); }); await T.click('#btnStageAll'); await T.waitForFunction(() => /모든 단계를 열었어요/.test(document.getElementById('stageMsg').textContent));
+        await T.selectOption('#inExp', 'malus'); await T.click('#btnCreate'); await T.waitForSelector('#classOut:not([hidden])'); await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); const r = document.getElementById('btnToRun'); if (r && r.offsetParent) { const m = /class=([a-z0-9]{24})/.exec(location.hash); location.hash = '#class=' + m[1] + '&view=run'; } }); await T.click('#btnStageAll'); await T.waitForFunction(() => /모든 단계를 열었어요/.test(document.getElementById('stageMsg').textContent));
         const cls = Object.entries(app.db.dump('labClasses/')).find(([p]) => p.split('/').length === 2)[1];
         const sp = Object.keys(app.db.dump('labClasses/')).find(p => p.split('/').length === 2).split('/')[1];
         const [g1, g2] = cls.groups.map(g => g.code), four = g1.split('-')[2];
