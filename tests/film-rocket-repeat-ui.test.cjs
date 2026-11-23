@@ -60,14 +60,14 @@ test('로켓: 다시 재기 바로 가기·반복 측정·끊긴 채 새로고�
         await go('q-control'); await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-ok'); await next();
         await go('t1-cond');
         assert.equal(await A.textContent('#ev-count'), '0');
-        await next(); await go('t1-predict'); await next(); await go('t1-measure');
+        await next(); await go('t1-measure');
         // 첫 측정: ⏱ 초시계
         await A.click('#ev-m-sw'); await A.click('#ev-sw1'); await A.waitForTimeout(400); await A.click('#ev-sw2'); await A.click('#ev-sw3');
         await go('t1-result');
         // ③ 같은 조건 한 번 더: 예측·방법 고르기 없이 지난 방법(초시계)으로 바로
         const before = (await trail()).length;
         await A.click('#ev-again'); await go('t1-measure');
-        assert.match(await A.textContent('.ev-screen'), /같은 조건 2번째[\s\S]*처음 예측 그대로/);
+        assert.match(await A.textContent('.ev-screen'), /같은 조건 2번째[\s\S]*🔮 우리 예측/);
         assert.equal(await A.isVisible('#ev-m-sw'), false, '방법 고르기 없음');
         assert.equal(await A.isVisible('#ev-sw1'), true, '초시계가 바로');
         assert.deepEqual((await trail()).slice(before), ['t1-measure'], '예측 화면을 지나지 않음');
@@ -83,8 +83,7 @@ test('로켓: 다시 재기 바로 가기·반복 측정·끊긴 채 새로고�
         await A.click('.ev-stepper:not(.locked) [data-pm="-1"]');
         assert.equal(await A.textContent('#ev-count'), '2');
         await A.click('.ev-stepper:not(.locked) [data-pm="1"]');
-        // 조건을 바꾸면 예측을 다시 (예측 → 관찰 → 설명)
-        await next(); await go('t1-predict');
+        // 조건을 바꾸면 방법을 다시 고름 ('몇 초?' 예측 화면은 2026-11-23 에 뺌)
         await next(); await go('t1-measure');
         assert.equal(await A.isVisible('#ev-m-sw'), true, '조건을 바꾸면 방법도 다시 고름');
         // ② 🎥 녹화: 끝 2초 앞에서 열림, ⏪ 2초 앞으로
@@ -104,15 +103,15 @@ test('로켓: 다시 재기 바로 가기·반복 측정·끊긴 채 새로고�
         await A.click('#ev-pick'); await go('t1-result');
         assert.equal((await A.evaluate(() => window.__filmRocket.state())).t1.trials.length, 3);
 
-        // ① 위 탭으로 다시 1차시: 소개·안전·퀴즈 없이 '이어서 하기' → 조건 → 예측 → 측정 (4화면)
+        // ① 위 탭으로 다시 1차시: 소개·안전·퀴즈 없이 '이어서 하기' → 조건 → 측정 (3화면)
         await A.evaluate(() => window.__filmRocket.show('think-pressure')); await go('think-pressure');
         const b0 = (await trail()).length;
         await A.click('.ev-stage[data-stage="t1"]'); await go('t1-again');
         assert.match(await A.textContent('.ev-screen'), /이어서 해요[\s\S]*3번[\s\S]*안전 다시 확인[\s\S]*보안경/);
         await layout('이어서 하기');
         await A.click('.ev-screen [data-go="t1-cond"]'); await go('t1-cond');
-        await next(); await go('t1-predict'); await next(); await go('t1-measure');
-        assert.deepEqual((await trail()).slice(b0), ['t1-again', 't1-cond', 't1-predict', 't1-measure'], '돌아가서 측정까지 4화면');
+        await next(); await go('t1-measure');
+        assert.deepEqual((await trail()).slice(b0), ['t1-again', 't1-cond', 't1-measure'], '돌아가서 측정까지 3화면');
 
         // ⑤ 인터넷이 끊긴 채 새로고침해도 2차시·정리는 잠김
         await A.evaluate(() => window.__filmRocket.show('t1-graph')); await go('t1-graph');

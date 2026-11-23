@@ -116,10 +116,9 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         assert.match(await A.textContent('#ev-score'), /25점/);
         await A.click('.ev-stepper:not(.locked) [data-pm="1"]');   // 10 → 15 mL
         assert.match(await A.textContent('.ev-stepper:not(.locked) .ev-sval'), /15 mL/);
-        await next(A); await go(A, 't1-predict');
-        await A.click('[data-pm="-1"]'); await A.click('[data-pm="-1"]');   // 10 → 8초
-        assert.match(await A.textContent('#ev-pv'), /8초/);
+        // 2026-11-23 '몇 초?' 예측은 뺌 — 조건 다음은 바로 측정 (🔮 방향 예측은 위에서 고름)
         await next(A); await go(A, 't1-measure');
+        assert.match(await A.textContent('.ev-screen'), /‘펑’까지 시간 재기/);
         // 🎥 녹화: 시계 시작 → 1.5초 → 녹화 끝 → 장면 고르기
         await A.click('#ev-m-rec');
         await A.waitForFunction(() => { const c = document.getElementById('ev-cam'); return c && c.width > 0; }, null, { timeout: 15000 });
@@ -138,11 +137,10 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         assert.equal(st1.t1.trials[0].method, 'video');
         assert.equal(st1.t1.trials[0].value, 15);
         assert.ok(st1.t1.trials[0].y > 0.8 && st1.t1.trials[0].y < 2.5, '시계 시작부터 펑까지 약 1.5초: ' + st1.t1.trials[0].y);
-        assert.match(await A.textContent('.ev-screen'), /예측 8초/);
         // ⏱ 초시계로 한 번 더 (같은 조건 2/2)
         // 같은 조건 반복은 예측·방법을 다시 묻지 않음 (지난 방법 = 녹화로 바로) → '다른 방법으로' 로 초시계
         await A.click('#ev-again'); await go(A, 't1-measure');
-        assert.match(await A.textContent('.ev-screen'), /같은 조건 2번째[\s\S]*예측 8초/);
+        assert.match(await A.textContent('.ev-screen'), /같은 조건 2번째[\s\S]*🔮 우리 예측/);
         await A.waitForSelector('#ev-r1');
         await A.click('#ev-m-other'); await A.waitForSelector('#ev-m-sw');
         await A.click('#ev-m-sw'); await A.click('#ev-sw1'); await A.waitForTimeout(700); await A.click('#ev-sw2');
@@ -151,7 +149,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         assert.match(await A.textContent('.ev-screen'), /같은 조건으로 2번 쟀어요/);
         // 다른 값 (20 mL) 초시계 한 번 → 그래프
         await A.click('#ev-change'); await go(A, 't1-cond'); await A.click('.ev-stepper:not(.locked) [data-pm="1"]');
-        await next(A); await go(A, 't1-predict'); await next(A); await go(A, 't1-measure');
+        await next(A); await go(A, 't1-measure');
         await A.click('#ev-m-sw'); await A.click('#ev-sw1'); await A.waitForTimeout(300); await A.click('#ev-sw2'); await A.click('#ev-sw3');
         await go(A, 't1-result');
         await A.click('[data-go="t1-graph"]'); await go(A, 't1-graph');
@@ -164,8 +162,6 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         assert.match(await A.textContent('.ev-screen h2'), /12초/);
         await A.click('.ev-screen [data-go="t1-ch-cond"]'); await go(A, 't1-ch-cond');
         assert.match(await A.textContent('#ev-mini'), /15 mL/, '도전 조건 화면에 지난 평균 표');
-        await next(A); await go(A, 't1-ch-predict');
-        assert.match(await A.textContent('#ev-pv'), /12초/, '도전 예측 기본 = 목표');
         await next(A); await go(A, 't1-ch-measure');
         await A.click('#ev-m-sw'); await A.click('#ev-sw1'); await A.waitForTimeout(400); await A.click('#ev-sw2'); await A.click('#ev-sw3');
         await go(A, 't1-ch-result');
@@ -226,7 +222,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         // ---- 인터넷 끊김: 가족 A ----
         net.off = true;
         await A.click('[data-go="t1-ch-cond"]'); await go(A, 't1-ch-cond');
-        await next(A); await go(A, 't1-ch-predict'); await next(A); await go(A, 't1-ch-measure');
+        await next(A); await go(A, 't1-ch-measure');
         await A.click('#ev-m-sw'); await A.click('#ev-sw1'); await A.waitForTimeout(300); await A.click('#ev-sw2'); await A.click('#ev-sw3');
         await go(A, 't1-ch-result');
         await A.waitForFunction(() => /폰에 저장됨/.test(document.getElementById('ev-sync').textContent), null, { timeout: 25000 });
@@ -277,7 +273,7 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
     }
 });
 
-test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 설계 → 촬영 → 세 곳 누르기 → % → 눈으로 → 도전 → 다시 풀기 ✨ → 결과 카드', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
+test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 촬영 → 세 곳 누르기 → % → 눈으로 → 도전 → 다시 풀기 ✨ → 결과 카드', { skip: !chromium && 'playwright 없음', timeout: 180000 }, async () => {
     const stat = http.createServer((req, res) => {
         const p = path.join(REPO, decodeURIComponent(new URL(req.url, 'http://x').pathname));
         fs.readFile(p, (e, d) => { if (e) { res.writeHead(404); return res.end(); }
@@ -300,12 +296,11 @@ test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 설계 → �
         for (const [id, k] of [['think-force', 'have'], ['think-accel', 'fast'], ['think-pressure', 'push']]) { await next(); await go(id); await P.click('.ev-choice[data-k="' + k + '"]'); }
         await P.click('[data-stage="t2"]'); await go('t2-intro');
         await next(); await go('q-action'); await P.click('.ev-choice[data-k="ok"]'); await next();
-        await go('t2-base');
-        await P.click('[data-var="mass"] [data-pm="1"]'); await P.click('[data-var="mass"] [data-pm="1"]');
-        assert.match(await P.textContent('[data-var="mass"] .ev-sval'), /2개/);
-        await next(); await go('q-mass'); await P.click('.ev-choice[data-k="ok"]'); await next();
+        // 2026-11-23 '✏️ 로켓 설계 기록' 은 뺌 — 발사 전 퀴즈 다음은 바로 mass 퀴즈
+        await go('q-mass'); await P.click('.ev-choice[data-k="ok"]'); await next();
         await go('t2-var'); await P.click('.ev-choice[data-k="mass"]'); await P.click('[data-guess] [data-dir="up"]'); await next();
-        await go('t2-cond'); assert.match(await P.textContent('.ev-stepper:not(.locked)'), /2개/, '설계 값에서 시작');
+        await go('t2-cond'); await P.click('.ev-stepper:not(.locked) [data-pm="1"]'); await P.click('.ev-stepper:not(.locked) [data-pm="1"]');
+        assert.match(await P.textContent('.ev-stepper:not(.locked)'), /2개/);
         await next(); await go('t2-safe');
         for (const k of ['goggle', 'face', 'away', 'wait']) await P.check('[data-safe="' + k + '"]');
         await next(); await go('t2-film');
@@ -348,8 +343,11 @@ test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 설계 → �
         }
         await go('end-compare');
         assert.equal(await P.locator('.ev-cmp.spark').count(), 3, '처음 셋 다 흔한 생각 → 지금 맞음 ✨');
-        // ✍️ 정리 문장: 결과·까닭 고르기 (2차시를 바꿔 잼)
+        // ✍️ 정리 문장: 2차시를 값마다 한 발씩만 쏘면 '아직 말할 수 없어요'(같은 조건 반복) → 한 발 더 넣으면 결과·까닭 고르기
         await next(); await go('end-sentence');
+        assert.match(await P.textContent('.ev-concl[data-concl="t2"]'), /아직 말할 수 없어요[\s\S]*같은 조건으로 한 번 더/);
+        await P.evaluate(() => { const s = window.__filmRocket.state(), t = s.t2.trials[0]; s.t2.trials.push(Object.assign({}, t, { pct: t.pct + 2 })); window.__filmRocket.show('end-sentence'); });
+        await go('end-sentence');
         assert.match(await P.textContent('.ev-concl[data-concl="t2"]'), /늘렸더니 높이가/);
         await P.click('.ev-concl[data-concl="t2"] [data-dir="down"]');
         await P.click('.ev-concl[data-concl="t2"] [data-why] >> nth=0');
@@ -360,7 +358,7 @@ test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 설계 → �
         const [dl] = await Promise.all([P.waitForEvent('download'), P.click('#ev-save')]);
         assert.equal(fs.readFileSync(await dl.path()).subarray(1, 4).toString(), 'PNG', '결과 카드 PNG (시험 브라우저는 한글 파일 이름을 download 로 보임)');
         const st = await P.evaluate(() => window.__filmRocket.state());
-        assert.equal(st.t2.trials.length, 2); assert.equal(st.t2.challenge.length, 1);
+        assert.equal(st.t2.trials.length, 3, '두 값 + 같은 조건 한 발 더'); assert.equal(st.t2.challenge.length, 1);
         assert.equal(Object.keys(st.quiz).length, 5);
         assert.match(await P.textContent('#ev-score'), /50점/);
         assert.match(await P.textContent('#ev-sync'), /이 폰에만 저장/);
