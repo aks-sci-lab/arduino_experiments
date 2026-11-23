@@ -218,13 +218,14 @@ const NAME = { A: '별빛가족', B: '달님 탐험대', C: '할머니와 나', 
                 await pg.waitForTimeout(500); await tapIf(pg, /기록|이 높이로/); await pg.waitForTimeout(700); };
             const again = async (k, o) => { const pg = P[k]; const b = await btns(pg);
                 const same = b.find(t => /같은 조건|한 번 더/.test(t) && !/바꿔/.test(t));
+                if (!o.change && !same) { note(k + ' 같은 조건으로 다시 쏘는 단추 없음 — 이 값은 여기까지', b); return 'skip'; }
                 if (!o.change && same) await W.tap(pg, same.slice(0, 10));
                 else { const ch = b.find(t => /바꿔/.test(t)); if (!ch) { note(k + ' 바꾸는 단추 없음', b); return false; } await W.tap(pg, ch.slice(0, 10)); }
                 await prep(k, o.change ? { plus: o.plus } : {}); return true; };
             const run = async (k, pl) => { const pg = P[k]; await prep(k, pl.first);
                 for (const [si, set] of pl.sets.entries()) for (const [ti, pct] of set.entries()) {
                     if (si > 0 && ti === 0) { if (!(await again(k, { change: true, plus: set.plus }))) return; }
-                    else if (ti > 0) { if (!(await again(k, {}))) return; }
+                    else if (ti > 0) { if (pg.vcSkip === si) continue; const r = await again(k, {}); if (r === 'skip') { pg.vcSkip = si; continue; } if (!r) return; }
                     if (!(await btns(pg)).includes('● 녹화 시작')) { note(k + ' 녹화 단추 없음', { 글: await res(pg, 600), 단추: await btns(pg) }); return; }
                     await launch(k, pct);
                     note(k + ' 2차시 ' + (si + 1) + '번째 값 ' + (ti + 1) + '발 뒤 결과', { 글: await res(pg, 1000), 단추: await btns(pg) });
