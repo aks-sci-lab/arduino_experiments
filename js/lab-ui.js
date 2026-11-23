@@ -392,11 +392,36 @@
         if (!PRESENT || !document.body) return;
         var W = window.innerWidth || 0, H = window.innerHeight || 0, big = root.classList.contains('big-view');
         if (!W || !H) return;
-        var z = document.body.classList.contains('ev-body') ? Math.min(W / 400, H / 820) : Math.min(H * 0.002, W / (H > W * 1.2 ? 560 : 760));   // 세로로 긴 틀(교사 발표 보기의 나란히 학생 화면)은 좁은 화면 배치로 글자를 더 크게
+        // 교사 발표 보기의 틀(iframe data-fit): phone = 폰 9 : 19.5 틀을 340px 폭 폰 화면으로 채움
+        var fit = ''; try { fit = (window.frameElement && window.frameElement.getAttribute('data-fit')) || ''; } catch (e) { fit = ''; }
+        var ev = document.body.classList.contains('ev-body');
+        var z = ev ? (fit === 'phone' ? W / 340 : Math.min(W / 400, H / 820)) : Math.min(H * 0.002, W / (H > W * 1.2 ? 560 : 760));   // 세로로 긴 틀은 좁은 화면 배치로 글자를 더 크게
         if (big) z = Math.min(z * 1.25, document.body.classList.contains('ev-body') ? z * 1.25 : W / 600);
         z = Math.max(1, Math.min(6, z));
+        // 폰 틀(로켓): 340px 폭 화면을 먼저 맞춘 뒤, 아래가 많이 비면 글자를 더 키워 틀을 채움 (화면 폭 280px 까지, 넘치면 줄임)
+        if (ev && fit === 'phone') {
+            var lo = z, hi = Math.max(lo, W / 280);
+            setZoom(lo);
+            var b = contentBottom();
+            if (b && b < H * 0.85 && hi > lo) {
+                var z2 = Math.min(hi, lo * H * 0.92 / b);
+                for (var k = 0; k < 4; k++) { setZoom(z2); if (contentBottom() <= H) break; z2 = lo + (z2 - lo) * 0.6; }
+                if (contentBottom() > H) z2 = lo;
+                z = z2;
+            }
+        }
         var v = String(Math.round(z * 100) / 100);
         if (root.style.zoom !== v) { root.style.zoom = v; window.dispatchEvent(new Event('resize')); }
+    }
+    function setZoom(z) { root.style.zoom = String(Math.round(z * 100) / 100); }
+    // 보이는 내용의 아래 끝 (화면 px, 맨 위에서부터)
+    function contentBottom() {
+        var y = window.scrollY || 0, m = 0;
+        Array.prototype.forEach.call(document.body.children, function (el) {
+            if (el.tagName === 'SCRIPT' || !el.getClientRects().length) return;
+            var r = el.getBoundingClientRect(); if (r.height) m = Math.max(m, r.bottom + y);
+        });
+        return m;
     }
     // 발표용은 학생과 함께 보는 화면이라 페이지 제목·소개 글(단계 탭 위의 글)·이전 페이지 링크는 숨김
     function presentTidy() {
@@ -412,6 +437,10 @@
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', presentReady); else presentReady();
         var fitTimer = null;
         window.addEventListener('resize', function () { clearTimeout(fitTimer); fitTimer = setTimeout(presentFit, 60); });
+        // 행사형은 화면마다 다시 그림 → 폰 틀이면 새 화면에 맞춰 다시 키움
+        var refit = function () { clearTimeout(fitTimer); fitTimer = setTimeout(presentFit, 60); };
+        var watchBody = function () { if (window.MutationObserver && document.body) new MutationObserver(function () { var f = ''; try { f = window.frameElement && window.frameElement.getAttribute('data-fit'); } catch (e) { f = ''; } if (f === 'phone') refit(); }).observe(document.body, { childList: true, subtree: true }); };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchBody); else watchBody();
         // 교사 화면에서 Alt+B 를 누르면(같은 브라우저 저장값) 발표용도 따라감
         window.addEventListener('storage', function (e) { if (e.key === KEY) { root.classList.toggle('big-view', read()); presentFit(); } });
     }
