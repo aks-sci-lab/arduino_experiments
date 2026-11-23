@@ -127,7 +127,7 @@ test('양자점 설명 화면: key 8개 가림 → 교사 풀이 열기 → 열�
         await L.page.click('nav.steps button[data-step="theory"]');
         assert.equal(await L.page.evaluate(() => [...document.querySelectorAll('[data-lesson-answer="qd-heat-dir"]')].every(e => getComputedStyle(e).visibility === 'visible')), true);
         // 발표 끝 → 띠 내려감, 열린 답은 그대로
-        await T.page.click('#btnPExit');
+        await T.page.click('#btnPExit'); await T.page.click('#btnRunPopGo');
         for (const P of [L, F]) {
             await P.page.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return !b || b.hidden; }, null, { timeout: 15000 });
             expectHidden(await hiddenMap(P.page), [], '발표 끝');

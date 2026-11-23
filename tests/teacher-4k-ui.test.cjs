@@ -48,7 +48,8 @@ test('교사 화면 4K: 발표 글자·먼저 내리기·큰 QR 한 화면·결�
         const open = async (c, w, h) => {
             await T.setViewportSize({ width: w, height: h });
             await T.goto(ORIGIN + '/projects/class-teacher.html#class=' + c.space); await T.reload();
-            await T.waitForSelector('#classOut:not([hidden])'); await T.waitForTimeout(300);
+            await T.waitForSelector('#classOut:not([hidden])'); await T.waitForSelector('#qr svg');   // QR 그림이 다 그려진 뒤에 잼
+            await T.waitForTimeout(300);
         };
         const frame = () => T.frames().find(f => /present=1/.test(f.url()));
         // 함께 보는 화면에서 보이면 안 되는 교사용 글
@@ -78,7 +79,7 @@ test('교사 화면 4K: 발표 글자·먼저 내리기·큰 QR 한 화면·결�
             assert.deepEqual(await teacherText(), [], name + ' 큰 QR 화면의 교사용 글');
             row['QR'] = (q.qr / h * 100).toFixed(1) + '%'; row['수업 코드'] = (q.code / h * 100).toFixed(1) + '%'; row['접속 방법'] = (q.steps / h * 100).toFixed(1) + '%';
             // 진행 화면
-            await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])'); await T.waitForSelector('#runPane:not([hidden])'); await T.waitForTimeout(300);
+            await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) { await T.click('#btnPExit'); await T.click('#btnRunPopGo'); } await T.waitForSelector('#runPane:not([hidden])'); await T.waitForSelector('#runPane:not([hidden])'); await T.waitForTimeout(300);
             const run = await T.evaluate(() => ({ w: document.getElementById('stageCard').getBoundingClientRect().width, note: parseFloat(getComputedStyle(document.querySelector('#stageCard .note')).fontSize), now: parseFloat(getComputedStyle(document.getElementById('stageNow')).fontSize), sx: document.documentElement.scrollWidth - innerWidth }));
             assert.ok(run.w / w >= 0.7, name + ' 진행 화면 내용 폭 ' + (run.w / w * 100).toFixed(1) + '%');
             assert.ok(run.note / h >= 0.017, name + ' 진행 화면 보통 글자');
@@ -111,13 +112,13 @@ test('교사 화면 4K: 발표 글자·먼저 내리기·큰 QR 한 화면·결�
             assert.ok(zb > p.z && zb <= p.z * 1.3, name + ' Alt+B 발표 배율 ' + p.z + ' → ' + zb);
             assert.ok(fb2.b <= h + 1 && fb2.sx === 0, name + ' Alt+B 뒤에도 화면 안');
             await T.keyboard.press('Alt+b'); await T.waitForTimeout(200);
-            await T.click('#btnPExit');
+            await T.click('#btnPExit'); await T.click('#btnRunPopGo');
             table.push(row);
         }
 
         // ② 긴 단계에서 → 는 먼저 내림, 끝에서 다음 작은 탭 (1920×1080 = 4K 200 %)
         await open(planck, 1920, 1080);
-        await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])'); await T.click('#btnPresent');
+        await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) { await T.click('#btnPExit'); await T.click('#btnRunPopGo'); } await T.waitForSelector('#runPane:not([hidden])'); await T.click('#btnPresent');
         await T.waitForFunction(() => { const d = document.getElementById('presentFrame').contentDocument; return d && d.querySelector('nav.steps button[data-step="materials"]'); }, null, { timeout: 15000 });
         await frame().click('nav.steps button[data-step="materials"]');
         await T.waitForTimeout(300);
@@ -135,12 +136,12 @@ test('교사 화면 4K: 발표 글자·먼저 내리기·큰 QR 한 화면·결�
         await T.keyboard.press('ArrowLeft'); await T.waitForTimeout(150);
         const back = await state();
         assert.ok(back.tab === s0.tab || back.y > 0 || back.step !== seq[firstChange].step || back.tab !== seq[firstChange].tab, '← 는 반대로');
-        await T.click('#btnPExit');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo');
 
         // ④ 결과판 크게 보기 · ⑥ 로켓 폰 틀
         for (const [name, w, h] of [SIZES[0], SIZES[2], SIZES[3]]) {
             await open(rocket, w, h);
-            await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])'); await T.waitForSelector('#boardCard:not([hidden])');
+            await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) { await T.click('#btnPExit'); await T.click('#btnRunPopGo'); } await T.waitForSelector('#runPane:not([hidden])'); await T.waitForSelector('#boardCard:not([hidden])');
             assert.deepEqual(await teacherText(), [], name + ' 로켓 진행 화면의 교사용 글');
             await T.click('#btnBoardBig'); await T.waitForSelector('#boardBig:not([hidden])');
             const bf = await T.evaluate(() => parseFloat(getComputedStyle(document.querySelector('#boardBigBody td')).fontSize));
@@ -154,13 +155,13 @@ test('교사 화면 4K: 발표 글자·먼저 내리기·큰 QR 한 화면·결�
             const rz = await frame().evaluate(() => ({ z: parseFloat(document.documentElement.style.zoom) || 1, sx: document.documentElement.scrollWidth - innerWidth }));
             assert.equal(rz.sx, 0, '로켓 화면 가로 스크롤 없음');
             if (h >= 1080) assert.ok(rz.z > 1, name + ' 로켓 화면도 틀에 맞춰 커짐');
-            await T.click('#btnPExit');
+            await T.click('#btnPExit'); await T.click('#btnRunPopGo');
         }
 
         // ⑧ 교사 화면 375px
         await open(planck, 375, 800);
         assert.equal(await T.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '375 큰 QR 화면');
-        await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])'); await T.waitForTimeout(300);
+        await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) { await T.click('#btnPExit'); await T.click('#btnRunPopGo'); } await T.waitForSelector('#runPane:not([hidden])'); await T.waitForTimeout(300);
         assert.equal(await T.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '375 진행 화면');
         console.log(table.map(r => Object.entries(r).map(([k, v]) => k + ' ' + v).join(' · ')).join('\n'));
         assert.deepEqual(errors, []);

@@ -140,7 +140,7 @@ test('진행 방법 화면: 수업 없이 고르기·기억, 가설연역 수업
         await T.click('#btnCreate');
         await T.waitForSelector('#viewMain:not([hidden]) #classOut:not([hidden])');
         assert.match(await T.textContent('#outTitle'), /가설연역/);
-        await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) { await T.click('#btnPExit'); await T.click('#btnRunPopGo'); } await T.waitForSelector('#runPane:not([hidden])');
         assert.match(await T.textContent('#stageNow'), /① 문제 인식.*\(1 \/ 6\)/);
         assert.match(await T.textContent('#btnStageNext'), /② 가설 설정/);
         const link = await T.getAttribute('#outLink', 'href');

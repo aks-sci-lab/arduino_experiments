@@ -66,7 +66,7 @@ test('교사 수업 목록 → 큰 QR → 진행 보기(오른쪽 위 QR) → �
         assert.match(await T.textContent('#btnToRun'), /발표 보기/);
         await T.click('#btnToRun'); await T.waitForSelector('#presentPane:not([hidden])');
         assert.match(T.url(), /view=present/);
-        await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo'); await T.waitForSelector('#runPane:not([hidden])');
         await T.waitForSelector('#stageCard:not([hidden])');
         assert.match(T.url(), /view=run/);
         assert.equal(await T.isVisible('#cornerQr'), true);
@@ -89,7 +89,7 @@ test('교사 수업 목록 → 큰 QR → 진행 보기(오른쪽 위 QR) → �
         await T.goBack(); await T.waitForSelector('#classOut:not([hidden])');
         await T.goBack(); await T.waitForSelector('#viewList:not([hidden])');
         // 수업 마치기 → 목록에 ✅ (아래 '마친 수업') → 되돌리기
-        await T.click('#classList button[data-open="' + a.space + '"]'); await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#classList button[data-open="' + a.space + '"]'); await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) { await T.click('#btnPExit'); await T.click('#btnRunPopGo'); } await T.waitForSelector('#runPane:not([hidden])');
         await T.click('#btnDone');
         await T.waitForFunction(() => /마친 수업으로 표시/.test(document.getElementById('doneMsg').textContent));
         assert.match(await T.textContent('#btnDone'), /다시 진행 중/);
@@ -100,14 +100,14 @@ test('교사 수업 목록 → 큰 QR → 진행 보기(오른쪽 위 QR) → �
         await T.click('#doneSum');
         assert.match(await T.textContent('#doneList'), /말루스[\s\S]*✅ 마침/);
         assert.equal(app.db.docs.get('labClasses/' + a.space).done, true);
-        await T.click('#doneList button[data-open="' + a.space + '"]'); await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#doneList button[data-open="' + a.space + '"]'); await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) { await T.click('#btnPExit'); await T.click('#btnRunPopGo'); } await T.waitForSelector('#runPane:not([hidden])');
         await T.click('#btnDone');
         await T.waitForFunction(() => /다시 진행 중인 수업/.test(document.getElementById('doneMsg').textContent));
         await T.click('#btnToList');
         assert.equal(await T.locator('#classList .ct-cls').count(), 3);
         assert.equal(await T.isVisible('#doneBox'), false);
         // 팀 결과판 크게 보기에도 QR
-        await T.click('#classList button[data-open="' + c.space + '"]'); await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#classList button[data-open="' + c.space + '"]'); await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) { await T.click('#btnPExit'); await T.click('#btnRunPopGo'); } await T.waitForSelector('#runPane:not([hidden])');
         await T.click('#btnBoardBig');
         assert.equal(await T.isVisible('#boardBigQr svg'), true);
         await T.click('#btnBoardClose');
@@ -119,7 +119,7 @@ test('교사 수업 목록 → 큰 QR → 진행 보기(오른쪽 위 QR) → �
         await layout(N, '목록 375');
         await N.click('#classList button[data-open="' + b.space + '"]');
         await layout(N, 'QR 375');
-        await N.click('#btnToRun'); await N.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await N.isVisible('#btnPExit')) await N.click('#btnPExit'); await N.waitForSelector('#runPane:not([hidden])');
+        await N.click('#btnToRun'); await N.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await N.isVisible('#btnPExit')) { await N.click('#btnPExit'); await N.click('#btnRunPopGo'); } await N.waitForSelector('#runPane:not([hidden])');
         await N.waitForSelector('#stageCard:not([hidden])');
         assert.equal(await N.isVisible('#cornerQrImg'), false, '폰 폭에서는 접힘');
         assert.equal(await N.isVisible('#cornerQr'), true);

@@ -120,7 +120,7 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         await T.click('#btnPQr'); assert.equal(await T.isVisible('#bigQr'), true, '띠의 📱 QR → 크게'); await T.keyboard.press('Escape');
         assert.equal(await T.isVisible('#bigQr'), false, 'Esc 로 닫기');
         // ✕ 진행 화면으로
-        await T.click('#btnPExit');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo');
         await T.waitForSelector('#stageCard:not([hidden])');
         assert.equal(await T.isVisible('#presentPane'), false);
 
