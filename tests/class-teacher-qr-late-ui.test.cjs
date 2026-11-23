@@ -46,9 +46,10 @@ test('QR 도구가 늦게 와도 QR 이 그려짐, 끝내 못 받으면 안내',
         const h = await T.evaluate(() => document.getElementById('qr').getBoundingClientRect().height / innerHeight);
         assert.ok(h >= 0.45, '큰 QR 한 변 ' + (h * 100).toFixed(1) + '%');
         assert.equal(await T.locator('#cornerQrImg svg').count(), 1, '오른쪽 위 QR 도');
-        // 발표 화면 왼쪽 위 QR
+        // 발표 화면: 띠의 📱 QR 로 크게 (왼쪽 위 QR 칸은 2026-11-23 뺌)
         await T.goto(ROOT + 'projects/class-teacher.html#class=' + c.space + '&view=present'); await T.reload();
-        await T.waitForSelector('#pQrImg svg', { timeout: 15000 });
+        await T.waitForSelector('#btnPQr'); await T.click('#btnPQr');
+        await T.waitForSelector('#bigQrImg svg', { timeout: 15000 });
         // 끝내 못 받음: 기다린 뒤 안내 글 (학생은 수업 코드로 들어와도 돼요)
         const N = await ctx('none');
         await N.goto(ROOT + 'projects/class-teacher.html#class=' + c.space);
