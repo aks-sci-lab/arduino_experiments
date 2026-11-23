@@ -107,8 +107,26 @@
       },
       "csv": "heart-rate/2026-11-22/hr-x6wpht-tow573-r28.csv",
       "json": "heart-rate/2026-11-22/hr-x6wpht-tow573-r28.json"
+    },
+    {
+      "id": "hr-x6wpht-toxs57-r29",
+      "exp": "heartrate",
+      "measuredAt": "2026-11-23T03:53:31.182Z",
+      "savedAt": "2026-11-23T03:53:31.917Z",
+      "device": "dve2x6wpht",
+      "summary": {
+        "심박수": 78.1,
+        "신뢰도": 0.73,
+        "노출": "steady",
+        "손목": "",
+        "FFT": 78,
+        "자기상관": 76,
+        "봉우리": 78
+      },
+      "csv": "heart-rate/2026-11-23/hr-x6wpht-toxs57-r29.csv",
+      "json": "heart-rate/2026-11-23/hr-x6wpht-toxs57-r29.json"
     }
   ],
-  "updated": "2026-11-22T08:22:54.860Z",
-  "count": 6
+  "updated": "2026-11-23T09:04:05.632Z",
+  "count": 7
 }
