@@ -164,10 +164,117 @@ const NAME = { A: '별빛가족', B: '달님 탐험대', C: '할머니와 나', 
             await lesson('t1', 8, '', false, 4000); for (const k of 'ABCDE') note('t1 8 도전(look) · ' + k, await scr(P[k], 400));
             note('점수', Object.fromEntries(await Promise.all(Object.keys(P).map(async k => [k, (await W.text(P[k])).match(/⭐ \d+점/)?.[0]]))));
         },
+
+        3: async () => {   // 45~75분 2차시: action → mass → 안전·계획·찍는 법 → do-t2(발사, 영상 세 곳) → 6 → 7 도전
+            for (const k of 'ABCDE') await open(k);
+            await P.A.waitForTimeout(3000);
+            const vis = (pg, re) => pg.locator('button').filter({ hasText: re }).locator('visible=true');
+            const tapIf = async (pg, re) => { const b = vis(pg, re); if (await b.count() && await b.first().isEnabled()) { await b.first().click(); await pg.waitForTimeout(450); return true; } return false; };
+            const res = async (pg, n) => (await W.text(pg)).split('\n').filter(l => !/선생님 연결 · 도움말|^(생각 열기|1차시|2차시|정리|🔒.*)$/.test(l)).slice(3).join(' / ').replace(/✅ 선생님께 보냄 \/ |⏳ 보내는 중 \/ /g, '').slice(0, n || 900);
+            note('action 물음 · B', await scr(P.B, 500));
+            await pick('B', '물과 기체를 아래로');   // 아빠 먼저
+            await pick('E', '공기가 로켓을 위로');   // 아빠 먼저, 첫 보기
+            await pick('A', '발포비타민이 가벼워서');
+            await pick('C', '공기가 로켓을 위로');
+            await lesson('t2', 0, 'action', true);
+            note('action 풀이 뒤 · A(틀림)', await res(P.A, 600));
+            await pick('D', '물과 기체를 아래로');   // 풀이 듣고
+            for (const k of 'ACE') if (/❌/.test(await res(P[k], 900))) await pick(k, '물과 기체를 아래로');   // 다시 골라 5점
+            await lesson('t2', 1, 'mass', false);
+            await pick('B', '가속도가 커져서 더 높이');   // 아빠가 또 먼저 — 이번엔 틀림
+            note('mass 고른 뒤 · B 아빠 틀림(풀이 전)', await res(P.B, 500));
+            await pick('A', '가속도가 작아져서');
+            await pick('C', '가속도가 작아져서');
+            await pick('D', '아무 차이가 없어요');
+            await pick('E', '가속도가 작아져서');
+            await lesson('t2', 1, 'mass', true);
+            note('mass 풀이 뒤 · B', await res(P.B, 700)); note('mass 풀이 뒤 · D', await res(P.D, 700));
+            for (const k of 'BD') if (/❌/.test(await res(P[k], 900))) await pick(k, '가속도가 작아져서');
+            for (const i of [2, 3, 4]) await lesson('t2', i, '', false, 2500);
+            note('t2 2~4(look) · C', await scr(P.C, 300));
+            await lesson('t2', 5, 'do-t2', false, 6000);
+            for (const k of 'ABCDE') note('do-t2 첫 화면 · ' + k, await res(P[k], 500));
+            const OK = /^물과 기체|^가속도가 작아/;
+            const prep = async (k, o) => { const pg = P[k];
+                for (let g = 0; g < 16; g++) {
+                    const b = await btns(pg), txt = await res(pg, 1200);
+                    if (b.includes('● 녹화 시작')) return;
+                    if (b.some(t => /^🎥 영상으로 재기/.test(t))) { await W.tap(pg, '영상으로 재기'); await pg.waitForTimeout(1200); continue; }
+                    const box = pg.locator('input[type=checkbox]:not(:checked)').locator('visible=true'); if (await box.count()) { while (await box.count()) await box.first().click(); continue; }
+                    if (/정의 퀴즈/.test(txt)) { const q = b.find(t => !/^\(꺼짐\)/.test(t) && OK.test(t)); if (q) { await W.tap(pg, q.slice(0, 8)); note(k + ' 2차시 측정 전 퀴즈', txt.slice(0, 300)); continue; } }
+                    if (b.includes('설계 끝 →')) { note(k + ' 설계 기록 화면(그대로 둠)', txt.slice(0, 400)); await W.tap(pg, '설계 끝'); continue; }
+                    if (b.some(t => /바꾸기$/.test(t)) && !pg.vcVar2) { pg.vcVar2 = 1; await W.tap(pg, o.v); await pg.waitForTimeout(400); if (o.pred) await W.tap(pg, o.pred); else { const f = (await btns(pg)).find(t => /것 같아요$/.test(t)); if (f && !(await vis(pg, /다음 →/).first().isEnabled())) await W.tap(pg, f); }
+                        if (o.why) { const w = pg.locator('input[type=text], textarea').locator('visible=true'); await w.first().fill(o.why); await w.first().blur(); }
+                        note(k + ' 2차시 계획', await res(pg, 800)); await tapIf(pg, /다음 →/); continue; }
+                    if (b.includes('이 조건으로 →')) { for (let i = 0; i < (o.plus || 0); i++) await W.tap(pg, '+'); note(k + ' 2차시 값 화면', await res(pg, 500)); await tapIf(pg, /이 조건으로/); continue; }
+                    if (!(await tapIf(pg, /다음 →|이어서|측정하러/))) { note(k + ' 2차시 준비 중 멈춤', { 글: txt.slice(0, 600), 단추: b }); return; }
+                } };
+            const launch = async (k, pct) => { const pg = P[k];
+                await W.tap(pg, '녹화 시작'); await pg.waitForTimeout(1600); await W.tap(pg, '녹화 끝'); await pg.waitForTimeout(1500);
+                await W.tap(pg, '이 장면이 가장 높아요'); await pg.waitForTimeout(600);
+                const c = pg.locator('canvas').locator('visible=true').first(); const bb = await c.boundingBox();
+                const foot = bb.height * 0.92, head = bb.height * 0.42, top = foot - (foot - head) * pct / 100;   // 아이 키 = 발끝~정수리, 로켓 꼭대기 = 짠 %
+                for (const y of [foot, head, top]) { await c.click({ position: { x: bb.width * 0.5, y } }); await pg.waitForTimeout(450); }
+                await pg.waitForTimeout(500); await tapIf(pg, /기록|이 높이로/); await pg.waitForTimeout(700); };
+            const again = async (k, o) => { const pg = P[k]; const b = await btns(pg);
+                const same = b.find(t => /같은 조건|한 번 더/.test(t) && !/바꿔/.test(t));
+                if (!o.change && same) await W.tap(pg, same.slice(0, 10));
+                else { const ch = b.find(t => /바꿔/.test(t)); if (!ch) { note(k + ' 바꾸는 단추 없음', b); return false; } await W.tap(pg, ch.slice(0, 10)); }
+                await prep(k, o.change ? { plus: o.plus } : {}); return true; };
+            const run = async (k, pl) => { const pg = P[k]; await prep(k, pl.first);
+                for (const [si, set] of pl.sets.entries()) for (const [ti, pct] of set.entries()) {
+                    if (si > 0 && ti === 0) { if (!(await again(k, { change: true, plus: set.plus }))) return; }
+                    else if (ti > 0) { if (!(await again(k, {}))) return; }
+                    if (!(await btns(pg)).includes('● 녹화 시작')) { note(k + ' 녹화 단추 없음', { 글: await res(pg, 600), 단추: await btns(pg) }); return; }
+                    await launch(k, pct);
+                    note(k + ' 2차시 ' + (si + 1) + '번째 값 ' + (ti + 1) + '발 뒤 결과', { 글: await res(pg, 1000), 단추: await btns(pg) });
+                    if (si === 0 && ti === 0) await W.shot(pg, k + ' 2차시 첫 발 결과', true);
+                }
+                if (pl.graph && await tapIf(pg, /그래프 보기/)) { await pg.waitForTimeout(800); note(k + ' 2차시 그래프 화면', { 글: await res(pg, 1400), 단추: await btns(pg) }); await W.shot(pg, k + ' 2차시 그래프', true); }
+                else note(k + ' 2차시 그래프 안 봄', await btns(pg)); };
+            const plans = {
+                A: { graph: true, first: { v: '몸체 무게 바꾸기', pred: '낮아질 것 같아요', why: '무거우면 덜 빨라져서' }, sets: [[80, 85, 78], Object.assign([55, 60, 52], { plus: 2 })] },
+                B: { graph: true, first: { v: '물의 양 바꾸기', pred: '높아질 것 같아요', why: '물이 많으면 세게 나가서' }, sets: [[70, 82, 75], Object.assign([90, 98, 94], { plus: 2 })] },
+                C: { graph: true, first: { v: '발포비타민 양 바꾸기', pred: '높아질 것 같아요' }, sets: [[60, 65, 58], Object.assign([90, 95, 88], { plus: 2 })] },
+                D: { graph: true, first: { v: '몸체 무게 바꾸기', pred: '비슷할 것 같아요', why: '점토는 가벼우니까' }, sets: [[72, 80, 76], Object.assign([70, 78, 74], { plus: 2 })] },
+                E: { graph: false, first: { v: '몸체 무게 바꾸기' }, sets: [[85, 70, 90], Object.assign([75, 88, 80], { plus: 1 })] },
+            };
+            await Promise.all(Object.entries(plans).map(([k, pl]) => guard(k + ' 2차시 측정', () => run(k, pl))));
+            note('측정 중 교사 물음 "지금 뭘 알아보는 거예요?" (연기)', { A: '아이: 무거우면 덜 올라가는지요! (엄마 "아까는 물이었지?" 아이 "이번엔 무게!")', B: '아빠: 물을 늘리면 높이요 / 아이: 아빠가 정했어요', C: '아이: 비타민 많이 넣으면 높이 가는지 (할머니 "아까랑 같은 거네")', D: '누나: 점토 붙이면 낮아지는지, 근데 별로 안 달라요 / 동생: 똑같애!', E: '아빠: 무게요. 아이: (처음으로) 근데 아빠 세 번 다 달라' });
+            await lesson('t2', 6, '', false, 4000); for (const k of 'ABCDE') note('t2 6 왜 % 로(look) · ' + k, await scr(P[k], 300));
+            await lesson('t2', 6, '', true, 3000);
+            await lesson('t2', 7, '', false, 5000); for (const k of 'ABCDE') note('t2 7 도전(look) · ' + k, { 글: await res(P[k], 400), 단추: await btns(P[k]) });
+            note('점수', Object.fromEntries(await Promise.all(Object.keys(P).map(async k => [k, (await W.text(P[k])).match(/⭐ \d+점/)?.[0]]))));
+        },
         23: async () => {   // 도전 장 동안: E 아이·C 아이가 폰을 받아 그래프를 눌러 봄, D 도 그래프
             for (const k of 'CDE') await open(k);
             await P.C.waitForTimeout(2500);
             for (const k of 'CDE') await guard(k + ' 그래프', async () => { const pg = P[k]; note(k + ' 지금 화면', await scr(pg, 300)); const b = pg.locator('button').filter({ hasText: /그래프 보기/ }).locator('visible=true'); if (await b.count()) { await b.first().click(); await pg.waitForTimeout(800); } note(k + ' 그래프 화면', await scr(pg, 1300)); await W.shot(pg, k + ' 그래프', true); });
+        },
+        39: async () => {   // 살펴보기(복사본): A 가 2차시 측정 화면까지
+            const A = await open('A'); await A.waitForTimeout(3000);
+            note('action · A', await scr(A, 600)); const b0 = (await btns(A))[2]; if (b0) await pick('A', b0.slice(0, 8));
+            await lesson('t2', 0, 'action', true, 3000); await lesson('t2', 1, 'mass', false); note('mass · A', await scr(A, 600)); const b1 = (await btns(A))[0]; if (b1) await pick('A', b1.slice(0, 8));
+            await lesson('t2', 1, 'mass', true, 3000); await lesson('t2', 5, 'do-t2', false);
+            let last = '';
+            for (let i = 0; i < 25; i++) { const s = await scr(A, 1000); const t = JSON.stringify(s); if (t !== last) { note('do-t2 ' + i, s); await W.shot(A, 'y' + i); } last = t;
+                const b = s.단추;
+                if (b.some(t => /눈으로 보고 고르기/.test(t))) { note('측정 방법 화면', s); break; }
+                const box = A.locator('input[type=checkbox]:not(:checked)').locator('visible=true'); if (await box.count()) { while (await box.count()) await box.first().click(); continue; }
+                if (/정의 퀴즈/.test(s.글) && b.some(t => !/꺼짐/.test(t) && /^물과 기체|^가속도가 작아/.test(t))) { await W.tap(A, b.find(t => /^물과 기체|^가속도가 작아/.test(t)).slice(0, 8)); continue; }
+                if (b.some(t => /바꾸기$/.test(t)) && !A.vcV) { A.vcV = 1; await W.tap(A, b.find(t => /무게 바꾸기/.test(t)) || b.find(t => /바꾸기$/.test(t))); await A.waitForTimeout(400); const p = (await btns(A)).find(t => /낮아|덜/.test(t)); if (p) await W.tap(A, p.slice(0, 8)); continue; }
+                const f = b.find(t => !/^\(꺼짐\)/.test(t) && /→|다음|시작|이 조건|했어요|끝/.test(t) && !/뒤로/.test(t)); if (f) { await W.tap(A, f.slice(0, 10)); continue; }
+                note('멈춤', s); break; }
+        },
+        38: async () => {   // 살펴보기(복사본): A 영상으로 재기 흐름
+            const A = await open('A'); await A.waitForTimeout(2500);
+            note('지금', await scr(A, 500));
+            await W.tap(A, '영상으로 재기'); await A.waitForTimeout(1500); note('영상 1', await scr(A, 800)); await W.shot(A, 'v1');
+            let last = '';
+            for (let i = 0; i < 12; i++) { const s = await scr(A, 900); const t = JSON.stringify(s); if (t !== last) { note('영상 ' + (i + 2), s); await W.shot(A, 'v' + (i + 2)); } last = t;
+                const f = s.단추.find(t => !/^\(꺼짐\)/.test(t) && /녹화 시작|시작|멈추|그만|끝|다음|이 장면|고르기|→/.test(t) && !/뒤로|눈으로/.test(t));
+                if (!f) break; await W.tap(A, f.slice(0, 8)); await A.waitForTimeout(f.includes('시작') ? 3500 : 1000); }
+            note('화면 요소', await A.evaluate(() => [...document.querySelectorAll('canvas, video, img')].filter(e => e.offsetParent).map(e => e.tagName + '#' + e.id + '.' + e.className + ' ' + JSON.stringify(e.getBoundingClientRect()))));
         },
         9: async () => {   // 살펴보기(상태 복사본에서만): A 가 gas → do-t1 측정 화면까지
             const A = await open('A');
