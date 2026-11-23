@@ -169,3 +169,6 @@ html.ev-answering .ev-screen .ev-ok, html.ev-answering .ev-screen .ev-no, html.e
 .ev-offline h2 { margin: 0 0 var(--sp-2); font-size: 1.35rem; }
 .ev-offline ol { margin: 0 0 var(--sp-2); padding-left: 1.4em; font-size: 1.1rem; line-height: 1.6; }
 .ev-offline .ev-code { font-size: 1.15em; letter-spacing: .04em; white-space: nowrap; }
+/* 응답 장: 물음과 답 칸만이라 짧음 → 화면 가운데로 (교사 발표 보기 옆 폰 틀·실제 폰 모두 아래가 휑하지 않게).
+   --ev-vh = 창 높이 ÷ 배율(js/film-rocket.js) — 발표용 틀은 html 에 zoom 을 걸어 100vh 가 배율만큼 커짐 */
+html.ev-answering .ev-wrap { min-height: var(--ev-vh, 100vh); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }

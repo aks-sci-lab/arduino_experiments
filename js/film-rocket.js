@@ -235,6 +235,14 @@
     }
     window.addEventListener('offline', function () { renderTop(); });
     window.addEventListener('online', function () { renderTop(); });
+    // 응답 장 가운데 놓기용 창 높이 (css/film-rocket.css --ev-vh): 발표용 틀의 zoom 을 나눠 실제 창 높이에 맞춤
+    function setVh() {
+        var z = parseFloat(document.documentElement.style.zoom || getComputedStyle(document.documentElement).zoom) || 1;
+        var v = Math.floor(window.innerHeight / z) + 'px';
+        if (document.documentElement.style.getPropertyValue('--ev-vh') !== v) document.documentElement.style.setProperty('--ev-vh', v);   // 같으면 안 씀 (지켜보기가 다시 부르지 않게)
+    }
+    window.addEventListener('resize', setVh); setVh();
+    if (window.MutationObserver) new MutationObserver(setVh).observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
     $('#ev-notice').addEventListener('click', function (e) {
         var b = e.target.closest('#ev-notice-go, #ev-notice-jump'); if (!b || b.disabled || busy() || !st.team) return;
         show(entryFor(b.dataset.next));
