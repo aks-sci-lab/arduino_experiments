@@ -64,3 +64,13 @@ html:not(.cs-solo) .cs-show-solo { display: none !important; }
 [data-lesson-answer].cs-ans-hide { visibility: hidden; position: relative; min-height: 3.2em; }
 [data-lesson-answer].cs-ans-hide::after { content: '🔒 선생님 설명 뒤에 열려요'; visibility: visible; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     padding: 6px 10px; text-align: center; font-weight: 700; color: var(--c-muted); background: var(--c-fill); border: 2px dashed var(--c-line); border-radius: 10px; }
+/* 📱 선생님이 만든 응답 물음 (js/class-share.js respCard): 띠 바로 아래 답 칸 */
+.cs-resp { margin: 8px; padding: 12px 14px; border: 2px solid var(--c-primary); border-radius: 12px; background: var(--c-card); }
+.cs-resp[hidden] { display: none; }
+.cs-resp-q { margin: 0 0 8px; font-size: 1.15rem; line-height: 1.35; }
+.cs-resp-choices { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); }
+.cs-resp-choices button { min-height: 56px; padding: 6px 10px; border: 2px solid var(--c-line); border-radius: 10px; background: var(--c-card); font: inherit; font-size: 1.05rem; text-align: left; cursor: pointer; color: var(--c-text); }
+.cs-resp-choices button[aria-pressed="true"] { border-color: var(--c-primary); background: var(--c-primary-soft); color: var(--c-primary-dark); font-weight: 700; }
+.cs-resp-tl { display: flex; flex-direction: column; gap: 4px; font-weight: 700; }
+.cs-resp-tl textarea { font: inherit; font-weight: 400; padding: 8px; border: 1px solid var(--c-line); border-radius: 8px; min-height: 56px; box-sizing: border-box; width: 100%; }
+.cs-resp .cs-btn { margin-top: 8px; min-height: 48px; }

@@ -80,10 +80,13 @@ test('로켓 폰은 응답만: 대기 → 응답 장 → 보냄 → 대기, 새�
         await T.click('#btnPOpen'); await T.click('#btnPAskYes');
         await T.waitForFunction(() => /뚜껑은 왜/.test((document.querySelector('#pSlides .ls-title') || {}).textContent || ''), null, { timeout: 15000 });
         await go(A, 'q-gas'); await go(B, 'q-gas');
-        await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-hold');
+        // 2026-11-23 선생님 결정: 수업 중 폰은 고르면 바로 '✅ 보냈어요'(⭕·점수는 폰에 안 보임, 계산·저장은 그대로)
+        await A.click('.ev-choice[data-k="ok"]'); await go(A, 'sent');
+        assert.match(await A.textContent('.ev-sentlist'), /✅ 보냈어요: 기체 발생과 압력/);
         await T.keyboard.press('ArrowRight');   // 풀이
-        await A.waitForSelector('.ev-ok', { timeout: 15000 });
-        assert.match(await A.textContent('.ev-ok'), /\+10점/);
+        await A.waitForTimeout(1000); assert.equal(await A.getAttribute('#ev-app', 'data-screen'), 'sent', '풀이를 열어도 보냈어요 그대로');
+        const gq = await A.evaluate(() => window.__filmRocket.state().quiz.gas);
+        assert.equal(gq.correct, true); assert.ok(!gq.late, '풀이 전에 골라 10점');
         // 측정 장(do-t1)까지 넘기기 → 폰은 측정 화면(안전 확인부터)
         for (let k = 0; k < 12 && !/이제 폰으로 재요/.test(await T.textContent('#pSlides .ls-title')); k++) await T.keyboard.press('ArrowRight');
         assert.match(await T.textContent('#pSlides .ls-title'), /이제 폰으로 재요/);

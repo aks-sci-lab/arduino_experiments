@@ -1,7 +1,8 @@
 // 필름통 로켓 가상 수업 4차 뒤 고침 (2026-11-23 선생님 "개선해") — Playwright, 가짜 저장소, iPhone 13 + 교사 4K·1280×720
 //  ① 2차시 같은 조건 반복: 결과 화면 '🔁 같은 조건으로 한 번 더'(예측·방법 다시 안 물음) → 반복 범위·'차이가 흔들림보다 큰가요?'
 //     반복이 하나도 없으면 정리 문장 '아직 말할 수 없어요'(같은 조건으로 한 번 더), 요약 '아직 말할 수 없음'
-//  ② 👀 대기 화면 아래 '📊 우리 팀 결과 보기'(접기, 1·2차시 표·그래프)
+//  ② 수업 중 팀 폰: 대기 화면은 👀·팀 이름·우리가 낸 답만, 응답 장은 물음과 답 칸만 (선생님 결정, 처음 넣은 '📊 우리 팀 결과 보기'는 뺌)
+//     연결이 끊겼을 때만 '📶 연결이 끊겼어요' 안내(수업 코드), 다시 연결되면 사라짐
 //  ③ 🎯 도전 장(ch-t1·ch-t2)을 띄우면 폰이 그 차시 도전 화면
 //  ④ 2차시 '✏️ 로켓 설계 기록' 빠짐  ⑤ 측정 장 안에서는 정의 퀴즈를 되풀이하지 않음  ⑥ 1차시 '몇 초?' 예측 빠짐
 //  ⑦ 교사 설정 발포비타민 양은 '알' 이름으로 고름 (저장값은 ¼ 알 단위 그대로, 폰·요약과 같은 말)
@@ -26,7 +27,7 @@ test('로켓 계산: 반복이 없으면 아직 말할 수 없음 (2차시도)',
     assert.equal(M.tabletLabel(2), '½ 알'); assert.equal(M.tabletLabel(4), '1 알'); assert.equal(M.tabletLabel(6), '1 ½ 알');
 });
 
-test('로켓 4차 고침: 2차시 반복·결과 보기·도전 장·흐름 줄이기·발포비타민 이름', { skip: !chromium && 'playwright 없음', timeout: 300000 }, async () => {
+test('로켓 4차 고침: 2차시 반복·대기 화면·끊김 안내·도전 장·흐름 줄이기·발포비타민 이름', { skip: !chromium && 'playwright 없음', timeout: 300000 }, async () => {
     const app = loadLabStore(), api = labServer(app);
     const stat = http.createServer((req, res) => {
         const p = path.join(REPO, decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -96,19 +97,7 @@ test('로켓 4차 고침: 2차시 반복·결과 보기·도전 장·흐름 줄�
         assert.match(await P.textContent('[data-concl="t1"]'), /아직 말할 수 없어요[\s\S]*같은 조건으로 한 번 더 재야/);
         assert.equal(await P.locator('[data-concl="t1"] [data-dir]').count(), 0);
         assert.ok(await P.locator('[data-concl="t2"] [data-dir]').count() > 0, '반복한 2차시는 결과를 고름');
-        // ② 대기 화면 아래 '📊 우리 팀 결과 보기' (접기 → 표·그래프)
-        await P.evaluate(() => window.__filmRocket.show('wait')); await go(P, 'wait');
-        assert.equal(await P.isVisible('.ev-myres summary'), true);
-        assert.equal(await P.isVisible('.ev-myres-table'), false, '처음엔 접힘');
-        await P.click('.ev-myres summary');
-        await P.waitForSelector('[data-myres="t2"] .ev-myres-table table');
-        assert.match(await P.textContent('[data-myres="t1"]'), /1차시[\s\S]*10 mL[\s\S]*15 mL/);
-        assert.match(await P.textContent('[data-myres="t2"]'), /2차시[\s\S]*0개[\s\S]*100%~120%[\s\S]*2개/);
-        assert.ok(await P.evaluate(() => window.__charts.length) >= 2, '그래프');
-        await noHScroll(P, '대기 결과 보기');
-        if (process.env.ROCKET_SHOTS) await P.screenshot({ path: path.join(process.env.ROCKET_SHOTS, 'phone-wait-results.png'), fullPage: true });
 
-        // ---------- 수업 + 교사 설명 화면: ⑤ 측정 장 안 퀴즈 건너뜀 · ③ 도전 장 · ⑦ 발포비타민 이름 ----------
         const c = await app.post({ action: 'createClass', ban: 4, mode: 'team', nTeams: 3, exp: 'rocket', stage: 1, setup: { tabletMin: 2, tabletMax: 4, tabletBase: 2 } });
         const A = await ctx(devices['iPhone 13'], 'A');
         await A.goto(ROOT + 'projects/film-rocket.html?c=' + c.classCode + '&s=' + c.space);
@@ -132,7 +121,27 @@ test('로켓 4차 고침: 2차시 반복·결과 보기·도전 장·흐름 줄�
         const L1 = app.db.docs.get('labClasses/' + c.space).lesson;
         assert.equal(JSON.stringify(Object.assign({}, L1, { at: null })), JSON.stringify(Object.assign({}, JSON.parse(L0), { at: null })), '지금 장을 다시 쓰지 않음');
         await T2.close();
+        // ② 수업 중 폰: 응답 장은 물음과 답 칸만 → 고르면 '✅ 보냈어요' + 낸 답, 대기 화면은 👀·팀 이름·우리가 낸 답만
+        assert.equal(await A.isVisible('#ev-score'), false, '응답 장에 점수 없음');
+        assert.equal(await A.isVisible('.ev-foot'), false, '선생님 연결·도움말 없음');
+        await A.click('.ev-choice[data-k="ok"]'); await go(A, 'sent');
+        assert.match(await A.textContent('.ev-sentlist'), /✅ 보냈어요: 힘 · /);
         await T.keyboard.press('ArrowLeft'); await go(A, 'wait');   // 장을 넘기면 그때부터 씀
+        const waitShown = await A.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
+        assert.match(waitShown, /앞 화면을 봐요[\s\S]*별빛가족[\s\S]*✅ 보냈어요: 힘/, '대기 화면: ' + waitShown);
+        assert.doesNotMatch(waitShown, /점|선생님이 설명 중|선생님 연결|도움말|우리 팀 결과/, '그 밖의 글 없음: ' + waitShown);
+        assert.equal(await A.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '375px');
+        if (process.env.ROCKET_SHOTS) await A.screenshot({ path: path.join(process.env.ROCKET_SHOTS, 'phone-wait-answers.png') });
+        // ⑤ 연결이 끊겼을 때만 큰 안내 (수업 코드 포함) → 다시 연결되면 사라짐
+        assert.equal(await A.isVisible('#ev-offline'), false, '연결돼 있으면 안내 없음');
+        await A.context().setOffline(true);
+        await A.waitForSelector('#ev-offline:not([hidden])', { timeout: 10000 });
+        assert.match(await A.textContent('#ev-offline'), /연결이 끊겼어요[\s\S]*와이파이[\s\S]*새로고침[\s\S]*QR 을 다시 찍어요[\s\S]*팀 이름은 그대로/);
+        assert.match(await A.textContent('#ev-offline'), new RegExp(c.classCode));
+        assert.match(await A.textContent('#ev-offline'), /다시 연결되면 저절로 보내요/);
+        if (process.env.ROCKET_SHOTS) await A.screenshot({ path: path.join(process.env.ROCKET_SHOTS, 'phone-offline.png') });
+        await A.context().setOffline(false);
+        await A.waitForSelector('#ev-offline', { state: 'hidden', timeout: 10000 });
         // ⑨ 발표 화면 🏆 결과판: 관리 표시(🔌·✓ 기다림) 없음, 값이 없는 ⏱·🎯 칸 없음, 💬 생각은 있음
         await T.click('#btnPBoard'); await T.waitForSelector('#pPanel:not([hidden]) .ct-board');
         const bh = await T.textContent('#pPanel .ct-board thead');
@@ -170,7 +179,7 @@ test('로켓 4차 고침: 2차시 반복·결과 보기·도전 장·흐름 줄�
         await A.click('#ev-m-sw'); await A.click('#ev-sw1'); await A.waitForTimeout(300); await A.click('#ev-sw2'); await A.click('#ev-sw3');
         await go(A, 'wait');
         assert.equal((await A.evaluate(() => window.__filmRocket.state().t1.challenge.length)), 1, '도전 기록은 저장');
-        assert.equal(await A.isVisible('.ev-myres summary'), true, '대기 중에도 결과 보기');
+        assert.equal(await A.locator('.ev-myres').count(), 0, '대기 화면에 결과 보기 접기 없음 (선생님 결정: 우리가 낸 답만)');
         // 교사 설정 화면: 발포비타민은 '알' 이름으로 고름
         await T.click('#btnPExit'); if (await T.isVisible('#btnRunPopGo').catch(() => false)) await T.click('#btnRunPopGo');   // (📋 진행 상황 팝업이 생기면 그 안의 '진행 화면으로')
         await T.waitForSelector('#te-tabletMin', { state: 'attached' });
