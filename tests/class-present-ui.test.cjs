@@ -47,7 +47,8 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         await T.click('#btnPresent');
         await T.waitForSelector('#presentPane:not([hidden])');
         assert.match(T.url(), /view=present/);
-        assert.equal(await T.isVisible('#cornerQr'), true, '발표 화면에도 오른쪽 위 QR');
+        assert.equal(await T.isVisible('#cornerQr'), false, '오른쪽 위 QR 대신 아래 띠의 📱 QR (교사 조작은 한곳)');
+        assert.equal(await T.isVisible('#btnPQr'), true);
         assert.equal(await T.isVisible('.ct-head'), false, '머리말은 숨김');
         assert.equal(await T.isVisible('#classOut'), false, '큰 QR 화면은 숨김');
         const F = () => T.frames().find(f => /present=1/.test(f.url()));
@@ -114,9 +115,10 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         // 1920 폭
         await T.setViewportSize({ width: 1920, height: 1080 });
         await noHScroll(T, '발표 1920');
-        const fb = await T.locator('#presentFrame').boundingBox(), qb = await T.locator('#cornerQrImg').boundingBox();
-        assert.ok(fb.x + fb.width <= qb.x, '오른쪽 위 QR 이 발표 화면을 가리지 않음');
-        assert.ok(fb.width > 1400, '발표 화면 폭: ' + fb.width);
+        const fb = await T.locator('#presentFrame').boundingBox();
+        assert.ok(fb.width > 1800, '설명 장이 없는 실험은 학생 화면만 크게: ' + fb.width);
+        await T.click('#btnPQr'); assert.equal(await T.isVisible('#bigQr'), true, '띠의 📱 QR → 크게'); await T.keyboard.press('Escape');
+        assert.equal(await T.isVisible('#bigQr'), false, 'Esc 로 닫기');
         // ✕ 진행 화면으로
         await T.click('#btnPExit');
         await T.waitForSelector('#stageCard:not([hidden])');

@@ -580,8 +580,8 @@
                 if (hide) el.setAttribute('aria-label', '🔒 선생님 설명 뒤에 열려요'); else if (el.getAttribute('aria-label') === '🔒 선생님 설명 뒤에 열려요') el.removeAttribute('aria-label');
             });
         }
-        function applyLesson(d) {
-            if (PRESENT || !CLASS || !d) return;
+        function applyLesson(d, pushed) {
+            if ((PRESENT && !pushed) || !CLASS || !d) return;
             var before = JSON.stringify([look.used, look.open, look.on, look.mode, look.key, look.reveal, look.stage]);
             look.used = !!d.lesson; look.on = !!(d.lesson && d.lesson.on); look.mode = d.lesson && d.lesson.mode === 'phone' ? 'phone' : 'look';
             // 지금 띄운 장 (2026-11-23 행사형 '폰은 응답만': 실험 페이지가 그 장의 답 칸·측정만 보이게)
@@ -657,6 +657,8 @@
             return r;
         }
         if (CLASS && PRESENT) {
+            // 나란히 보기 (2026-11-23): 교사 화면이 지금 띄운 장을 바로 알려 줌 → 학생과 같게 👀 띠·답 가리기 (행사형은 opts.onLesson 으로 폰이 보는 화면)
+            window.addEventListener('lab-present-lesson', function (e) { if (!e.detail) return; look.pres = true; applyLesson(e.detail, true); });
             // 발표용: 수업 정보만 (joinInfo 는 수업 문서 읽기 — 교사 화면과 같은 사이트라 교사 로그인 그대로)
             CC.joinInfo(srv().url, CLASS).then(function (r) {
                 if (!r || !r.ok) { cls.failed = r; tellClass(); return; }
@@ -899,11 +901,11 @@
             send: send, pull: pull, render: render, beat: beat,
             role: function () { return role; }, solo: function () { return SOLO; },
             // 이 수업이 설명 화면을 쓰고, 그 key 의 풀이를 아직 안 열었으면 true (실험 페이지가 답·정답 표시를 미룰 때)
-            lessonHidden: function (key) { return !PRESENT && !!CLASS && look.used && look.open.indexOf(String(key)) < 0; },
+            lessonHidden: function (key) { return (!PRESENT || look.pres) && !!CLASS && look.used && look.open.indexOf(String(key)) < 0; },
             // 이 수업이 설명 화면을 쓰는지 (풀이가 이미 열린 뒤 고른 퀴즈 점수를 낮출 때)
-            lessonUsed: function () { return !PRESENT && !!CLASS && look.used; },
+            lessonUsed: function () { return (!PRESENT || look.pres) && !!CLASS && look.used; },
             // 지금 선생님이 띄운 설명 장 { on, key, mode, reveal, stage } (설명 화면을 안 쓰는 수업·수업 없이 연 화면은 on: false)
-            lessonNow: function () { var u = !PRESENT && !!CLASS && look.used; return { on: u && look.on, key: u ? look.key : '', mode: look.mode, reveal: u && look.reveal, stage: u ? look.stage : '' }; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
+            lessonNow: function () { var u = (!PRESENT || look.pres) && !!CLASS && look.used; return { on: u && look.on, key: u ? look.key : '', mode: look.mode, reveal: u && look.reveal, stage: u ? look.stage : '' }; }, isPhone: function () { return !!PHONE; }, isPresent: function () { return PRESENT; },
             openPhone: openPhone, phoneLink: phoneLink, phoneCard: phoneCard,
             // 실험이 측정 하나를 저장했을 때 부른다: 폰 화면(또는 autoSendOnSave)이면 바로 보내기
             // 폰은 기본으로 회차 목록에 쌓기만 하고(고른 회차 보내기), autoSendOnSave: true 면 바로 보낸다

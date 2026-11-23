@@ -61,8 +61,9 @@
         var live = sub === 'run' || sub === 'present';
         $('runPane').hidden = sub !== 'run';
         $('presentPane').hidden = sub !== 'present';
-        $('cornerQr').hidden = !(main && live);
-        document.body.classList.toggle('ct-has-corner', main && live);
+        // 오른쪽 위 QR 은 진행 화면에만 — 🎬 발표 보기에서는 아래 띠의 '📱 QR' 로 (2026-11-23 '교사 조작은 한곳')
+        $('cornerQr').hidden = !(main && sub === 'run');
+        document.body.classList.toggle('ct-has-corner', main && sub === 'run');
         document.body.classList.toggle('ct-presenting', main && sub === 'present');
         if (c && sub !== 'list') {
             var e = CC.expInfo(c.exp);
@@ -539,7 +540,14 @@
     // ---------- 🎬 발표 보기 (2026-11-20 선생님 "수업 진행하기에서는 학생의 화면이 보이도록", "웹앱만으로 프레젠테이션을 대신") ----------
     // 그 수업의 실험 페이지를 발표용(?present=1)으로 iframe 에 띄움: 학생으로 참여하지 않고(자리·하트비트·조 공유 없음) 단계 잠금은 학생과 같게.
     // 선생님은 → · PageDown · Space 로 그 단계 안의 작은 탭을 넘기고(학생 폰은 그대로), 단계 끝에서 한 번 더 누르면 '다음 단계를 열까요?'
-    var pres = { space: '', ask: false };
+    var pres = { space: '', ask: false, layout: 'side', frameGate: '' };
+    // ⇔ 나란히(설명 + 학생 화면) / ⬜ 설명만 — 이 브라우저에 기억 (기본 나란히)
+    try { if (localStorage.getItem('ct-present-layout') === 'deck') pres.layout = 'deck'; } catch (e) { /* 무시 */ }
+    function applyLayout() {
+        $('presentPane').classList.toggle('lay-side', pres.layout === 'side');
+        if (typeof lesson !== 'undefined' && lesson.on && LSx) LSx.fit($('pSlides'));
+    }
+    applyLayout();
     function frameDoc() { try { var f = $('presentFrame'); return f && f.contentDocument && f.contentDocument.body ? f.contentDocument : null; } catch (e) { return null; } }
     function shown(el) { return !!(el && el.getClientRects().length); }
     // 발표 틀 주소 바꾸기: src 를 바꾸면 브라우저 뒤로 가기 기록에 쌓여 '뒤로' 가 틀 안에서만 돎 → replace 로 (2026-11-23 발표 보기가 첫 화면)
@@ -552,7 +560,7 @@
     function openPresent(c) {
         $('presentPane').classList.toggle('phone', isPhoneFrame(c));
         if (pres.space !== c.space) {
-            pres.space = c.space; pres.ask = false;
+            pres.space = c.space; pres.ask = false; pres.open = Array.isArray(c.lessonOpen) ? c.lessonOpen.slice() : [];
             var u = new URL(studentLink(c));
             u.searchParams.set('present', '1');
             setFrame(u.href);
@@ -582,10 +590,21 @@
         $('btnPOpen').textContent = si && !si.all ? '▶ 다음 단계: ' + name(si.gate[si.n]) : '▶ 다음 단계';
         $('btnPOpen').title = si && !si.all ? '다음 단계 열기: ' + name(si.gate[si.n]) : '모든 단계가 열려 있어요';
         if (pres.ask && (!si || si.all)) askOpen(false);
-        var pm = $('btnPMode');
+        // 나란히 ↔ 크게(하나만) (2026-11-23): 왼쪽(설명 장·🧩·🏆)이 떠 있으면 ⇔ 나란히 / ⬜ 설명만, 📱 학생 크게 = 설명을 닫고 학생 화면만
+        var left = lesson.on || !!pres.panel, pm = $('btnPMode'), pl = $('btnPLayout');
         pm.hidden = !lesson.def && !pres.panel;
-        pm.textContent = pres.panel ? (lesson.def ? '📖 설명' : '📱 학생') : lesson.on ? '📱 학생' : '📖 설명';
-        pm.title = pm.textContent === '📱 학생' ? '학생 화면 보기' : '설명 장 보기';
+        pm.textContent = left ? '📱 학생 크게' : '📖 설명';
+        pm.title = left ? '설명을 닫고 학생 화면만 크게' : '이 단계 설명 장 보기 (학생 화면은 옆에)';
+        pm.setAttribute('aria-pressed', left ? 'false' : 'true');
+        pl.hidden = !left;
+        pl.textContent = pres.layout === 'side' ? '⬜ 설명만' : '⇔ 나란히';
+        pl.title = pres.layout === 'side' ? '학생 화면을 접고 ' + (pres.panel ? '이것만' : '설명만') + ' 크게' : '학생 화면을 옆에 함께';
+        // 🔓 풀이: 지금 장에 풀이가 있고 아직 안 열었을 때 (→ 와 같음)
+        var sl = lesson.on && lesson.list[lesson.i];
+        $('btnPReveal').hidden = !(sl && sl.reveal && !pres.panel);
+        $('btnPReveal').disabled = !!(sl && lesson.rev);
+        $('btnPReveal').textContent = sl && lesson.rev ? '✅ 풀이 열림' : '🔓 풀이';
+        $('btnPBack').disabled = !si || si.n <= 1 || state.stageBusy;
         // 🧩 모아 보기 · 🏆 결과판: 프로젝터에 띄울 것을 바꿈 (팀 수업 = 결과판·💬 팀 생각, 조 수업 = 🧩 모아 보기 카드)
         $('btnPBoard').hidden = c.mode !== 'team';
         $('btnPGather').hidden = !(c.mode === 'team' || window.ClassTeacherGather);
@@ -710,6 +729,7 @@
     var lsync = { t: 0, last: '' };
     function lessonSync(now) {
         var c = watched(); if (!c || !c.space) return;
+        framePush();
         var s = lesson.on ? lesson.list[lesson.i] : null;
         // 'phone' 장은 풀이를 열기 전까지 학생 띠가 '✍️ 내 화면에서 해요' (풀이를 열면 '👀 앞 화면을 봐요')
         var L = { on: !!lesson.on, stage: lesson.on ? lesson.gate : '', i: lesson.on ? lesson.i : 0, key: s && s.key ? s.key : '', reveal: !!(lesson.on && lesson.rev),
@@ -718,8 +738,36 @@
         var sig = JSON.stringify([c.space, L, open]);
         if (sig === lsync.last) return;
         clearTimeout(lsync.t);
-        var go = function () { lsync.last = sig; CC.classLesson(c.space, L, open).then(function (r) { if (!r || !r.ok) lsync.last = ''; }); };
+        var go = function () { lsync.last = sig; CC.classLesson(c.space, L, open).then(function (r) {
+            if (!r || !r.ok) { lsync.last = ''; return; }
+            if (Array.isArray(r.lessonOpen) && watched() === c) { pres.open = r.lessonOpen.slice(); framePush(); }
+        }); };
         if (now || open.length) go(); else lsync.t = setTimeout(go, 400);
+    }
+    /* 옆의 학생 화면이 지금 띄운 장을 따라가게 (2026-11-23 나란히 보기): 같은 사이트 iframe 에 바로 알림 (저장소를 거치지 않아 바로 바뀜)
+       · js/class-share.js (발표용) 가 학생과 같게 '👀 앞 화면을 봐요' 띠·답 가리기, 행사형(로켓)은 폰이 보는 화면(대기·답 칸·측정)
+       · 단계형은 그 단계 탭으로 (작은 탭은 첫 탭) */
+    function framePush() {
+        if (!pres.space) return;
+        var s = lesson.on ? lesson.list[lesson.i] : null;
+        var L = { on: !!lesson.on, stage: lesson.on ? lesson.gate : '', i: lesson.on ? lesson.i : 0, key: s && s.key ? s.key : '', reveal: !!(lesson.on && lesson.rev),
+            mode: s && s.mode === 'phone' && !(lesson.rev && s.reveal) ? 'phone' : 'look' };
+        var open = (pres.open || []).slice();
+        if (s && s.key && lesson.rev && open.indexOf(s.key) < 0) open.push(s.key);
+        try {
+            var w = $('presentFrame').contentWindow;
+            if (w && w.document && w.document.body) w.dispatchEvent(new w.CustomEvent('lab-present-lesson', { detail: JSON.parse(JSON.stringify({ lesson: L, lessonOpen: open })) }));
+        } catch (e) { /* 다른 주소면 건너뜀 */ }
+        if (lesson.on) frameToGate(lesson.gate);
+    }
+    // 단계형 학생 화면을 그 단계로 (같은 단계면 그대로 — 학생 화면에서 선생님이 넘긴 작은 탭을 지우지 않게)
+    function frameToGate(gate) {
+        var d = frameDoc(); if (!d || !gate) return;
+        var bs = stepBtns(d), b = bs.filter(function (x) { return x.dataset.step === gate; })[0];
+        if (!b || b.classList.contains('cs-locked') || b.getAttribute('aria-selected') === 'true') return;
+        b.click();
+        var sb = subBtns(d); if (sb.length) sb[0].click();
+        try { d.defaultView.scrollTo(0, 0); } catch (e) { /* 무시 */ }
     }
     function lessonRender() {
         var c = watched(), box = $('pSlides');
@@ -748,7 +796,7 @@
     var ans = { space: '', data: {}, busy: false, t: 0, at: 0 };
     function answerSlide() {
         var c = watched(), sl = lesson.on && lesson.list[lesson.i];
-        return c && sl && sl.mode === 'phone' && sl.key && CTA && CTA.supports(c.exp) && state.sub === 'present' ? sl : null;
+        return c && sl && sl.mode === 'phone' && sl.key && !/^do-/.test(sl.key) && CTA && CTA.supports(c.exp) && state.sub === 'present' ? sl : null;   // 측정 장(do-t1·do-t2)은 모을 답이 없음
     }
     function answersHtml() {
         var c = watched(), sl = answerSlide(); if (!sl) return '';
@@ -812,10 +860,22 @@
     window.addEventListener('resize', function () { if (lesson.on && LSx) LSx.fit($('pSlides')); });
     $('btnPMode').addEventListener('click', function () {
         var c = watched(); if (!c) return;
-        if (pres.panel) { setPanel(''); if (lesson.def && !lesson.on) lessonStart(frameGate(c), 0); return; }
+        if (pres.panel) { setPanel(''); if (lesson.on) lessonToFrame(1); return; }
         if (lesson.on) lessonToFrame(1);
         else if (!lessonStart(frameGate(c), 0)) $('pHint').textContent = '이 단계에는 설명 화면이 없어요.';
     });
+    $('btnPLayout').addEventListener('click', function () {
+        pres.layout = pres.layout === 'side' ? 'deck' : 'side';
+        try { localStorage.setItem('ct-present-layout', pres.layout); } catch (e) { /* 무시 */ }
+        applyLayout(); renderPresentBar();
+    });
+    $('btnPReveal').addEventListener('click', function () {
+        var s = lesson.on && lesson.list[lesson.i];
+        if (s && s.reveal && !lesson.rev) { lesson.rev = true; lessonRender(); }
+    });
+    // ↩ 단계 하나 되돌리기 (진행 화면의 '◀ 하나 되돌리기' 와 같음, 확인을 거침)
+    $('btnPBack').addEventListener('click', function () { $('btnStagePrev').click(); });
+    $('btnPQr').addEventListener('click', function () { $('btnBig').click(); });
     // 그 단계 안의 작은 탭 → 다음 단계(열려 있으면) → 잠겨 있으면 열기 확인
     function presentMove(dir) {
         // '다음 단계를 열까요?' 가 떠 있는 동안 → 는 무시 (빨리 두 번 눌러 잘못 열리지 않게): 열기는 Enter·단추로만, ← 는 닫기
@@ -875,6 +935,7 @@
     $('presentFrame').addEventListener('load', function () {
         var d = frameDoc(); if (!d) return;
         d.addEventListener('keydown', presentKey, true);   // iframe 안을 누른 뒤에도 같은 키로
+        setTimeout(framePush, 0);   // 새로 연 학생 화면도 지금 장에 맞춤
     });
     $('btnPNext').addEventListener('click', function () { presentMove(1); });
     $('btnPPrev').addEventListener('click', function () { presentMove(-1); });

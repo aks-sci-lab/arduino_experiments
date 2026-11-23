@@ -42,7 +42,7 @@
     color: var(--c-primary-dark); background: var(--c-fill); border-radius: 0.3em; font-variant-numeric: tabular-nums; }
 .ls-slide .formula.inline { display: inline-block; margin: 0 0.15em; padding: 0 0.3em; font-size: 1.1em; }
 /* 발표 화면 안: 설명을 보일 때는 학생 화면(iframe)을 감춤 */
-.ct-present.ls-on .ct-pframe iframe { display: none; }
+.ct-present.ls-on:not(.lay-side) .ct-pframe iframe { display: none; }   /* ⬜ 설명만 크게 (⇔ 나란히면 학생 화면이 옆에) */
 .ct-present:not(.ls-on) .ls-deck { display: none; }
 #btnPMode[hidden] { display: none; }
 @media (max-width: 899px) { .ls-main { flex-direction: column; } .ls-fig { flex-basis: auto; width: 70%; } }

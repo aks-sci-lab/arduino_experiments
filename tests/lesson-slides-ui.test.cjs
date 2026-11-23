@@ -49,9 +49,10 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         await T.waitForFunction(() => document.querySelector('#presentPane.ls-on .ls-slide'), null, { timeout: 15000 });
         let s = await slide(T);
         assert.match(s.title, /필름통 로켓/, '생각 열기 첫 장');
-        assert.equal(s.frame, 'none', '설명 동안 학생 화면은 숨김');
+        assert.equal(s.frame, 'block', '설명 옆에 학생 화면 (나란히 보기)');
         assert.match(await T.textContent('#btnPMode'), /📱 학생/);
-        assert.equal(await T.isVisible('#cornerQr'), true, '오른쪽 위 QR 그대로');
+        assert.equal(await T.isVisible('#cornerQr'), false, '오른쪽 위 QR 없음 — 띠의 📱 QR');
+        assert.equal(await T.isVisible('#btnPQr'), true);
         assert.equal(await T.isVisible('.ls-note summary'), true, '선생님용은 접기');
         assert.equal(await T.isVisible('.ls-note div'), false, '선생님 말은 바로 안 보임');
         await T.keyboard.press('ArrowRight');
@@ -122,8 +123,8 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
             });
             assert.deepEqual(bad, [], w + '×' + h);
             assert.equal(await T.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, w + ' 가로 스크롤');
-            const db = await T.locator('#pSlides').boundingBox(), qb = await T.locator('#cornerQrImg').boundingBox();
-            assert.ok(db.x + db.width <= qb.x + 1, '설명 화면이 오른쪽 위 QR 을 가리지 않음');
+            const db = await T.locator('#pSlides').boundingBox(), fb = await T.locator('#presentFrame').boundingBox();
+            assert.ok(db.x + db.width <= fb.x + 1, '설명 장과 학생 화면이 겹치지 않음');
         }
         await T.setViewportSize({ width: 1920, height: 1080 });
 
@@ -147,7 +148,7 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         assert.ok(look.border >= 1 && look.pad >= 4, '표 칸 테두리·간격: ' + JSON.stringify(look));
         assert.ok(look.fw >= 700 && look.fs >= 1.2, '식은 크고 굵게: ' + JSON.stringify(look));
         assert.equal(look.over, false, '표·식이 있어도 넘치지 않음');
-        assert.equal(await sel(), 'purpose');
+        assert.equal(await sel(), 'theory', '옆의 학생 화면도 띄운 장의 단계로 따라감');
         await T.keyboard.press('ArrowRight');
         assert.equal(await slide(T), null);
         assert.equal(await sel(), 'theory', '설명 다음은 그 단계 학생 화면');

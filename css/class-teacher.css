@@ -288,7 +288,7 @@ details.ct-phint:not([open]) > summary { min-height: 0; padding: 2px 0; }
 .ct-present .ct-pbar .ct-pbtns > button { min-height: 44px; padding: 0 .7em; }
 .ct-present .ct-pbtns > button.on { outline: 3px solid var(--c-primary); outline-offset: -3px; }
 .ct-present .ct-pframe { margin-top: 0; }
-.ct-present.pp-panel .ls-deck, .ct-present.pp-panel .ct-pframe iframe { display: none !important; }
+.ct-present.pp-panel .ls-deck, .ct-present.pp-panel:not(.lay-side) .ct-pframe iframe { display: none !important; }
 .ct-ppanel { height: 100%; box-sizing: border-box; overflow: auto; background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-3); font-size: 1.15rem; }
 .ct-ppanel[hidden] { display: none; }
 .ct-ppanel .ct-ppanel-h { margin: 0 0 var(--sp-2); }
@@ -319,3 +319,33 @@ details.ct-phint:not([open]) > summary { min-height: 0; padding: 2px 0; }
 }
 /* 띠가 맨 아래라 펼친 팀 이름은 위로 */
 .ct-present .ct-pbar .ct-pmore[open] > div { top: auto; bottom: 100%; margin: 0 0 4px; }
+/* ===== 나란히 보기 (2026-11-23 선생님 "학생 화면은 수업화면 옆에 같이 보이도록") =====
+   ⇔ 나란히(lay-side): 왼쪽 설명 장(또는 🧩·🏆) 65 : 오른쪽 학생 화면 35 — 학생 화면은 지금 띄운 장을 따라감
+   ⬜ 설명만: 왼쪽 것만 크게 · 📱 학생 크게: 설명을 닫고 학생 화면만 (설명 장이 없는 실험은 늘 학생 화면만) */
+.ct-pframe { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--sp-2); }
+.ct-pframe > * { grid-row: 1; grid-column: 1; min-width: 0; min-height: 0; }
+.ct-present.lay-side.ls-on .ct-pframe, .ct-present.lay-side.pp-panel .ct-pframe { grid-template-columns: minmax(0, 65fr) minmax(0, 35fr); }
+.ct-present.lay-side.ls-on .ct-pframe iframe, .ct-present.lay-side.pp-panel .ct-pframe iframe { grid-column: 2; }
+.ct-present .ct-pframe iframe { justify-self: center; }
+.ct-present.lay-side.ls-on:not(.phone) .ct-pframe iframe, .ct-present.lay-side.pp-panel:not(.phone) .ct-pframe iframe { justify-self: stretch; }
+body.ct-presenting .ct-present.phone .ct-pframe iframe { max-width: 100%; }
+.ct-psep { flex: 0 0 1px; align-self: stretch; margin: 4px 2px; background: var(--c-line); }
+.ct-pkeys > summary { min-height: 44px; min-width: 44px; justify-content: center; box-sizing: border-box; display: flex; align-items: center; padding: 0 .4em; list-style: none; }
+.ct-pkeys > summary::-webkit-details-marker { display: none; }
+.ct-present .ct-pbar .ct-pkeys[open] > div { left: auto; right: 0; max-width: min(40em, 80vw); white-space: normal; }
+#btnPReveal[hidden], #btnPLayout[hidden] { display: none; }
+/* 좁은 화면(폰·작은 창)은 나란히 대신 하나만 */
+@media (max-width: 899px) {
+    .ct-present.lay-side.ls-on .ct-pframe, .ct-present.lay-side.pp-panel .ct-pframe { grid-template-columns: minmax(0, 1fr); }
+    .ct-present.ls-on .ct-pframe iframe, .ct-present.pp-panel .ct-pframe iframe { display: none !important; }
+    #btnPLayout { display: none; }
+}
+/* 작은 노트북(1280 폭 근처)에서도 띠 한 줄: 단추 여백·다음 단계 이름을 조금 줄임 */
+@media (min-width: 1000px) and (max-width: 1500px) {
+    .ct-present .ct-pbar .ct-pbtns > button { padding: 0 .5em; }
+    .ct-present #btnPOpen { max-width: 11em; }
+    .ct-present .ct-psep { margin: 4px 0; }
+}
+.ct-present .ct-pbar .ct-pbtns > button { min-width: 44px; }
+/* 폰 틀은 테두리까지 칸 안에 (아래 띠에 가려지지 않게) */
+body.ct-presenting .ct-present.phone .ct-pframe iframe { box-sizing: border-box; }
