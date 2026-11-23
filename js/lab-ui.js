@@ -395,7 +395,7 @@
         // 교사 발표 보기의 틀(iframe data-fit): phone = 폰 9 : 19.5 틀을 340px 폭 폰 화면으로 채움
         var fit = ''; try { fit = (window.frameElement && window.frameElement.getAttribute('data-fit')) || ''; } catch (e) { fit = ''; }
         var ev = document.body.classList.contains('ev-body');
-        var z = ev ? (fit === 'phone' ? W / 340 : Math.min(W / 400, H / 820)) : Math.min(H * 0.002, W / (H > W * 1.2 ? 560 : 760));   // 세로로 긴 틀은 좁은 화면 배치로 글자를 더 크게
+        var z = ev ? (fit === 'phone' ? W / 340 : Math.min(W / 400, H / 820)) : Math.min(H * 0.002, W / (H > W * 1.2 ? 440 : 760));   // 세로로 긴 틀은 좁은 화면 배치로 글자를 더 크게
         if (big) z = Math.min(z * 1.25, document.body.classList.contains('ev-body') ? z * 1.25 : W / 600);
         z = Math.max(1, Math.min(6, z));
         // 폰 틀(로켓): 340px 폭 화면을 먼저 맞춘 뒤, 아래가 많이 비면 글자를 더 키워 틀을 채움 (화면 폭 280px 까지, 넘치면 줄임)

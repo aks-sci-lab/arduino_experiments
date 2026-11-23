@@ -351,8 +351,8 @@ body.ct-presenting .ct-present.phone .ct-pframe iframe { max-width: 100%; }
 body.ct-presenting .ct-present.phone .ct-pframe iframe { box-sizing: border-box; }
 /* ===== 2026-11-23 선생님 "이부분 비율 조절해서 최적화해", "큐알코드는 왼쪽 위에 계속 배치" =====
    · 왼쪽 위 작은 QR·수업 코드(--rail 칸, 설명 장·학생 화면을 가리지 않음, 누르면 크게)
-   · 학생 화면 칸 폭(--fw)은 js/class-teacher.js 가 계산: 로켓 = 칸 높이 × 폰 9 : 19.5, 7단계 = 폭의 36 % (남는 폭은 설명 장) */
-.ct-pframe { --rail: clamp(150px, 15vh, 380px); --fw: 35%; grid-template-columns: var(--rail) minmax(0, 1fr); }
+   · 학생 화면 칸 폭(--fw)은 js/class-teacher.js 가 계산: 로켓 = 칸 높이 × 폰 9 : 19.5, 7단계 = 폭의 26 % (작은 노트북 34 %) (남는 폭은 설명 장) */
+.ct-pframe { --rail: clamp(150px, 13vh, 340px); --fw: 35%; grid-template-columns: var(--rail) minmax(0, 1fr); }
 .ct-pframe > * { grid-column: 2; }
 .ct-present.lay-side.ls-on .ct-pframe, .ct-present.lay-side.pp-panel .ct-pframe { grid-template-columns: var(--rail) minmax(0, 1fr) var(--fw); }
 .ct-present.lay-side.ls-on .ct-pframe iframe, .ct-present.lay-side.pp-panel .ct-pframe iframe { grid-column: 3; }
