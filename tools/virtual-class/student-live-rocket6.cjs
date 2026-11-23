@@ -231,13 +231,16 @@ const NAME = { A: '별빛가족', B: '달님 탐험대', C: '할머니와 나', 
                     note(k + ' 2차시 ' + (si + 1) + '번째 값 ' + (ti + 1) + '발 뒤 결과', { 글: await res(pg, 1000), 단추: await btns(pg) });
                     if (si === 0 && ti === 0) await W.shot(pg, k + ' 2차시 첫 발 결과', true);
                 }
-                if (pl.graph && await tapIf(pg, /그래프 보기/)) { await pg.waitForTimeout(800); note(k + ' 2차시 그래프 화면', { 글: await res(pg, 1400), 단추: await btns(pg) }); await W.shot(pg, k + ' 2차시 그래프', true); }
+                if (pl.graph && await tapIf(pg, /그래프 보기/)) { await pg.waitForTimeout(800); note(k + ' 2차시 그래프 화면', { 글: await res(pg, 1400), 단추: await btns(pg) }); await W.shot(pg, k + ' 2차시 그래프', true);
+                    if (pl.more) { await tapIf(pg, /더 재기/); await pg.waitForTimeout(600); note(k + ' ➕ 더 재기 누른 뒤', { 글: await res(pg, 900), 단추: await btns(pg) });
+                        for (const pct of pl.more) { await prep(k, {}); if (!(await btns(pg)).includes('● 녹화 시작')) { note(k + ' 더 재기: 녹화까지 못 감', { 글: await res(pg, 700), 단추: await btns(pg) }); break; } await launch(k, pct); note(k + ' 더 재기 뒤 결과', { 글: await res(pg, 900), 단추: await btns(pg) }); const r = (await btns(pg)).find(t => /더 재기|같은 조건|한 번 더/.test(t)); if (r) await W.tap(pg, r.slice(0, 8)); else if (await tapIf(pg, /그래프 보기/)) await tapIf(pg, /더 재기/); }
+                        if (await tapIf(pg, /그래프 보기/)) { await pg.waitForTimeout(800); } note(k + ' 더 잰 뒤 그래프', { 글: await res(pg, 1400), 단추: await btns(pg) }); await W.shot(pg, k + ' 2차시 더 잰 그래프', true); } }
                 else note(k + ' 2차시 그래프 안 봄', await btns(pg)); };
             const plans = {
                 A: { graph: true, first: { v: '몸체 무게 바꾸기', pred: '낮아질 것 같아요', why: '무거우면 덜 빨라져서' }, sets: [[80, 85, 78], Object.assign([55, 60, 52], { plus: 2 })] },
                 B: { graph: true, first: { v: '물의 양 바꾸기', pred: '높아질 것 같아요', why: '물이 많으면 세게 나가서' }, sets: [[70, 82, 75], Object.assign([90, 98, 94], { plus: 2 })] },
                 C: { graph: true, first: { v: '발포비타민 양 바꾸기', pred: '높아질 것 같아요' }, sets: [[60, 65, 58], Object.assign([90, 95, 88], { plus: 2 })] },
-                D: { graph: true, first: { v: '몸체 무게 바꾸기', pred: '비슷할 것 같아요', why: '점토는 가벼우니까' }, sets: [[72, 80, 76], Object.assign([70, 78, 74], { plus: 2 })] },
+                D: { graph: true, first: { v: '몸체 무게 바꾸기', pred: '비슷할 것 같아요', why: '점토는 가벼우니까' }, sets: [[72, 80, 76], Object.assign([70, 78, 74], { plus: 2 })], more: [78, 74] },
                 E: { graph: false, first: { v: '몸체 무게 바꾸기' }, sets: [[85, 70, 90], Object.assign([75, 88, 80], { plus: 1 })] },
             };
             await Promise.all(Object.entries(plans).map(([k, pl]) => guard(k + ' 2차시 측정', () => run(k, pl))));
