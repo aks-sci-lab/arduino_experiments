@@ -213,8 +213,28 @@
             }
         }
         $('#ev-top').hidden = st.screen === 'enter';
+        offlineCard();
         if (!saveOk) { s.hidden = false; s.className = 'ev-sync warn'; s.textContent = '⚠ 이 브라우저는 저장이 안 돼요 (사생활 보호 모드?)'; }
     }
+    /* 📶 연결이 끊겼을 때만 큰 안내 (2026-11-23 선생님 '연결이 끊기면 어떻게 다시 접속하는지 안내는 포함'): 이미 있는 다시 보내기 상태로 판단, 다시 연결되면 저절로 사라짐 */
+    function isOffline() {
+        if (!CLASS || PRESENT || PAST || !st.team) return false;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+        if (st.dirty && net.lastNet) return true;
+        var cf = share && share.classFailed && share.classFailed();
+        return !!(share && !share.me() && cf && isNetErr(cf));
+    }
+    function offlineCard() {
+        var el = $('#ev-offline'); if (!el) return;
+        var off = isOffline();
+        el.hidden = !off;
+        if (!off) return;
+        el.innerHTML = '<h2>📶 연결이 끊겼어요</h2><ol><li>📶 <b>와이파이</b>를 확인해요</li><li>🔄 이 화면을 <b>새로고침</b>해요</li><li>📷 그래도 안 되면 선생님 화면의 <b>QR 을 다시 찍어요</b> (팀 이름은 그대로 들어가요)</li></ol>' +
+            '<p class="ev-small">QR 이 안 되면 메인 화면 → <b>학생</b> → 수업 코드 <b class="ev-code">' + esc(CLASS) + '</b> 넣기</p>' +
+            '<p class="ev-small">💾 이 폰에 먼저 저장해 둔 답은 다시 연결되면 저절로 보내요.</p>';
+    }
+    window.addEventListener('offline', function () { renderTop(); });
+    window.addEventListener('online', function () { renderTop(); });
     $('#ev-notice').addEventListener('click', function (e) {
         var b = e.target.closest('#ev-notice-go, #ev-notice-jump'); if (!b || b.disabled || busy() || !st.team) return;
         show(entryFor(b.dataset.next));
@@ -336,7 +356,7 @@
         if (DO_PART[k]) return { free: DO_PART[k] };
         if (CH_PART[k]) return { free: CH_PART[k], ch: true };
         if (conceptOf(k)) return st.think.first[k] ? 'sent' : 'think-' + k;
-        if (M.QUIZ[k] && SCREENS['q-' + k]) return 'q-' + k;
+        if (M.QUIZ[k] && SCREENS['q-' + k]) return st.quiz[k] && st.quiz[k].tries ? 'sent' : 'q-' + k;   // 고르면 바로 ✅ 보냈어요 (점수 계산은 그대로)
         if (k === 'end-think') {
             for (var i = 0; i < M.CONCEPTS.length; i++) { var z = st.quiz['end_' + M.CONCEPTS[i].key]; if (!(z && z.tries)) return 'end-' + M.CONCEPTS[i].key; }
             return 'sent';
@@ -438,36 +458,24 @@
     }
 
     var SCREENS = {};
+    // 수업 중 팀 폰 대기 화면 (2026-11-23 선생님 '응답한 답과 화면을 보세요만'): 👀 앞 화면을 봐요 · 팀 이름 · 우리가 낸 답(이 차시, 최근 3줄)
     SCREENS['wait'] = function () {
         return { html: '<div class="ev-hero ev-wait"><div class="ev-hero-ic" aria-hidden="true">👀</div><h2>앞 화면을 봐요</h2>' +
-            '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : PRESENT ? '팀 이름' : '') + '</b></p></div>' + myResults(), mount: mountMyResults };
+            '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : PRESENT ? '팀 이름' : '') + '</b></p></div>' + sentList() };
     };
     SCREENS['sent'] = function () {
         return { html: '<div class="ev-hero ev-wait"><div class="ev-hero-ic" aria-hidden="true">✅</div><h2>보냈어요</h2><p class="ev-wait-sub">앞 화면을 봐요</p>' +
-            '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : '') + '</b></p></div>' + myResults(), mount: mountMyResults };
+            '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : '') + '</b></p></div>' + sentList() };
     };
-    /* 📊 우리 팀 결과 보기 (2026-11-23 가상 수업 4차 '없어서 불편한 기능 상'): 대기 화면 아래 작게 접기 — 선생님이 물으면 팀이 숫자를 말할 수 있게.
-       1·2차시 표(평균·↕ 범위·횟수·흔들림 판정)·그래프. 잰 값이 없으면 안 보임 */
-    function myResults() {
-        var parts = ['t1', 't2'].filter(function (k) { return st[k] && st[k].changed && st[k].trials && st[k].trials.length; });
-        if (!parts.length) return '';
-        return '<details class="ev-more ev-myres"><summary>📊 우리 팀 결과 보기</summary>' + parts.map(function (k) {
-            return '<div class="ev-myres-part" data-myres="' + k + '"><h3>' + (k === 't1' ? '1차시 · 열리는 시간' : '2차시 · 오른 높이') + '</h3>' +
-                '<div class="ev-chart small"><canvas aria-label="' + (k === 't1' ? '1차시' : '2차시') + ' 그래프"></canvas></div><div class="ev-myres-table"></div></div>';
-        }).join('') + '</details>';
+    // 우리가 낸 답: 선생님이 띄운 응답 장에서 고른(보낸) 답을 폰에만 적어 둠 (선생님께 보내는 자료는 그대로)
+    function logAnswer(word, text) {
+        if (!following() || PRESENT) return;
+        st.sentLog = (st.sentLog || []).concat([{ s: lessonNow().stage || st.stage, w: String(word || ''), t: String(text || '') }]).slice(-20);
     }
-    function mountMyResults(el) {
-        var dt = el.querySelector('.ev-myres'); if (!dt) return;
-        var drawn = false;
-        dt.addEventListener('toggle', function () {
-            if (!dt.open || drawn) return;
-            drawn = true;
-            Array.prototype.forEach.call(dt.querySelectorAll('[data-myres]'), function (box) {
-                var k = box.dataset.myres;
-                miniTable(box.querySelector('.ev-myres-table'), k);
-                chart(box.querySelector('canvas'), k, { target: false });
-            });
-        });
+    function sentList() {
+        var stg = lessonNow().stage || st.stage, list = (st.sentLog || []).filter(function (x) { return x.s === stg; }).slice(-3).reverse();
+        if (!list.length) return '';
+        return '<ul class="ev-sentlist" aria-label="우리가 낸 답">' + list.map(function (x) { return '<li>✅ 보냈어요: ' + (x.w ? '<b>' + esc(x.w) + '</b> · ' : '') + esc(x.t) + '</li>'; }).join('') + '</ul>';
     }
 
     // ===== 0 입장 =====
@@ -555,7 +563,7 @@
                 return { html: html, mount: function (el) {
                     el.querySelector('.ev-choices').addEventListener('click', function (e) {
                         var b = e.target.closest('[data-k]'); if (!b || st.think.first[c.key]) return;   // 처음 생각은 한 번만
-                        st.think.first[c.key] = b.dataset.k; changed(); show(st.screen, { back: true });
+                        st.think.first[c.key] = b.dataset.k; logAnswer(c.word, M.optText(c.opts, b.dataset.k)); changed(); show(st.screen, { back: true });
                     });
                 } };
             }
@@ -575,6 +583,7 @@
                     if (!cur.tries && lateNow(qk)) cur.late = true;
                     cur.tries++; cur.picks.push(b.dataset.k); if (b.dataset.k === 'ok') cur.correct = true;
                     if (!st.think.last[c.key]) st.think.last[c.key] = b.dataset.k;
+                    if (cur.tries === 1) logAnswer(c.word, M.optText(c.opts, b.dataset.k));
                     changed(); show(st.screen, { back: true });
                 });
             } };
@@ -610,6 +619,7 @@
                     if (cur.correct || cur.picks.indexOf(b.dataset.k) >= 0) return;
                     if (!cur.tries && lateNow(key)) cur.late = true;
                     cur.tries++; cur.picks.push(b.dataset.k); if (b.dataset.k === 'ok') cur.correct = true;
+                    if (cur.tries === 1) logAnswer(Q.word, M.optText(Q.opts, b.dataset.k));
                     changed(); show(st.screen, { back: true });
                 });
             } };
@@ -1314,7 +1324,7 @@
             nav('end-card', '결과 카드 만들기 →');
         return { html: html, mount: function (el) {
             var snd = el.querySelector('#ev-concl-send');
-            if (snd) snd.addEventListener('click', function () { st.sentKeys = st.sentKeys || {}; st.sentKeys['end-cause'] = true; changed(); show('sent', { follow: true }); });
+            if (snd) snd.addEventListener('click', function () { st.sentKeys = st.sentKeys || {}; st.sentKeys['end-cause'] = true; logAnswer('정리 문장', '우리 팀 정리 문장'); changed(); show('sent', { follow: true }); });
             Array.prototype.forEach.call(el.querySelectorAll('[data-concl]'), function (box) {
                 var k = box.dataset.concl;
                 box.addEventListener('click', function (e) {

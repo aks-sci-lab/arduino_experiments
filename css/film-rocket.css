@@ -156,7 +156,16 @@ html.ev-answering .ev-screen .ev-nav:not(.ev-follow-only) { display: none !impor
 .ev-wait h2 { font-size: 2rem; }
 .ev-wait-sub { font-size: 1.3rem; font-weight: 700; margin: 0; }
 .ev-wait-team { font-size: 1.6rem; margin-top: var(--sp-4); }
-/* 📊 우리 팀 결과 보기 (대기 화면 아래 접기, 2026-11-23) */
-.ev-myres { margin-top: var(--sp-3); }
-.ev-myres-part h3 { margin: var(--sp-2) 0 var(--sp-1); font-size: 1.05rem; }
-.ev-chart.small { height: clamp(180px, 30vh, 260px); }
+/* 수업 중 팀 폰: 대기·응답 화면에는 '👀 앞 화면을 봐요'·팀 이름·우리가 낸 답·물음과 답 칸만 (2026-11-23 선생님 '응답한 답과 화면을 보세요만')
+   위 띠(팀·⭐ 점수·보냄)·'🏫 선생님 연결 · 도움말'·겹치는 '👀 앞 화면을 봐요 — 선생님이 설명 중이에요' 띠·정의·설명 글은 숨김 (측정 장은 그대로) */
+html.ev-answering #ev-top, html.ev-answering .ev-foot, html.ev-answering .cs-look-band { display: none !important; }
+html.ev-answering .ev-screen .ev-small, html.ev-answering .ev-screen .ev-def, html.ev-answering .ev-screen .ev-ex, html.ev-answering .ev-screen .ev-easy,
+html.ev-answering .ev-screen .ev-ok, html.ev-answering .ev-screen .ev-no, html.ev-answering .ev-screen .ev-hold, html.ev-answering .ev-screen [data-lesson-answer] { display: none !important; }
+.ev-sentlist { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: var(--sp-1); }
+.ev-sentlist li { padding: var(--sp-2) var(--sp-3); border-radius: 12px; background: var(--c-ok-bg); color: var(--c-ok-text); font-size: 1.05rem; }
+/* 📶 연결이 끊겼어요 (끊겼을 때만) */
+.ev-offline { margin: 0 0 var(--sp-3); padding: var(--sp-3); border: 3px solid var(--c-warn-text); border-radius: 16px; background: var(--c-warn-bg); color: var(--c-text); }
+.ev-offline[hidden] { display: none; }
+.ev-offline h2 { margin: 0 0 var(--sp-2); font-size: 1.35rem; }
+.ev-offline ol { margin: 0 0 var(--sp-2); padding-left: 1.4em; font-size: 1.1rem; line-height: 1.6; }
+.ev-offline .ev-code { font-size: 1.15em; letter-spacing: .04em; white-space: nowrap; }
