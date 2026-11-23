@@ -68,6 +68,32 @@
             '</tbody></table>' +
             (v.predict ? '<p class="ls-ask">🔮 ' + v.predict + '</p>' : '');
     }
+    /* 📱 응답 물음의 고를 답·모인 답 (③). answers: 교사 화면이 받은 답 목록 [{ jo, num, seat, choice, text }] 또는 null(아직)
+       프로젝터에는 수·글만, 어느 조가 무엇을 골랐는지는 '🔧 선생님용' 접기. 정답 ✅ 는 풀이를 연 뒤에만. 받은 글은 모두 esc */
+    var ABC = 'ABCDEF';
+    function respHtml(slide, answers, revealed) {
+        var r = slide && slide.resp; if (!r) return '';
+        var list = Array.isArray(answers) ? answers : [], n = list.length, h = '<div class="ls-resp" data-type="' + r.type + '">';
+        if (r.type === 'pick') {
+            var cnt = r.choices.map(function () { return 0; });
+            list.forEach(function (a) { if (a.choice >= 0 && a.choice < cnt.length) cnt[a.choice]++; });
+            var max = Math.max.apply(null, cnt.concat([1]));
+            h += '<ol class="ls-choices">' + r.choices.map(function (c, i) {
+                var ok = revealed && r.answer === i;
+                return '<li' + (ok ? ' class="ok"' : '') + '><span class="ls-abc">' + ABC[i] + '</span><span class="ls-ctext">' + esc(c) + (ok ? ' ✅' : '') + '</span>' +
+                    (answers ? '<span class="ls-bar" style="--w:' + Math.round(cnt[i] / max * 100) + '%"></span><b class="ls-cnt">' + cnt[i] + '</b>' : '') + '</li>';
+            }).join('') + '</ol>';
+        } else if (answers) {
+            h += n ? '<ul class="ls-texts">' + list.slice(-30).map(function (a) { return '<li>' + esc(a.text) + '</li>'; }).join('') + '</ul>' : '';
+        }
+        h += '<p class="ls-rnote">📱 폰·노트북에서 답해요' + (answers ? ' · 답한 기기 <b>' + n + '</b>' : '') + '</p>';
+        if (answers && n) {
+            h += '<details class="ct-teach ls-who"><summary>🔧 선생님용: 조별 답</summary><div>' + list.map(function (a) {
+                return '<span>' + a.jo + '조 ' + a.num + '번' + (/-p$/.test(a.seat || '') ? '📱' : '') + ': ' + (r.type === 'pick' ? (ABC[a.choice] || '?') : esc(a.text)) + '</span>';
+            }).join(' · ') + '</div></details>';
+        }
+        return h + '</div>';
+    }
     /* 장 하나 그리기. revealed: 풀이까지 보임. pos: { i, n, stageName } */
     function render(slide, revealed, pos) {
         pos = pos || {};
@@ -76,6 +102,7 @@
         var text = (slide.body ? '<div class="ls-body">' + slide.body + '</div>' : '') +
             (k === 'vars' ? varsHtml(slide.vars) : '') +
             (slide.ask ? '<p class="ls-ask">❓ ' + slide.ask + '</p>' : '') +
+            (slide.resp ? respHtml(slide, pos.answers || null, revealed) : '') +
             // 풀이는 열기 전에는 화면(문서)에 넣지 않음 — 답이 먼저 보이지 않게
             (hasReveal ? (revealed ? '<div class="ls-reveal">' + slide.reveal + '</div>' : '<p class="ls-wait">→ 이야기를 나눈 뒤 넘기면 풀이가 나와요</p>') : '');
         var dots = '';
@@ -170,6 +197,24 @@
         return out;
     }
     function plain(html) { return String(html == null ? '' : html).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
+    function cleanResp(r) {
+        if (!r || typeof r !== 'object' || (r.type !== 'pick' && r.type !== 'text')) return null;
+        var o = { type: r.type };
+        if (r.type === 'pick') {
+            o.choices = (Array.isArray(r.choices) ? r.choices : []).map(function (c) { return plain(c).slice(0, 60); }).filter(Boolean).slice(0, 6);
+            if (o.choices.length < 2) return null;
+            var a = Math.round(Number(r.answer));
+            o.answer = r.answer != null && r.answer !== '' && a >= 0 && a < o.choices.length ? a : -1;
+        }
+        return o;
+    }
+    // 띄울 때 학생에게 보내는 물음 (정답 빼고). 응답 장이 아니면 null
+    function respQ(slide) {
+        if (!slide || !slide.resp || !NEW_KEY_RE.test(String(slide.key || ''))) return null;
+        var q = { type: slide.resp.type, text: (plain(slide.ask) || plain(slide.title)).slice(0, 300) };
+        if (slide.resp.type === 'pick') q.choices = slide.resp.choices.slice();
+        return q;
+    }
     function cleanVars(v) {
         if (!v || typeof v !== 'object') return null;
         var keep = (Array.isArray(v.keep) ? v.keep : []).map(function (x) { return sanitize(x, VAR_MAX); }).filter(Boolean).slice(0, KEEP_MAX);
@@ -183,6 +228,9 @@
         var s = { kind: e.kind, key: e.add, title: sanitize(e.title, EDIT_FIELDS.title) || '(제목 없음)', mine: true };
         ['body', 'ask', 'reveal', 'note'].forEach(function (f) { var v = sanitize(e[f], EDIT_FIELDS[f]); if (v) s[f] = v; });
         if (!s.ask) delete s.reveal;
+        // 📱 응답 물음 (③): 학생 폰·노트북이 답함 → mode 'phone' (띄우면 수업 문서 lesson.q 로 물음이 감, 정답은 교사 화면에만)
+        var r = cleanResp(e.resp);
+        if (r) { s.resp = r; s.mode = 'phone'; if (!s.ask) s.ask = s.title; }
         if (e.kind === 'vars') { s.vars = cleanVars(e.vars); if (!s.vars || !s.vars.change) { s.kind = 'concept'; delete s.vars; } }
         if (!s.body && !s.ask && !s.vars) s.body = '';
         return s;
@@ -251,6 +299,7 @@
                     var n = { add: e.add, kind: e.kind };
                     ['title', 'body', 'ask', 'reveal', 'note'].forEach(function (f) { var v = sanitize(e[f], EDIT_FIELDS[f]); if (v) n[f] = v; });
                     if (e.kind === 'vars' && e.vars) n.vars = cleanVars(e.vars);
+                    var rp = cleanResp(e.resp); if (rp) n.resp = rp;
                     return n;
                 }
                 var o = { ref: e.ref, of: plain(e.base.title) };
@@ -296,6 +345,6 @@
         return loading[exp];
     }
     var LessonSlides = { KINDS: KINDS, slidesFor: slidesFor, gateOf: gateOf, firstPanel: firstPanel, render: render, fit: fit, check: check, load: load, loadBase: loadBase,
-        sanitize: sanitize, plain: plain, applyEdit: applyEdit, resolveEdit: resolveEdit, entrySlide: entrySlide, toEdit: toEdit, refOf: refOf, EDIT_FIELDS: EDIT_FIELDS, NEW_KEY_RE: NEW_KEY_RE };
+        sanitize: sanitize, plain: plain, applyEdit: applyEdit, resolveEdit: resolveEdit, entrySlide: entrySlide, toEdit: toEdit, refOf: refOf, cleanResp: cleanResp, respQ: respQ, respHtml: respHtml, EDIT_FIELDS: EDIT_FIELDS, NEW_KEY_RE: NEW_KEY_RE };
     return { LessonContent: LessonContent, LessonSlides: LessonSlides };
 });

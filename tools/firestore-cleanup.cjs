@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /* 학기 끝 자동 삭제 (2026-11-18): expireAt 가 지난 문서를 지운다. GitHub Actions(firestore-cleanup.yml)가 매일 실행.
    Firestore TTL 정책을 켜 두면 Firestore 가 스스로 지우지만(최대 하루쯤 늦음), TTL 을 켜지 못했을 때를 위해 같은 일을 한 번 더 한다.
-   대상(컬렉션 그룹): items·raw·progress·aiAsk·reports·aiDesk·teams(labSpaces·labClasses 아래), labClasses, labClassCodes, devlog
+   대상(컬렉션 그룹): items·raw·progress·aiAsk·reports·aiDesk·teams·answers(labSpaces·labClasses 아래), labClasses, labClassCodes, devlog
    환경 변수: FIREBASE_SERVICE_ACCOUNT(사이트 배포와 같은 서비스 계정 JSON). DRY_RUN=1 이면 세기만 */
 'use strict';
-const GROUPS = ['items', 'raw', 'progress', 'aiAsk', 'reports', 'aiDesk', 'teams', 'labClasses', 'labClassCodes', 'devlog'];
+const GROUPS = ['items', 'raw', 'progress', 'aiAsk', 'reports', 'aiDesk', 'teams', 'answers', 'labClasses', 'labClassCodes', 'devlog'];
 
 // db 는 firebase-admin 의 Firestore (시험에서는 같은 모양의 가짜)
 async function cleanup(db, now, opts) {
