@@ -116,6 +116,11 @@ test('수업 자료 편집 → 발표 보기에 반영 → 기본 자료로 되�
         const P = await ctx({ viewport: { width: 1280, height: 900 } }, 'P', { uid: 'teacher-1', google: true, teacher: true });
         await P.goto(ROOT + 'projects/class-teacher.html#class=' + cls.space + '&view=present'); await P.reload();
         await P.waitForFunction(() => document.querySelector('#presentPane.ls-on .ls-title'), null, { timeout: 15000 });
+        // 나란히 보기(#176, 기본): 왼쪽 설명 장 = 고친 자료(새 장), 오른쪽 학생 화면도 보임
+        const side = await P.evaluate(() => { const pane = document.getElementById('presentPane'), s = document.querySelector('#pSlides .ls-slide'), fr = document.getElementById('presentFrame');
+            const a = s.getBoundingClientRect(), b = fr.getBoundingClientRect();
+            return { side: pane.classList.contains('lay-side'), title: s.querySelector('.ls-title').textContent, frame: getComputedStyle(fr).display !== 'none' && b.width > 100, left: a.right <= b.left + 2 }; });
+        assert.deepEqual(side, { side: true, title: '오늘 순서 (새 장)', frame: true, left: true }, '나란히 보기 왼쪽에 고친 자료');
         const seen = [];
         for (let i = 0; i < 9; i++) {
             const s = await P.evaluate(() => { const el = document.querySelector('#presentPane.ls-on #pSlides .ls-slide'); return el ? el.querySelector('.ls-title').textContent + (el.dataset.revealed === '0' ? '?' : '') : null; });
