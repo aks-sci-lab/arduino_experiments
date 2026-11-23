@@ -44,24 +44,18 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         await A.fill('#ev-name', '별빛가족'); await A.click('#ev-start');
         // 설명 화면이 '기체' 응답 장을 띄운 반 → 폰은 그 답 칸(q-gas)으로 (2026-11-23 폰은 응답만)
         await go(A, 'q-gas');
-        // ③ 'phone' 장: 띠가 '✍️ 내 화면에서 해요'
-        await A.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return b && !b.hidden; }, null, { timeout: 15000 });
-        assert.match(await A.textContent('.cs-look-band'), /내 화면에서 해요 — 다 하면 앞 화면을 봐요/);
-        // ② 1차시 첫 퀴즈: 고르면 '골랐어요 ✓ — 앞 화면을 봐요', ⭕·점수는 아직
-        await A.evaluate(() => window.__filmRocket.show('q-gas')); await go(A, 'q-gas');
-        await A.click('.ev-choice[data-k="ok"]');
-        await A.waitForSelector('.ev-hold');
-        assert.equal(await A.locator('.ev-ok').count(), 0, '⭕ 는 풀이 뒤에');
-        assert.equal(await A.locator('.ev-choice.right').count(), 0, '정답 색도 풀이 뒤에');
-        assert.match(await A.textContent('#ev-score'), /⭐ 0점/, '점수도 풀이 뒤에');
+        // ③ 응답 장: 2026-11-23 선생님 결정 — 겹치는 띠·점수 없이 물음과 답 칸만
+        await A.waitForFunction(() => document.documentElement.classList.contains('ev-answering'), null, { timeout: 15000 });
+        assert.equal(await A.isVisible('.cs-look-band'), false, '띠와 큰 글자 중 하나만 (띠는 숨김)');
+        assert.equal(await A.isVisible('#ev-score'), false, '점수 없음');
+        // ② 1차시 첫 퀴즈: 고르면 바로 '✅ 보냈어요' + 낸 답 (⭕·정답 색·점수는 폰에 안 보임)
+        await A.click('.ev-choice[data-k="ok"]'); await go(A, 'sent');
+        assert.match(await A.textContent('.ev-screen'), /보냈어요[\s\S]*기체 발생과 압력/);
         assert.equal((await A.evaluate(() => window.__filmRocket.state().quiz.gas)).correct, true, '고른 답·점수는 바로 저장');
-        assert.equal(await A.isDisabled('.ev-screen .ev-next'), false, '다음으로는 갈 수 있음');
-        // 교사가 풀이를 엶 → ⭕ +10점·📘·점수
+        // 교사가 풀이를 엶 → 폰은 그대로 (점수는 계산돼 결과판으로)
         Object.assign(doc(), { lesson: { on: true, stage: 't1', i: 0, key: 'gas', reveal: true, mode: 'look' }, lessonOpen: ['gas'] });
-        await A.waitForSelector('.ev-ok', { timeout: 15000 });
-        assert.match(await A.textContent('.ev-ok'), /\+10점/);
-        assert.match(await A.textContent('#ev-score'), /⭐ 10점/);
-        assert.match(await A.textContent('.cs-look-band'), /앞 화면을 봐요/);
+        await A.waitForTimeout(1500);
+        assert.equal(await A.getAttribute('#ev-app', 'data-screen'), 'sent');
         // ④ 🔮 예측: 바꿀 것을 고르면 예측 고르기·까닭 칸
         // 선생님이 설명을 닫음(📱 학생 화면) → 폰 혼자 흐름
         Object.assign(doc(), { lesson: { on: false, stage: 't1', i: 0, key: '', reveal: false, mode: 'look' } });
@@ -86,7 +80,7 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         assert.equal(await A.getAttribute('#ev-app', 'data-screen'), 't1-cond', '같은 값이면 넘어가지 않음');
         assert.match(await A.textContent('#ev-must'), /값을 하나 바꿔요/);
         await A.click('.ev-stepper:not(.locked) [data-pm="1"]');
-        await next(A); await go(A, 't1-predict');
+        await next(A); await go(A, 't1-measure');
         assert.equal(await A.evaluate(() => window.__filmRocket.state().t1.mustChange), null);
         // 안내 화면: 다음 단계(2차시)가 잠겨 있으면 그리로 가는 단추 없음
         await A.evaluate(() => window.__filmRocket.show('t1-more')); await go(A, 't1-more');
@@ -105,7 +99,11 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         await go(A, 't2-result');
         assert.match(await A.textContent('.ev-screen'), /아이 키보다 낮아요/);
         assert.doesNotMatch(await A.textContent('.ev-screen'), /무게를 줄이거나/);
-        assert.match(await A.textContent('.ev-more-hint'), /값을 하나 바꿔 한 번 더 쏘아요/, '2차시는 첫 발에도 바로 안내');
+        // 2026-11-23 가상 수업 4차: 첫 발 뒤에는 '같은 조건으로 한 번 더' 가 먼저, 같은 조건을 다 쏜 뒤에 '값을 하나 바꿔' 안내
+        assert.equal(await A.isVisible('#ev-again2'), true, '2차시 첫 발 뒤 같은 조건 반복');
+        await A.evaluate(() => { const s = window.__filmRocket.state(); s.t2.trials.push({ value: 10, pct: 62, method: 'hand' }, { value: 10, pct: 58, method: 'hand' }); s.last2 = s.t2.trials[2]; window.__filmRocket.show('t2-result'); });
+        await A.waitForSelector('.ev-more-hint');
+        assert.match(await A.textContent('.ev-more-hint'), /값을 하나 바꿔 한 번 더 쏘아요/, '같은 조건을 다 쏘면 바로 안내');
         assert.equal(await A.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '375px');
         // 요약 → 교사 결과판 💬 생각
         await A.evaluate(() => window.__filmRocket.sendNow());

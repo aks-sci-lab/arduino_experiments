@@ -44,27 +44,23 @@ test('로켓: 예측을 골라야 다음·늦게 고른 팀 5점', { skip: !chro
         // 풀이 전에 고른 팀 A
         const A = await ctx(devices['iPhone 13'], 'A');
         await join(A, c, '별빛가족');
-        await A.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return b && !b.hidden; }, null, { timeout: 15000 });
+        // 2026-11-23 선생님 결정: 수업 중 폰은 점수를 안 보이고 고르면 바로 '✅ 보냈어요' — 점수 계산(10/5점)은 그대로라 상태로 확인
+        const pts = pg => pg.evaluate(() => { const q = window.__filmRocket.state().quiz.gas; return q && q.correct ? (q.late ? 5 : 10) : 0; });
+        await A.waitForFunction(() => document.documentElement.classList.contains('ev-answering'), null, { timeout: 15000 });
         await quiz(A);
-        assert.match(await A.textContent('.ev-screen'), /처음에 맞히면 10점/);
-        await A.click('.ev-choice[data-k="ok"]'); await A.waitForSelector('.ev-hold');
+        await A.click('.ev-choice[data-k="ok"]'); await go(A, 'sent');
         // 교사가 풀이를 엶
         Object.assign(doc(), { lesson: { on: true, stage: 't1', i: 0, key: 'gas', reveal: true, mode: 'look' }, lessonOpen: ['gas'] });
-        await A.waitForSelector('.ev-ok', { timeout: 15000 });
-        assert.match(await A.textContent('.ev-ok'), /\+10점/);
-        assert.equal(await A.locator('.ev-late').count(), 0, '풀이 전에 고른 팀은 한 줄 없음');
-        assert.match(await A.textContent('#ev-score'), /⭐ 10점/);
+        await A.waitForTimeout(1000);
+        assert.equal(await pts(A), 10, '풀이 전에 고른 팀 10점');
         // 풀이가 열린 뒤 처음 고른 팀 B → 맞혀도 5점
         const B = await ctx(devices['iPhone 13'], 'B');
         await join(B, c, '달빛가족');
-        await B.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return b && !b.hidden; }, null, { timeout: 15000 });
+        await B.waitForFunction(() => document.documentElement.classList.contains('ev-answering'), null, { timeout: 15000 });
         await quiz(B);
-        assert.match(await B.textContent('.ev-late'), /풀이가 이미 나왔어요/);
-        await B.click('.ev-choice[data-k="ok"]'); await B.waitForSelector('.ev-ok');
-        assert.match(await B.textContent('.ev-ok'), /\+5점/);
-        assert.equal((await B.textContent('.ev-late')).trim(), '풀이를 본 뒤 골라서 5점이에요');
-        assert.match(await B.textContent('#ev-score'), /⭐ 5점/);
+        await B.click('.ev-choice[data-k="ok"]'); await go(B, 'sent');
         assert.equal((await B.evaluate(() => window.__filmRocket.state().quiz.gas)).late, true);
+        assert.equal(await pts(B), 5, '풀이를 본 뒤 고른 팀 5점');
 
         // 설명 화면을 안 쓴 반: 지금 그대로 10점
         const c2 = await app.post({ action: 'createClass', ban: 2, mode: 'team', nTeams: 4, exp: 'rocket', stage: 2 });

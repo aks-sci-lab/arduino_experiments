@@ -382,3 +382,7 @@ body.ct-presenting .ct-present.phone .ct-pframe iframe { aspect-ratio: 9 / 19.5;
 @media (max-width: 1500px) { .ct-present .ct-pbtns .ct-pslot > button { padding: 0 .4em; } .ct-present .ct-pbtns .ct-pslot-rev > button { width: 7em; } .ct-present .ct-pbtns .ct-pslot-lay > button { width: 5.9em; } }
 .ct-present .ct-pbar .ct-pbtns > #btnPOpen { display: inline-block; vertical-align: middle; width: min(16em, 14vw); min-width: 7em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; line-height: 44px; padding-block: 0; }
 @media (min-width: 1700px) { .ct-present .ct-pbar .ct-pbtns > #btnPOpen { width: 19em; } }
+/* 🎬 발표 화면에 띄운 🏆 결과판 (2026-11-23 가상 수업 4차): 💬 생각 칸을 크게, 아래 빈 곳을 채움 */
+.ct-board-present .ct-board { font-size: 1.15em; }
+.ct-board-present .ct-board td.ct-talk { max-width: none; min-width: 40%; width: 55%; font-size: 1em; color: var(--c-text); line-height: 1.45; }
+.ct-board-present .ct-board td.ct-talk div + div { margin-top: .35em; }

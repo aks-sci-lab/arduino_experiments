@@ -95,9 +95,10 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
             // 폰 틀 = 실제 폰 비율 9 : 19.5, 안쪽 답 칸 화면은 틀을 채움 (아래 빈 곳 25 % 미만)
             assert.ok(Math.abs(ff.width / ff.height - 9 / 19.5) < 0.02, w + ' 폰 비율: ' + Math.round(ff.width) + '×' + Math.round(ff.height));
             await T.waitForTimeout(250);
-            const fill = await T.evaluate(() => { const f = document.getElementById('presentFrame'), win = f.contentWindow, d = f.contentDocument; let m = 0;
+            const fill = await T.evaluate(() => { const f = document.getElementById('presentFrame'), win = f.contentWindow, d = f.contentDocument; let m = 0; window.__over = d.documentElement.scrollHeight - win.innerHeight;
                 [...d.body.children].forEach(el => { if (el.tagName !== 'SCRIPT' && el.getClientRects().length) m = Math.max(m, el.getBoundingClientRect().bottom); }); return m / win.innerHeight; });
             assert.ok(fill >= 0.75, w + ' 폰 틀 안 채움: ' + fill.toFixed(2));
+            assert.ok(await T.evaluate(() => window.__over) <= 2, w + ' 폰 틀 안 넘침: ' + await T.evaluate(() => window.__over));
             await qrTopLeft(T, '로켓 ' + w);
         }
         await T.setViewportSize({ width: 1920, height: 1080 });
