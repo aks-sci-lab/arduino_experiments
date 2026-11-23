@@ -55,13 +55,11 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         assert.equal(r.scroll, 0, label + ' 가로 스크롤');
         assert.ok(r.bottom <= r.vh + 1, label + ' 띠가 화면 안: ' + JSON.stringify(r));
     };
-    // 왼쪽 위 작은 QR·수업 코드: 늘 보이고, 설명 장·학생 화면과 겹치지 않음, 찍을 수 있는 크기(화면 높이의 12 % 이상)
+    // 왼쪽 위 작은 QR 칸은 없음 (2026-11-23 선생님 "큐알코드 화면 다시 없애") — QR 은 띠의 📱 QR 로 크게
     const qrTopLeft = async (T, label) => {
-        const q = await box(T, '#pQr'), img = await box(T, '#pQrImg'), d = await box(T, '#pSlides') || await box(T, '#pPanel'), f = await box(T, '#presentFrame'), vh = T.viewportSize().height;
-        assert.ok(q && q.x < T.viewportSize().width * 0.03 && q.y < vh * 0.05, label + ' QR 왼쪽 위: ' + JSON.stringify(q));
-        assert.ok(img.width >= vh * 0.12, label + ' QR 크기: ' + Math.round(img.width));
-        for (const o of [d, f]) if (o) assert.ok(q.x + q.width <= o.x + 1 || q.y + q.height <= o.y + 1, label + ' QR 이 가리지 않음');
-        assert.match(await T.textContent('#pQrCode'), /^\d+-\d{4}$/, label + ' 수업 코드');
+        assert.equal(await T.locator('#pQr').count(), 0, label + ' 왼쪽 위 QR 칸 없음');
+        const d = await box(T, '#pSlides') || await box(T, '#pPanel');
+        if (d) assert.ok(d.x < T.viewportSize().width * 0.05, label + ' 설명 장이 왼쪽 끝부터: ' + JSON.stringify(d));
     };
     try {
         // ---------- 로켓 (팀 수업) ----------
@@ -79,7 +77,7 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         let d = await box(T, '#pSlides'), f = await box(T, '#presentFrame');
         assert.ok(d && f, '설명 장과 학생 화면이 함께 보임');
         assert.ok(d.x + d.width <= f.x + 1, '설명 왼쪽 · 학생 화면 오른쪽');
-        assert.ok(d.width / T.viewportSize().width > 0.55 && d.width / T.viewportSize().width < 0.7, '설명 장 약 65 %: ' + Math.round(d.width));
+        assert.ok(d.width / T.viewportSize().width > 0.55 && d.width / T.viewportSize().width < 0.8, '설명 장 (65~75 %): ' + Math.round(d.width));
         assert.equal(await T.isVisible('#cornerQr'), false, '오른쪽 위 QR 없음');
         assert.match(await T.evaluate(() => document.getElementById('presentFrame').contentDocument.querySelector('.ev-screen').textContent), /앞 화면을 봐요/, '학생 화면 = 폰이 보는 👀 대기');
         await A.waitForSelector('#ev-app[data-screen="wait"]');
@@ -124,8 +122,18 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         await T.click('#btnPGather');
         assert.equal(await T.isVisible('#pPanel'), false, '다시 누르면 설명 장으로');
         assert.ok(await slideTitle(T), '설명 장 그대로');
-        // 왼쪽 위 QR 을 눌러도 크게
-        await T.click('#pQr'); assert.equal(await T.isVisible('#bigQr'), true); await T.keyboard.press('Escape');
+        // 📋 진행 상황 = 팝업 (발표 보기를 떠나지 않음, 2026-11-23 "진행 화면으로 돌아가기 보다는 … 팝업으로")
+        const before = await slideTitle(T);
+        await T.click('#btnPExit');
+        assert.equal(await T.isVisible('#runPop'), true, '진행 상황 팝업');
+        assert.equal(await T.evaluate(() => !!document.querySelector('#runPopBody #runPane:not([hidden])')), true, '진행 화면 내용이 팝업 안에');
+        assert.equal(await T.isVisible('#presentPane'), true, '발표 화면은 뒤에 그대로');
+        assert.match(T.url(), /view=present/, '주소도 발표 보기 그대로');
+        await T.keyboard.press('ArrowRight');
+        await T.keyboard.press('Escape');
+        assert.equal(await T.isVisible('#runPop'), false, 'Esc 로 닫힘');
+        assert.equal(await slideTitle(T), before, '팝업을 띄운 동안 장이 넘어가지 않음');
+        assert.equal(await T.evaluate(() => { const p = document.getElementById('runPane'); return !p.closest('#runPop') && p.hidden; }), true, '닫으면 제자리·숨김');
         // 📱 QR (띠) → 크게, Esc 로 닫기
         await T.click('#btnPQr');
         assert.equal(await T.isVisible('#bigQr'), true);
@@ -153,7 +161,7 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         await A.waitForFunction(() => !document.documentElement.classList.contains('ev-following'), null, { timeout: 15000 });
         assert.match(await T.textContent('#btnPMode'), /설명/);
         // 📋 진행 화면 (띠) → 관리 화면, 오른쪽 위 QR 은 거기에만
-        await T.click('#btnPExit');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo');
         await T.waitForSelector('#stageCard:not([hidden])');
         assert.equal(await T.isVisible('#cornerQr'), true, '진행 화면에는 오른쪽 위 QR');
         await A.close();

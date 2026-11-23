@@ -52,6 +52,22 @@
     }
     window.addEventListener('hashchange', route);
     window.addEventListener('popstate', route);
+    // 📋 진행 상황 팝업: 발표 보기를 떠나지 않고 진행 화면(#runPane)을 그 위에 띄움 (같은 요소를 옮겨 실시간 갱신 그대로, 닫으면 제자리)
+    var runHome = null;
+    function runPop(on) {
+        var pane = $('runPane'), pop = $('runPop');
+        if (on) {
+            if (!pop.hidden) return;
+            runHome = { p: pane.parentNode, n: pane.nextSibling };
+            $('runPopBody').appendChild(pane); pane.hidden = false; pop.hidden = false;
+            try { $('btnRunPopClose').focus(); } catch (e) { /* 무시 */ }
+        } else {
+            if (pop.hidden) return;
+            pop.hidden = true;
+            if (runHome) runHome.p.insertBefore(pane, runHome.n);
+            runHome = null; pane.hidden = state.sub !== 'run';
+        }
+    }
     function renderSub() {
         var ok = !!(state.user && state.user.google), main = ok && state.view === 'main', sub = state.sub, c = watched();
         if (sub !== 'list' && !c) sub = 'list';
@@ -60,6 +76,7 @@
         $('classOut').hidden = sub !== 'qr';
         var live = sub === 'run' || sub === 'present';
         $('runPane').hidden = sub !== 'run';
+        if (!$('runPop').hidden) { if (sub === 'present') $('runPane').hidden = false; else runPop(false); }   // 팝업으로 띄운 진행 상황은 발표 보기 동안만
         $('presentPane').hidden = sub !== 'present';
         // 오른쪽 위 QR 은 진행 화면에만 — 🎬 발표 보기에서는 아래 띠의 '📱 QR' 로 (2026-11-23 '교사 조작은 한곳')
         $('cornerQr').hidden = !(main && sub === 'run');
@@ -570,8 +587,6 @@
     if (window.ResizeObserver) new ResizeObserver(sizeFrame).observe(document.querySelector('#presentPane .ct-pframe'));
     if (window.MutationObserver) new MutationObserver(sizeFrame).observe($('presentPane'), { attributes: true, attributeFilter: ['class', 'hidden'] });
     window.addEventListener('resize', sizeFrame);
-    // 왼쪽 위 작은 QR (늦게 온 팀·조가 찍음) — 누르면 크게
-    $('pQr').addEventListener('click', function () { $('btnBig').click(); });
     function frameDoc() { try { var f = $('presentFrame'); return f && f.contentDocument && f.contentDocument.body ? f.contentDocument : null; } catch (e) { return null; } }
     function shown(el) { return !!(el && el.getClientRects().length); }
     // 발표 틀 주소 바꾸기: src 를 바꾸면 브라우저 뒤로 가기 기록에 쌓여 '뒤로' 가 틀 안에서만 돎 → replace 로 (2026-11-23 발표 보기가 첫 화면)
@@ -589,8 +604,6 @@
             u.searchParams.set('present', '1');
             setFrame(u.href);
             lessonLoad(c);
-            $('pQrImg').innerHTML = qrSvg(studentLink(c), 'H') || '';
-            $('pQrCode').textContent = c.classCode;
         }
         sizeFrame();
         renderPresentBar();
@@ -948,6 +961,7 @@
     }
     function presentKey(e) {
         if (state.sub !== 'present' || e.altKey || e.ctrlKey || e.metaKey) return;
+        if (!$('runPop').hidden) { if (e.key === 'Escape') { e.preventDefault(); runPop(false); } return; }   // 팝업을 띄운 동안은 장을 넘기지 않음
         var t = e.target, tag = t && t.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
         var dir = { ArrowRight: 1, PageDown: 1, ' ': 1, ArrowLeft: -1, PageUp: -1 }[e.key];
@@ -969,7 +983,10 @@
     $('btnPOpen').addEventListener('click', function () { askOpen(true); });
     $('btnPAskYes').addEventListener('click', openNext);
     $('btnPAskNo').addEventListener('click', function () { askOpen(false); });
-    $('btnPExit').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'run'); });
+    $('btnPExit').addEventListener('click', function () { if (watched()) runPop(true); });
+    $('btnRunPopClose').addEventListener('click', function () { runPop(false); });
+    $('btnRunPopGo').addEventListener('click', function () { var c = watched(); runPop(false); if (c) go(c.space, 'run'); });
+    $('runPop').addEventListener('click', function (e) { if (e.target === this) runPop(false); });   // 바깥(어두운 곳)을 눌러도 닫힘
     $('btnPFull').addEventListener('click', function () {
         if (document.fullscreenElement) { if (document.exitFullscreen) document.exitFullscreen(); return; }
         var r = document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen() : null;
