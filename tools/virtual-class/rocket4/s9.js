@@ -1,0 +1,11 @@
+const r = L.in(L.dir + '/in-1.json');
+const T=P.T; await T.waitForTimeout(6000);
+const box = async () => T.evaluate(() => { const e=[...document.querySelectorAll('*')].find(x=>/지금 폰으로 답해요/.test(x.textContent) && x.children.length>2 && x.offsetParent); return e? e.innerText.replace(/\n+/g,' | ').slice(0,500):null; });
+const out = { r: r.set };
+out.force = await box(); out.forceShot = await S.shot(T,'force-답모음');
+await T.click('#btnPNext'); await T.waitForTimeout(2500); out.forceReveal = await box(); out.frShot = await S.shot(T,'force-풀이');
+await T.click('#btnPNext'); await T.waitForTimeout(3500); out.accel = await box();
+await T.click('#btnPNext'); await T.waitForTimeout(2500);
+await T.click('#btnPNext'); await T.waitForTimeout(3500); out.pressure = await box(); out.pShot = await S.shot(T,'pressure-답모음');
+out.bar = await T.evaluate(()=>document.querySelector('#btnPPrev').parentElement.parentElement.innerText.replace(/\n+/g,' '));
+return out;
