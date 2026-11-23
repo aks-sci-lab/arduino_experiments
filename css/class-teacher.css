@@ -321,7 +321,7 @@ details.ct-phint:not([open]) > summary { min-height: 0; padding: 2px 0; }
 .ct-present .ct-pbar .ct-pmore[open] > div { top: auto; bottom: 100%; margin: 0 0 4px; }
 /* ===== 나란히 보기 (2026-11-23 선생님 "학생 화면은 수업화면 옆에 같이 보이도록") =====
    ⇔ 나란히(lay-side): 왼쪽 설명 장(또는 🧩·🏆) 65 : 오른쪽 학생 화면 35 — 학생 화면은 지금 띄운 장을 따라감
-   ⬜ 설명만: 왼쪽 것만 크게 · 📱 학생 크게: 설명을 닫고 학생 화면만 (설명 장이 없는 실험은 늘 학생 화면만) */
+   ⬜ 설명만: 왼쪽 것만 크게 · 마지막 장 다음은 학생 화면만, 📖 설명 으로 다시 ('📱 학생 크게' 단추는 2026-11-23 뺌, 설명 장이 없는 실험은 늘 학생 화면만) */
 .ct-pframe { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--sp-2); }
 .ct-pframe > * { grid-row: 1; grid-column: 1; min-width: 0; min-height: 0; }
 .ct-present.lay-side.ls-on .ct-pframe, .ct-present.lay-side.pp-panel .ct-pframe { grid-template-columns: minmax(0, 65fr) minmax(0, 35fr); }
@@ -371,6 +371,17 @@ body.ct-presenting .ct-present.phone .ct-pframe iframe { aspect-ratio: 9 / 19.5;
 .ct-runpop-head b { font-size: 1.2rem; }
 .ct-runpop-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .ct-runpop-body { overflow: auto; padding: var(--sp-3); min-height: 0; }
+/* 띠 단추 자리 고정 (2026-11-23 선생님 "이부분 버튼 위치 바뀌지 않도록"): 장마다 나타나고 숨는 단추(🔓 풀이 · ⇔ 나란히/⬜ 설명만/📖 설명)는
+   자기 칸(.ct-pslot)을 늘 차지하고 숨을 때는 보이지 않기만, 글이 바뀌는 단추(풀이 열림·다음 단계 이름)는 폭을 고정해 옆 단추가 밀리지 않게 */
+.ct-present .ct-pbtns .ct-pslot { display: inline-grid; flex: 0 0 auto; }
+.ct-present .ct-pbtns .ct-pslot > button { grid-area: 1 / 1; min-height: 44px; padding: 0 .7em; white-space: nowrap; }
+.ct-present .ct-pbtns .ct-pslot > button[hidden] { display: inline-flex !important; visibility: hidden; pointer-events: none; }
+.ct-present .ct-pbtns .ct-pslot > button { overflow: hidden; text-overflow: ellipsis; justify-content: center; }
+.ct-present .ct-pbtns .ct-pslot-rev > button { width: 7.8em; }
+.ct-present .ct-pbtns .ct-pslot-lay > button { width: 6.6em; }
+@media (max-width: 1500px) { .ct-present .ct-pbtns .ct-pslot > button { padding: 0 .4em; } .ct-present .ct-pbtns .ct-pslot-rev > button { width: 7em; } .ct-present .ct-pbtns .ct-pslot-lay > button { width: 5.9em; } }
+.ct-present .ct-pbar .ct-pbtns > #btnPOpen { display: inline-block; vertical-align: middle; width: min(16em, 14vw); min-width: 7em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; line-height: 44px; padding-block: 0; }
+@media (min-width: 1700px) { .ct-present .ct-pbar .ct-pbtns > #btnPOpen { width: 19em; } }
 /* 🎯 도전 장면 (필름통 로켓 결과판): 📷 ▶ 단추 → 누를 때만 읽어 크게 */
 .ct-media { display: inline-flex; gap: 4px; vertical-align: middle; }
 .ct-media-btn { min-height: 0; min-width: 2.2em; padding: 2px 6px; font-size: .95em; line-height: 1.2; background: var(--c-card, #fff); color: var(--c-primary); border: 1px solid var(--c-primary); border-radius: 6px; }
