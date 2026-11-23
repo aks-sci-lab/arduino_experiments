@@ -136,7 +136,7 @@ test('수업 참여 → 조 공유 보내기·자동 불러오기 → 교사 진
                 'lab-store:fake-user': JSON.stringify({ uid: 'teacher-1', google: true, teacher: true })   // 가짜 구글 로그인 (수업 주인)
             });
             await T.page.click('#classList button[data-open]');   // 수업 목록에서 그 수업 → 큰 QR → 진행 보기
-            await T.page.click('#btnToRun'); await T.page.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.page.isVisible('#btnPExit')) await T.page.click('#btnPExit'); await T.page.waitForSelector('#runPane:not([hidden])');
+            await T.page.click('#btnToRun'); await T.page.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.page.isVisible('#btnPExit')) { await T.page.click('#btnPExit'); await T.page.click('#btnRunPopGo'); } await T.page.waitForSelector('#runPane:not([hidden])');
             await T.page.waitForSelector('.ct-group');
             const g1 = await T.page.textContent('.ct-group');
             assert.match(g1, /📤 제출: 1개/, C.exp + ': 조 제출');
