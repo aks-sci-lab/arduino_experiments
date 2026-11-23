@@ -117,6 +117,29 @@ test('로켓 4차 고침: 2차시 반복·결과 보기·도전 장·흐름 줄�
         await T.goto(ROOT + 'projects/class-teacher.html#class=' + c.space + '&view=present');
         await T.waitForSelector('#pSlides .ls-slide');
         await go(A, 'wait');
+        // ⑧ 응답 장('힘')을 보는 중에 교사 화면 새로고침 · 두 번째 창(다른 배율) → 같은 장에서 이어 보임, 폰 답 칸 그대로 (문서를 되돌려 쓰지 않음)
+        await T.keyboard.press('ArrowRight'); await go(A, 'think-force');
+        await T.waitForFunction(() => /힘/.test((document.querySelector('#pSlides .ls-title') || {}).textContent || ''));
+        await T.waitForTimeout(800);
+        const L0 = JSON.stringify(app.db.docs.get('labClasses/' + c.space).lesson);
+        await T.reload();
+        await T.waitForFunction(() => /힘/.test((document.querySelector('#pSlides .ls-title') || {}).textContent || ''), null, { timeout: 15000 });
+        const T2 = await ctx({ viewport: { width: 2560, height: 1440 } }, 'T2', true);
+        await T2.goto(ROOT + 'projects/class-teacher.html#class=' + c.space + '&view=present');
+        await T2.waitForFunction(() => /힘/.test((document.querySelector('#pSlides .ls-title') || {}).textContent || ''), null, { timeout: 15000 });
+        await A.waitForTimeout(2000);
+        assert.equal(await A.getAttribute('#ev-app', 'data-screen'), 'think-force', '새로고침·두 번째 창에도 폰 답 칸 그대로');
+        const L1 = app.db.docs.get('labClasses/' + c.space).lesson;
+        assert.equal(JSON.stringify(Object.assign({}, L1, { at: null })), JSON.stringify(Object.assign({}, JSON.parse(L0), { at: null })), '지금 장을 다시 쓰지 않음');
+        await T2.close();
+        await T.keyboard.press('ArrowLeft'); await go(A, 'wait');   // 장을 넘기면 그때부터 씀
+        // ⑨ 발표 화면 🏆 결과판: 관리 표시(🔌·✓ 기다림) 없음, 값이 없는 ⏱·🎯 칸 없음, 💬 생각은 있음
+        await T.click('#btnPBoard'); await T.waitForSelector('#pPanel:not([hidden]) .ct-board');
+        const bh = await T.textContent('#pPanel .ct-board thead');
+        assert.doesNotMatch(bh, /⏱|🎯|🚀/, '값이 없는 도전 칸 숨김: ' + bh);
+        assert.match(bh, /⭐ 점수[\s\S]*💬 생각/);
+        assert.doesNotMatch(await T.textContent('#pPanel'), /🔌|✓ 기다림/);
+        await T.click('#btnPBoard');
         // 1차시 열기 → 측정 장(do-t1)까지
         await T.click('#btnPOpen'); await T.click('#btnPAskYes');
         await T.waitForFunction(() => /뚜껑은 왜/.test((document.querySelector('#pSlides .ls-title') || {}).textContent || ''), null, { timeout: 15000 });
