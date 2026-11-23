@@ -6,6 +6,7 @@
 //     띠는 한 줄 (4K 3840×2160 배율 100·150·200 %·1280×720), 단추 44px 이상, 오른쪽 위 QR 없음
 //  ③ 설명 장이 없는 실험은 학생 화면만 크게
 const test = require('node:test');
+const toStudent = async P => { for (let i = 0; i < 80 && await P.evaluate(() => !!document.querySelector('#presentPane.ls-on .ls-slide')); i++) { await P.keyboard.press('ArrowRight'); await P.waitForTimeout(40); } };   // 설명 장을 끝까지 넘겨 학생 화면으로 ('📱 학생 크게' 단추는 2026-11-23 뺌)
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const { loadLabStore, labServer, configJs } = require('./fake-lab-store.cjs');
@@ -155,7 +156,7 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         await T.waitForFunction(() => /생각 열기/.test(document.getElementById('pStage').textContent), null, { timeout: 15000 });
         assert.equal(app.db.docs.get('labClasses/' + c.space).stage, 1, '↩ 로 되돌림');
         // 📱 학생 크게 → 설명 닫고 학생 화면만 (폰도 혼자 흐름으로)
-        await T.click('#btnPMode');
+        await toStudent(T);
         assert.equal(await slideTitle(T), '', '설명 닫힘');
         f = await box(T, '#presentFrame');
         assert.ok(f && f.height > 900, '학생 화면 크게');
