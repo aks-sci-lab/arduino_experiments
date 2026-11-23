@@ -91,7 +91,7 @@ test('설명 화면 ↔ 학생 폰: 👀 띠·답 가리기·풀이 열기, 설�
         assert.equal(await A.evaluate(() => getComputedStyle(document.querySelector('[data-lesson-answer] .ev-def p')).visibility), 'hidden', '정의 글은 안 보임');
         assert.equal(await A.isDisabled('.ev-screen .ev-next'), false, '답을 가려도 다음으로는 갈 수 있음');
         // 진행 화면 '🔓 모든 풀이 열기'
-        await T.click('#btnPExit'); await T.waitForSelector('#stageCard:not([hidden])');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo'); await T.waitForSelector('#stageCard:not([hidden])');
         await T.waitForSelector('#lessonTeach:not([hidden])');
         await T.evaluate(() => { document.getElementById('lessonTeach').open = true; });
         await T.click('#btnLessonOpenAll');

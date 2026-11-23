@@ -68,11 +68,11 @@ test('발표 보기가 수업 첫 화면: QR → 다음 = 설명 첫 장, 단계
         await T.waitForSelector('#pSlides .ls-slide');
         assert.match(await slideTitle(T), /오늘은 필름통 로켓을 쏘아 올려요/, '가장 뒤에 연 단계(생각 열기) 설명 첫 장');
         assert.equal(await T.isVisible('#runPane'), false, '진행 화면은 뒤에');
-        assert.match(await T.textContent('#btnPExit'), /📋 진행 화면/);
+        assert.match(await T.textContent('#btnPExit'), /📋 진행 상황/);
         assert.deepEqual((await barOneLine(T)).one, true, '1280×720 띠 단추 한 줄');
         if (SHOTS) await T.screenshot({ path: path.join(SHOTS, 'rocket-2-present-first.png') });
         // 📋 진행 화면 → '▶ 다음 단계 열기' → 발표 보기로 넘어가 1차시 설명 첫 장, 수업 문서 lesson 도 그 장
-        await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo'); await T.waitForSelector('#runPane:not([hidden])');
         assert.match(T.url(), /view=run/);
         assert.equal(await T.isVisible('#stageCard'), true);
         if (SHOTS) await T.screenshot({ path: path.join(SHOTS, 'rocket-3-run.png') });
@@ -83,7 +83,7 @@ test('발표 보기가 수업 첫 화면: QR → 다음 = 설명 첫 장, 단계
         assert.deepEqual([doc(rocket.space).stage, doc(rocket.space).lesson.on, doc(rocket.space).lesson.stage, doc(rocket.space).lesson.i], [2, true, 't1', 0], '학생 폰도 그 장 (👀)');
         if (SHOTS) await T.screenshot({ path: path.join(SHOTS, 'rocket-4-open-t1.png') });
         // '◀ 하나 되돌리기'·'모두 열기' 는 진행 화면 그대로
-        await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo'); await T.waitForSelector('#runPane:not([hidden])');
         await T.click('#btnStagePrev');
         await T.waitForFunction(() => /까지 열었어요/.test(document.getElementById('stageMsg').textContent));
         await T.waitForTimeout(500);
@@ -95,19 +95,19 @@ test('발표 보기가 수업 첫 화면: QR → 다음 = 설명 첫 장, 단계
         // 브라우저 뒤로 가기: 진행 화면 → 발표 보기 (발표 틀 주소는 기록에 쌓이지 않음 — 뒤로 가기 전체는 class-list-ui)
         await T.goBack(); await T.waitForSelector('#presentPane:not([hidden])');
         // 목록 → 다시 카드 → QR → 다음 = 발표 보기
-        await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo'); await T.waitForSelector('#runPane:not([hidden])');
         await openCard(T, rocket.space); await T.click('#btnToRun');
         await T.waitForSelector('#presentPane:not([hidden])'); await T.waitForSelector('#pSlides .ls-slide');
         assert.match(T.url(), /view=present/, '다시 들어와도 발표 보기부터');
 
         // ② 양자점: QR → 다음 = 1 목적 설명 첫 장 → 진행 화면에서 2 이론 열기 → 2 이론 설명 첫 장
-        await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo'); await T.waitForSelector('#runPane:not([hidden])');
         await openCard(T, qdot.space);
         assert.match(await T.textContent('#btnToRun'), /발표 보기/);
         await T.click('#btnToRun'); await T.waitForSelector('#presentPane:not([hidden])'); await T.waitForSelector('#pSlides .ls-slide');
         assert.match(await T.textContent('#pSlides .ls-kicker'), /1 목적/);
         if (SHOTS) await T.screenshot({ path: path.join(SHOTS, 'qdot-1-present-first.png') });
-        await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo'); await T.waitForSelector('#runPane:not([hidden])');
         assert.match(await T.textContent('#lessonTeach'), /발표 보기\(설명 장\)부터 시작/, '선생님용 안내 글');
         await T.click('#btnStageNext');
         await T.waitForSelector('#presentPane:not([hidden])');
@@ -116,14 +116,14 @@ test('발표 보기가 수업 첫 화면: QR → 다음 = 설명 첫 장, 단계
         if (SHOTS) await T.screenshot({ path: path.join(SHOTS, 'qdot-2-open-theory.png') });
 
         // ③ 설명 내용이 없는 실험(말루스): 발표 보기가 학생 화면부터
-        await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo'); await T.waitForSelector('#runPane:not([hidden])');
         await openCard(T, malus.space);
         await T.click('#btnToRun'); await T.waitForSelector('#presentPane:not([hidden])');
         await T.waitForFunction(() => { const d = document.getElementById('presentFrame').contentDocument; return d && d.querySelector('nav.steps'); }, null, { timeout: 15000 });
         await T.waitForTimeout(400);
         assert.equal(await T.evaluate(() => document.getElementById('presentPane').classList.contains('ls-on')), false, '설명 없이 학생 화면');
         // 진행 화면에서 단계를 열어도 설명이 없으면 진행 화면 그대로
-        await T.click('#btnPExit'); await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#btnPExit'); await T.click('#btnRunPopGo'); await T.waitForSelector('#runPane:not([hidden])');
         await T.click('#btnStageNext');
         await T.waitForFunction(() => /까지 열었어요/.test(document.getElementById('stageMsg').textContent));
         await T.waitForTimeout(600);

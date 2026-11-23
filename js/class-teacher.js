@@ -52,6 +52,22 @@
     }
     window.addEventListener('hashchange', route);
     window.addEventListener('popstate', route);
+    // 📋 진행 상황 팝업: 발표 보기를 떠나지 않고 진행 화면(#runPane)을 그 위에 띄움 (같은 요소를 옮겨 실시간 갱신 그대로, 닫으면 제자리)
+    var runHome = null;
+    function runPop(on) {
+        var pane = $('runPane'), pop = $('runPop');
+        if (on) {
+            if (!pop.hidden) return;
+            runHome = { p: pane.parentNode, n: pane.nextSibling };
+            $('runPopBody').appendChild(pane); pane.hidden = false; pop.hidden = false;
+            try { $('btnRunPopClose').focus(); } catch (e) { /* 무시 */ }
+        } else {
+            if (pop.hidden) return;
+            pop.hidden = true;
+            if (runHome) runHome.p.insertBefore(pane, runHome.n);
+            runHome = null; pane.hidden = state.sub !== 'run';
+        }
+    }
     function renderSub() {
         var ok = !!(state.user && state.user.google), main = ok && state.view === 'main', sub = state.sub, c = watched();
         if (sub !== 'list' && !c) sub = 'list';
@@ -60,6 +76,7 @@
         $('classOut').hidden = sub !== 'qr';
         var live = sub === 'run' || sub === 'present';
         $('runPane').hidden = sub !== 'run';
+        if (!$('runPop').hidden) { if (sub === 'present') $('runPane').hidden = false; else runPop(false); }   // 팝업으로 띄운 진행 상황은 발표 보기 동안만
         $('presentPane').hidden = sub !== 'present';
         // 오른쪽 위 QR 은 진행 화면에만 — 🎬 발표 보기에서는 아래 띠의 '📱 QR' 로 (2026-11-23 '교사 조작은 한곳')
         $('cornerQr').hidden = !(main && sub === 'run');
@@ -144,7 +161,7 @@
         LS.isTeacher().then(function (yes) {
             if (!yes || state.user !== u) return;
             $('devBox').hidden = false;
-            $('devQr').innerHTML = qrSvg(location.href.split('#')[0].split('?')[0]) || '';
+            paintQr($('devQr'), location.href.split('#')[0].split('?')[0], 'M');
         }, function () { /* 확인 못 하면 숨김 */ });
     }
 
@@ -265,6 +282,27 @@
         var qr = window.qrcode(0, level || 'M'); qr.addData(text); qr.make();
         return qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true });
     }
+    /* QR 그리기: QR 도구(qrcode-generator, defer)가 아직 안 불러졌으면 '⏳' 만 두고, 불러지면 다시 그림
+       (예전에는 도구보다 화면이 먼저 그려지면 '불러오지 못했어요' 글이 남아 큰 QR 이 안 나왔음 — 4K 시험에서 가끔 실패) */
+    var qrWait = { els: [], tries: 0, t: 0, failed: false };
+    function paintQr(el, text, level, fail) {
+        if (!el) return;
+        var svg = qrSvg(text, level);
+        qrWait.els = qrWait.els.filter(function (x) { return x.el !== el; });
+        if (svg) { el.innerHTML = svg; return; }
+        if (qrWait.failed) { el.innerHTML = fail || ''; return; }
+        el.innerHTML = fail ? '<p class="note">⏳ QR 을 만드는 중…</p>' : '';
+        qrWait.els.push({ el: el, text: text, level: level, fail: fail });
+        if (!qrWait.t) qrWait.t = setTimeout(qrRetry, 150);
+    }
+    function qrRetry() {
+        qrWait.t = 0;
+        var ready = typeof window.qrcode === 'function';
+        if (!ready && ++qrWait.tries < 80) { qrWait.t = setTimeout(qrRetry, 150); return; }   // 12초까지 기다림
+        if (!ready) qrWait.failed = true;
+        var list = qrWait.els; qrWait.els = [];
+        list.forEach(function (x) { paintQr(x.el, x.text, x.level, x.fail); });
+    }
     function expireNote(c) { var t = CC.expireText(c.expireAt); return t ? '🗓 이 수업의 학생 자료는 ' + t + '에 저절로 지워져요. 그 전에 ⚙ 설정 → 📥 자료 내려받기에서 받아 두세요.' : ''; }
     function showClass(c) {
         var link = studentLink(c), e = CC.expInfo(c.exp);
@@ -272,8 +310,8 @@
         $('outCode').textContent = c.classCode;
         $('outLink').href = link; $('outLink').textContent = link;
         $('outExpire').textContent = expireNote(c);
-        $('qr').innerHTML = qrSvg(link) || '<p class="note">QR 을 만드는 도구를 불러오지 못했어요(인터넷 확인). 학생은 메인 페이지 → 학생으로 시작에서 수업 코드를 넣어도 돼요.</p>';
-        $('cornerQrImg').innerHTML = qrSvg(link, 'H') || '';
+        paintQr($('qr'), link, 'M', '<p class="note">QR 을 만드는 도구를 불러오지 못했어요(인터넷 확인). 학생은 메인 페이지 → 학생으로 시작에서 수업 코드를 넣어도 돼요.</p>');
+        paintQr($('cornerQrImg'), link, 'H');
         $('cornerCode').textContent = c.classCode;
         state.shown = c;
     }
@@ -283,7 +321,7 @@
     });
     $('btnBig').addEventListener('click', function () {
         var c = state.shown; if (!c) return;
-        $('bigQrImg').innerHTML = qrSvg(studentLink(c)) || '';
+        paintQr($('bigQrImg'), studentLink(c), 'M');
         $('bigQrCode').textContent = '수업 코드 ' + c.classCode;
         $('bigQr').hidden = false; $('btnBigClose').focus();
     });
@@ -570,8 +608,6 @@
     if (window.ResizeObserver) new ResizeObserver(sizeFrame).observe(document.querySelector('#presentPane .ct-pframe'));
     if (window.MutationObserver) new MutationObserver(sizeFrame).observe($('presentPane'), { attributes: true, attributeFilter: ['class', 'hidden'] });
     window.addEventListener('resize', sizeFrame);
-    // 왼쪽 위 작은 QR (늦게 온 팀·조가 찍음) — 누르면 크게
-    $('pQr').addEventListener('click', function () { $('btnBig').click(); });
     function frameDoc() { try { var f = $('presentFrame'); return f && f.contentDocument && f.contentDocument.body ? f.contentDocument : null; } catch (e) { return null; } }
     function shown(el) { return !!(el && el.getClientRects().length); }
     // 발표 틀 주소 바꾸기: src 를 바꾸면 브라우저 뒤로 가기 기록에 쌓여 '뒤로' 가 틀 안에서만 돎 → replace 로 (2026-11-23 발표 보기가 첫 화면)
@@ -589,8 +625,6 @@
             u.searchParams.set('present', '1');
             setFrame(u.href);
             lessonLoad(c);
-            $('pQrImg').innerHTML = qrSvg(studentLink(c), 'H') || '';
-            $('pQrCode').textContent = c.classCode;
         }
         sizeFrame();
         renderPresentBar();
@@ -948,6 +982,7 @@
     }
     function presentKey(e) {
         if (state.sub !== 'present' || e.altKey || e.ctrlKey || e.metaKey) return;
+        if (!$('runPop').hidden) { if (e.key === 'Escape') { e.preventDefault(); runPop(false); } return; }   // 팝업을 띄운 동안은 장을 넘기지 않음
         var t = e.target, tag = t && t.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
         var dir = { ArrowRight: 1, PageDown: 1, ' ': 1, ArrowLeft: -1, PageUp: -1 }[e.key];
@@ -969,7 +1004,10 @@
     $('btnPOpen').addEventListener('click', function () { askOpen(true); });
     $('btnPAskYes').addEventListener('click', openNext);
     $('btnPAskNo').addEventListener('click', function () { askOpen(false); });
-    $('btnPExit').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'run'); });
+    $('btnPExit').addEventListener('click', function () { if (watched()) runPop(true); });
+    $('btnRunPopClose').addEventListener('click', function () { runPop(false); });
+    $('btnRunPopGo').addEventListener('click', function () { var c = watched(); runPop(false); if (c) go(c.space, 'run'); });
+    $('runPop').addEventListener('click', function (e) { if (e.target === this) runPop(false); });   // 바깥(어두운 곳)을 눌러도 닫힘
     $('btnPFull').addEventListener('click', function () {
         if (document.fullscreenElement) { if (document.exitFullscreen) document.exitFullscreen(); return; }
         var r = document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen() : null;
