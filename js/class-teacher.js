@@ -651,12 +651,12 @@
         $('btnPOpen').textContent = si && !si.all ? '▶ 다음 단계: ' + name(si.gate[si.n]) : '▶ 다음 단계';
         $('btnPOpen').title = si && !si.all ? '다음 단계 열기: ' + name(si.gate[si.n]) : '모든 단계가 열려 있어요';
         if (pres.ask && (!si || si.all)) askOpen(false);
-        // 나란히 ↔ 크게(하나만) (2026-11-23): 왼쪽(설명 장·🧩·🏆)이 떠 있으면 ⇔ 나란히 / ⬜ 설명만, 📱 학생 크게 = 설명을 닫고 학생 화면만
+        // 나란히 ↔ 설명만 (2026-11-23): 왼쪽(설명 장·🧩·🏆)이 떠 있으면 ⇔ 나란히 / ⬜ 설명만.
+        // '📱 학생 크게'(설명을 닫고 학생 화면만)는 2026-11-23 선생님 "학생 화면만 크게 보이는 기능은 필요 없어"로 뺌 — 설명 장은 마지막 장 다음 → 로 학생 화면이 되고, 📖 설명 은 그때만 보임
         var left = lesson.on || !!pres.panel, pm = $('btnPMode'), pl = $('btnPLayout');
-        pm.hidden = !lesson.def && !pres.panel;
-        pm.textContent = left ? '📱 학생 크게' : '📖 설명';
-        pm.title = left ? '설명을 닫고 학생 화면만 크게' : '이 단계 설명 장 보기 (학생 화면은 옆에)';
-        pm.setAttribute('aria-pressed', left ? 'false' : 'true');
+        pm.hidden = left || !lesson.def;
+        pm.textContent = '📖 설명';
+        pm.title = '이 단계 설명 장 보기 (학생 화면은 옆에)';
         pl.hidden = !left;
         pl.textContent = pres.layout === 'side' ? '⬜ 설명만' : '⇔ 나란히';
         pl.title = pres.layout === 'side' ? '학생 화면을 접고 ' + (pres.panel ? '이것만' : '설명만') + ' 크게' : '학생 화면을 옆에 함께';
@@ -947,9 +947,8 @@
     window.addEventListener('resize', function () { if (lesson.on && LSx) LSx.fit($('pSlides')); });
     $('btnPMode').addEventListener('click', function () {
         var c = watched(); if (!c) return;
-        if (pres.panel) { setPanel(''); if (lesson.on) lessonToFrame(1); return; }
-        if (lesson.on) lessonToFrame(1);
-        else if (!lessonStart(frameGate(c), 0)) $('pHint').textContent = '이 단계에는 설명 화면이 없어요.';
+        if (pres.panel || lesson.on) return;   // 설명·🧩·🏆 가 떠 있을 때는 단추가 숨어 있음
+        if (!lessonStart(frameGate(c), 0)) $('pHint').textContent = '이 단계에는 설명 화면이 없어요.';
     });
     $('btnPLayout').addEventListener('click', function () {
         pres.layout = pres.layout === 'side' ? 'deck' : 'side';
