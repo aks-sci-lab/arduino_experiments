@@ -18,6 +18,7 @@
      labClasses/{공간}/aiAsk/{a…}           보고서 AI 질문 하나 (학생 익명 uid 가 만들고, 켜 둔 교사 화면이 답을 씀 — 키는 교사 브라우저에만, js/report-ai.js)
      labClasses/{공간}/reports/{조코드~uid} 학생 보고서 글 (기기마다 하나, 최종 제출 뒤에는 학생이 못 고침)
      labClasses/{공간}/aiDesk/status        교사 화면 AI 켜짐 신호 (학생 화면이 '선생님 화면 켜짐'을 보여 줌)
+     labClasses/{공간}/answers/{장key~조-번호}  📱 응답 물음의 답 하나 (학생 기기마다, 교사가 띄운 물음에만 — 발표 보기 프로젝터 모음)
      labClasses/{공간}/teams/{조 번호}       '팀 이름으로 입장' 수업(mode 'team', 가족 행사 — 필름통 로켓)의 팀 하나: 이름·그 팀 폰(익명 uid)
                                             팀 이름을 정하면 빈 조 자리 하나를 차지하고, 그 뒤로는 그 조 코드로 저장한다 (조 방식 수업은 그대로)
    모든 문서에 expireAt = 만든 때 + 183일 (학기 끝 자동 삭제: TTL 정책 + .github/workflows/firestore-cleanup.yml)
@@ -58,6 +59,9 @@
     // 🎬 설명 화면: 장의 key(학생 화면 답 [data-lesson-answer] 와 짝), 단계 키, 풀이를 연 key 목록 최대 수 (firestore.rules 와 같게)
     var LESSON_KEY_RE = /^[a-z0-9][a-z0-9-]{0,39}$/, STAGE_KEY_RE = /^[a-z0-9_-]{1,20}$/, LESSON_OPEN_MAX = 200;
     var TEAM_EXPS = { rocket: 1 };
+    // 📱 응답 물음 (③ 2026-11-23): 교사가 띄운 물음(수업 문서 lesson.q)에 학생 기기마다 답 하나 (labClasses/{수업}/answers/{장 key~자리})
+    var RESP = { TEXT: 300, CHOICE: 60, CHOICES: 6, ANSWER: 100, GAP_MS: 2000 };
+    var RESP_KEY_RE = /^my-[a-z0-9-]{1,36}$/;
     // 📖 선생님이 고친 수업 자료 (firestore.rules lessonEdits 와 같게): 실험 키·장 자리·새 장 key·장 종류·크기
     var LESSON_EXP_RE = /^[a-z0-9]{1,20}$/, LESSON_REF_RE = /^(k:[a-z0-9][a-z0-9-]{0,39}|s:[a-z0-9_-]{1,20}:\d{1,3})$/, LESSON_NEW_KEY_RE = /^my-[a-z0-9-]{1,36}$/;
     var LESSON_KINDS = ['why', 'concept', 'vars', 'how', 'ask', 'safety'];
@@ -312,7 +316,23 @@
             return Object.assign({ space: space }, c);
         }
         // mode: 띠 문구 ('look' = 👀 앞 화면을 봐요, 'phone' = ✍️ 내 화면에서 해요 — 장의 mode, js/lesson-slides.js)
-        function lessonOut(L) { return L && typeof L === 'object' ? { on: L.on === true, stage: String(L.stage || ''), i: Number(L.i) || 0, key: String(L.key || ''), reveal: L.reveal === true, mode: L.mode === 'phone' ? 'phone' : 'look' } : null; }
+        function cleanQ(q) {
+            if (!q || typeof q !== 'object' || (q.type !== 'pick' && q.type !== 'text')) return null;
+            var t = text(q.text, RESP.TEXT).trim(); if (!t) return null;
+            var out = { type: q.type, text: t };
+            if (q.type === 'pick') {
+                var ch = (Array.isArray(q.choices) ? q.choices : []).slice(0, RESP.CHOICES).map(function (c) { return text(c, RESP.CHOICE).trim(); }).filter(Boolean);
+                if (ch.length < 2) return null;
+                out.choices = ch;
+            }
+            return out;
+        }
+        function lessonOut(L) {
+            if (!L || typeof L !== 'object') return null;
+            var o = { on: L.on === true, stage: String(L.stage || ''), i: Number(L.i) || 0, key: String(L.key || ''), reveal: L.reveal === true, mode: L.mode === 'phone' ? 'phone' : 'look' };
+            var q = cleanQ(L.q); if (q && o.on) o.q = q;
+            return o;
+        }
         function aiLimitOf(c) { var n = Number(c && c.aiLimit); return c && c.aiLimit != null && isFinite(n) ? n : AI.LIMIT_DEFAULT; }   // 예전 수업(칸 없음)은 기본 20
         function publicClass(c) {
             return { ok: true, classCode: c.classCode, space: c.space, ban: c.ban, nStudents: c.nStudents, groupSize: c.groupSize, exp: c.exp,
@@ -378,6 +398,9 @@
             var i = Math.round(Number(L.i));
             var lesson = { on: L.on === true, stage: STAGE_KEY_RE.test(String(L.stage || '')) ? String(L.stage) : '', i: isFinite(i) && i >= 0 && i < 200 ? i : 0,
                 key: LESSON_KEY_RE.test(String(L.key || '')) ? String(L.key) : '', reveal: L.reveal === true, mode: L.mode === 'phone' ? 'phone' : 'look', at: db.stamp() };
+            // 띄운 장이 응답 물음이면 물음 글·고를 답 (정답은 넣지 않음 — 학생에게 미리 보이지 않게)
+            var q = cleanQ(L.q);
+            if (q && lesson.on && RESP_KEY_RE.test(lesson.key)) lesson.q = q;
             var fresh = await db.get('labClasses/' + c.space, { cache: false }) || c;
             var open = Array.isArray(fresh.lessonOpen) ? fresh.lessonOpen.slice(0, LESSON_OPEN_MAX) : [];
             var add = (Array.isArray(b.open) ? b.open : []).map(String).filter(function (k, j, arr) { return LESSON_KEY_RE.test(k) && open.indexOf(k) < 0 && arr.indexOf(k) === j; });
@@ -393,6 +416,46 @@
             var done = b.done === true || b.done === 'true';
             await db.update('labClasses/' + c.space, { done: done, doneAt: done ? db.stamp() : null });
             return { ok: true, done: done };
+        }
+        /* ---------- 📱 응답 물음 (③): 학생 기기마다 띄운 물음의 답 하나. 그 물음을 띄운 동안만 쓰고(규칙도 확인), 같은 문서를 고쳐 씀(2초에 한 번까지) ---------- */
+        function answerPath(c, key, jo, num, phone) { return 'labClasses/' + c.space + '/answers/' + key + '~' + jo + '-' + num + (phone ? '-p' : ''); }
+        async function answerSave(b, auth) {
+            needUid(auth);
+            var s = await seatOf(b), c = await db.get('labClasses/' + s.c.space, { cache: false }) || s.c;
+            var key = String(b.key || ''), L = c.lesson || {}, q = cleanQ(L.q);
+            if (!RESP_KEY_RE.test(key) || !L.on || L.key !== key || !q) fail('선생님이 지금 띄운 물음이 아니에요. 앞 화면을 봐 주세요.');
+            var doc = { key: key, jo: s.jo, num: s.num, uid: auth.uid, at: db.stamp(), expireAt: classExpire(s.c) };
+            if (q.type === 'pick') {
+                var ch = Math.round(Number(b.choice));
+                if (!(ch >= 0 && ch < q.choices.length)) fail('고를 답이 올바르지 않습니다.');
+                doc.choice = ch;
+            } else {
+                var t = text(String(b.text == null ? '' : b.text).trim(), RESP.ANSWER).trim();
+                if (!t) fail('답을 적어 주세요.');
+                doc.text = t;
+            }
+            var path = answerPath(s.c, key, s.jo, s.num, !!b.phone), old = null;
+            try { old = await db.get(path); } catch (e) { old = null; }   // 다른 기기가 쓴 문서는 규칙이 읽기를 막음 → 쓰기에서도 막힘
+            if (old && old.uid && old.uid !== auth.uid) fail('이 자리는 다른 기기가 답했어요. 조·번호를 확인해 주세요.');
+            if (old && old.at instanceof Date && db.now().getTime() - old.at.getTime() < RESP.GAP_MS) fail('조금 뒤에 다시 눌러 주세요.');
+            await db.set(path, doc);
+            return { ok: true };
+        }
+        async function answerMine(b, auth) {
+            needUid(auth);
+            var s = await seatOf(b), key = String(b.key || '');
+            if (!RESP_KEY_RE.test(key)) fail('물음 번호가 올바르지 않습니다.');
+            var d = null; try { d = await db.get(answerPath(s.c, key, s.jo, s.num, !!b.phone)); } catch (e) { d = null; }
+            if (!d || d.uid !== auth.uid) return { ok: true, answer: null };
+            return { ok: true, answer: d.choice != null ? { choice: d.choice } : { text: String(d.text || '') } };
+        }
+        // 교사: 한 물음의 답 모두 (발표 보기 프로젝터 모음, 실시간 — Firestore 는 듣고 있는 동안 읽기 한 번씩)
+        async function answerList(b, auth) {
+            var c = await ownedClass(b, auth), key = String(b.key || '');
+            if (!RESP_KEY_RE.test(key)) fail('물음 번호가 올바르지 않습니다.');
+            var rows = await db.query('labClasses/' + c.space + '/answers', [['key', key]], { live: true });
+            return { ok: true, answers: rows.map(function (r) { var x = r.data; return { seat: String(r.id).split('~')[1] || '', jo: Number(x.jo), num: Number(x.num), choice: x.choice == null ? null : Number(x.choice), text: x.text == null ? null : String(x.text), at: iso(x.at) }; })
+                .sort(function (a, z) { return a.jo - z.jo || a.num - z.num || a.seat.localeCompare(z.seat); }) };
         }
         /* ---------- 📖 선생님이 고친 수업 자료 (projects/lesson-editor.html, 그리는 쪽 js/lesson-slides.js applyEdit) ----------
            lessonEdits/{교사 uid}/exps/{실험}: 그 교사 본인만 읽고 씀(규칙), 학생은 읽지 않음. 교사 자료라 expireAt 없음(정리 작업 대상 아님).
@@ -415,6 +478,16 @@
             if (x.add != null) {
                 if (!LESSON_NEW_KEY_RE.test(String(x.add)) || LESSON_KINDS.indexOf(String(x.kind)) < 0) return null;
                 o.add = String(x.add); o.kind = String(x.kind); fields(x, o);
+                // 📱 응답 물음 (③): 고르기(답 2~6개·정답 번호 또는 -1) / 짧은 글
+                var r = x.resp;
+                if (r && typeof r === 'object' && (r.type === 'pick' || r.type === 'text')) {
+                    o.resp = { type: r.type };
+                    if (r.type === 'pick') {
+                        var ch = (Array.isArray(r.choices) ? r.choices : []).slice(0, RESP.CHOICES).map(function (c) { return text(c, RESP.CHOICE).trim(); }).filter(Boolean);
+                        var an = Math.round(Number(r.answer));
+                        if (ch.length >= 2) { o.resp.choices = ch; o.resp.answer = an >= 0 && an < ch.length ? an : -1; } else delete o.resp;
+                    }
+                }
                 return o;
             }
             if (!LESSON_REF_RE.test(String(x.ref || ''))) return null;
@@ -672,7 +745,7 @@
             (await db.query('labClasses/' + c.space + '/progress', [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/progress/' + r.id); });
             (await db.query(itemsPath(c.space), [])).forEach(function (r) { paths.push(itemsPath(c.space) + '/' + r.id); });
             (await db.query('labSpaces/' + c.space + '/raw', [])).forEach(function (r) { paths.push('labSpaces/' + c.space + '/raw/' + r.id); });
-            for (var sub of ['aiAsk', 'reports', 'aiDesk', 'teams']) (await db.query('labClasses/' + c.space + '/' + sub, [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/' + sub + '/' + r.id); });
+            for (var sub of ['aiAsk', 'reports', 'aiDesk', 'teams', 'answers']) (await db.query('labClasses/' + c.space + '/' + sub, [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/' + sub + '/' + r.id); });
             for (var i = 0; i < paths.length; i++) await db.del(paths[i]);
             var look = await db.get('labClassCodes/' + c.classCode);
             if (look && look.space === c.space) await db.del('labClassCodes/' + c.classCode);
@@ -900,6 +973,9 @@
                 if (a === 'lessonEditSave') return await lessonEditSave(body, auth);
                 if (a === 'lessonEditReset') return await lessonEditReset(body, auth);
                 if (a === 'lessonEditList') return await lessonEditList(body, auth);
+                if (a === 'answerSave') return await answerSave(body, auth);
+                if (a === 'answerMine') return await answerMine(body, auth);
+                if (a === 'answerList') return await answerList(body, auth);
                 if (a === 'lessonImgSave') return await lessonImgSave(body, auth);
                 if (a === 'lessonImgGet') return await lessonImgGet(body, auth);
                 if (a === 'classStatus') return await classStatus(body, auth);

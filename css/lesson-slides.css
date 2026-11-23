@@ -46,3 +46,15 @@
 .ct-present:not(.ls-on) .ls-deck { display: none; }
 #btnPMode[hidden] { display: none; }
 @media (max-width: 899px) { .ls-main { flex-direction: column; } .ls-fig { flex-basis: auto; width: 70%; } }
+/* 📱 응답 물음 (③, 선생님이 만든 장): 고를 답·모인 수(막대)·글 답 */
+.ls-resp { margin-top: 0.5em; }
+.ls-choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25em; }
+.ls-choices li { position: relative; display: flex; align-items: center; gap: 0.5em; padding: 0.2em 0.5em; border: 1px solid var(--c-line); border-radius: 0.3em; overflow: hidden; }
+.ls-choices li.ok { border: 2px solid var(--c-success); background: var(--c-ok-bg); }
+.ls-abc { position: relative; z-index: 1; flex: 0 0 auto; font-weight: 700; color: var(--c-primary); }
+.ls-ctext { flex: 1 1 auto; position: relative; z-index: 1; }
+.ls-rbar { position: absolute; left: 0; top: 0; bottom: 0; width: var(--w, 0%); background: var(--c-primary-soft); z-index: 0; }
+.ls-cnt { position: relative; z-index: 1; min-width: 1.6em; text-align: right; }
+.ls-texts { margin: 0; padding-left: 1.2em; columns: 2; font-size: 0.85em; }
+.ls-rnote { margin: 0.35em 0 0; font-size: 0.7em; color: var(--c-muted); }
+.ls-who { font-size: 0.55em; }

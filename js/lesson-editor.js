@@ -140,7 +140,7 @@
         if (!list.length) { $('slideList').innerHTML = '<li class="le-empty">이 단계에는 설명 장이 없어요. <b>➕ 새 장 더하기</b>로 만들어 보세요.</li>'; return; }
         $('slideList').innerHTML = list.map(function (e, i) {
             var tags = (e.base ? '' : '<span class="le-tag new">➕ 새 장</span>') + (isEdited(e) ? '<span class="le-tag ed">✏️ 고침</span>' : '') + (e.hide ? '<span class="le-tag hid">숨김</span>' : '') +
-                (e.base && e.base.key ? '<span class="le-tag key" title="학생 화면 답과 묶인 장">🔗</span>' : '');
+                (e.base && e.base.key ? '<span class="le-tag key" title="학생 화면 답과 묶인 장">🔗</span>' : '') + (!e.base && e.resp ? '<span class="le-tag new">📱 응답</span>' : '');
             return '<li class="le-item' + (i === st.sel ? ' on' : '') + (e.hide ? ' hid' : '') + '">' +
                 '<button type="button" class="le-pickslide" data-i="' + i + '" aria-current="' + (i === st.sel) + '"><span class="le-no">' + (i + 1) + '</span> <span class="le-kind">' + esc((KINDS[kindOf(e)] || '').split(' ')[0]) + '</span> <span class="le-ttl">' + esc(LS.plain(val(e, 'title')) || '(제목 없음)') + '</span> ' + tags + '</button>' +
                 '<span class="le-ops"><button type="button" data-op="up" data-i="' + i + '" aria-label="' + (i + 1) + '번 장 위로"' + (i ? '' : ' disabled') + '>↑</button>' +
@@ -185,6 +185,7 @@
                 '<div class="le-rich" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="lbl-' + F.f + '" data-f="' + F.f + '"' + (F.needs && !LS.plain(val(e, F.needs)) ? ' data-off="1"' : '') + '>' + LS.sanitize(v) + '</div>' +
                 (F.needs ? '<small class="note">물음이 있어야 풀이가 나와요.</small>' : '') + '</div>';
         });
+        if (!e.base) h += respField(e);
         h += imgField(e, 'img', '🖼 그림');
         if (LS.plain(val(e, 'ask'))) h += imgField(e, 'revealImg', '🖼 풀이를 연 뒤 그림 (없으면 위 그림)');
         if (k === 'vars') {
@@ -198,6 +199,42 @@
         h += '<div class="le-row">' + (e.base ? '<button type="button" class="le-btn secondary" id="btnUndoSlide"' + (isEdited(e) ? '' : ' disabled') + '>↩ 이 장 원래대로</button>' : '<button type="button" class="le-btn danger" id="btnDelSlide">🗑 이 장 지우기</button>') + '</div>';
         box.innerHTML = h;
     }
+    // ---------- 📱 응답 물음 만들기 (③, 새 장만): 띄우면 학생 폰·노트북에 답 칸, 프로젝터에 답이 모임 ----------
+    function respField(e) {
+        var r = e.resp || null, type = r ? r.type : '';
+        var h = '<fieldset class="le-vars le-resp"><legend>📱 학생이 답하는 물음</legend>' +
+            '<label class="le-field">답하는 방법 <select data-r="type"><option value=""' + (type ? '' : ' selected') + '>없음 (설명만)</option><option value="pick"' + (type === 'pick' ? ' selected' : '') + '>고르기 (2~6개)</option><option value="text"' + (type === 'text' ? ' selected' : '') + '>짧은 글 (100자)</option></select></label>';
+        if (type === 'pick') {
+            var ch = r.choices || [];
+            h += '<label class="le-field">고를 답 <small>(한 줄에 하나, 2~6개)</small><textarea data-r="choices" rows="4">' + esc(ch.join('\n')) + '</textarea></label>' +
+                '<label class="le-field">정답 <small>(풀이를 연 뒤에만 프로젝터에 ✅)</small><select data-r="answer"><option value="-1">정답 없음 (생각 묻기)</option>' +
+                ch.map(function (c, i) { return '<option value="' + i + '"' + (r.answer === i ? ' selected' : '') + '>' + 'ABCDEF'[i] + '. ' + esc(c) + '</option>'; }).join('') + '</select></label>';
+        }
+        if (type) h += '<p class="note">학생에게는 위 <b>❓ 물음</b> 글(없으면 제목)과 고를 답만 가요. 정답은 가지 않아요. 수업 설명 화면에서 이 장을 띄우는 동안만 답할 수 있어요.</p>';
+        return h + '</fieldset>';
+    }
+    function onResp(el) {
+        var e = cur(); if (!e || e.base) return;
+        var k = el.dataset.r;
+        if (k === 'type') {
+            if (!el.value) delete e.resp;
+            else e.resp = el.value === 'pick' ? { type: 'pick', choices: (e.resp && e.resp.choices) || ['', ''], answer: -1 } : { type: 'text' };
+            if (e.resp && e.kind !== 'ask') e.kind = 'ask';
+            setDirty(true); drawForm(); preview();
+            return;
+        }
+        if (!e.resp) return;
+        if (k === 'choices') {
+            e.resp.choices = el.value.split('\n').map(function (x) { return x.trim().slice(0, 60); }).slice(0, 6);
+            if (e.resp.answer >= e.resp.choices.length) e.resp.answer = -1;
+            var sel = $('slideForm').querySelector('select[data-r="answer"]');
+            if (sel) sel.innerHTML = '<option value="-1">정답 없음 (생각 묻기)</option>' + e.resp.choices.map(function (c, i) { return c ? '<option value="' + i + '"' + (e.resp.answer === i ? ' selected' : '') + '>' + 'ABCDEF'[i] + '. ' + esc(c) + '</option>' : ''; }).join('');
+        }
+        if (k === 'answer') e.resp.answer = Number(el.value);
+        setDirty(true); preview();
+    }
+    $('slideForm').addEventListener('input', function (ev) { if (ev.target.dataset && ev.target.dataset.r === 'choices') onResp(ev.target); });
+    $('slideForm').addEventListener('change', function (ev) { if (ev.target.dataset && ev.target.dataset.r && ev.target.dataset.r !== 'choices') onResp(ev.target); });
     // ---------- 그림 바꾸기 (② 선생님 기기에서 긴 변 1280px·WebP(안 되면 JPEG)·300KB 아래로 줄여 내 계정에) ----------
     function imgSrc(v) {
         v = String(v || '');

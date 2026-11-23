@@ -814,6 +814,8 @@
         // 'phone' 장은 풀이를 열기 전까지 학생 띠가 '✍️ 내 화면에서 해요' (풀이를 열면 '👀 앞 화면을 봐요')
         var L = { on: !!lesson.on, stage: lesson.on ? lesson.gate : '', i: lesson.on ? lesson.i : 0, key: s && s.key ? s.key : '', reveal: !!(lesson.on && lesson.rev),
             mode: s && s.mode === 'phone' && !(lesson.rev && s.reveal) ? 'phone' : 'look' };
+        // 📱 선생님이 만든 응답 물음 (③): 물음 글·고를 답을 함께 (정답은 빼고) → 학생 화면(js/class-share.js)이 답 칸을 띄움
+        var q = LSx.respQ ? LSx.respQ(s) : null; if (q) L.q = q;
         var open = s && s.key && lesson.rev ? [s.key] : [];
         var sig = JSON.stringify([c.space, L, open]);
         // 이어 보기로 연 장은 문서에 이미 있는 그대로 → 쓰지 않음 (다음에 장을 넘길 때부터 씀)
@@ -862,6 +864,7 @@
             if (tx) tx.insertAdjacentHTML('beforeend', '<div class="ls-answers" aria-live="polite">' + answersHtml() + '</div>');
             answersFetch();
         }
+        if (respSlide()) respFetch();
         LSx.fit(box);
         renderPresentBar();
         lessonSync();
@@ -879,7 +882,30 @@
     var ans = { space: '', data: {}, busy: false, t: 0, at: 0 };
     function answerSlide() {
         var c = watched(), sl = lesson.on && lesson.list[lesson.i];
-        return c && sl && sl.mode === 'phone' && sl.key && !/^(do|ch)-/.test(sl.key) && CTA && CTA.supports(c.exp) && state.sub === 'present' ? sl : null;   // 측정 장(do-t1·do-t2)·도전 장(ch-t1·ch-t2)은 모을 답이 없음
+        return c && sl && !sl.resp && sl.mode === 'phone' && sl.key && !/^(do|ch)-/.test(sl.key) && CTA && CTA.supports(c.exp) && state.sub === 'present' ? sl : null;   // 측정 장(do-t1·do-t2)·도전 장(ch-t1·ch-t2)은 모을 답이 없음
+    }
+    // ---------- 📱 선생님이 만든 응답 물음의 답 모으기 (③, 어느 실험이나): 그 장을 띄운 동안만 몇 초마다 answerList (Firestore 는 실시간 듣기라 바뀐 답만 읽음) ----------
+    var resp = { key: '', list: null, t: 0, busy: false };
+    function respSlide() {
+        var c = watched(), sl = lesson.on && lesson.list[lesson.i];
+        return c && sl && sl.resp && LSx.respQ && LSx.respQ(sl) && state.sub === 'present' ? sl : null;
+    }
+    function respPaint() {
+        var sl = respSlide(), box = $('pSlides'), el = box.querySelector('.ls-resp'); if (!sl || !el) return;
+        var h = LSx.respHtml(sl, resp.key === sl.key ? resp.list || [] : [], lesson.rev);
+        if (el.outerHTML !== h) { var open = !!(el.querySelector('details.ls-who') || {}).open; el.outerHTML = h; var w = box.querySelector('details.ls-who'); if (w && open) w.open = true; LSx.fit(box); }
+    }
+    async function respFetch() {
+        clearTimeout(resp.t);
+        var c = watched(), sl = respSlide(); if (!sl) return;
+        if (resp.key !== sl.key) { resp.key = sl.key; resp.list = null; }
+        respPaint();
+        if (resp.busy) return;
+        resp.busy = true;
+        var r = null; try { r = await CC.answerList(c.space, sl.key); } catch (e) { r = null; }
+        resp.busy = false;
+        if (r && r.ok && respSlide() === sl) { resp.list = r.answers; respPaint(); }
+        if (respSlide()) resp.t = setTimeout(respFetch, 2500);
     }
     function answersHtml() {
         var c = watched(), sl = answerSlide(); if (!sl) return '';
