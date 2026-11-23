@@ -118,7 +118,7 @@ const NAME = { A: '별빛가족', B: '달님 탐험대', C: '할머니와 나', 
                     if (b.some(t => /⏱ 초시계로 재기/.test(t))) { await tapIf(pg, /초시계로 재기/); continue; }
                     if (b.some(t => /시작 \(뚜껑/.test(t))) return;
                     const box = pg.locator('input[type=checkbox]:not(:checked)').locator('visible=true'); if (await box.count()) { while (await box.count()) await box.first().click(); continue; }
-                    const q = b.find(t => !/^\(꺼짐\)/.test(t) && QZ[k].test(t)); if (q) { await W.tap(pg, q.slice(0, 8)); await pg.waitForTimeout(500); note(k + ' 측정 전 퀴즈', await res(pg, 400)); continue; }
+                    const wrong = /❌ 아니에요/.test(await res(pg, 900)); const q = b.find(t => !/^\(꺼짐\)/.test(t) && (wrong ? /^일정한 넓이|^무엇 때문에/ : QZ[k]).test(t)); if (q) { await W.tap(pg, q.slice(0, 8)); await pg.waitForTimeout(500); note(k + ' 측정 전 퀴즈', await res(pg, 400)); continue; }
                     if (b.some(t => /바꾸기$/.test(t)) && !pg.vcVar) { pg.vcVar = 1; await W.tap(pg, o.v); if (o.pred) await W.tap(pg, o.pred); if (o.why) { const w = pg.locator('input[type=text], textarea').locator('visible=true'); await w.first().fill(o.why); await w.first().blur(); } note(k + ' 계획(바꿀 것·예측)', await res(pg, 700)); if (k === 'E') { const f = await vis(pg, /다음 →/).first().isEnabled(); note('E 예측 안 고르고 다음 누름 → 켜져 있나', f); if (!f) { await W.tap(pg, '짧아질 것 같아요'); } } await tapIf(pg, /다음 →/); continue; }
                     if (b.includes('이 조건으로 →')) { for (let i = 0; i < (o.plus || 0); i++) await W.tap(pg, '+'); for (let i = 0; i < (o.minus || 0); i++) await W.tap(pg, '−'); note(k + ' 값 화면', await res(pg, 500)); await tapIf(pg, /이 조건으로/); continue; }
                     if (b.some(t => /예측했어요/.test(t))) { for (let i = 0; i < (o.sec || 0); i++) await W.tap(pg, '+'); await tapIf(pg, /예측했어요/); continue; }
@@ -137,17 +137,19 @@ const NAME = { A: '별빛가족', B: '달님 탐험대', C: '할머니와 나', 
                     if (!(await btns(pg)).some(t => /시작 \(뚜껑/.test(t))) { note(k + ' 시작 단추 없음', { 글: await res(pg, 500), 단추: await btns(pg) }); return; }
                     await sw(k, sec);
                     note(k + ' ' + (si + 1) + '번째 값 ' + (ti + 1) + '회 뒤 결과', { 글: await res(pg, 1000), 단추: await btns(pg) });
-                } };
+                }
+                if (plan.graph !== false && await tapIf(pg, /그래프 보기/)) { await pg.waitForTimeout(800); note(k + ' 그래프 화면', { 글: await res(pg, 1400), 단추: await btns(pg) }); await W.shot(pg, k + ' 1차시 그래프', true); }
+                else note(k + ' 그래프 안 봄(단추 없음 또는 안 누르는 팀)', await btns(pg)); };
             const S = n => n - 0.4;   // 짠 값(초)만큼 실제로 기다림(누르는 시간 0.4초 빼기), 팀은 동시에
             const plans = {
                 A: { first: { v: '물의 양 바꾸기', pred: '길어질 것 같아요', why: '물이 많으면 무거워서', sec: 1 }, sets: [[12, 15, 13], Object.assign([18, 21, 19], { plus: 2 })] },
                 B: { first: { v: '물의 온도 바꾸기', pred: '짧아질 것 같아요', why: '따뜻하면 빨리 녹아서' }, sets: [[14, 16, 15], Object.assign([13, 15, 14], { plus: 1 }), Object.assign([9, 10, 9], { plus: 1 })] },
-                C: { first: { v: '발포비타민 양 바꾸기', pred: '짧아질 것 같아요' }, sets: [[15, 13, 16], Object.assign([8, 9, 8], { plus: 2 })] },
+                C: { graph: false, first: { v: '발포비타민 양 바꾸기', pred: '짧아질 것 같아요' }, sets: [[15, 13, 16], Object.assign([8, 9, 8], { plus: 2 })] },
                 D: { first: { v: '조각 크기 바꾸기', pred: '비슷할 것 같아요' }, sets: [[14, 15, 13]] },
-                E: { first: { v: '물의 온도 바꾸기' }, sets: [[15, 12, 16], Object.assign([17, 14, 18], { minus: 1 })] },
+                E: { graph: false, first: { v: '물의 온도 바꾸기' }, sets: [[15, 12, 16], Object.assign([17, 14, 18], { minus: 1 })] },
             };
             W.realSec = true;
-            await Promise.all(Object.entries(plans).map(([k, pl]) => guard(k + ' 측정', () => run(k, { first: pl.first, sets: pl.sets.map(s => Object.assign(s.map(S), { plus: s.plus, minus: s.minus })) }))));
+            await Promise.all(Object.entries(plans).map(([k, pl]) => guard(k + ' 측정', () => run(k, { graph: pl.graph, first: pl.first, sets: pl.sets.map(s => Object.assign(s.map(S), { plus: s.plus, minus: s.minus })) }))));
             await W.shot(P.B, 'B 1차시 결과', true); await W.shot(P.C, 'C 1차시 결과', true);
             // D: 한 값만 재고 정리로 가려 함
             await guard('D 정리로', async () => { const t = P.D.locator('button, a').filter({ hasText: /정리/ }).locator('visible=true'); note('D 정리 탭 누르기 전 단추', await btns(P.D)); if (await t.count()) { await t.first().click({ force: true }); await P.D.waitForTimeout(600); } note('D 정리 탭 누른 뒤', { 글: await res(P.D, 700), 단추: await btns(P.D) }); await W.shot(P.D, 'D 정리 누름', true); });
