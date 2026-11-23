@@ -164,6 +164,11 @@ const NAME = { A: '별빛가족', B: '달님 탐험대', C: '할머니와 나', 
             await lesson('t1', 8, '', false, 4000); for (const k of 'ABCDE') note('t1 8 도전(look) · ' + k, await scr(P[k], 400));
             note('점수', Object.fromEntries(await Promise.all(Object.keys(P).map(async k => [k, (await W.text(P[k])).match(/⭐ \d+점/)?.[0]]))));
         },
+        23: async () => {   // 도전 장 동안: E 아이·C 아이가 폰을 받아 그래프를 눌러 봄, D 도 그래프
+            for (const k of 'CDE') await open(k);
+            await P.C.waitForTimeout(2500);
+            for (const k of 'CDE') await guard(k + ' 그래프', async () => { const pg = P[k]; note(k + ' 지금 화면', await scr(pg, 300)); const b = pg.locator('button').filter({ hasText: /그래프 보기/ }).locator('visible=true'); if (await b.count()) { await b.first().click(); await pg.waitForTimeout(800); } note(k + ' 그래프 화면', await scr(pg, 1300)); await W.shot(pg, k + ' 그래프', true); });
+        },
         9: async () => {   // 살펴보기(상태 복사본에서만): A 가 gas → do-t1 측정 화면까지
             const A = await open('A');
             await A.waitForTimeout(3000); note('gas 물음 · A', await scr(A));
