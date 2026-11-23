@@ -782,7 +782,6 @@
                 if (at < 0 && L.i < list.length) at = L.i;
                 if (at >= 0) { lsync.hold = true; if (lessonStart(L.stage, at, L.reveal)) return; lsync.hold = false; }
             }
-            if (L && !L.on) { lsync.hold = true; lessonOff(); lsync.hold = false; renderPresentBar(); return; }   // 설명을 닫고 학생 화면을 보던 중이면 그대로
             // 처음 여는 수업: 가장 뒤에 연 단계의 설명부터 (설명이 끝나면 학생 화면도 그 단계로)
             var si = CC.stageInfo(c.exp, c.stage, c.flow);
             if (!lessonStart(si ? si.cur : frameGate(c), 0)) renderPresentBar();
