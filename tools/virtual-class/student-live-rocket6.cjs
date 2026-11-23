@@ -250,6 +250,49 @@ const NAME = { A: '별빛가족', B: '달님 탐험대', C: '할머니와 나', 
             await lesson('t2', 7, '', false, 5000); for (const k of 'ABCDE') note('t2 7 도전(look) · ' + k, { 글: await res(P[k], 400), 단추: await btns(P[k]) });
             note('점수', Object.fromEntries(await Promise.all(Object.keys(P).map(async k => [k, (await W.text(P[k])).match(/⭐ \d+점/)?.[0]]))));
         },
+
+        4: async () => {   // 75~95분 정리: end-think(다시 풀기) → 풀이 → end-cause(정리 문장) → 풀이 → 결과 카드
+            const d = doc(); d.stage = 99; for (const k of ['action', 'mass']) if (!OPEN().includes(k)) OPEN().push(k);
+            d.lesson = { on: true, stage: 'end', i: 0, key: 'end-think', reveal: false, mode: 'phone', at: new Date() };
+            for (const k of 'ABCDE') await open(k);
+            await P.A.waitForTimeout(4000);
+            const res = async (pg, n) => (await W.text(pg)).split('\n').filter(l => !/선생님 연결 · 도움말|^(생각 열기|1차시|2차시|정리|🔒.*)$/.test(l)).slice(1).join(' / ').replace(/✅ 선생님께 보냄 \/ |⏳ 보내는 중 \/ /g, '').slice(0, n || 1200);
+            const vis = (pg, re) => pg.locator('button').filter({ hasText: re }).locator('visible=true');
+            const tapIf = async (pg, re) => { const b = vis(pg, re); if (await b.count() && await b.first().isEnabled()) { await b.first().click(); await pg.waitForTimeout(500); return true; } return false; };
+            for (const k of 'ABCDE') note('end-think 첫 화면 · ' + k, { 글: await res(P[k], 700), 단추: await btns(P[k]) });
+            await W.shot(P.A, 'A end-think', true);
+            // 다시 풀기: 화면에 보이는 물음마다 인물대로
+            const ANS = { A: [/원인/, /속도가 변하는/, /일정한 넓이/], B: [/원인/, /속도가 변하는/, /일정한 넓이/], C: [/원인/, /빠른 정도/, /일정한 넓이/], D: [/원인/, /속도가 변하는/, /누르는 힘/], E: [/세게 움직이는/, /움직인 거리/, /공기의 무게/] };
+            const redo = async k => { const pg = P[k];
+                for (let g = 0; g < 12; g++) { const b = await btns(pg), t = await res(pg, 900);
+                    const qi = /힘’은|‘힘|힘이란/.test(t) ? 0 : /가속도/.test(t) ? 1 : /압력/.test(t) ? 2 : -1;
+                    const ch = qi >= 0 && b.find(x => !/^\(꺼짐\)/.test(x) && ANS[k][qi].test(x));
+                    if (ch) { await W.tap(pg, ch.slice(0, 8)); note(k + ' 다시 풀기 고른 뒤(물음 ' + qi + ')', { 글: (await res(pg, 700)), 단추: await btns(pg) }); continue; }
+                    if (!(await tapIf(pg, /다음 →|시작 →|다시 풀기/))) break; } };
+            await Promise.all([...'ABCDE'].map(k => guard(k + ' 다시 풀기', () => redo(k))));
+            await lesson('end', 0, 'end-think', true);
+            for (const k of 'ABCDE') note('end-think 풀이 뒤 · ' + k, { 글: await res(P[k], 900), 단추: await btns(P[k]) });
+            await W.shot(P.A, 'A end-think 풀이 뒤', true);
+            await lesson('end', 1, 'end-cause', false);
+            for (const k of 'ABCDE') { note('end-cause 화면 · ' + k, { 글: await res(P[k], 1500), 단추: await btns(P[k]), 칸: await P[k].evaluate(() => [...document.querySelectorAll('input, textarea, select')].filter(e => e.offsetParent).map(e => (e.type || e.tagName) + ':' + (e.placeholder || '') + '=' + e.value)) }); await W.shot(P[k], k + ' end-cause', true); }
+            // 정리 문장: 보기 고르기(인물대로) + 쓰고 싶은 팀만
+            const SEN = { A: { pick: [/낮아|길어/, /무거워|덜 빨라|무게/], text: '무게 2개 붙였더니 80에서 55로 낮아졌어요' }, B: { pick: [/높아|짧아/, /기체|많/] , text: '물 20 mL 는 90% 였어요' }, C: { pick: [/높아|짧아/, /기체|많/] }, D: { pick: [/비슷|낮아/, /무게|무거워/] }, E: { pick: [/낮아|짧아/] } };
+            const write = async k => { const pg = P[k], o = SEN[k];
+                for (let r = 0; r < 3; r++) { for (const re of o.pick) { const b = (await btns(pg)).find(x => !/^\(꺼짐\)/.test(x) && re.test(x) && x.length < 40); if (b) await W.tap(pg, b.slice(0, 10)); }
+                    if (o.text) { const w = pg.locator('textarea, input[type=text]').locator('visible=true'); if (await w.count()) { await w.last().fill(o.text); await w.last().blur(); } }
+                    note(k + ' 정리 문장 고른 뒤 (' + (r + 1) + ')', { 글: await res(pg, 1500), 단추: await btns(pg) });
+                    if (!(await tapIf(pg, /다음 →|보내기|다 썼어요|저장/))) break; }
+                await W.shot(pg, k + ' 정리 문장', true); };
+            for (const k of 'ABCDE') await guard(k + ' 정리 문장', () => write(k));
+            await lesson('end', 1, 'end-cause', true);
+            for (const k of 'ABCDE') note('end-cause 풀이 뒤 · ' + k, { 글: await res(P[k], 900), 단추: await btns(P[k]) });
+            await lesson('end', 2, '', false, 5000);
+            for (const k of 'ABCDE') note('결과 카드 장(look) · ' + k, { 글: await res(P[k], 600), 단추: await btns(P[k]) });
+            await off(6000);
+            for (const k of 'ABCDE') { note('설명 화면 닫은 뒤 · ' + k, { 글: await res(P[k], 900), 단추: await btns(P[k]) }); }
+            await W.shot(P.C, 'C 닫은 뒤', true);
+            note('점수', Object.fromEntries(await Promise.all(Object.keys(P).map(async k => [k, (await W.text(P[k])).match(/⭐ \d+점/)?.[0]]))));
+        },
         23: async () => {   // 도전 장 동안: E 아이·C 아이가 폰을 받아 그래프를 눌러 봄, D 도 그래프
             for (const k of 'CDE') await open(k);
             await P.C.waitForTimeout(2500);

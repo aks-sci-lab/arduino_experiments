@@ -34,7 +34,8 @@ async function openLive(dir) {
         const after = snap(), set = {}, del = [], cut = [];
         for (const [p, j] of Object.entries(after)) if (before[p] !== j) {
             const d = JSON.parse(j);
-            for (const k of Object.keys(d)) if (typeof d[k] === 'string' && d[k].length > CUT) { d[k] = d[k].slice(0, 200) + '…(줄임, 원래 ' + d[k].length + '자)'; if (!cut.includes(p)) cut.push(p); }
+            for (const k of Object.keys(d)) if (typeof d[k] === 'string' && d[k].length > (/-team$/.test(p) ? 60000 : CUT))   // 팀 줄(퀴즈·요약)은 자르지 않음
+                { d[k] = d[k].slice(0, 200) + '…(줄임, 원래 ' + d[k].length + '자)'; if (!cut.includes(p)) cut.push(p); }
             set[p] = d;
         }
         for (const p of Object.keys(before)) if (!(p in after)) del.push(p);
