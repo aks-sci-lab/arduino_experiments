@@ -10,6 +10,9 @@ module.exports = async function pickVars(page) {
     if (!ok) return false;
     const box = page.locator('.rai-inline.rai-vc:not([hidden])').first();
     if (!(await box.locator('input[data-vc="change"]:checked').count())) await box.locator('input[data-vc="change"]').first().check();
+    const v1 = box.locator('input[data-vc="val1"]'), v2 = box.locator('input[data-vc="val2"]');
+    if (await v1.count() && !(await v1.inputValue()).trim()) await v1.fill('처음 값');
+    if (await v2.count() && !(await v2.inputValue()).trim()) await v2.fill('바꿀 값');
     if (!(await box.locator('input[data-vc="predict"]:checked').count())) await box.locator('input[data-vc="predict"]').first().check();
     return true;
 };

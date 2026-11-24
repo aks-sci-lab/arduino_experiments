@@ -82,7 +82,18 @@
     // ---------- 변인 카드 (바꿀 것 하나 · 재는 것 · 같게 둘 것 · 예상) ----------
     // 항목 하나(sections[key])에 글로 저장: 줄마다 '[바꿀 것] 가열 시간' 꼴, 그 밖의 줄은 그대로 남김. 보고서 탭에서 글로 고쳐도 다시 읽힘
     // cfg = { vars: [{ key, name }], choose: [바꿀 수 있는 key], measure: '재는 것', predictQ: '{var}을(를) 늘리면 …?', predict: [{ key: 'up'|'down'|'same'|…, label }] }
-    var VAR_TAGS = { change: '바꿀 것', measure: '재는 것', keep: '같게 둘 것', extra: '더 같게 둘 것', predict: '예상', reason: '까닭', observed: '결과' };
+    var VAR_TAGS = { change: '바꿀 것', plan: '바꿀 값', measure: '재는 것', keep: '같게 둘 것', extra: '더 같게 둘 것', predict: '예상', reason: '까닭', observed: '결과' };
+    var PLAN_HINTS = {
+        heat: ['예: 60초', '예: 180초'], ratio: ['예: 1:1', '예: 3:1'], led: ['예: 빨강 LED', '예: 파랑 LED'],
+        pres: ['예: 대기압 (100 kPa)', '예: 감압 (70 kPa)'], temp: ['예: 찬물 (10 °C)', '예: 따뜻한 물 (50 °C)'],
+        speed: ['예: 천천히', '예: 빠르게'], turns: ['예: 100회', '예: 200회'],
+        ball: ['예: 가벼운 공', '예: 무거운 공'], height: ['예: 0.5 m', '예: 1.0 m'],
+        len: ['예: 30 cm', '예: 60 cm'], amp: ['예: 10°', '예: 20°'], mass: ['예: 폰만', '예: 폰 + 추']
+    };
+    function planHint(cfg, key) {
+        var h = (cfg && cfg.planHint && cfg.planHint[key]) || PLAN_HINTS[key];
+        return Array.isArray(h) && h.length >= 2 ? h : ['예: 처음 값', '예: 바꿀 값'];
+    }
     // 받침에 맞는 조사: josa('가열 시간', '을', '를') → '가열 시간을'. 괄호·기호 뒤는 그 앞 한글로 판단
     function josa(w, a, b) {
         var t = String(w || '').replace(/\s*\([^)]*\)\s*$/, ''), c = t.charCodeAt(t.length - 1);
@@ -92,10 +103,11 @@
     function varName(cfg, key) { var v = (cfg.vars || []).filter(function (x) { return x.key === key; })[0]; return v ? v.name : ''; }
     function parseVars(text, cfg) {
         cfg = cfg || {};
-        var o = { change: '', changeName: '', predict: '', predictLabel: '', reason: '', extra: '', observed: '', observedLabel: '', rest: '' }, rest = [];
+        var o = { change: '', changeName: '', val1: '', val2: '', predict: '', predictLabel: '', reason: '', extra: '', observed: '', observedLabel: '', rest: '' }, rest = [];
         String(text || '').split('\n').forEach(function (line) {
             var m = /^\[([^\]]+)\] ?(.*)$/.exec(line), tag = m && m[1].trim(), val = m ? m[2].trim() : '';
             if (tag === VAR_TAGS.change) { o.changeName = val; (cfg.vars || []).forEach(function (v) { if (v.name === val) o.change = v.key; }); }
+            else if (tag === VAR_TAGS.plan) { var parts = val.split(/\s*(?:→|->)\s*/); o.val1 = (parts[0] || '').trim(); o.val2 = (parts[1] || '').trim(); }
             else if (tag === VAR_TAGS.predict) { o.predictLabel = val; (cfg.predict || []).forEach(function (p) { if (p.label === val) o.predict = p.key; }); }
             else if (tag === VAR_TAGS.reason) o.reason = val;
             else if (tag === VAR_TAGS.observed) { o.observedLabel = val; (cfg.predict || []).forEach(function (p) { if (p.label === val) o.observed = p.key; }); }
@@ -111,6 +123,8 @@
         cfg = cfg || {};
         var name = varName(cfg, o.change) || o.changeName || '', lines = [];
         if (name) lines.push('[' + VAR_TAGS.change + '] ' + name);
+        var v1 = String(o.val1 || '').trim(), v2 = String(o.val2 || '').trim();
+        if (v1 || v2) lines.push('[' + VAR_TAGS.plan + '] ' + v1 + ' → ' + v2);
         if (cfg.measure) lines.push('[' + VAR_TAGS.measure + '] ' + cfg.measure);
         if (o.change) lines.push('[' + VAR_TAGS.keep + '] ' + (cfg.vars || []).filter(function (v) { return v.key !== o.change; }).map(function (v) { return v.name; }).join(', '));
         if (o.extra) lines.push('[' + VAR_TAGS.extra + '] ' + o.extra);
@@ -134,10 +148,21 @@
         return diff.length >= 2 ? diff.map(function (v) { return v.name; }) : [];
     }
 
-    // 변인 카드 '골라야 다음': 바꿀 것과 예상 방향을 둘 다 골랐나 (까닭은 안 써도 됨)
-    function varsReady(o) { return !!(o && o.change && o.predict); }
+    // 변인 카드 '골라야 다음': 바꿀 것 · 바꿀 값 ① → ② (서로 다르게) · 예상 방향을 모두 정했나 (까닭은 안 써도 됨)
+    function varsReady(o) {
+        if (!o || !o.change || !o.predict) return false;
+        var v1 = String(o.val1 || '').trim(), v2 = String(o.val2 || '').trim();
+        return !!(v1 && v2 && v1 !== v2);
+    }
+    function varsMissingMsg(o) {
+        var v1 = String((o && o.val1) || '').trim(), v2 = String((o && o.val2) || '').trim();
+        if (!o || !o.change) return '바꿀 것 · 바꿀 값(①→②) · 예상 방향을 정하면 다음으로 가요 (까닭은 안 써도 돼요)';
+        if (!v1 || !v2) return '바꿀 값 ①과 ②를 적고 예상 방향을 고르면 다음으로 가요 (까닭은 안 써도 돼요)';
+        if (v1 === v2) return '바꿀 값 ①과 ②를 서로 다르게 적어야 다음으로 가요';
+        return '예상 방향을 고르면 다음으로 가요 (까닭은 안 써도 돼요)';
+    }
     // 실험 하나의 변인 카드 설정(opts.vars)을 보고서 항목 묶음에 넣기: 7단계 = 4. 과정의 '변인·예상' 칸, 가설연역 = ③ 탐구 설계 항목이 카드가 됨
-    var VARS_HINT = '바꿀 것은 하나만, 나머지는 같게. 재기 전에 결과를 예상해요.';
+    var VARS_HINT = '바꿀 것 하나와 ① → ② 값을 정하고, 나머지는 같게. 재기 전에 결과를 예상해요.';
     function withVars(list, vars, hd) {
         var out = list.slice(), has = out.some(function (k) { return (k && k.key || k) === 'design'; });
         if (hd) return out.map(function (k) { return (k && k.key || k) === 'design' ? Object.assign({ key: 'design', hint: VARS_HINT }, typeof k === 'object' ? k : {}, { vars: vars }) : k; });
@@ -561,8 +586,14 @@
             var cfg = s.vars, nm = 'rai-vc-' + esc(exp) + '-' + k;
             return '<fieldset class="rai-vc-f"><legend>🔀 바꿀 것 <span class="rai-note">하나만 골라요</span></legend><div class="rai-row">' +
                 (cfg.choose || []).map(function (key) { return '<label class="rai-pill"><input type="radio" name="' + nm + '-c" value="' + esc(key) + '" data-vc="change"> ' + esc(varName(cfg, key)) + '</label>'; }).join('') + '</div></fieldset>' +
+                '<div class="rai-vc-plan" data-vc-plan><p class="rai-vc-plan-h"><b>🎯 어떻게 바꿔서 비교할까요?</b> <span class="rai-note">①과 ②에 서로 다른 값을 적어요</span></p>' +
+                '<div class="rai-vc-plan-row">' +
+                '<label class="rai-vc-plan-box"><span>① 처음 값</span><input type="text" class="rai-vc-in" data-vc="val1" maxlength="40" autocomplete="off" placeholder="예: 처음 값" aria-label="바꿀 값 ① 처음 값"></label>' +
+                '<span class="rai-vc-arr" aria-hidden="true">→</span>' +
+                '<label class="rai-vc-plan-box"><span>② 바꿀 값</span><input type="text" class="rai-vc-in" data-vc="val2" maxlength="40" autocomplete="off" placeholder="예: 바꿀 값" aria-label="바꿀 값 ② 바꿀 값"></label>' +
+                '</div><p class="rai-vc-same" data-vc-same role="alert" hidden>✋ ①과 ②는 서로 다른 값으로 적어요.</p></div>' +
                 '<p class="rai-vc-line">📏 재는 것: <b>' + esc(cfg.measure || '') + '</b></p>' +
-                '<div class="rai-vc-line">🔒 같게 둘 것: <span class="rai-vc-keep" data-vc-keep></span>' +
+                '<div class="rai-vc-line">🔒 같게 둘 것 <span class="rai-note">(①·② 둘 다 똑같이)</span>: <span class="rai-vc-keep" data-vc-keep></span>' +
                 '<input type="text" class="rai-vc-in" data-vc="extra" maxlength="80" placeholder="그 밖에 같게 둘 것 (예: 같은 컵, 같은 거리)" aria-label="그 밖에 같게 둘 것"></div>' +
                 '<fieldset class="rai-vc-f"><legend>🔮 예상 <span class="rai-note" data-vc-q></span></legend><div class="rai-row">' +
                 (cfg.predict || []).map(function (p) { return '<label class="rai-pill"><input type="radio" name="' + nm + '-p" value="' + esc(p.key) + '" data-vc="predict"> ' + esc(p.label) + '</label>'; }).join('') + '</div>' +
@@ -594,7 +625,7 @@
                 box.addEventListener('input', function (e) {
                     var t = e.target;
                     if (t.tagName === 'TEXTAREA') { setText(key, t.value, box); syncVerdict(box, t.value); }
-                    else if (vs && t.dataset.vc) setText(key, serializeVars(readCard(box, vs), vs), box);
+                    else if (vs && t.dataset.vc) { setText(key, serializeVars(readCard(box, vs), vs), box); fillCard(box, vs, st.sections[key]); }
                 });
                 box.addEventListener('change', function (e) {
                     var r = e.target; if (r.type !== 'radio' || !r.checked) return;
@@ -610,6 +641,8 @@
             var o = parseVars(st.sections[box.dataset.sec], cfg);   // 보고서 탭에서 덧붙인 줄(rest)은 남김
             var c = box.querySelector('input[data-vc="change"]:checked'), p = box.querySelector('input[data-vc="predict"]:checked');
             o.change = c ? c.value : ''; o.predict = p ? p.value : '';
+            var v1 = box.querySelector('input[data-vc="val1"]'), v2 = box.querySelector('input[data-vc="val2"]');
+            o.val1 = v1 ? v1.value.trim() : ''; o.val2 = v2 ? v2.value.trim() : '';
             o.extra = box.querySelector('input[data-vc="extra"]').value.trim(); o.reason = box.querySelector('input[data-vc="reason"]').value.trim();
             return o;
         }
@@ -617,8 +650,15 @@
             var o = parseVars(text, cfg);
             box.querySelectorAll('input[type=radio][data-vc]').forEach(function (r) { r.checked = r.value === (r.dataset.vc === 'change' ? o.change : o.predict); });
             box.querySelectorAll('input[type=text][data-vc]').forEach(function (t) { if (document.activeElement !== t) t.value = o[t.dataset.vc] || ''; });
+            var hints = planHint(cfg, o.change), i1 = box.querySelector('input[data-vc="val1"]'), i2 = box.querySelector('input[data-vc="val2"]');
+            if (i1) i1.placeholder = hints[0]; if (i2) i2.placeholder = hints[1];
+            var same = box.querySelector('[data-vc-same]');
+            if (same) same.hidden = !(o.val1 && o.val2 && o.val1 === o.val2);
             box.querySelector('[data-vc-keep]').innerHTML = o.change ? o.keep.map(function (n) { return '<span class="rai-lock">🔒 ' + esc(n) + '</span>'; }).join(' ') : '<span class="rai-note">바꿀 것을 고르면 나머지가 저절로 🔒</span>';
-            var q = cfg.predictQ ? String(cfg.predictQ).replace('{var}을(를)', josa(varName(cfg, o.change) || '바꿀 것', '을', '를')).replace('{var}', varName(cfg, o.change) || '바꿀 것') : '';
+            var cname = varName(cfg, o.change) || '바꿀 것';
+            var q = o.change && o.val1 && o.val2
+                ? '— ' + josa(cname, '을', '를') + ' ' + o.val1 + ' → ' + o.val2 + ' 로 바꾸면 ' + (cfg.measure ? josa(cfg.measure, '은', '는') + '?' : '어떻게 될까요?')
+                : (cfg.predictQ ? String(cfg.predictQ).replace('{var}을(를)', josa(cname, '을', '를')).replace('{var}', cname) : '');
             box.querySelector('[data-vc-q]').textContent = q;
         }
         // 글 하나를 바꾸면: 이 기기 저장 → (수업이면) 선생님께 저장, 보고서 탭·다른 칸·예상 ↔ 결과도 함께
@@ -657,15 +697,18 @@
             var pl = o.predictLabel || '', pdir = o.predict, verdict = '';
             if (rdir && pdir && pdir !== 'unknown' && rdir !== 'unknown') verdict = rdir === pdir ? '<p class="rai-cmp-v ok">✅ 예상과 같은 방향이에요. 왜 그런지 이론으로 설명해 봐요.</p>' : '<p class="rai-cmp-v warn">🤔 예상과 달라요. 틀린 게 아니라 좋은 단서예요 — 무엇 때문일지 결론에 써 봐요.</p>';
             var nm = 'rai-obs-' + esc(exp);
+            var predLead = o.changeName
+                ? (o.val1 && o.val2 ? esc(josa(o.changeName, '을', '를')) + ' <b>' + esc(o.val1) + ' → ' + esc(o.val2) + '</b> 로 바꾸면 → ' : esc(josa(o.changeName, '을', '를')) + ' 늘리면 → ')
+                : '';
             document.querySelectorAll('[data-rai-compare="' + v.key + '"]').forEach(function (el, i) {
                 var ae = document.activeElement, refocus = el.contains(ae) && ae.hasAttribute && ae.hasAttribute('data-obs') ? ae.value : null;   // 키보드로 고르는 중이면 다시 그린 뒤 같은 칸에
                 el.classList.add('card', 'rai-cmp');
                 var res = pick
-                    ? '<p class="rai-note">' + esc(cfg.observeQ || '6. 결과의 그래프·표를 보고 골라요 — ' + josa(o.changeName || '바꾼 것', '을', '를') + ' 늘렸을 때 ' + (cfg.measure || '잰 값') + '은(는)?') + '</p><div class="rai-row">' +
+                    ? '<p class="rai-note">' + esc(cfg.observeQ || '6. 결과의 그래프·표를 보고 골라요 — ' + josa(o.changeName || '바꾼 것', '을', '를') + (o.val1 && o.val2 ? ' ' + o.val1 + ' → ' + o.val2 + ' 로 바꿨을 때 ' : ' 늘렸을 때 ') + (cfg.measure || '잰 값') + '은(는)?') + '</p><div class="rai-row">' +
                         (cfg.predict || []).map(function (p) { return '<label class="rai-pill"><input type="radio" name="' + nm + '-' + i + '" value="' + esc(p.key) + '" data-obs' + (o.observed === p.key ? ' checked' : '') + (st.submitted ? ' disabled' : '') + '> ' + esc(p.key === 'unknown' ? '아직 판단하기 어려워요' : p.label) + '</label>'; }).join('') + '</div>'
                     : '<p>' + (r && r.text ? r.text : '<span class="rai-note">아직 결과가 없어요</span>') + '</p>';
                 el.innerHTML = '<h3>🔮 내 예상 ↔ 📊 결과</h3><div class="rai-cmp-grid">' +
-                    '<div><b>🔮 내 예상</b><p>' + (o.changeName ? esc(josa(o.changeName, '을', '를')) + ' 늘리면 → ' : '') + (pl ? '<b>' + esc(pl) + '</b>' : '<span class="rai-note">아직 안 골랐어요 (' + esc(cardStepName()) + '의 변인 카드)</span>') + (o.reason ? '<br><span class="rai-note">까닭: ' + esc(o.reason) + '</span>' : '') + '</p></div>' +
+                    '<div><b>🔮 내 예상</b><p>' + predLead + (pl ? '<b>' + esc(pl) + '</b>' : '<span class="rai-note">아직 안 골랐어요 (' + esc(cardStepName()) + '의 변인 카드)</span>') + (o.reason ? '<br><span class="rai-note">까닭: ' + esc(o.reason) + '</span>' : '') + '</p></div>' +
                     '<div><b>📊 결과</b>' + res + '</div></div>' + verdict;
                 if (refocus != null) { var rf = el.querySelector('input[data-obs][value="' + refocus + '"]'); if (rf) rf.focus(); }
                 if (pick && !el._obsBound) {
@@ -681,13 +724,13 @@
         }
         // 변인 카드가 있는 단계 이름 (7단계 '4. 과정', 가설연역 '③ 탐구 설계')
         function cardStepName() { return flow === 'hd' ? '③ 탐구 설계' : '4. 과정'; }
-        // --- '골라야 다음' (교수 세션 공통 원칙 2): 바꿀 것·예상 방향을 고르기 전에는 카드 뒤 단계로 못 감. 까닭은 선택 ---
+        // --- '골라야 다음' (교수 세션 공통 원칙 2): 바꿀 것·바꿀 값(①→②)·예상 방향을 정하기 전에는 카드 뒤 단계로 못 감. 까닭은 선택 ---
         //     학생 노트북·태블릿(수업이든 수업 없이 연 화면이든). 📱 폰(측정 화면 ?role=phone·폰으로 연 화면 — 보고서는 노트북에서)·🎬 발표용(?present=1)·opts.varsGate === false 는 막지 않음
         var GATE = opts.varsGate !== false && !/[?&]role=phone\b/.test(location.search) && !/[?&]present=1\b/.test(location.search);
         function gateBox() { return inlineEls().filter(function (b) { return b._vars && !b.hidden; })[0] || null; }
         function stepsApi() { return window.LabUI && LabUI.steps && LabUI.steps(); }
         function stepOrder() { return Array.prototype.map.call(document.querySelectorAll('nav.steps button[data-step]'), function (b) { return b.dataset.step; }); }
-        // 지금 막아야 하나: 카드가 보이고, 아직 다 안 골랐고, 낸 보고서가 아님 → { box, cardStep, idx(카드 단계 순서) }
+        // 지금 막아야 하나: 카드가 보이고, 아직 다 안 정했고, 낸 보고서가 아님 → { box, cardStep, idx(카드 단계 순서) }
         function gateNow() {
             if (!GATE || st.submitted || document.documentElement.classList.contains('device-phone')) return null;
             var box = gateBox(); if (!box || varsReady(vars())) return null;
@@ -705,10 +748,12 @@
         }
         function goCard(g) {
             var sp = stepsApi(); if (sp && sp.show) sp.show(g.box.closest('.step-panel').dataset.step);
-            gateToast('🔮 먼저 ' + cardStepName() + '의 변인 카드에서 바꿀 것과 예상 방향을 골라요 (까닭은 안 써도 돼요)');
+            var cur = vars() || {};
+            gateToast('🔮 먼저 ' + cardStepName() + '의 변인 카드에서 ' + varsMissingMsg(cur));
             g.box.classList.add('rai-vc-need');
             if (g.box.scrollIntoView) g.box.scrollIntoView({ block: 'center' });
-            var first = g.box.querySelector(vars().change ? 'input[data-vc="predict"]' : 'input[data-vc="change"]'); if (first) try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); }
+            var sel = !cur.change ? 'input[data-vc="change"]' : !cur.val1 ? 'input[data-vc="val1"]' : (!cur.val2 || cur.val1 === cur.val2) ? 'input[data-vc="val2"]' : 'input[data-vc="predict"]';
+            var first = g.box.querySelector(sel); if (first) try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); }
         }
         // 카드 뒤 단계로 가는 '다음' 단추를 끄고 한 줄 안내
         function renderGate() {
@@ -717,14 +762,14 @@
             document.querySelectorAll('[data-go].rai-gated').forEach(function (b) { b.disabled = false; b.classList.remove('rai-gated'); b.removeAttribute('aria-describedby'); });
             var box = gateBox(); if (box && (!g)) box.classList.remove('rai-vc-need');
             if (!g) return;
-            var panel = g.box.closest('.step-panel');
+            var panel = g.box.closest('.step-panel'), msg = '🔮 변인 카드에서 ' + varsMissingMsg(vars());
             Array.prototype.forEach.call(panel.querySelectorAll('[data-go]'), function (b) {
                 if (!afterCard(g, b.dataset.go)) return;
                 b.disabled = true; b.classList.add('rai-gated');
                 var row = b.parentNode;
                 if (!row.querySelector('.rai-gate-note')) {
                     var n = document.createElement('p'); n.className = 'rai-gate-note'; n.id = 'rai-gate-note-' + esc(exp);
-                    n.textContent = '🔮 변인 카드에서 바꿀 것과 예상 방향을 고르면 다음으로 가요 (까닭은 안 써도 돼요)';
+                    n.textContent = msg;
                     row.parentNode.insertBefore(n, row);
                 }
                 b.setAttribute('aria-describedby', 'rai-gate-note-' + esc(exp));

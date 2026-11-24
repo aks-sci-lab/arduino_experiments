@@ -368,8 +368,10 @@ body.ct-presenting .ct-present.phone .ct-pframe iframe { aspect-ratio: 9 / 19.5;
 .ct-runpop[hidden] { display: none; }
 .ct-runpop-box { background: var(--c-bg, #f5f6f8); border-radius: var(--r-card); box-shadow: 0 10px 40px rgba(0,0,0,.35); width: min(94vw, 1600px); max-height: 94vh; display: flex; flex-direction: column; overflow: hidden; }
 .ct-runpop-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); background: var(--c-card); border-bottom: 1px solid var(--c-line); }
-.ct-runpop-head b { font-size: 1.2rem; }
-.ct-runpop-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.ct-runpop-lead { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); min-width: 0; }
+.ct-runpop-head b { font-size: 1.2rem; white-space: nowrap; }
+.ct-runpop-btns { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.ct-runpop-btns button { min-height: 44px; padding: 0 .75em; white-space: nowrap; }
 .ct-runpop-body { overflow: auto; padding: var(--sp-3); min-height: 0; }
 /* 띠 단추 자리 고정 (2026-11-23 선생님 "이부분 버튼 위치 바뀌지 않도록"): 장마다 나타나고 숨는 단추(🔓 풀이 · ⇔ 나란히/⬜ 설명만/📖 설명)는
    자기 칸(.ct-pslot)을 늘 차지하고 숨을 때는 보이지 않기만, 글이 바뀌는 단추(풀이 열림·다음 단계 이름)는 폭을 고정해 옆 단추가 밀리지 않게 */

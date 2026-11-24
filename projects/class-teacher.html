@@ -42,7 +42,7 @@
             <div id="classList" class="ct-classes"></div>
             <details id="doneBox" class="ct-key" hidden><summary id="doneSum">✅ 마친 수업</summary><div id="doneList" class="ct-classes"></div></details>
             <p id="listMsg" class="note" role="status" aria-live="polite"></p>
-            <p class="note">수업을 누르면 학생 연결 QR 이 크게 나오고, <b>다음 → 진행 보기</b>로 단계 열기·결과판으로 가요. 학생 자료는 만든 날부터 6개월 뒤 저절로 지워져요.</p>
+            <p class="note">수업을 누르면 학생 연결 QR 이 크게 나오고, <b>다음 → 🎬 발표 보기</b>로 수업을 시작해요(진행 상황·단계 열기·수업 마치기는 발표 화면의 📋 팝업에서). 학생 자료는 만든 날부터 6개월 뒤 저절로 지워져요.</p>
         </section>
       </div>
 
@@ -300,10 +300,18 @@
             </section>
         </div>
     </div>
-    <!-- 📋 진행 상황 팝업 (2026-11-23 선생님 "진행 화면으로 돌아가기 보다는 진행 정도를 보고 싶을때는 팝업으로"): 발표 보기 위에 진행 화면(#runPane)을 그대로 옮겨 띄움, 닫으면 제자리 -->
+    <!-- 📋 진행 상황 팝업 (2026-11-23): 발표 보기 위에 진행 화면(#runPane)을 그대로 띄우고, 수업 목록·마치기·설정도 여기서 바로 (진행 화면으로 따로 빠지지 않음) -->
     <div id="runPop" class="ct-runpop" hidden role="dialog" aria-modal="true" aria-labelledby="runPopTitle">
         <div class="ct-runpop-box">
-            <div class="ct-runpop-head"><b id="runPopTitle">📋 진행 상황</b><span class="ct-runpop-btns"><button id="btnRunPopGo" class="secondary">진행 화면으로 가기</button><button id="btnRunPopClose" class="good">✕ 닫기 (Esc)</button></span></div>
+            <div class="ct-runpop-head">
+                <span class="ct-runpop-lead"><b id="runPopTitle">📋 진행 상황</b><span id="runPopMsg" class="note" role="status" aria-live="polite"></span></span>
+                <span class="ct-runpop-btns">
+                    <button id="btnRunPopList" class="secondary">← 수업 목록</button>
+                    <button id="btnRunPopDone" class="secondary">✅ 수업 마치기</button>
+                    <button id="btnRunPopSet" class="secondary">⚙ 설정</button>
+                    <button id="btnRunPopClose" class="good">✕ 닫기 (Esc)</button>
+                </span>
+            </div>
             <div id="runPopBody" class="ct-runpop-body"></div>
         </div>
     </div>

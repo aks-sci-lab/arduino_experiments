@@ -119,9 +119,12 @@ test('발표 보기: 발표용 iframe 은 참여하지 않고 단계 잠금은 �
         assert.ok(fb.width > 1600, '설명 장이 없는 실험은 학생 화면만 크게 (왼쪽 위 QR 칸만 빼고): ' + fb.width);
         await T.click('#btnPQr'); assert.equal(await T.isVisible('#bigQr'), true, '띠의 📱 QR → 크게'); await T.keyboard.press('Escape');
         assert.equal(await T.isVisible('#bigQr'), false, 'Esc 로 닫기');
-        // ✕ 진행 화면으로
-        await T.click('#btnPExit'); await T.click('#btnRunPopGo');
-        await T.waitForSelector('#stageCard:not([hidden])');
+        // 📋 진행 상황 팝업 → 단계 열기 + 목록으로 나가기
+        await T.click('#btnPExit');
+        await T.waitForSelector('#runPop:not([hidden]) #stageCard:not([hidden])');
+        assert.equal(await T.locator('#btnRunPopGo').count(), 0);
+        await T.click('#btnRunPopList');
+        await T.waitForSelector('#viewList:not([hidden])');
         assert.equal(await T.isVisible('#presentPane'), false);
 
         // 로켓 (행사형): 폰 모양 틀, 열린 단계 첫 화면 → 열기 → 1차시 첫 화면

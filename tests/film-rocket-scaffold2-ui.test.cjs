@@ -63,19 +63,29 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         await A.evaluate(() => window.__filmRocket.show('t1-var')); await go(A, 't1-var');
         await A.click('.ev-choice[data-k="temp"]');
         await A.waitForSelector('[data-guess="t1"]');
-        assert.match(await A.textContent('[data-guess="t1"] h3'), /물의 온도을\(를\) 늘리면 열리는 시간이/);
+        assert.match(await A.textContent('[data-guess="t1"] h3'), /물의 온도을\(를\) 20 °C → 30 °C 로 바꾸면 열리는 시간이/);
+        // ①과 ②가 같으면 경고 + 다음 꺼짐 → 다시 다르게 바꾸면 풀림
+        await A.click('[data-plan-slot="1"] [data-pm="-1"]');
+        assert.equal(await A.isVisible('#ev-plan-same'), true, '①=② 면 경고');
         await A.click('[data-guess="t1"] [data-dir="down"]');
+        assert.equal(await A.isDisabled('.ev-screen .ev-next[data-go]'), true, '①=② 면 다음 꺼짐');
+        await A.click('[data-plan-slot="1"] [data-pm="1"]');
+        assert.equal(await A.isVisible('#ev-plan-same'), false, '①≠② 면 경고 사라짐');
+        assert.equal(await A.isDisabled('.ev-screen .ev-next[data-go]'), false, '①≠② + 예측이면 다음 켜짐');
         await A.fill('[data-guess="t1"] .ev-why-in', '따뜻하면 거품이 빨리 나서'); await A.dispatchEvent('[data-guess="t1"] .ev-why-in', 'change');
         assert.deepEqual(await A.evaluate(() => window.__filmRocket.state().t1.guess), { dir: 'down', why: '따뜻하면 거품이 빨리 나서' });
         assert.deepEqual(await small(A), [], '56px');
-        // ① 한 값(20 °C)으로 3번 → 결과 화면에서 바로 '값을 하나 바꿔', 그래프 단추 없음
+        // ① 한 값(20 °C)으로 3번 → 결과 화면에서 바로 '정해 둔 ② 30 °C 로', 그래프 단추 없음
         await A.evaluate(() => { const s = window.__filmRocket.state(); s.t1.value = 20; s.t1.trials = [1, 2, 3].map(i => ({ value: 20, y: 10 + i, predict: 10, method: 'stopwatch' })); s.last = s.t1.trials[2]; window.__filmRocket.show('t1-result'); });
         await go(A, 't1-result');
-        assert.match(await A.textContent('.ev-more-hint'), /물의 온도.*값을 하나 바꿔/);
+        assert.match(await A.textContent('.ev-more-hint'), /정해 둔 ② 물의 온도 30 °C 로 바꿔/);
+        assert.match(await A.textContent('#ev-change'), /정해 둔 ② 30 °C 로 재러 가기/);
         assert.equal(await A.locator('[data-go="t1-graph"]').count(), 0, '한 값이면 그래프 단추 대신 안내');
-        // '바꿔서 다시' → 값을 안 바꾸고 '이 조건으로' → 받지 않음
+        // '정해 둔 ②' 누르면 30 °C 로 바로 맞춰짐 → 일부러 지난번 20 °C 로 되돌리면 받지 않음
         await A.click('#ev-change'); await go(A, 't1-cond');
+        assert.match(await A.textContent('.ev-stepper:not(.locked) .ev-sval'), /30 °C/, '정해 둔 ② 로 자동 맞춤');
         assert.match(await A.textContent('#ev-must'), /지난번\(20 °C\)과 다른 값/);
+        await A.click('.ev-stepper:not(.locked) [data-pm="-1"]');   // 일부러 20 °C 로 되돌림
         await next(A); await A.waitForTimeout(300);
         assert.equal(await A.getAttribute('#ev-app', 'data-screen'), 't1-cond', '같은 값이면 넘어가지 않음');
         assert.match(await A.textContent('#ev-must'), /값을 하나 바꿔요/);
@@ -99,11 +109,11 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         await go(A, 't2-result');
         assert.match(await A.textContent('.ev-screen'), /아이 키보다 낮아요/);
         assert.doesNotMatch(await A.textContent('.ev-screen'), /무게를 줄이거나/);
-        // 2026-11-23 가상 수업 4차: 첫 발 뒤에는 '같은 조건으로 한 번 더' 가 먼저, 같은 조건을 다 쏜 뒤에 '값을 하나 바꿔' 안내
+        // 2026-11-23 가상 수업 4차: 첫 발 뒤에는 '같은 조건으로 한 번 더' 가 먼저, 같은 조건을 다 쏜 뒤에 '정해 둔 ②' 안내
         assert.equal(await A.isVisible('#ev-again2'), true, '2차시 첫 발 뒤 같은 조건 반복');
         await A.evaluate(() => { const s = window.__filmRocket.state(); s.t2.trials.push({ value: 10, pct: 62, method: 'hand' }, { value: 10, pct: 58, method: 'hand' }); s.last2 = s.t2.trials[2]; window.__filmRocket.show('t2-result'); });
         await A.waitForSelector('.ev-more-hint');
-        assert.match(await A.textContent('.ev-more-hint'), /값을 하나 바꿔 한 번 더 쏘아요/, '같은 조건을 다 쏘면 바로 안내');
+        assert.match(await A.textContent('.ev-more-hint'), /바꿔 한 번 더 쏘아요/, '같은 조건을 다 쏘면 바로 안내');
         assert.equal(await A.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '375px');
         // 요약 → 교사 결과판 💬 생각
         await A.evaluate(() => window.__filmRocket.sendNow());

@@ -20,6 +20,7 @@
         String(text || '').split('\n').forEach(function (line) {
             var m = /^\[([^\]]+)\] ?(.*)$/.exec(line);
             if (m && map[m[1].trim()]) o[map[m[1].trim()]] = m[2].trim();
+            else if (m && m[1].trim() === '바꿀 값' && m[2].trim()) o.plan = m[2].trim();
             else if (!m) rest.push(line);
         });
         o.rest = rest.join(' ').trim();
@@ -44,18 +45,19 @@
     }
     function sameDir(a, b) { return !!(a && b && a === b); }
     /* status = classStatus 응답({ groups, submissions }), reports = reportList 의 reports → 조별 모음
-       { rows: [{ jo, code, think, change, predict, reason, observed, match, claim, verdict, nums, joined }], keys, predicts: [{ label, jos }], missing: { think, predict, claim }, total } */
+       { rows: [{ jo, code, think, change, plan, predict, reason, observed, match, claim, verdict, nums, joined }], keys, predicts: [{ label, jos }], missing: { think, predict, claim }, total } */
     function gather(status, reports, exp) {
         var groups = (status && status.groups) || [], subs = {};
         ((status && status.submissions) || []).forEach(function (s) { if (s) subs[s.code] = s; });
         var by = {};
-        groups.forEach(function (g) { by[g.code] = { jo: Number(g.jo) || 0, code: g.code, think: '', change: '', predict: '', reason: '', observed: '', claim: '', verdict: '', at: {}, nums: numsOf(subs[g.code], exp) }; });
+        groups.forEach(function (g) { by[g.code] = { jo: Number(g.jo) || 0, code: g.code, think: '', change: '', plan: '', predict: '', reason: '', observed: '', claim: '', verdict: '', at: {}, nums: numsOf(subs[g.code], exp) }; });
         // 같은 조의 노트북 여러 대: 항목마다 가장 나중에 고친 빈칸 아닌 것
         (reports || []).slice().sort(function (a, b) { return String(a.updatedAt).localeCompare(String(b.updatedAt)); }).forEach(function (r) {
             var g = by[r.group]; if (!g) return;
             var sec = r.sections || {}, t = parseTags(sec.design), cl = claimOf(sec);
             if (String(sec.problem || '').trim()) g.think = clip(sec.problem, 140);
             if (t.change) g.change = t.change;
+            if (t.plan) g.plan = clip(t.plan, 60);
             if (t.predict) g.predict = t.predict;
             if (t.reason) g.reason = clip(t.reason, 100);
             if (t.observed) g.observed = t.observed;
@@ -127,7 +129,7 @@
         return '<div class="ctg-groups">' + G.predicts.map(function (p) {
             return '<section class="ctg-pred"><h3>🔮 ' + esc(p.label) + ' <span class="ctg-n">· ' + p.jos.length + '개 조</span></h3><ul>' + p.jos.map(function (jo) {
                 var g = byJo[jo];
-                return '<li><b>' + esc(jo) + '조</b>' + (g.match === 'same' ? ' <span class="ctg-ok" title="결과도 같은 방향">✅ 결과 ' + esc(g.observed) + '</span>' : g.match === 'diff' ? ' <span class="ctg-diff" title="결과가 예상과 다름">🤔 결과 ' + esc(g.observed) + '</span>' : '') +
+                return '<li><b>' + esc(jo) + '조</b>' + (g.plan ? ' <span class="ctg-tag">' + esc(g.plan) + '</span>' : '') + (g.match === 'same' ? ' <span class="ctg-ok" title="결과도 같은 방향">✅ 결과 ' + esc(g.observed) + '</span>' : g.match === 'diff' ? ' <span class="ctg-diff" title="결과가 예상과 다름">🤔 결과 ' + esc(g.observed) + '</span>' : '') +
                     (g.reason ? '<br><span class="ctg-why">까닭: ' + esc(g.reason) + '</span>' : '') + '</li>';
             }).join('') + '</ul></section>';
         }).join('') + '</div>' + waitLine(G.missing.predict.length, '고르는 중이에요');

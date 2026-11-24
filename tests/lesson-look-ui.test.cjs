@@ -74,8 +74,8 @@ test('설명 화면 ↔ 학생 폰: 👀 띠·답 가리기·풀이 열기, 설�
         await A.waitForFunction(() => /앞 화면을 봐요/.test((document.querySelector('.cs-look-band') || {}).textContent || ''), null, { timeout: 15000 });
         assert.deepEqual(app.db.docs.get('labClasses/' + c.space).lessonOpen, ['force']);
         assert.equal(await A.getAttribute('#ev-app', 'data-screen'), 'sent');
-        // 발표 보기를 떠나 진행 화면으로 가면(설명을 닫음) 폰의 띠가 내려가고 하던 곳으로 → 혼자 흐름에서는 연 풀이만 보임
-        await T.click('#btnPExit'); await T.click('#btnRunPopGo'); await T.waitForSelector('#stageCard:not([hidden])');
+        // 발표 보기를 떠나 수업 목록으로 가면(설명을 닫음) 폰의 띠가 내려가고 하던 곳으로 → 혼자 흐름에서는 연 풀이만 보임
+        await T.click('#btnPExit'); await T.click('#btnRunPopList'); await T.waitForSelector('#viewList:not([hidden])');
         await A.waitForFunction(() => { const b = document.querySelector('.cs-look-band'); return b && b.hidden; }, null, { timeout: 15000 });
         assert.equal(await A.evaluate(() => document.documentElement.classList.contains('cs-look')), false);
         await go(A, 'think-intro');
@@ -90,7 +90,8 @@ test('설명 화면 ↔ 학생 폰: 👀 띠·답 가리기·풀이 열기, 설�
         assert.ok(box && box.height >= 40, '가린 자리에 🔒 안내');
         assert.equal(await A.evaluate(() => getComputedStyle(document.querySelector('[data-lesson-answer] .ev-def p')).visibility), 'hidden', '정의 글은 안 보임');
         assert.equal(await A.isDisabled('.ev-screen .ev-next'), false, '답을 가려도 다음으로는 갈 수 있음');
-        // 진행 화면 '🔓 모든 풀이 열기'
+        // 선생님용 '🔓 모든 풀이 열기'
+        await T.evaluate(sp => { location.hash = '#class=' + sp + '&view=run'; }, c.space);
         await T.waitForSelector('#lessonTeach:not([hidden])');
         await T.evaluate(() => { document.getElementById('lessonTeach').open = true; });
         await T.click('#btnLessonOpenAll');
@@ -111,7 +112,7 @@ test('설명 화면 ↔ 학생 폰: 👀 띠·답 가리기·풀이 열기, 설�
         // ---------- 한 가지 바꿔 한 번 더: 한 값으로만 재면 그래프·도전 대신 안내 ----------
         await B.evaluate(() => { const s = window.__filmRocket.state(); s.t1.changed = 'water'; s.t1.trials = [{ value: 10, y: 9 }, { value: 10, y: 10 }]; window.__filmRocket.show('t1-graph'); });
         await go(B, 't1-more');
-        assert.match(await B.textContent('.ev-screen'), /하나만 바꿔 한 번 더[\s\S]*물의 양[\s\S]*10 mL[\s\S]*2번/);
+        assert.match(await B.textContent('.ev-screen'), /정해 둔 ② 15 mL 로 재요[\s\S]*물의 양[\s\S]*10 mL[\s\S]*2번/);
         assert.match(await B.textContent('.ev-screen'), /무엇 때문에 열리는 시간이 달라지는지/, '막힌 까닭 한 줄');
         await B.evaluate(() => window.__filmRocket.show('t1-challenge')); await go(B, 't1-more');
         const small = await B.evaluate(() => [...document.querySelectorAll('.ev-screen button')].filter(e => e.offsetParent && e.getBoundingClientRect().height < 55.5).map(e => e.textContent.trim()));
