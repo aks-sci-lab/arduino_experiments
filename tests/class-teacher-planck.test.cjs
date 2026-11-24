@@ -105,7 +105,9 @@ test('교사 화면: 플랑크 수업이면 조별 h 표·그래프·CSV 가 나
             summary: { hCurrent: 6.6 }, curMode: 'extrapolate', iMin: 1, now: new Date().toISOString() }, C.isGroupCode);
         for (const p of payloads) { const r = await app.post(Object.assign({ space: String(space).replace(/^lab:/, '') }, p), { uid: 'stu-1', anonymous: true }); assert.equal(r.ok, true, r.error); }
         await T.evaluate(() => { const b = document.getElementById('btnMain'); if (!b.hidden) b.click(); });   // 만든 수업의 큰 QR 화면
-        await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) { await T.click('#btnPExit'); await T.click('#btnRunPopGo'); } await T.waitForSelector('#runPane:not([hidden])');   // 다음 → 진행 보기
+        await T.click('#btnToRun'); await T.waitForSelector('#presentPane:not([hidden])');
+        await T.click('#btnPExit'); await T.waitForSelector('#runPop:not([hidden])');
+        await T.click('#rpTabs [data-rptab="planck"]');
         await T.waitForSelector('#planckCard:not([hidden])', { timeout: 10000 });
         await T.click('#ctpReload');
         await T.waitForFunction(() => /6\.\d\d/.test(document.getElementById('ctpTable').textContent), null, { timeout: 10000 });

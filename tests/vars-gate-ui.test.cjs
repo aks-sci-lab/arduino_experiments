@@ -69,30 +69,37 @@ test('변인 카드 골라야 다음: 보고서 실험 5개 (수업 없이, 노�
             // 고르기 전: 다음 꺼짐·안내
             const next = '.step-panel[data-step="procedure"] [data-go="data"]';
             assert.equal(await P.isDisabled(next), true, name + ' 다음 꺼짐');
-            assert.match(await P.textContent('.step-panel[data-step="procedure"] .rai-gate-note'), /바꿀 것과 예상 방향을 고르면/);
+            assert.match(await P.textContent('.step-panel[data-step="procedure"] .rai-gate-note'), /바꿀 것 · 바꿀 값\(①→②\) · 예상 방향을 정하면/);
             // 위 단계 단추로 5. 데이터 → 안내 + 카드에 남음
             await P.click('nav.steps button[data-step="data"]');
             assert.equal(await selected(P), 'procedure', name + ' 5. 데이터로 안 감');
-            assert.match(await P.textContent('#rai-gate-toast'), /먼저 4\. 과정의 변인 카드에서 바꿀 것과 예상 방향을 골라요/);
+            assert.match(await P.textContent('#rai-gate-toast'), /먼저 4\. 과정의 변인 카드에서 바꿀 것/);
             await P.click('nav.steps button[data-step="conclusion"]');
             assert.equal(await selected(P), 'procedure', name + ' 7. 결론으로도 안 감');
             // 앞 단계로는 갈 수 있음
             await P.click('nav.steps button[data-step="theory"]');
             assert.equal(await selected(P), 'theory');
             await P.click('nav.steps button[data-step="procedure"]');
-            // 바꿀 것만 → 아직, 예상까지 → 켜짐 (까닭은 비워 둠)
+            // 바꿀 것만 → 아직, 같은 값 ①=② → 막힘, 서로 다른 ①→② + 예상 → 켜짐 (까닭은 비워 둠)
             await P.check(VC + ' input[data-vc="change"][value="' + want.change[0] + '"]');
             assert.equal(await P.isDisabled(next), true, name + ' 바꿀 것만으로는 아직');
             assert.match(await P.textContent(VC + ' [data-vc-keep]'), /🔒/, name + ' 나머지 🔒');
             await P.check(VC + ' input[data-vc="predict"][value="up"]');
-            assert.equal(await P.isDisabled(next), false, name + ' 고르면 켜짐');
+            assert.equal(await P.isDisabled(next), true, name + ' ①→② 안 적으면 아직');
+            await P.fill(VC + ' input[data-vc="val1"]', '조건 A');
+            await P.fill(VC + ' input[data-vc="val2"]', '조건 A');
+            assert.equal(await P.isVisible(VC + ' [data-vc-same]'), true, name + ' 같은 값 경고');
+            assert.equal(await P.isDisabled(next), true, name + ' ①=② 면 막힘');
+            await P.fill(VC + ' input[data-vc="val2"]', '조건 B');
+            assert.equal(await P.isVisible(VC + ' [data-vc-same]'), false, name + ' 다르면 경고 사라짐');
+            assert.equal(await P.isDisabled(next), false, name + ' ①→② + 예상 고르면 켜짐');
             assert.equal(await P.locator('.rai-gate-note').count(), 0, name + ' 안내 사라짐');
             await P.click(next);
             assert.equal(await selected(P), 'data', name + ' 5. 데이터로');
             // 6 결과: 예상 ↔ 결과, 결과 방향 고르기
             await P.click('nav.steps button[data-step="result"]');
             const cmp = '.step-panel[data-step="result"] [data-rai-compare="design"]';
-            assert.match(await P.textContent(cmp), /내 예상[\s\S]*커진다[\s\S]*결과/, name + ' 예상이 결과 옆에');
+            assert.match(await P.textContent(cmp), /내 예상[\s\S]*조건 A → 조건 B[\s\S]*커진다[\s\S]*결과/, name + ' 예상이 결과 옆에');
             await P.check(cmp + ' input[data-obs][value="same"]');
             await P.waitForFunction(s => /예상과 달라요/.test(document.querySelector(s).textContent), cmp);
             await P.check(cmp + ' input[data-obs][value="up"]');
@@ -101,11 +108,13 @@ test('변인 카드 골라야 다음: 보고서 실험 5개 (수업 없이, 노�
             await P.click('nav.steps button[data-step="conclusion"]');
             assert.equal(await P.isChecked('.step-panel[data-step="conclusion"] [data-rai-compare="design"] input[data-obs][value="up"]'), true, name + ' 결론에도 같은 결과');
             const design = await P.evaluate(() => ReportAI.current.state().sections.design);
-            assert.match(design, /^\[바꿀 것\] .+\n\[재는 것\] .+\n\[같게 둘 것\] .+[\s\S]*\[예상\] 커진다\n\[결과\] 커진다$/, name + ' 저장 ' + design);
+            assert.match(design, /^\[바꿀 것\] .+\n\[바꿀 값\] 조건 A → 조건 B\n\[재는 것\] .+\n\[같게 둘 것\] .+[\s\S]*\[예상\] 커진다\n\[결과\] 커진다$/, name + ' 저장 ' + design);
             // 새로고침해도 고른 것 그대로, 막힘 없음
             await P.reload();
             await P.waitForSelector('#report-ai .rai-card', { state: 'attached' });
             await P.click('nav.steps button[data-step="procedure"]');
+            assert.equal(await P.inputValue(VC + ' input[data-vc="val1"]'), '조건 A');
+            assert.equal(await P.inputValue(VC + ' input[data-vc="val2"]'), '조건 B');
             assert.equal(await P.isChecked(VC + ' input[data-vc="predict"][value="up"]'), true);
             assert.equal(await P.isDisabled(next), false);
             assert.deepEqual(errors, [], name + ' 오류');
@@ -134,13 +143,15 @@ test('변인 카드: 가설연역 ③ → ④ · 수업이면 선생님께 저�
         assert.equal(await selected(L.page), 'design', '④ 로 안 감');
         assert.match(await L.page.textContent('#rai-gate-toast'), /③ 탐구 설계의 변인 카드/);
         await L.page.check(VC + ' input[data-vc="change"][value="len"]');
+        await L.page.fill(VC + ' input[data-vc="val1"]', '30 cm');
+        await L.page.fill(VC + ' input[data-vc="val2"]', '60 cm');
         await L.page.check(VC + ' input[data-vc="predict"][value="up"]');
         await L.page.fill(VC + ' input[data-vc="reason"]', '줄이 길면 더 멀리 가니까');
         await L.page.click('nav.steps button[data-step="perform"]');
         assert.equal(await selected(L.page), 'perform');
         const saved = await (async () => { for (let i = 0; i < 40; i++) { const r = await app.post({ action: 'reportList', space: cls.space }); const x = (r.reports || [])[0]; if (x && /\[까닭\] 줄이 길면/.test(x.sections.design || '')) return x; await new Promise(z => setTimeout(z, 300)); } return null; })();
         assert.ok(saved, '선생님께 저장');
-        assert.match(saved.sections.design, /\[바꿀 것\] 줄 길이 L[\s\S]*\[예상\] 커진다\n\[까닭\] 줄이 길면 더 멀리 가니까/);
+        assert.match(saved.sections.design, /\[바꿀 것\] 줄 길이 L\n\[바꿀 값\] 30 cm → 60 cm[\s\S]*\[예상\] 커진다\n\[까닭\] 줄이 길면 더 멀리 가니까/);
         assert.deepEqual(L.errors, []);
 
         // 📱 폰으로 연 화면(수업 없이): 막지 않음

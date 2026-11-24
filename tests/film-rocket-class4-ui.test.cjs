@@ -83,8 +83,11 @@ test('로켓 4차 고침: 2차시 반복·대기 화면·끊김 안내·도전 �
         await P.click('.ev-choice[data-k="same"]'); await go(P, 't2-result');
         assert.match(await P.textContent('.ev-screen'), /이 조건: 2번째 · 평균 <?b?>?/);
         assert.equal((await P.evaluate(() => window.__filmRocket.state().t2.trials.map(t => t.value))).join(','), '0,0', '같은 값 두 발');
-        // '바꿔서 다시' 는 그대로 같은 값을 막음
-        await P.click('#ev-change'); await go(P, 't2-cond'); await next(P); await P.waitForTimeout(200);
+        // '정해 둔 ②' 로 바로 맞춰지고, 일부러 지난번(0개)으로 되돌리면 여전히 막음
+        await P.click('#ev-change'); await go(P, 't2-cond');
+        assert.match(await P.textContent('.ev-stepper:not(.locked) .ev-sval'), /1개/, '정해 둔 ② 로 자동 맞춤');
+        await P.click('.ev-stepper:not(.locked) [data-pm="-1"]');
+        await next(P); await P.waitForTimeout(200);
         assert.equal(await P.getAttribute('#ev-app', 'data-screen'), 't2-cond'); assert.match(await P.textContent('#ev-must'), /값을 하나 바꿔요/);
         // 다른 값 두 발 → 그래프 표에 ↕ 범위·흔들림 판정
         await P.evaluate(() => { const s = window.__filmRocket.state(); s.t2.mustChange = null; s.t2.trials.push({ value: 2, pct: 70, method: 'hand' }, { value: 2, pct: 72, method: 'hand' }); window.__filmRocket.show('t2-graph'); });
@@ -180,8 +183,9 @@ test('로켓 4차 고침: 2차시 반복·대기 화면·끊김 안내·도전 �
         await go(A, 'wait');
         assert.equal((await A.evaluate(() => window.__filmRocket.state().t1.challenge.length)), 1, '도전 기록은 저장');
         assert.equal(await A.locator('.ev-myres').count(), 0, '대기 화면에 결과 보기 접기 없음 (선생님 결정: 우리가 낸 답만)');
-        // 교사 설정 화면: 발포비타민은 '알' 이름으로 고름
-        await T.click('#btnPExit'); if (await T.isVisible('#btnRunPopGo').catch(() => false)) await T.click('#btnRunPopGo');   // (📋 진행 상황 팝업이 생기면 그 안의 '진행 화면으로')
+        // 교사 설정 화면: 발포비타민은 '알' 이름으로 고름 (팝업의 🔧 선생님용 탭에서 바로)
+        await T.click('#btnPExit'); await T.waitForSelector('#runPop:not([hidden])');
+        await T.click('#rpTabs [data-rptab="teach"]');
         await T.waitForSelector('#te-tabletMin', { state: 'attached' });
         const opts = await T.evaluate(() => { const s = document.getElementById('te-tabletMin'); return s ? { tag: s.tagName, sel: s.options[s.selectedIndex].textContent, all: [...s.options].map(o => o.textContent) } : null; });
         assert.ok(opts && opts.tag === 'SELECT', '고르기 칸');

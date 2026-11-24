@@ -110,11 +110,13 @@ test('교사 화면 진행 표시: 노트북+폰 합치기 · 옛 자리 치우�
         await T.goto(ROOT + 'projects/class-teacher.html');
         await T.click('#btnLogin');
         await T.waitForSelector('#classList .ct-cls');
-        await T.click('#classList button[data-open="' + c.space + '"]'); await T.click('#btnToRun'); await T.waitForFunction(() => !document.getElementById('runPane').hidden || !document.getElementById('presentPane').hidden); if (await T.isVisible('#btnPExit')) { await T.click('#btnPExit'); await T.click('#btnRunPopGo'); } await T.waitForSelector('#runPane:not([hidden])');
+        await T.click('#classList button[data-open="' + c.space + '"]'); await T.click('#btnToRun'); await T.waitForSelector('#presentPane:not([hidden])');
+        await T.click('#btnPExit'); await T.waitForSelector('#runPop:not([hidden])');
+        await T.click('#rpTabs [data-rptab="sub"]');
         await T.waitForFunction(() => /점 3/.test((document.getElementById('groups') || {}).textContent || ''), null, { timeout: 15000 });
         const g = await T.textContent('#groups');
         assert.match(g, /7 결론 · 📱[^·]*· 점 3 · ✅/, '노트북 단계 · 폰 단계 · 점 · 제출이 함께: ' + g.replace(/\s+/g, ' ').slice(0, 300));
-        assert.match(await T.textContent('#watchSum'), /들어온 학생\s*4 \/ 9/);
+        assert.match(await T.textContent('#rpSum'), /들어온 학생\s*4 \/ 9/);
         assert.deepEqual(errors, []);
     } finally { await browser.close(); api.close(); stat.close(); }
 });

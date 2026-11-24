@@ -81,11 +81,14 @@ test('양자점: 결론 쓸 곳 하나로 · 예상·변인 칸 (수업 없이, 
         const keep = await P.textContent(vc + ' [data-vc-keep]');
         assert.match(keep, /🔒 재료 비율/); assert.match(keep, /🔒 희석/); assert.doesNotMatch(keep, /가열 시간/);
         assert.match(await P.textContent(vc + ' [data-vc-q]'), /가열 시간을 늘리면/);
+        await P.fill(vc + ' input[data-vc="val1"]', '60초');
+        await P.fill(vc + ' input[data-vc="val2"]', '180초');
+        assert.match(await P.textContent(vc + ' [data-vc-q]'), /가열 시간을 60초 → 180초 로 바꾸면/);
         await P.check(vc + ' input[data-vc="predict"][value="up"]');
         await P.fill(vc + ' input[data-vc="reason"]', '알갱이가 커지면 띠 틈이 작아져서');
         await P.fill(vc + ' input[data-vc="extra"]', '같은 컵');
         const design = await P.evaluate(() => ReportAI.current.state().sections.design);
-        assert.match(design, /^\[바꿀 것\] 가열 시간\n\[재는 것\] .+\n\[같게 둘 것\] 재료 비율 \(요소\/구연산\), 물의 양, 희석, 비춘 빛\n\[더 같게 둘 것\] 같은 컵\n\[예상\] 길어진다 \(빨강 쪽으로\)\n\[까닭\] 알갱이가/);
+        assert.match(design, /^\[바꿀 것\] 가열 시간\n\[바꿀 값\] 60초 → 180초\n\[재는 것\] .+\n\[같게 둘 것\] 재료 비율 \(요소\/구연산\), 물의 양, 희석, 비춘 빛\n\[더 같게 둘 것\] 같은 컵\n\[예상\] 길어진다 \(빨강 쪽으로\)\n\[까닭\] 알갱이가/);
         assert.deepEqual(await small(P, vc + ' label.rai-pill, ' + vc + ' input[type=text]'), [], '변인 카드 44px');
 
         // ③ 5 데이터: 희석도 앞 시료와 다름 → ⚠ (막지 않음)
@@ -126,7 +129,7 @@ test('양자점: 결론 쓸 곳 하나로 · 예상·변인 칸 (수업 없이, 
         await P.press('#mix-box [data-mix-no="2"] [data-mix-why]', 'Tab');
         assert.match(await P.textContent('#xy-fit'), /최소제곱 직선[\s\S]*점 2개[\s\S]*넣었어요/);
         const c6 = await P.textContent(cmp6);
-        assert.match(c6, /내 예상.*가열 시간을 늘리면.*길어진다/s);
+        assert.match(c6, /내 예상.*가열 시간을 60초 → 180초 로 바꾸면.*길어진다/s);
         assert.match(c6, /결과.*봉우리 파장이 길어졌어요.*\+\d+ nm.*두 가지가 바뀌었지만 넣었어요/s);
         assert.match(c6, /예상과 같은 방향/);
 
@@ -213,6 +216,8 @@ test('양자점 수업: 우리 생각·변인 카드 → 선생님께 저장 · 
         await L.page.click('nav.steps button[data-step="procedure"]');
         const vc = '.rai-inline.rai-vc[data-sec="design"]';
         await L.page.check(vc + ' input[data-vc="change"][value="heat"]');
+        await L.page.fill(vc + ' input[data-vc="val1"]', '60초');
+        await L.page.fill(vc + ' input[data-vc="val2"]', '180초');
         await L.page.check(vc + ' input[data-vc="predict"][value="down"]');
         await L.page.fill(vc + ' input[data-vc="reason"]', '더 타서 진해지니까');
         const rep = await until(async () => {
@@ -222,7 +227,7 @@ test('양자점 수업: 우리 생각·변인 카드 → 선생님께 저장 · 
         });
         assert.ok(rep, '선생님께 저장');
         assert.equal(rep.sections.problem, '탄 정도가 달라서 색이 섞였다?');
-        assert.match(rep.sections.design, /\[바꿀 것\] 가열 시간[\s\S]*\[예상\] 짧아진다/);
+        assert.match(rep.sections.design, /\[바꿀 것\] 가열 시간\n\[바꿀 값\] 60초 → 180초[\s\S]*\[예상\] 짧아진다/);
         // 7 결론: 측정값은 5 데이터, 글은 보고서 최종 제출 하나
         await L.page.click('nav.steps button[data-step="conclusion"]');
         assert.match(await L.page.textContent('.qd-hand'), /최종 제출/);
@@ -280,13 +285,15 @@ test('양자점 수업: 우리 생각·변인 카드 → 선생님께 저장 · 
         assert.equal(await H.page.locator('.rai-inline[data-sec="design"] textarea').count(), 0, '글 칸 대신 변인 카드');
         assert.equal(await H.page.isVisible(vc), true);
         await H.page.check(vc + ' input[data-vc="change"][value="ratio"]');
-        // 예상 방향을 고르기 전에는 ③ 뒤 단계로 못 감 → 안내 + 카드로 (골라야 다음)
+        // 바꿀 값(①→②)과 예상 방향을 정하기 전에는 ③ 뒤 단계로 못 감 → 안내 + 카드로 (골라야 다음)
         await H.page.click('nav.steps button[data-step="conclude"]');
         assert.equal(await H.page.isVisible(vc), true, '카드에 남음');
-        assert.match(await H.page.textContent('#rai-gate-toast'), /예상 방향을 골라요/);
+        assert.match(await H.page.textContent('#rai-gate-toast'), /바꿀 값 ①과 ②를 적고 예상 방향/);
         assert.equal(await H.page.isDisabled('.step-panel[data-step="procedure"] .step-next button[data-go="perform"]'), true, '다음 단추 꺼짐');
+        await H.page.fill(vc + ' input[data-vc="val1"]', '1:1');
+        await H.page.fill(vc + ' input[data-vc="val2"]', '3:1');
         await H.page.check(vc + ' input[data-vc="predict"][value="up"]');
-        assert.equal(await H.page.isDisabled('.step-panel[data-step="procedure"] .step-next button[data-go="perform"]'), false, '고르면 켜짐 (까닭은 안 써도)');
+        assert.equal(await H.page.isDisabled('.step-panel[data-step="procedure"] .step-next button[data-go="perform"]'), false, '정하면 켜짐 (까닭은 안 써도)');
         await H.page.click('nav.steps button[data-step="conclude"]');
         await H.page.click('#rai-tabs button[data-tab="design"]');
         assert.match(await H.page.inputValue('#rai-t-design'), /^\[바꿀 것\] 재료 비율/);
@@ -315,6 +322,8 @@ test('양자점 6-2: 가로축 = 조가 바꾼 것(변인 카드 → 시료 값�
         // 변인 카드에서 재료 비율을 고르고, 가로축을 가열 시간으로 바꾸면 안내 → 되돌리기
         await P.click('nav.steps button[data-step="procedure"]');
         await P.check('.rai-vc input[data-vc="change"][value="ratio"]');
+        await P.fill('.rai-vc input[data-vc="val1"]', '1:1');
+        await P.fill('.rai-vc input[data-vc="val2"]', '2:1');
         await P.check('.rai-vc input[data-vc="predict"][value="up"]');
         await P.click('nav.steps button[data-step="result"]');
         assert.equal(await P.inputValue('#sel-x'), 'ratio');

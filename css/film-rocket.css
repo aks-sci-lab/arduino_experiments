@@ -135,7 +135,19 @@
 .ev-notice .ev-notice-go { flex: 1 1 100%; min-height: var(--ev-tap, 56px); }
 .ev-notice .ev-notice-jump { flex: 1 1 100%; min-height: 44px; font-size: .95em; }
 
-/* 🔮 예측 · ✍️ 정리 문장 · 🔧 한 번 더 안내 · 퀴즈 풀이 기다림 (2026-11-21) */
+/* 🔮 예측 · 🎯 비교 계획(①→②) · ✍️ 정리 문장 · 🔧 한 번 더 안내 · 퀴즈 풀이 기다림 (2026-11-21~23) */
+.ev-plan { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--c-primary); border-radius: 14px; background: var(--c-primary-soft); }
+.ev-plan h3 { margin: 0 0 var(--sp-2); font-size: 1.05rem; }
+.ev-plan h3 small { font-weight: 400; color: var(--c-muted); }
+.ev-plan-row { display: grid; gap: var(--sp-1); }
+.ev-plan-step { margin: 0; border-width: 1px; border-color: var(--c-line); }
+.ev-plan-bar { display: flex; align-items: center; gap: var(--sp-1); margin: var(--sp-2) 0; }
+.ev-plan-chip { flex: 1 1 0; min-width: 0; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; padding: 6px 8px; border: 2px solid var(--c-line); border-radius: 12px; background: var(--c-card); color: var(--c-text); font: inherit; font-size: .92rem; text-align: center; }
+button.ev-plan-chip { min-height: var(--ev-tap); cursor: pointer; }
+.ev-plan-chip.on { border-color: var(--c-primary); background: var(--c-primary-soft); font-weight: 700; }
+.ev-plan-chip.done { border-color: var(--c-success); background: var(--c-ok-bg); color: var(--c-ok-text); }
+.ev-plan-chip.on.done { border-color: var(--c-primary); }
+.ev-plan-arr { flex: none; font-weight: 800; color: var(--c-primary); }
 .ev-guess { margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 2px dashed var(--c-primary); border-radius: 14px; }
 .ev-guess h3 { margin: var(--sp-1) 0 var(--sp-2); }
 .ev-field small { font-weight: 400; color: var(--c-muted); }

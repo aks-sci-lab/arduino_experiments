@@ -65,6 +65,9 @@
             teachHome = ['lessonTeach', 'setupTeach'].map(function (id) { var el = $(id); if (!el) return null; var h = { el: el, p: el.parentNode, n: el.nextSibling }; $('rpTeach').appendChild(el); return h; }).filter(Boolean);
             Array.prototype.forEach.call(document.querySelectorAll('#runPane .ct-rp'), function (el) { el.hidden = false; });
             if (!pane.getAttribute('data-rptab')) pane.setAttribute('data-rptab', '');
+            var c = watched();
+            if ($('btnRunPopDone') && c) $('btnRunPopDone').textContent = c.done ? '↩ 다시 진행 중으로' : '✅ 수업 마치기';
+            if ($('runPopMsg')) { $('runPopMsg').className = 'note'; $('runPopMsg').textContent = ''; }
             renderPop();
             try { $('btnRunPopClose').focus(); } catch (e) { /* 무시 */ }
         } else {
@@ -184,6 +187,7 @@
             var e = CC.expInfo(c.exp);
             $('classTitle').innerHTML = (e ? e.icon + ' ' : '') + '<b>' + esc(e ? e.name : c.exp) + '</b> <span class="note">' + esc(c.ban) + '반 · 수업 코드 ' + esc(c.classCode) + (c.done ? ' · ✅ 마침' : '') + '</span>';
             $('btnDone').textContent = c.done ? '↩ 다시 진행 중으로' : '✅ 수업 마치기';
+            if ($('btnRunPopDone')) $('btnRunPopDone').textContent = $('btnDone').textContent;
             $('btnShowQr').hidden = sub === 'qr';
             $('btnRefresh').hidden = sub !== 'run';
             $('btnPresent').hidden = !CC.gateSteps(c.exp);
@@ -204,20 +208,25 @@
     function firstSub(c) { return c && CC.gateSteps(c.exp) ? 'present' : 'run'; }
     $('btnToRun').addEventListener('click', function () { var c = watched(); if (c) go(c.space, firstSub(c)); });
     $('btnPresent').addEventListener('click', function () { var c = watched(); if (c) go(c.space, 'present'); });
-    $('btnDone').addEventListener('click', async function () {
+    async function toggleDone() {
         var c = watched(); if (!c) return;
         var to = !c.done;
         var warn = c.mode === 'team'
             ? '\n※ 팀들이 보낸 도전 장면 사진·영상은 지금 바로 지워지며 되돌릴 수 없어요. 나머지 기록은 그대로예요.'
             : '\n학생 화면과 자료는 그대로예요. 다시 눌러 되돌릴 수 있어요.';
         if (to && !confirm('수업 ' + c.classCode + ' 을 ‘마친 수업’으로 표시할까요?' + warn)) return;
-        $('doneMsg').className = 'note'; $('doneMsg').textContent = '⏳ 저장하는 중…';
+        var setMsg = function (cls, txt) {
+            $('doneMsg').className = cls; $('doneMsg').textContent = txt;
+            if ($('runPopMsg')) { $('runPopMsg').className = cls; $('runPopMsg').textContent = txt; }
+        };
+        setMsg('note', '⏳ 저장하는 중…');
         var r = await CC.classDone(c.space, to);
-        if (!r.ok) { $('doneMsg').className = 'note err'; $('doneMsg').textContent = '⚠️ ' + r.error; return; }
+        if (!r.ok) { setMsg('note err', '⚠️ ' + r.error); return; }
         c.done = r.done; c.doneAt = r.done ? new Date().toISOString() : '';
-        $('doneMsg').textContent = r.done ? '✅ 마친 수업으로 표시했어요. 목록 아래 ‘마친 수업’에 있어요.' : '⏳ 다시 진행 중인 수업이에요.';
+        setMsg('note', r.done ? '✅ 마친 수업으로 표시했어요. 목록 아래 ‘마친 수업’에 있어요.' : '⏳ 다시 진행 중인 수업이에요.');
         renderList(); renderSub();
-    });
+    }
+    $('btnDone').addEventListener('click', toggleDone);
     $('cornerQr').addEventListener('click', function () { $('btnBig').click(); });
     $('btnSettings').addEventListener('click', function () { setView('settings'); });
     $('btnMain').addEventListener('click', function () { setView('main'); });
@@ -1193,7 +1202,9 @@
     $('btnPAskNo').addEventListener('click', function () { askOpen(false); });
     $('btnPExit').addEventListener('click', function () { if (watched()) runPop(true); });
     $('btnRunPopClose').addEventListener('click', function () { runPop(false); });
-    $('btnRunPopGo').addEventListener('click', function () { var c = watched(); runPop(false); if (c) go(c.space, 'run'); });
+    $('btnRunPopList').addEventListener('click', function () { runPop(false); $('doneMsg').textContent = ''; go('', 'list'); });
+    $('btnRunPopDone').addEventListener('click', toggleDone);
+    $('btnRunPopSet').addEventListener('click', function () { runPop(false); setView('settings'); });
     $('runPop').addEventListener('click', function (e) { if (e.target === this) runPop(false); });   // 바깥(어두운 곳)을 눌러도 닫힘
     $('btnPFull').addEventListener('click', function () {
         if (document.fullscreenElement) { if (document.exitFullscreen) document.exitFullscreen(); return; }

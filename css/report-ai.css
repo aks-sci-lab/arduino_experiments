@@ -48,6 +48,14 @@
 .rai-vc .rai-vc-line { margin: var(--sp-2) 0; }
 .rai-vc .rai-lock { display: inline-block; margin: 2px 4px 2px 0; padding: 2px var(--sp-2); border-radius: 999px; background: var(--c-fill); font-size: var(--fs-sm); }
 .rai-vc .rai-vc-in { display: block; width: 100%; box-sizing: border-box; min-height: var(--tap); margin-top: var(--sp-1); font: inherit; padding: var(--sp-2); border: 1px solid #c5ccd3; border-radius: var(--r-ctl); }
+.rai-vc .rai-vc-plan { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); background: var(--c-primary-soft); border: 1px solid var(--c-primary); border-radius: var(--r-ctl); }
+.rai-vc .rai-vc-plan-h { margin: 0 0 var(--sp-1); }
+.rai-vc .rai-vc-plan-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: var(--sp-2); }
+.rai-vc .rai-vc-plan-box { display: block; font-size: var(--fs-sm); font-weight: 700; min-width: 0; }
+.rai-vc .rai-vc-plan-box .rai-vc-in { background: var(--c-card); }
+.rai-vc .rai-vc-arr { font-weight: 800; font-size: 1.2rem; color: var(--c-primary); padding-bottom: 10px; text-align: center; }
+.rai-vc .rai-vc-same { margin: var(--sp-1) 0 0; padding: var(--sp-1) var(--sp-2); border-radius: var(--r-ctl); background: var(--c-err-bg); color: var(--c-err-text); font-size: var(--fs-sm); font-weight: 700; }
+@media (max-width: 480px) { .rai-vc .rai-vc-plan-row { grid-template-columns: minmax(0, 1fr); gap: var(--sp-1); } .rai-vc .rai-vc-arr { padding: 0; } }
 /* 예상 ↔ 결과 */
 .rai-cmp h3 { margin: 0 0 var(--sp-2); font-size: 1.05rem; }
 .rai-cmp .rai-cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }

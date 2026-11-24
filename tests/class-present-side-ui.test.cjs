@@ -162,10 +162,14 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         assert.ok(f && f.height > 900, '학생 화면 크게');
         await A.waitForFunction(() => !document.documentElement.classList.contains('ev-following'), null, { timeout: 15000 });
         assert.match(await T.textContent('#btnPMode'), /설명/);
-        // 📋 진행 화면 (띠) → 관리 화면, 오른쪽 위 QR 은 거기에만
-        await T.click('#btnPExit'); await T.click('#btnRunPopGo');
-        await T.waitForSelector('#stageCard:not([hidden])');
-        assert.equal(await T.isVisible('#cornerQr'), true, '진행 화면에는 오른쪽 위 QR');
+        // 📋 진행 상황 (띠) → 팝업에서 바로 단계·목록·마치기·설정 (진행 화면으로 빠지지 않음)
+        await T.click('#btnPExit');
+        await T.waitForSelector('#runPop:not([hidden]) #stageCard:not([hidden])');
+        assert.equal(await T.locator('#btnRunPopGo').count(), 0);
+        assert.equal(await T.isVisible('#btnRunPopList'), true);
+        assert.equal(await T.isVisible('#btnRunPopDone'), true);
+        assert.equal(await T.isVisible('#btnRunPopSet'), true);
+        await T.click('#btnRunPopClose');
         await A.close();
 
         // ---------- 7단계 (탄소 양자점, 실제 설명 내용) ----------

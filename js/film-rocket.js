@@ -808,7 +808,7 @@
     ], 'q-pressure');
     SCREENS['q-pressure'] = quizScreen('pressure', 't1-var', '측정 전');
 
-    // 한 가지만 바꾸기 (변인 통제): 바꿀 조건 하나 → 나머지는 잠김
+    // 한 가지만 바꾸기 (변인 통제): 바꿀 조건 하나 + 바꿀 값 ① → ② 를 미리 정함 → 나머지는 잠김
     function ensureBase(part) {
         var defs = part === 't1' ? M.vars1(st.setup) : M.vars2(st.setup);
         var p = st[part];
@@ -817,83 +817,181 @@
         if (p.value == null && p.changed) p.value = p.base[p.changed];
         return defs;
     }
+    function ensurePlan(part) {
+        var defs = ensureBase(part), p = st[part], d = defs[p.changed];
+        if (!d) return null;
+        var vals = d.values || [];
+        if (!Array.isArray(p.plan) || p.plan.length < 2 || vals.indexOf(p.plan[0]) < 0 || vals.indexOf(p.plan[1]) < 0) {
+            var v1 = vals.indexOf(p.base[p.changed]) >= 0 ? p.base[p.changed] : vals[0];
+            var i1 = vals.indexOf(v1);
+            var v2 = vals.length > 1 ? vals[i1 + 1 < vals.length ? i1 + 1 : i1 - 1] : v1;
+            p.plan = [v1, v2];
+        }
+        return p.plan;
+    }
+    function planOk(part) {
+        var defs = ensureBase(part), p = st[part], d = defs[p.changed];
+        if (!d) return false;
+        var plan = ensurePlan(part);
+        return d.values.length <= 1 || !!(plan && plan[0] !== plan[1]);
+    }
+    // 정해 둔 ① → ② 중 아직 다 안 잰 다른 값 (현재 값 curVal 과 다를 때만)
+    function nextPlanned(part, curVal) {
+        var defs = ensureBase(part), p = st[part], d = defs[p.changed];
+        if (!d || d.values.length <= 1) return null;
+        var plan = ensurePlan(part), reps = setup().repeats;
+        if (!plan || plan[0] === plan[1]) return null;
+        var idx = curVal === plan[0] ? 1 : curVal === plan[1] ? 0 : -1;
+        if (idx < 0) return null;
+        var target = plan[idx];
+        var cnt = p.trials.filter(function (t) { return t.value === target; }).length;
+        return cnt < reps ? { idx: idx, val: target } : null;
+    }
+    function planBar(part, opt) {
+        opt = opt || {};
+        var defs = ensureBase(part), p = st[part], d = defs[p.changed];
+        if (!d || d.values.length <= 1) return '';
+        var plan = ensurePlan(part), reps = setup().repeats;
+        if (!plan) return '';
+        var item = function (idx) {
+            var v = plan[idx], cnt = p.trials.filter(function (t) { return t.value === v; }).length;
+            var tag = idx === 0 ? '①' : '②', on = p.value === v ? ' on' : '', done = cnt >= reps ? ' done' : '';
+            var txt = tag + ' <b>' + esc(d.label(v)) + '</b> <small>(' + cnt + '/' + reps + (cnt >= reps ? ' ✅' : '') + ')</small>';
+            return opt.pickable
+                ? '<button type="button" class="ev-plan-chip' + on + done + '" data-pick-plan="' + idx + '">' + txt + '</button>'
+                : '<span class="ev-plan-chip' + on + done + '">' + txt + '</span>';
+        };
+        return '<div class="ev-plan-bar" aria-label="정해 둔 비교 계획">' + item(0) + '<span class="ev-plan-arr" aria-hidden="true">→</span>' + item(1) + '</div>';
+    }
+    function guessHeading(part, d) {
+        var G = M.GUESS[part], plan = ensurePlan(part);
+        var changeTxt = plan && d.values.length > 1
+            ? '<b>' + esc(d.label(plan[0])) + ' → ' + esc(d.label(plan[1])) + '</b> 로 바꾸면 '
+            : (d.cat ? '바꾸면 ' : '늘리면 ');
+        return '🔮 ' + esc(d.short || d.name) + '을(를) ' + changeTxt + G.what + '?';
+    }
     function varScreen(part, title, next) {
         return function () {
-            var defs = ensureBase(part), p = st[part];
+            var defs = ensureBase(part), p = st[part], d = p.changed ? defs[p.changed] : null;
+            var plan = d ? ensurePlan(part) : null, okP = planOk(part), okG = hasGuess(part);
             var keys = part === 't1' ? ['water', 'temp', 'tablet', 'piece'] : ['mass', 'water', 'tablet', 'fins'];
-            // 고른 뒤에는 설명 글을 줄이고 단추를 두 칸으로 → 🔮 예측 칸이 첫 화면에 보이게
-            var html = '<h2>🔒 ' + esc(title) + '</h2>' + (p.changed ? '<p class="ev-small"><b>한 가지만 바꾸기(변인 통제)</b> · 나머지는 같게 🔒</p>' : '<p><b>한 가지만 바꾸기(변인 통제)</b>: 바꿀 조건을 <b>하나</b> 고르면, 나머지는 같게 🔒 잠가요.</p>') +
+            var planHtml = d && plan && d.values.length > 1
+                ? '<div class="ev-plan" data-plan="' + part + '"><h3>🎯 어떻게 바꿔서 비교할까요? <small>(① → ②)</small></h3>' +
+                    '<div class="ev-plan-row">' +
+                    '<div class="ev-stepper ev-plan-step" data-plan-slot="0"><span class="ev-sname">① 첫 번째</span><button type="button" class="ev-pm" data-pm="-1" aria-label="첫 번째 값 줄이기">−</button><b class="ev-sval">' + esc(d.label(plan[0])) + '</b><button type="button" class="ev-pm" data-pm="1" aria-label="첫 번째 값 늘리기">+</button></div>' +
+                    '<div class="ev-stepper ev-plan-step" data-plan-slot="1"><span class="ev-sname">② 바꿔 볼 값</span><button type="button" class="ev-pm" data-pm="-1" aria-label="바꿔 볼 값 줄이기">−</button><b class="ev-sval">' + esc(d.label(plan[1])) + '</b><button type="button" class="ev-pm" data-pm="1" aria-label="바꿔 볼 값 늘리기">+</button></div>' +
+                    '</div><p class="ev-no" role="alert" id="ev-plan-same"' + (okP ? ' hidden' : '') + '>✋ ①과 ②는 <b>서로 다른 값</b>으로 정해요. + 나 − 를 눌러 바꿔요.</p></div>'
+                : '';
+            var html = '<h2>🔒 ' + esc(title) + '</h2>' + (p.changed ? '<p class="ev-small"><b>한 가지만 바꾸기(변인 통제)</b> · 나머지는 같게 🔒</p>' : '<p><b>한 가지만 바꾸기(변인 통제)</b>: 바꿀 조건을 <b>하나</b> 고르고 ① → ② 를 정해요. 나머지는 같게 🔒 잠가요.</p>') +
                 '<div class="ev-choices' + (p.changed ? ' ev-var-compact' : '') + '">' + keys.map(function (k) {
                     return '<button type="button" class="ev-choice' + (p.changed === k ? ' on' : '') + '" data-k="' + k + '">' + (p.changed === k ? '🔓 ' : '') + esc(defs[k].short || defs[k].name) + ' 바꾸기</button>';
                 }).join('') + '</div>' +
-                // 🔮 예측은 고른 단추 바로 아래 (스크롤 없이 보이게), 방향을 골라야 [다음 →] (2026-11-21)
-                (p.changed ? guessBlock(part, defs[p.changed]) : '') +
-                (p.changed ? '<h3>같게 할 조건 🔒</h3>' + Object.keys(defs).filter(function (k) { return k !== p.changed; }).map(function (k) {
+                planHtml +
+                // 🔮 예측은 ① → ② 바로 아래, ①≠② 와 방향을 골라야 [다음 →]
+                (p.changed ? guessBlock(part, d) : '') +
+                (p.changed ? '<h3>같게 할 조건 🔒 <small>(①·② 둘 다 똑같이)</small></h3>' + Object.keys(defs).filter(function (k) { return k !== p.changed; }).map(function (k) {
                     return stepper(k, defs[k].short || defs[k].name, defs[k].label(p.base[k]), { locked: true });
                 }).join('') : '') +
                 (p.trials.length && p.changed ? '<p class="ev-small">바꿀 조건을 바꾸면 지금까지 잰 값은 그대로 두고, 그래프는 새 조건으로 그려요.</p>' : '') +
-                (p.changed && !hasGuess(part) ? '<p class="ev-small ev-need-guess">🔮 예측을 골라야 다음으로 가요</p>' : '') +
-                nav(next, '다음 →', hasGuess(part) ? '' : ' disabled');
+                (p.changed && !okG ? '<p class="ev-small ev-need-guess">' + (okP ? '🔮 예측을 골라야 다음으로 가요' : '✋ ①과 ②를 서로 다른 값으로 정해야 다음으로 가요') + '</p>' : '') +
+                nav(next, '다음 →', okG ? '' : ' disabled');
             return { html: html, mount: function (el) {
+                var syncNext = function () {
+                    var ok1 = planOk(part), ok2 = hasGuess(part);
+                    var same = el.querySelector('#ev-plan-same'); if (same) same.hidden = ok1;
+                    var nx = el.querySelector('.ev-next[data-go]'); if (nx) nx.disabled = !ok2;
+                    var need = el.querySelector('.ev-need-guess');
+                    if (ok2 && need) need.remove();
+                    else if (!ok2 && need) need.textContent = ok1 ? '🔮 예측을 골라야 다음으로 가요' : '✋ ①과 ②를 서로 다른 값으로 정해야 다음으로 가요';
+                };
                 el.querySelector('.ev-choices').addEventListener('click', function (e) {
                     var b = e.target.closest('[data-k]'); if (!b) return;
-                    if (p.changed !== b.dataset.k) { p.changed = b.dataset.k; p.value = p.base[p.changed]; p.guess = null; changed(); }
+                    if (p.changed !== b.dataset.k) { p.changed = b.dataset.k; p.plan = null; var pl = ensurePlan(part); p.value = pl ? pl[0] : p.base[p.changed]; p.guess = null; changed(); }
                     show(st.screen, { back: true });
                 });
-                mountGuess(el, part);
+                var pbox = el.querySelector('[data-plan]');
+                if (pbox && d) pbox.addEventListener('click', function (e) {
+                    var b = e.target.closest('[data-pm]'); if (!b) return;
+                    var row = b.closest('[data-plan-slot]'), slot = Number(row.dataset.planSlot);
+                    var pl = ensurePlan(part);
+                    pl[slot] = M.stepIn(d.values, pl[slot], Number(b.dataset.pm));
+                    if (slot === 0 && !p.trials.length) p.value = pl[0];
+                    row.querySelector('.ev-sval').textContent = d.label(pl[slot]);
+                    var gh = el.querySelector('[data-guess] h3'); if (gh) gh.innerHTML = guessHeading(part, d);
+                    changed(); syncNext();
+                });
+                mountGuess(el, part, syncNext);
             } };
         };
     }
-    /* 🔮 예측 (2026-11-21 '예측·정리 문장 적는 칸'): 고른 조건을 늘리면(바꾸면) 어떻게 될까? — 큰 고르기 + 까닭 짧은 칸(안 써도 됨) */
+    /* 🔮 예측 (2026-11-21 '예측·정리 문장 적는 칸'): 고른 조건의 ① → ② 로 바꾸면 어떻게 될까? — 큰 고르기 + 까닭 짧은 칸(안 써도 됨) */
     function guessBlock(part, d) {
         var G = M.GUESS[part], g = st[part].guess || {};
-        return '<div class="ev-guess" data-guess="' + part + '"><h3>🔮 ' + esc(d.short || d.name) + '을(를) ' + (d.cat ? '바꾸면' : '늘리면') + ' ' + G.what + '?</h3>' +
+        return '<div class="ev-guess" data-guess="' + part + '"><h3>' + guessHeading(part, d) + '</h3>' +
             '<div class="ev-choices">' + ['down', 'up', 'same'].map(function (k) {
                 return '<button type="button" class="ev-choice' + (g.dir === k ? ' on' : '') + '" data-dir="' + k + '">' + esc(G[k]) + '</button>';
             }).join('') + '</div>' +
             '<label class="ev-field">왜 그렇게 생각해요? <small>(짧게, 안 써도 돼요)</small><input type="text" class="ev-why-in" maxlength="40" autocomplete="off" placeholder="' + esc(M.whyExample(part, st[part].changed)) + '" value="' + esc(g.why || '') + '"></label></div>';
     }
-    function hasGuess(part) { var p = st[part]; return !!(p.changed && p.guess && p.guess.dir); }
+    function hasGuess(part) { var p = st[part]; return !!(p.changed && planOk(part) && p.guess && p.guess.dir); }
     // 🔮 우리 예측 한 줄 (측정·결과 화면 위, 맞았는지는 그래프·정리에서)
     function guessLine(part) { var g = st[part].guess, G = M.GUESS[part]; return g && G[g.dir] ? '🔮 우리 예측: <b>' + esc(G[g.dir]) + '</b> · ' : ''; }
-    function mountGuess(el, part) {
+    function mountGuess(el, part, onSync) {
         var box = el.querySelector('[data-guess]'); if (!box) return;
         box.querySelector('.ev-choices').addEventListener('click', function (e) {
             var b = e.target.closest('[data-dir]'); if (!b) return;
             st[part].guess = Object.assign({}, st[part].guess, { dir: b.dataset.dir }); changed();
             Array.prototype.forEach.call(box.querySelectorAll('[data-dir]'), function (x) { x.classList.toggle('on', x === b); });
-            var nx = el.querySelector('.ev-next[data-go]'); if (nx) nx.disabled = false;
-            var need = el.querySelector('.ev-need-guess'); if (need) need.remove();
+            if (onSync) onSync();
+            else {
+                var nx = el.querySelector('.ev-next[data-go]'); if (nx) nx.disabled = !hasGuess(part);
+                var need = el.querySelector('.ev-need-guess'); if (need && hasGuess(part)) need.remove();
+            }
         });
         box.querySelector('.ev-why-in').addEventListener('change', function () { st[part].guess = Object.assign({}, st[part].guess, { why: M.cleanShort(this.value) }); changed(); });
     }
     SCREENS['t1-var'] = varScreen('t1', '무엇을 바꿔 볼까요?', 'q-control');
     SCREENS['q-control'] = quizScreen('control', 't1-cond');
 
-    // 이번 조건 정하기 (+/−): 바뀌는 것은 하나뿐
+    // 이번 조건 정하기 (+/− 또는 정해 둔 ①·② 바로 고르기): 바뀌는 것은 하나뿐
     function condScreen(part, next, challenge) {
         return function () {
             var defs = ensureBase(part), p = st[part], d = defs[p.changed];
             if (!d) return { html: '<p>먼저 바꿀 조건을 골라요.</p>' + nav(part + '-var', '고르러 가기 →') };
+            if (!challenge) ensurePlan(part);
             if (part === 't2' && p.ch !== !!challenge) { p.ch = !!challenge; save(); }
             var s = setup();
             p.quick = false;
             var countOf = function () { return p.trials.filter(function (t) { return t.value === p.value; }).length; }, count = countOf();
             var html = '<p class="ev-kicker">' + (challenge ? '🎯 도전' : (part === 't1' ? '1차시' : '2차시') + ' · 이번 조건') + '</p>' +
                 '<h2>' + esc(d.short || d.name) + '을(를) 얼마로 할까요?</h2>' +
-                (challenge ? '<p class="ev-target">목표: <b>' + (part === 't1' ? esc(s.targetTime) + '초' : '아이 키만큼 (' + esc(s.targetPct) + '%)') + '</b> · 그래프를 보고 정해요</p>' : '') +
+                (challenge ? '<p class="ev-target">목표: <b>' + (part === 't1' ? esc(s.targetTime) + '초' : '아이 키만큼 (' + esc(s.targetPct) + '%)') + '</b> · 그래프를 보고 정해요</p>' : planBar(part, { pickable: true })) +
                 stepper(p.changed, d.short || d.name, d.label(p.value), {}) +
                 '<h3>같게 할 조건 🔒</h3>' + Object.keys(defs).filter(function (k) { return k !== p.changed; }).map(function (k) { return stepper(k, defs[k].short || defs[k].name, defs[k].label(p.base[k]), { locked: true }); }).join('') +
                 (!challenge && part === 't1' ? '<p class="ev-small">같은 조건으로 <b>' + s.repeats + '번</b> 재서 평균' + easySpan('평균') + '을 내요. 이 조건은 지금까지 <b id="ev-count">' + count + '</b>번 쟀어요.</p>' : '') +
                 (challenge && part === 't1' ? '<div id="ev-mini"></div>' : '') +
-                (!challenge && p.mustChange != null ? '<p class="ev-small" id="ev-must">🔧 지난번(<b>' + esc(d.label(p.mustChange)) + '</b>)과 <b>다른 값</b>으로 바꿔요. + 나 − 를 눌러요.</p>' : '') +
+                (!challenge && p.mustChange != null ? '<p class="ev-small" id="ev-must">🔧 지난번(<b>' + esc(d.label(p.mustChange)) + '</b>)과 <b>다른 값</b>으로 비교해요.' + (p.value === p.mustChange ? ' + 나 − 또는 위 계획에서 골라요.' : ' 지금 <b>' + esc(d.label(p.value)) + '</b>로 준비됐어요!') + '</p>' : '') +
                 nav(next, '이 조건으로 →');
             return { html: html, mount: function (el) {
+                var syncVal = function () {
+                    el.querySelector('.ev-stepper:not(.locked) .ev-sval').textContent = d.label(p.value);
+                    var ce = el.querySelector('#ev-count'); if (ce) ce.textContent = String(countOf());
+                    var pl = p.plan;
+                    Array.prototype.forEach.call(el.querySelectorAll('[data-pick-plan]'), function (b) {
+                        var v = pl && pl[Number(b.dataset.pickPlan)];
+                        b.classList.toggle('on', v === p.value);
+                    });
+                };
                 el.querySelector('.ev-stepper:not(.locked)').addEventListener('click', function (e) {
                     var b = e.target.closest('[data-pm]'); if (!b) return;
                     p.value = M.stepIn(d.values, p.value, Number(b.dataset.pm)); save();
-                    el.querySelector('.ev-stepper:not(.locked) .ev-sval').textContent = d.label(p.value);
-                    var ce = el.querySelector('#ev-count'); if (ce) ce.textContent = String(countOf());
+                    syncVal();
+                });
+                var bar = el.querySelector('.ev-plan-bar');
+                if (bar) bar.addEventListener('click', function (e) {
+                    var b = e.target.closest('[data-pick-plan]'); if (!b || !p.plan) return;
+                    var v = p.plan[Number(b.dataset.pickPlan)];
+                    if (v != null) { p.value = v; save(); syncVal(); }
                 });
                 if (challenge && part === 't1') miniTable(el.querySelector('#ev-mini'), 't1');
                 // '바꿔서 다시'로 왔는데 값을 안 바꾸면 받지 않음
@@ -1087,18 +1185,22 @@
         var p = st.t1, s = setup(), r = st.last || p.trials[p.trials.length - 1], defs = ensureBase('t1'), d = defs[p.changed];
         if (!r) return { html: '<p>아직 잰 값이 없어요.</p>' + nav('t1-cond', '재러 가기 →') };
         var same = p.trials.filter(function (t) { return t.value === r.value; }), avg = M.mean(same.map(function (t) { return t.y; }));
-        var oneKind = M.valueKinds(p.trials) < 2 && same.length >= s.repeats;   // 한 값으로 다 쟀음 → 바로 '값을 하나 바꿔'
+        var oneKind = M.valueKinds(p.trials) < 2 && same.length >= s.repeats;   // 한 값으로 다 쟀음 → 바로 '정해 둔 ②로'
+        var np = nextPlanned('t1', r.value);
+        var changeBtn = np && d
+            ? '▶ 정해 둔 ' + (np.idx === 0 ? '① ' : '② ') + esc(d.label(np.val)) + ' 로 재러 가기'
+            : '🔧 ' + esc(d ? d.short || d.name : '조건') + '을(를) 바꿔서 재기';
         var html = '<p class="ev-kicker">결과 · ' + esc(d ? d.label(r.value) : '') + '</p><h2>💥 ' + fmtS(r.y) + ' 만에 ‘펑’!</h2>' +
-            card('<p>이 조건: <b>' + same.length + '번째</b> · 평균 <b>' + fmtS(avg) + '</b></p>' + (guessLine('t1') ? '<p class="ev-small">' + guessLine('t1') + '</p>' : '')) +
+            card('<p>이 조건: <b>' + same.length + '번째</b> · 평균 <b>' + fmtS(avg) + '</b></p>' + planBar('t1') + (guessLine('t1') ? '<p class="ev-small">' + guessLine('t1') + '</p>' : '')) +
             '<div class="ev-nav col">' + (same.length < s.repeats ? '<button type="button" class="ev-next good" id="ev-again">🔁 같은 조건으로 한 번 더 (' + same.length + '/' + s.repeats + ')</button>' : '<p class="ev-ok">✅ 같은 조건으로 ' + s.repeats + '번 쟀어요!</p>') +
-            (oneKind ? moreHint('t1') : '') +
-            '<button type="button" class="ev-next ' + (same.length < s.repeats ? 'secondary' : 'good') + '" id="ev-change">🔧 ' + esc(d ? d.short || d.name : '조건') + '을(를) 바꿔서 재기</button>' +
+            (oneKind ? moreHint('t1', r.value) : '') +
+            '<button type="button" class="ev-next ' + (same.length < s.repeats ? 'secondary' : 'good') + '" id="ev-change">' + changeBtn + '</button>' +
             (oneKind ? '' : '<button type="button" class="ev-next secondary" data-go="t1-graph">📈 그래프 보기</button>') + '</div>' +
             '<p class="ev-small">잘못 잰 값이면 <button type="button" class="ev-link" id="ev-undo">이 기록 지우기</button></p>';
         return { html: html, mount: function () {
             var ag = $('#ev-again');
             if (ag) ag.addEventListener('click', function () { p.value = r.value; p.quick = true; save(); show('t1-measure'); });
-            $('#ev-change').addEventListener('click', function () { mustChange('t1', r.value); });
+            $('#ev-change').addEventListener('click', function () { mustChange('t1', r.value, np ? np.val : null); });
             $('#ev-undo').addEventListener('click', function () {
                 if (!confirm('방금 잰 값을 지울까요?')) return;
                 var i = p.trials.indexOf(r); if (i < 0) i = p.trials.length - 1;
@@ -1162,23 +1264,36 @@
         return function () {
             var p = st[part], defs = ensureBase(part), d = defs[p.changed], n = p.trials.length, one = p.trials[n - 1], t1 = part === 't1';
             var name = d ? d.short || d.name : '바꿀 조건';
-            var html = '<p class="ev-kicker">' + (t1 ? '1차시' : '2차시') + ' · 한 번 더</p><h2>🔧 하나만 바꿔 한 번 더 재요</h2>' +
+            var np = one ? nextPlanned(part, one.value) : null;
+            var btnTxt = np && d
+                ? '▶ 정해 둔 ' + (np.idx === 0 ? '① ' : '② ') + esc(d.label(np.val)) + ' 로 ' + (t1 ? '재러 가기 →' : '발사하러 가기 →')
+                : '🔧 ' + esc(name) + ' 바꿔서 다시 ' + (t1 ? '재기' : '발사하기') + ' →';
+            var html = '<p class="ev-kicker">' + (t1 ? '1차시' : '2차시') + ' · 한 번 더</p><h2>🔧 ' + (np && d ? '정해 둔 ' + (np.idx === 0 ? '① ' : '② ') + esc(d.label(np.val)) + ' 로 재요' : '하나만 바꿔 한 번 더 재요') + '</h2>' +
                 card((n && d ? '<p>지금은 <b>' + esc(name) + '</b>을(를) <b>' + esc(d.label(one.value)) + '</b> 하나로만 ' + n + '번 쟀어요.</p>' : '<p>아직 잰 값이 없어요.</p>') +
+                    planBar(part) +
                     '<p class="ev-why">💡 값을 바꿔서 한 번 더 재야 무엇 때문에 ' + (t1 ? '열리는 시간이' : '높이가') + ' 달라지는지 그래프로 볼 수 있어요.</p>') +
-                '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-change">🔧 ' + esc(name) + ' 바꿔서 다시 ' + (t1 ? '재기' : '발사하기') + ' →</button>' +
+                '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-change">' + btnTxt + '</button>' +
                 // 다음 단계가 아직 잠겨 있으면 그리로 가는 단추는 두지 않음
                 (stageLocked(t1 ? 't2' : 'end') ? '' : '<button type="button" class="ev-next secondary" data-go="' + (t1 ? 't2-intro' : 'end-intro') + '">' + (t1 ? '2차시로 가기 →' : '정리로 가기 →') + '</button>') + '</div>';
-            return { html: html, mount: function () { $('#ev-change').addEventListener('click', function () { mustChange(part, one ? one.value : null); }); } };
+            return { html: html, mount: function () { $('#ev-change').addEventListener('click', function () { mustChange(part, one ? one.value : null, np ? np.val : null); }); } };
         };
     }
-    // 결과 화면에서 바로: 한 값으로만 쟀으면 '값을 하나 바꿔 한 번 더' (그래프를 안 눌러도)
-    function moreHint(part) {
-        var p = st[part], d = ensureBase(part)[p.changed];
-        return '<div class="ev-def ev-more-hint"><p>🔧 이제 <b>' + esc(d ? d.short || d.name : '바꿀 조건') + '</b> 값을 하나 바꿔 한 번 더 ' + (part === 't1' ? '재요' : '쏘아요') + '!</p>' +
+    // 결과 화면에서 바로: 한 값으로만 쟀으면 '정해 둔 ② 로' (그래프를 안 눌러도)
+    function moreHint(part, curVal) {
+        var p = st[part], d = ensureBase(part)[p.changed], np = curVal != null ? nextPlanned(part, curVal) : null;
+        var lead = np && d
+            ? '🔧 이제 정해 둔 ' + (np.idx === 0 ? '① ' : '② ') + '<b>' + esc(d.short || d.name) + ' ' + esc(d.label(np.val)) + '</b> 로 바꿔 한 번 더 ' + (part === 't1' ? '재요' : '쏘아요') + '!'
+            : '🔧 이제 <b>' + esc(d ? d.short || d.name : '바꿀 조건') + '</b> 값을 하나 바꿔 한 번 더 ' + (part === 't1' ? '재요' : '쏘아요') + '!';
+        return '<div class="ev-def ev-more-hint"><p>' + lead + '</p>' +
             '<p class="ev-small">값이 두 가지 넘어야 무엇 때문에 ' + (part === 't1' ? '열리는 시간이' : '높이가') + ' 달라지는지 알 수 있어요.</p></div>';
     }
-    // '바꿔서 다시' → 조건 화면: 지난 값 그대로는 받지 않음 ('값을 하나 바꿔요')
-    function mustChange(part, from) { st[part].mustChange = from; save(); show(part + '-cond'); }
+    // '바꿔서 다시' → 조건 화면: 정해 둔 다음 값(toVal)이 있으면 바로 맞춰 주고, 지난 값 그대로는 받지 않음 ('값을 하나 바꿔요')
+    function mustChange(part, from, toVal) {
+        st[part].mustChange = from;
+        if (toVal != null) st[part].value = toVal;
+        save();
+        show(part + '-cond');
+    }
     // 2차시 결과 안내 (2026-11-21 비계 4): 지금 바꾸는 조건 안에서만 권함 — 잠긴 조건은 권하지 않음
     function t2Hint(high) {
         var p = st.t2, d = ensureBase('t2')[p.changed], name = d ? d.short || d.name : '바꿀 조건';
@@ -1369,18 +1484,23 @@
         if (!r) return { html: nav('t2-cond', '발사하러 가기 →') };
         // 같은 조건 반복 (2026-11-23 가상 수업 4차 '없어서 불편한 기능 상'): 1차시처럼 예측·방법을 다시 묻지 않고 바로 발사 → 반복 범위·흔들림 판정
         var same = p.trials.filter(function (t) { return t.value === r.value; }), reps = setup().repeats;
+        var np = nextPlanned('t2', r.value);
+        var changeBtn = np && d
+            ? '▶ 정해 둔 ' + (np.idx === 0 ? '① ' : '② ') + esc(d.label(np.val)) + ' 로 발사하기'
+            : '🔧 바꿔서 다시 발사';
         var html = '<p class="ev-kicker">결과 · ' + esc(d ? d.label(r.value) : '') + '</p><h2>🚀 아이 키의 ' + r.pct + '%' + (r.method === 'hand' ? ' <small>(눈으로)</small>' : '') + '</h2>' + '<p class="ev-small ev-easy">🧒 % = ' + esc(M.EASY['%']) + '</p>' +
             '<p class="ev-small">이 조건: <b>' + same.length + '번째</b>' + (same.length > 1 ? ' · 평균 <b>' + Math.round(M.mean(same.map(function (t) { return t.pct; }))) + '%</b>' : '') + '</p>' +
+            planBar('t2') +
             card('<p>' + (r.pct >= 90 && r.pct <= 110 ? '🎉 아이 키와 거의 같아요!' : (r.pct > 110 ? '아이 키보다 높아요. 천장 조심! ' : '아이 키보다 낮아요. ') + t2Hint(r.pct > 110)) + '</p>' +
                 '<p class="ev-small">' + esc(M.DEF.design) + '</p>') +
             '<details class="ev-more"><summary>📏 아이 키(cm)로도 보기 (선택, 이 폰에만)</summary>' + stepper('child', '아이 키', st.childCm ? st.childCm + ' cm' : '넣지 않음', {}) +
             '<p class="ev-small" id="ev-cm">' + (st.childCm ? '로켓 높이 약 ' + M.cmFrom(r.pct, st.childCm) + ' cm' : '+ 를 누르면 넣어요. 선생님께는 %만 보내요.') + '</p></details>' +
             '<div class="ev-nav col">' + (same.length < reps ? '<button type="button" class="ev-next good" id="ev-again2">🔁 같은 조건으로 한 번 더 (' + same.length + '/' + reps + ')</button>' : '<p class="ev-ok">✅ 같은 조건으로 ' + reps + '번 쐈어요!</p>') +
-            (M.valueKinds(p.trials) < 2 && same.length >= reps ? moreHint('t2') : '') + '<button type="button" class="ev-next ' + (same.length < reps ? 'secondary' : 'good') + '" id="ev-change">🔧 바꿔서 다시 발사</button>' +
+            (M.valueKinds(p.trials) < 2 && same.length >= reps ? moreHint('t2', r.value) : '') + '<button type="button" class="ev-next ' + (same.length < reps ? 'secondary' : 'good') + '" id="ev-change">' + changeBtn + '</button>' +
             (M.valueKinds(p.trials) < 2 ? '' : '<button type="button" class="ev-next secondary" data-go="t2-graph">📈 그래프 보기</button>') + '</div>' +
             '<p class="ev-small">잘못 잰 값이면 <button type="button" class="ev-link" id="ev-undo">이 기록 지우기</button></p>';
         return { html: html, mount: function (el) {
-            $('#ev-change').addEventListener('click', function () { mustChange('t2', r.value); });
+            $('#ev-change').addEventListener('click', function () { mustChange('t2', r.value, np ? np.val : null); });
             var ag2 = $('#ev-again2');
             if (ag2) ag2.addEventListener('click', function () { p.value = r.value; p.ch = false; p.quick = true; save(); show(r.method === 'hand' ? 't2-hand' : 't2-measure'); });
             el.querySelector('[data-var="child"]').addEventListener('click', function (e) {

@@ -109,12 +109,14 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await A.waitForSelector('.ev-stepper.locked');
         assert.match(await A.textContent('.ev-screen'), /🔒 물의 온도/);
         assert.equal(await A.isDisabled('.ev-screen .ev-next[data-go]'), true, '🔮 예측을 골라야 다음');
-        await A.click('[data-guess] [data-dir="up"]'); 
+        // ① 10→15 mL, ② 15→20 mL 로 미리 계획
+        await A.click('[data-plan-slot="0"] [data-pm="1"]');
+        await A.click('[data-plan-slot="1"] [data-pm="1"]');
+        await A.click('[data-guess] [data-dir="up"]');
         await next(A); await go(A, 'q-control');
         await quiz(A, true);                          // 두 번째에 맞힘 5점 → 25점
         await go(A, 't1-cond');
         assert.match(await A.textContent('#ev-score'), /25점/);
-        await A.click('.ev-stepper:not(.locked) [data-pm="1"]');   // 10 → 15 mL
         assert.match(await A.textContent('.ev-stepper:not(.locked) .ev-sval'), /15 mL/);
         // 2026-11-23 '몇 초?' 예측은 뺌 — 조건 다음은 바로 측정 (🔮 방향 예측은 위에서 고름)
         await next(A); await go(A, 't1-measure');
@@ -147,8 +149,9 @@ test('필름통 로켓: 교사 수업 → 가족 2팀 입장 → 1차시 녹화�
         await A.click('#ev-sw-adj [data-pm="1"]');
         await A.click('#ev-sw3'); await go(A, 't1-result');
         assert.match(await A.textContent('.ev-screen'), /같은 조건으로 2번 쟀어요/);
-        // 다른 값 (20 mL) 초시계 한 번 → 그래프
-        await A.click('#ev-change'); await go(A, 't1-cond'); await A.click('.ev-stepper:not(.locked) [data-pm="1"]');
+        // 정해 둔 ② (20 mL) 로 바로 맞춰짐 → 초시계 한 번 → 그래프
+        await A.click('#ev-change'); await go(A, 't1-cond');
+        assert.match(await A.textContent('.ev-stepper:not(.locked) .ev-sval'), /20 mL/, '정해 둔 ② 로 자동 맞춤');
         await next(A); await go(A, 't1-measure');
         await A.click('#ev-m-sw'); await A.click('#ev-sw1'); await A.waitForTimeout(300); await A.click('#ev-sw2'); await A.click('#ev-sw3');
         await go(A, 't1-result');

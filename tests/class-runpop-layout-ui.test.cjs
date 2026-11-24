@@ -126,10 +126,22 @@ test('진행 상황 팝업: 요약 → 챙길 팀 → 팀별 칸 · 오른쪽 �
             await oneScreen('조 ' + w + '×' + h);
             if (SHOTS) await T.screenshot({ path: path.join(SHOTS, 'runpop-groups-' + w + '.png') });
         }
-        // 진행 화면으로 가기 → 예전 진행 화면 그대로 (요약 칸·조별 카드)
+        // 팝업에는 '진행 화면으로 가기' 단추가 없고, 수업 마치기·설정·수업 목록을 바로 조작
         await T.setViewportSize({ width: 1920, height: 1080 });
-        await T.click('#btnRunPopGo'); await T.waitForSelector('#runPane:not([hidden])');
-        assert.equal(await T.isVisible('#watchSum'), true); assert.equal(await T.isVisible('#rpSum'), false); assert.equal(await T.isVisible('#groups .ct-group'), true);
+        assert.equal(await T.locator('#btnRunPopGo').count(), 0, '진행 화면으로 가기 단추 없음');
+        await T.click('#btnRunPopDone');
+        await T.waitForFunction(() => /마친 수업으로 표시/.test(document.getElementById('runPopMsg').textContent));
+        assert.match(await T.textContent('#btnRunPopDone'), /다시 진행 중/);
+        await T.click('#btnRunPopDone');
+        await T.waitForFunction(() => /다시 진행 중인 수업/.test(document.getElementById('runPopMsg').textContent));
+        await T.click('#btnRunPopSet');
+        await T.waitForSelector('#viewSettings:not([hidden])');
+        assert.equal(await T.isVisible('#runPop'), false, '설정으로 가면 팝업 닫힘');
+        await T.click('#btnMain');
+        await T.waitForSelector('#presentPane:not([hidden])');
+        await openPop();
+        await T.click('#btnRunPopList');
+        await T.waitForSelector('#viewList:not([hidden])');
         assert.deepEqual(errors, []);
     } finally { await browser.close(); api.close(); stat.close(); }
 });
