@@ -54,11 +54,11 @@
             transition: background-color 0.2s;
         }
         .btn-google {
-            background-color: #4285F4;
+            background-color: var(--c-primary);
             color: white;
         }
         .btn-google:hover {
-            background-color: #357ae8;
+            background-color: var(--c-primary-dark);
         }
         .btn-logout {
             background-color: var(--c-danger);
@@ -166,9 +166,10 @@
             .split-tools { grid-column: 1 / -1; }
             .split-tools .pick-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
         }
-        /* 큰 모니터(1700 이상, 24인치 1920 · 100% 배율): 폭을 넓혀 보고서 실험 9칸 한 줄 + 행사·센서·도구 7칸 한 줄 */
+        /* 큰 모니터(1700 이상, 24인치 1920 · 100% 배율): 카드가 좁아지지 않게 폭 1560px 안에서 보고서 실험 5칸 두 줄(5+4) + 행사·센서·도구 7칸 한 줄 */
         @media (min-width: 1700px) {
-            .report-grid { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+            .container { max-width: 1560px; }
+            .report-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
             .home-split { grid-template-columns: 1fr 4fr 2fr; }
             .split-tools { grid-column: auto; }
             .split-tools .pick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -364,8 +365,8 @@
             </div>
             </section>
         </div><!-- /homeLabs -->
+        </main>
     </div>
-    </main>
     <footer class="home-foot"><p class="note">센서 기반 실험실 · 크게 보기 <kbd>Alt</kbd>+<kbd>B</kbd> · 학생 이름·학번은 받지 않아요</p></footer>
     <script>LabUI.initTabs('#boardTabs', { key: 'home-board' }); window.homeTabs = LabUI.initTabs('#homeTabs', { start: 'labs' });</script>
 
@@ -522,14 +523,14 @@
                     if (currentViewMode === 'teacher') {
                         modeToggleBtn.textContent = '🎓 학생용 모드로 전환';
                         const roleBadge = '<span class="role-badge role-teacher">👨‍🏫 교사 (교사용 모드)</span>';
-                        userInfo.innerHTML = `👤 ${currentUser.displayName || currentUser.email} ${roleBadge}`;
+                        userInfo.innerHTML = `👤 ${escapeHtml(currentUser.displayName || currentUser.email)} ${roleBadge}`;
                         title.textContent = '📋 교사 대시보드 - 전체 학생 제출 현황';
                         notice.textContent = '모든 학생이 제출한 실험 데이터 목록입니다:';
                         loadTeacherDashboard();
                     } else {
                         modeToggleBtn.textContent = '👨‍🏫 교사용 모드로 전환';
                         const roleBadge = '<span class="role-badge role-student">👨‍🏫 교사 (학생용 모드 체험)</span>';
-                        userInfo.innerHTML = `👤 ${currentUser.displayName || currentUser.email} ${roleBadge}`;
+                        userInfo.innerHTML = `👤 ${escapeHtml(currentUser.displayName || currentUser.email)} ${roleBadge}`;
                         title.textContent = '🧪 내 실험 기록 관리 (학생용 화면)';
                         notice.textContent = '내가 저장한 실험 기록 목록입니다 (학생용 화면 미리보기):';
                         loadStudentExperiments();
@@ -537,7 +538,7 @@
                 } else {
                     modeToggleBtn.style.display = 'none';
                     const roleBadge = '<span class="role-badge role-student">🎓 학생</span>';
-                    userInfo.innerHTML = `👤 ${currentUser.displayName || currentUser.email} ${roleBadge}`;
+                    userInfo.innerHTML = `👤 ${escapeHtml(currentUser.displayName || currentUser.email)} ${roleBadge}`;
                     title.textContent = '🧪 내 실험 기록 관리';
                     notice.textContent = '내가 저장한 실험 기록 목록입니다:';
                     loadStudentExperiments();
@@ -655,7 +656,7 @@
                 renderExperiments(snap, false);
             } catch (e) {
                 console.error('Load experiments error:', e);
-                expList.innerHTML = '<p style="color:var(--c-danger);">실험 기록 불러오기 실패: ' + e.message + '</p>';
+                expList.innerHTML = '<p style="color:var(--c-danger);">실험 기록 불러오기 실패: ' + escapeHtml(e.message) + '</p>';
             }
         }
 
@@ -676,7 +677,7 @@
                 renderExperiments(snap, true);
             } catch (e) {
                 console.error('Teacher dashboard load error:', e);
-                expList.innerHTML = '<p style="color:var(--c-danger);">학생 기록 불러오기 실패: ' + e.message + '</p>';
+                expList.innerHTML = '<p style="color:var(--c-danger);">학생 기록 불러오기 실패: ' + escapeHtml(e.message) + '</p>';
             }
         }
 

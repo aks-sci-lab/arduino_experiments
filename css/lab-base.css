@@ -315,9 +315,11 @@ html.lab-present body > .wrap, html.lab-present body > main { max-width: none; }
     html.big-view body { zoom: 1; }
     .lab-toast { display: none; }
 }
-/* 고르기 카드의 교과 배지 (메인 화면: 물리·화학·생명·보건·정보·가족 행사) — 카드 오른쪽 위 */
+/* 고르기 카드의 교과 배지 (메인 화면: 물리·화학·생명·보건·정보·가족 행사) — 카드 오른쪽 위, 좁은 폭에서도 아이콘과 겹치지 않게 */
 .pick-card .subj {
     position: absolute; top: var(--sp-2); right: var(--sp-2);
     padding: 1px 7px; border-radius: 999px; background: var(--c-ok-bg, #e8f5e9); color: var(--c-text);
     font-size: .72rem; font-weight: 600; line-height: 1.5; border: 1px solid var(--c-line);
+    max-width: calc(100% - 48px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.pick-card:has(.subj) .ic { margin-right: 4.5rem; }
