@@ -555,10 +555,14 @@
                     if (!pend.ph) { box.innerHTML = '<p class="ev-no">⚠ 도전 장면을 만들지 못했어요 (' + esc(pend.err) + '). 보내지 않아요.</p>'; return; }
                     // 사진 | 영상 두 칸 (한 화면에 단추까지 보이게)
                     box.innerHTML = '<figure><img id="ev-chk-img" class="ev-chk-img" alt="보낼 사진 (얼굴은 캐릭터로 가림)"><figcaption>📷 사진</figcaption></figure>' +
-                        (pend.vd ? '<figure><video id="ev-chk-vid" class="ev-chk-img" controls muted playsinline preload="auto"></video><figcaption>▶ 영상 (앞뒤 3초, 끝까지 봐요)</figcaption></figure>' : '');
+                        (pend.vd ? '<figure><video id="ev-chk-vid" class="ev-chk-img" controls muted playsinline preload="auto"></video><figcaption id="ev-chk-vcap">▶ 영상 (앞뒤 3초 — 꼭 재생해 끝까지 봐요)</figcaption></figure>' : '');
                     box.classList.toggle('two', !!pend.vd);
                     $('#ev-chk-img').src = pend.ph.data;
-                    if (pend.vd) $('#ev-chk-vid').src = pend.vd.data;
+                    if (pend.vd) {
+                        var vEl = $('#ev-chk-vid'), vCap = $('#ev-chk-vcap');
+                        vEl.src = pend.vd.data;
+                        vEl.addEventListener('ended', function () { if (vCap) { vCap.textContent = '✅ 영상 끝까지 확인했어요 (앞뒤 3초)'; vCap.style.color = 'var(--c-ok-text)'; } });
+                    }
                     send.disabled = false;
                 });
                 send.addEventListener('click', function () {
@@ -618,7 +622,8 @@
         html += '<h2>팀 이름을 정해요</h2>' +
             '<p>가족이 함께 정한 <b>별명</b>이나 <b>가족 이름</b>으로 해요. <span class="ev-small">(실명·학번은 쓰지 않아요)</span></p>' +
             '<label class="ev-field">팀 이름 (12글자까지)<input type="text" id="ev-name" maxlength="12" autocomplete="off" placeholder="예: 별빛 가족" value="' + esc(st.team ? st.team.name : '') + '"></label>' +
-            (CLASS ? '<p class="ev-small ev-media-note">📷 도전 장면은 얼굴을 캐릭터로 가리고, 팀이 확인한 뒤에만 선생님께 보내요. 수업이 끝나면 지워져요.</p>' : '') +
+            (CLASS ? '<p class="ev-small ev-media-note">📷 도전 장면은 얼굴을 캐릭터로 가리고, 팀이 확인한 뒤에만 선생님께 보내요. 수업이 끝나면 지워져요.</p>' +
+                '<p class="ev-small">💡 크롬·사파리 <b>일반 탭</b>으로 열어야 팀 자리와 기록이 유지돼요 (카카오톡·QR 앱 안 창이나 사생활 보호 모드는 닫으면 기록이 지워질 수 있어요).</p>' : '') +
             '<div class="ev-chips">' + ['별빛 가족', '로켓 탐험대', '무지개 팀', '번개 가족'].map(function (n) { return '<button type="button" class="ev-chip" data-name="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') + '</div>' +
             '<p id="ev-enter-msg" class="ev-msg" role="status" aria-live="polite">' + (st.team && st.team.problem ? '⚠ ' + esc(st.team.problem) : share && share.classFailed() && !isNetErr(share.classFailed()) ? '⚠ ' + esc(share.classFailed().error) : waiting ? '⏳ 선생님 수업에 연결하는 중…' : !CLASS ? 'ℹ️ 선생님 QR 로 들어오지 않았어요. 결과는 이 폰에만 저장돼요.' : '') + '</p>' +
             '<div class="ev-nav"><button type="button" class="ev-next good" id="ev-start">시작하기 →</button></div>' + pastBox();
@@ -1526,6 +1531,20 @@
         g.fillText('압력 = 일정한 넓이에 작용하는 힘 · 가속도 = 속도가 변하는 정도', W / 2, 1230);
     }
     function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+
+    // ---------- 화면 켜짐 유지 (수업 중 폰이 잠겨 🔌 끊김으로 뜨는 것 방지) ----------
+    var wakeLock = null;
+    function keepAwake() {
+        if (PRESENT || PAST || !navigator.wakeLock || !navigator.wakeLock.request) return;
+        navigator.wakeLock.request('screen').then(function (l) {
+            wakeLock = l;
+            l.addEventListener('release', function () { wakeLock = null; });
+        }).catch(function () { /* 배터리 절약 모드 등에서는 무시 */ });
+    }
+    if (!PRESENT && !PAST) {
+        keepAwake();
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && !wakeLock) keepAwake(); });
+    }
 
     // ---------- 시작 ----------
     initShare();

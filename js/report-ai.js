@@ -147,12 +147,17 @@
         return out;
     }
 
+    // 실험별 맞춤 과학 안내 (AI 가 일반 교과서 말만 하지 않고 이 실험의 장치·한계에 맞춰 질문하도록)
+    var EXP_GUIDES = {
+        qdot: '탄소 양자점 실험 주의: 학생은 알갱이 크기를 직접 재지 않았으므로 "가열이 길어져 크기가 커졌다"를 측정 사실이 아니라 가설로 구분하게 질문한다. 탄소 양자점은 표면 작용기·형광 분자의 영향도 크고, 색상 파장(≈)은 추정치이며, 보정 밝기는 사람 눈 기준(초록 가중치 큼)이라는 한계도 필요할 때 질문으로 짚는다.'
+    };
     function clip(s, n) { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n) + '…(뒤는 줄임)' : s; }
     // 질문 문서 하나 → { system, user }
     function buildPrompt(ask, expName) {
         var sec = sectionInfo(ask.section) || {};
         var guide = sec.guide || '이 보고서 항목: ' + (ask.sectionName || ask.section) + '. 질문으로 안내한다.';
-        var system = BASE_RULES + '\n\n이번 항목 — ' + guide;
+        var expGuide = ask.exp && EXP_GUIDES[ask.exp] ? '\n\n' + EXP_GUIDES[ask.exp] : '';
+        var system = BASE_RULES + '\n\n이번 항목 — ' + guide + expGuide;
         var att = ask.attach || [];
         var user = '[실험] ' + (expName || ask.exp || '') + '\n[보고서 항목] ' + (ask.sectionName || sec.name || ask.section) + '\n\n[학생 질문]\n' + clip(ask.prompt, LIMITS.prompt) +
             '\n\n[학생 초안]\n' + (att.indexOf('draft') >= 0 ? (String(ask.draft || '').trim() ? clip(ask.draft, LIMITS.draft) : '(비어 있음)') : '(함께 보내지 않음)') +
@@ -169,10 +174,10 @@
                 generationConfig: { maxOutputTokens: LIMITS.answerTokens * 3, temperature: 0.4 } }) } };
         if (provider === 'claude') return { url: 'https://api.anthropic.com/v1/messages',
             init: { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-                body: JSON.stringify({ model: model, max_tokens: LIMITS.answerTokens, system: system, messages: [{ role: 'user', content: user }] }) } };
+                body: JSON.stringify({ model: model, max_tokens: LIMITS.answerTokens, temperature: 0.4, system: system, messages: [{ role: 'user', content: user }] }) } };
         if (provider === 'gpt') return { url: 'https://api.openai.com/v1/chat/completions',
             init: { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
-                body: JSON.stringify({ model: model, max_completion_tokens: LIMITS.answerTokens * 3, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) } };
+                body: JSON.stringify({ model: model, max_completion_tokens: LIMITS.answerTokens * 3, temperature: 0.4, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) } };
         throw new Error('알 수 없는 AI 회사');
     }
     function modelsRequest(provider, key) {
