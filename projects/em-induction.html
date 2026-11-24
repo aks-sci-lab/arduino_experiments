@@ -257,9 +257,9 @@
         <div class="card">
             <h3 style="margin-top:0">지금 값</h3>
             <div class="readouts">
-                <div class="readout"><div class="k">코일 전압 ε</div><div class="v v-volt" id="rV">—</div><div class="u">mV</div></div>
+                <div class="readout"><div class="k">코일 단자 전압 V</div><div class="v v-volt" id="rV">—</div><div class="u">mV</div></div>
                 <div class="readout"><div class="k">전류 I</div><div class="v v-curr" id="rI">—</div><div class="u">mA</div></div>
-                <div class="readout"><div class="k">전력 P = εI</div><div class="v" id="rP">—</div><div class="u">µW</div></div>
+                <div class="readout"><div class="k">전력 P = V·I</div><div class="v" id="rP">—</div><div class="u">µW</div></div>
                 <div class="readout"><div class="k">샘플링</div><div class="v" id="rHz">—</div><div class="u">Hz</div></div>
             </div>
         </div>
@@ -296,7 +296,7 @@
             <div class="muted legend">
                 <span style="color:#d63384">━ 전압</span> &nbsp;
                 <span style="color:var(--c-primary)">━ 전류</span> &nbsp;
-                ● 최대 양의 기전력 / 최대 음의 기전력, 옅은 색 넓이 = ∫ε dt
+                ● 최대 양(+) 전압 / 최대 음(−) 전압, 옅은 색 넓이 = ∫V dt (들어갈 때·나올 때 반파 넓이를 아래에서 따로 확인)
             </div>
             <h3>분석 결과</h3>
             <div class="result-grid" id="results"><div>측정을 완료하면 결과가 표시됩니다.</div></div>
@@ -307,8 +307,8 @@
             <div class="tbl-wrap">
             <table>
                 <thead><tr>
-                    <th>이름</th><th>N</th><th>최대 +ε (mV)</th><th>최대 −ε (mV)</th>
-                    <th>최대 |I| (mA)</th><th>∫ε dt (mV·s)</th><th>ΔΦ (µWb)</th><th>그래프</th><th></th>
+                    <th>이름</th><th>N</th><th>최대 +V (mV)</th><th>최대 −V (mV)</th>
+                    <th>최대 |I| (mA)</th><th>∫V dt (mV·s)</th><th>ΔΦ (µWb)</th><th>그래프</th><th></th>
                 </tr></thead>
                 <tbody id="trials"></tbody>
             </table>
@@ -336,11 +336,11 @@
             <ol class="big-list">
                 <li>자석이 코일에 <b>들어갈 때와 나올 때</b> 전압의 부호가 반대인 이유를 선속의 변화와 렌츠 법칙으로 설명해 보자.</li>
                 <li>자석을 빠르게 움직이면 <b>봉우리 크기</b>는 어떻게 달라졌나? 패러데이 법칙(ε = −N·dΦ/dt)으로 설명해 보자.</li>
-                <li>속도를 바꿔도 <b>∫ε dt</b>(그래프 넓이)와 ΔΦ 가 거의 같게 나온 이유는? 들어갈 때 넓이와 나올 때 넓이는 서로 어떤 관계인가?</li>
+                <li>속도를 바꿔도 <b>들어갈 때(+)·나올 때(−) 각각의 넓이(∫V₊ dt, ∫V₋ dt)</b>와 선속 변화(|ΔΦ|)가 거의 같게 나온 이유는? 두 넓이를 더한 전체 순 넓이(∫V dt)는 왜 0 에 가까울까?</li>
                 <li>떨어뜨린 자석이 코일을 통과할 때 <b>두 번째 봉우리가 첫 번째보다 크고 좁은</b> 이유는?</li>
                 <li>코일 감은 수 N 을 두 배로 하면 최대 전압과 ΔΦ(= −∫ε dt ÷ N) 중 무엇이 두 배가 될까?</li>
-                <li>전압과 전류의 비 ε/I 는 무엇을 뜻할까? (션트 R 과 코일 저항 r)</li>
-                <li>이 회로에서 '코일 전압'은 기전력이 아니라 <b>단자 전압</b>(= 기전력 − 코일 저항 × I)이다. 진짜 기전력을 구하려면 무엇을 더 재야 할까? 코일 저항이 클 때 결과는 어떻게 달라지나?</li>
+                <li>측정한 코일 단자 전압과 전류의 비 V/I 는 무엇과 같았는가? (션트 저항 R 과 코일 저항 r 중 어느 쪽인지 회로와 연결해 설명해 보자)</li>
+                <li>이 회로에서 '코일 단자 전압'은 기전력이 아니라 <b>단자 전압</b>(= 기전력 − 코일 저항 × I)이다. 진짜 기전력을 구하려면 무엇을 더 재야 할까? 코일 저항이 클 때 결과는 어떻게 달라지나?</li>
             </ol>
             <h3>점검 목록</h3>
             <ul class="check-list">
@@ -495,10 +495,11 @@
     function startDemo() {
         startSession('demo', '시뮬레이션 모드 (자석이 약 2초마다 코일을 통과)');
         const start = performance.now();
-        const Rcircuit = 25;     // 코일+션트 (Ω)
+        const rCoil = 15;        // 코일 자체 저항 r (Ω)
         let lastT = -1;
         demoTimer = setInterval(() => {
             const t = (performance.now() - start) / 1000;
+            const R = shuntOhm();
             // 100 Hz 로 샘플 생성
             while (lastT + 0.01 <= t) {
                 lastT += 0.01;
@@ -506,12 +507,15 @@
                 const c = 0.5;                         // 코일 중심 시각
                 const gauss = (x, s) => Math.exp(-(x * x) / (2 * s * s));
                 // 들어갈 때(선속 증가) 양의 봉우리 하나, 나올 때(선속 감소) 음의 봉우리 하나.
-                // 떨어지며 빨라지므로 나올 때 봉우리가 더 높고 좁다. 두 넓이(∫ε dt)는 같다(선속이 처음과 같아짐).
-                const eps = 30 * gauss(ph - (c - 0.07), 0.04)
-                          - 40 * gauss(ph - (c + 0.07), 0.03);
-                const noise = (Math.random() - 0.5) * 0.8;
-                const v = eps + noise + 1.2;                  // 1.2 mV 의 센서 오프셋
-                const i = eps / Rcircuit + (Math.random() - 0.5) * 0.02 + 0.03;   // mV ÷ Ω = mA
+                // 떨어지며 빨라지므로 나올 때 봉우리가 더 높고 좁다. 두 넓이(∫ε dt)의 크기는 같다.
+                const eps = 60 * gauss(ph - (c - 0.07), 0.04)
+                          - 80 * gauss(ph - (c + 0.07), 0.03);
+                // 닫힌 회로: 전류 I = ε ÷ (R + r), ADS1115 가 재는 코일 단자 전압 V = ε − r·I = R·I
+                const iClean = eps / (R + rCoil);      // mV ÷ Ω = mA
+                const vTerm = iClean * R;              // mV (단자 전압 = 션트 전압)
+                const noise = (Math.random() - 0.5) * 0.6;
+                const v = vTerm + noise + 1.2;         // 1.2 mV 의 센서 오프셋
+                const i = iClean + (Math.random() - 0.5) * 0.02 + 0.03;
                 addSample(lastT, v, i);
             }
         }, 20);
@@ -571,7 +575,7 @@
     // ---------- 분석 ----------
     function analyze(data) {
         let maxV = -Infinity, minV = Infinity, tMax = 0, tMin = 0, maxAbsI = 0;
-        let integral = 0, integralI = 0;
+        let integral = 0, intPos = 0, intNeg = 0, integralI = 0;
         for (let k = 0; k < data.length; k++) {
             const d = data[k];
             if (d.v > maxV) { maxV = d.v; tMax = d.t; }
@@ -579,17 +583,28 @@
             if (Math.abs(d.i) > maxAbsI) maxAbsI = Math.abs(d.i);
             if (k > 0) {
                 const dt = d.t - data[k - 1].t;
-                integral += 0.5 * (d.v + data[k - 1].v) * dt;       // mV·s
+                const v0 = data[k - 1].v, v1 = d.v;
+                integral += 0.5 * (v0 + v1) * dt;                   // 전체 순 적분 (mV·s)
+                if (v0 >= 0 && v1 >= 0) intPos += 0.5 * (v0 + v1) * dt;
+                else if (v0 <= 0 && v1 <= 0) intNeg += 0.5 * (v0 + v1) * dt;
+                else {
+                    // 부호가 바뀌는 구간은 0 통과 지점으로 나눠 양(+)·음(−) 넓이를 따로 적분
+                    const dt0 = dt * Math.abs(v0) / (Math.abs(v0) + Math.abs(v1));
+                    const a0 = 0.5 * v0 * dt0, a1 = 0.5 * v1 * (dt - dt0);
+                    if (v0 > 0) { intPos += a0; intNeg += a1; } else { intNeg += a0; intPos += a1; }
+                }
                 integralI += 0.5 * (d.i + data[k - 1].i) * dt;      // mA·s = mC
             }
         }
         const N = turns();
         const dPhi = -integral / N * 1000;                          // mV·s = mWb·turn → µWb : ×1000
+        const dPhiPos = intPos / N * 1000;                          // 양(+) 반파 선속 변화 크기 (µWb)
+        const dPhiNeg = -intNeg / N * 1000;                         // 음(−) 반파 선속 변화 크기 (µWb)
         const total = data[data.length - 1].t - data[0].t;
         const rms = Math.sqrt(data.reduce((a, d) => a + d.v * d.v, 0) / data.length);
         const charge = integralI;                                   // 순 전하(mC)
         const hasPair = maxV > 0 && minV < 0;
-        return { maxV, minV, tMax, tMin, maxAbsI, integral, dPhi, total, rms, charge, N, hasPair,
+        return { maxV, minV, tMax, tMin, maxAbsI, integral, intPos, intNeg, dPhi, dPhiPos, dPhiNeg, total, rms, charge, N, hasPair,
                  order: hasPair ? (tMax < tMin ? '+ 먼저, − 나중' : '− 먼저, + 나중') : '—' };
     }
 
@@ -599,12 +614,14 @@
         const f = (x, d) => (x !== null && x !== undefined && Number.isFinite(+x)) ? (+x).toFixed(d) : '—';
         const at = t => (t !== null && t !== undefined && Number.isFinite(+t)) ? ` @ ${(+t).toFixed(2)} s` : '';
         $('results').innerHTML = [
-            cell('최대 양의 기전력', `${f(r.maxV, 2)} mV${at(r.tMax)}`),
-            cell('최대 음의 기전력', `${f(r.minV, 2)} mV${at(r.tMin)}`),
+            cell('최대 양(+) 단자 전압', `${f(r.maxV, 2)} mV${at(r.tMax)}`),
+            cell('최대 음(−) 단자 전압', `${f(r.minV, 2)} mV${at(r.tMin)}`),
             cell('봉우리 순서 (렌츠 법칙)', esc(r.order || '—')),
             cell('최대 전류 |I|', `${f(r.maxAbsI, 3)} mA`),
-            cell('전압 넓이 ∫ε dt', `${f(r.integral, 3)} mV·s`),
-            cell('선속 변화 ΔΦ = −∫ε dt ÷ N', `${f(r.dPhi, 2)} µWb`),
+            cell('양(+) 넓이 ∫V₊ dt / |ΔΦ₊|', `${f(r.intPos, 3)} mV·s (${f(r.dPhiPos, 2)} µWb)`),
+            cell('음(−) 넓이 ∫V₋ dt / |ΔΦ₋|', `${f(r.intNeg, 3)} mV·s (${f(r.dPhiNeg, 2)} µWb)`),
+            cell('전체 순 넓이 ∫V dt (상쇄 확인)', `${f(r.integral, 3)} mV·s`),
+            cell('전체 순 선속 변화 ΔΦ', `${f(r.dPhi, 2)} µWb`),
             cell('실효 전압 (RMS)', `${f(r.rms, 2)} mV`),
             cell('측정 시간', `${f(r.total, 2)} s`)
         ].join('');
@@ -762,7 +779,8 @@
         if (t) {
             const pts = ES.wavePoints(t.wave);
             const total = pts.length > 1 ? pts[pts.length - 1].t - pts[0].t : null;
-            showResults(Object.assign({ rms: null, total }, t));
+            const half = (t.intPos == null && pts.length > 1) ? analyze(pts) : null;
+            showResults(Object.assign({ rms: null, total }, half ? { intPos: half.intPos, intNeg: half.intNeg, dPhiPos: half.dPhiPos, dPhiNeg: half.dPhiNeg } : {}, t));
         }
         else if (lastResult) showResults(lastResult);
         renderTrials();
@@ -816,7 +834,7 @@
         if (name === null) return;
         const r = analyze(rec);
         trials.push({ id: ES.newId(), name: name || `측정 ${trials.length + 1}`, N: r.N, maxV: r.maxV, minV: r.minV,
-                      tMax: r.tMax, tMin: r.tMin, order: r.order, maxAbsI: r.maxAbsI, integral: r.integral, dPhi: r.dPhi,
+                      tMax: r.tMax, tMin: r.tMin, order: r.order, maxAbsI: r.maxAbsI, integral: r.integral, intPos: r.intPos, intNeg: r.intNeg, dPhi: r.dPhi, dPhiPos: r.dPhiPos, dPhiNeg: r.dPhiNeg,
                       samples: rec.length, wave: ES.downsample(rec) });
         persistTrials(); renderTrials();
         if (share) share.stepChanged();

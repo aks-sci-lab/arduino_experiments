@@ -42,7 +42,7 @@ async function newPage(browser, app, opt, init) {
 
 const PAGES = {
     'planck-led': { exp: 'planck', change: ['led'], measure: /문턱 전압 V₀/ },
-    'ideal-gas': { exp: 'idealgas', change: ['vol', 'temp'], measure: /압력 P/ },
+    'ideal-gas': { exp: 'idealgas', change: ['pres', 'temp'], measure: /주사기 부피 V/ },
     'em-induction': { exp: 'eminduction', change: ['speed', 'turns'], measure: /코일 전압 봉우리/ },
     'free-fall': { exp: 'freefall', change: ['ball', 'height'], measure: /중력 가속도 g/ },
     'pendulum-report': { exp: 'pendulum', change: ['len', 'amp', 'mass'], measure: /주기 T/ }
