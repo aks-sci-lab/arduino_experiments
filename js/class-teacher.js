@@ -577,7 +577,7 @@
             // 팀 폰은 앞 단계를 끝내고 잠김 화면에서 기다리면 '앞단계-done', 끝낸 단계에서 결과를 보거나 더 재면 '단계-more' (js/film-rocket.js stepNow)
             var done = pg && /^([a-z0-9_]+)-(done|more)$/.exec(String(pg.step || '')), ss = CC.studentState(pg, st.now);
             return { jo: t.jo, name: t.name, score: Number(sm['팀 점수']) || 0, quiz: sm['퀴즈 맞힘'], tDiff: sm['시간 도전 차이(초)'], tOk: sm['시간 도전 성공'] === 1,
-                hMax: sm['높이 최고(%)'], hDiff: sm['높이 도전 차이(%)'], hOk: sm['높이 도전 성공'] === 1, spark: sm['생각 바뀜 ✨'],
+                hDiff: sm['높이 도전 차이(%)'], media: String(sm['도전 장면'] || ''), hOk: sm['높이 도전 성공'] === 1, spark: sm['생각 바뀜 ✨'],
                 kinds: { t1: Number(sm['1차시 값 가짓수']) || 0, t2: Number(sm['2차시 값 가짓수']) || 0 },
                 // 💬 예측·정리 문장 (팀 폰 js/film-rocket.js 의 🔮 예측·✍️ 정리 문장)
                 // 2026-11-21 비계 4: 무엇을 바꿨는지·우리 숫자(증거) → 예측(까닭) → 결과 · 왜냐하면
@@ -612,20 +612,56 @@
             behind.map(function (r) { return '<span class="ct-behind-team">' + esc(r.name) + ' · ' + esc(r.step) + '</span>'; }).join('') + '</details>';
         els.forEach(function (e) { e.innerHTML = html; e.hidden = false; e.classList.toggle('all', all); });
     }
+    // 🎯 도전 장면 단추 (팀 폰이 얼굴을 캐릭터로 가려 보낸 사진·앞뒤 3초 영상). 요약 '도전 장면' = 차시마다 v(사진+영상)·p(사진)·x(얼굴 가리기 못 함)·n(팀이 확인하고 안 보냄)·-(없음)
+    function mediaBtns(r, part) {
+        var k = (r.media || '').charAt(part === 't1' ? 0 : 1);
+        if (k === 'x') return ' <span class="ct-media-no">📷 없음(얼굴 가리기 못 함)</span>';
+        if (k === 'n') return ' <span class="ct-media-no">📷 안 보냄</span>';   // 팀이 확인 화면에서 '가려지지 않은 얼굴이 있어요'
+        if (k !== 'v' && k !== 'p') return '';
+        var b = function (kind, ic, label) { return '<button type="button" class="ct-media-btn" data-media="' + r.jo + '~' + part + '~' + kind + '" data-team="' + esc(r.name) + '" aria-label="' + esc(r.name) + ' ' + label + '">' + ic + '</button>'; };
+        return ' <span class="ct-media">' + b('photo', '📷', '도전 사진') + (k === 'v' ? b('video', '▶', '도전 영상') : '') + '</span>';
+    }
+    // 누를 때만 그 하나를 읽어 크게 (결과판 어디서나: 진행 화면·크게 보기·발표 화면 결과판)
+    async function openMedia(btn) {
+        var c = watched(), m = /^(\d{1,2})~(t[12])~(photo|video)$/.exec(btn.dataset.media || ''); if (!c || !m) return;
+        var box = document.getElementById('ctMedia');
+        if (!box) {
+            box = document.createElement('div'); box.id = 'ctMedia'; box.className = 'ct-media-modal'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+            box.innerHTML = '<div class="ct-media-in"><div class="ct-media-head"><b id="ctMediaTitle"></b><button type="button" class="secondary" id="ctMediaClose">✕ 닫기</button></div><div id="ctMediaBody" class="ct-media-body"></div>' +
+                '<p class="note">얼굴은 팀 폰이 캐릭터로 가린 뒤 보냈어요 · 수업을 마치면 지워져요</p></div>';
+            document.body.appendChild(box);
+            var close = function () { box.hidden = true; document.getElementById('ctMediaBody').innerHTML = ''; };
+            box.addEventListener('click', function (e) { if (e.target === box || e.target.id === 'ctMediaClose') close(); });
+            // 크게 본 동안에는 발표 보기 넘기기 키(→·Space 등)가 장을 넘기지 않게
+            // window 의 잡기 단계(가장 먼저)에서 받아 '📋 진행 상황' 팝업·발표 보기의 Esc·넘기기가 함께 움직이지 않게 (Esc 는 사진만 닫음)
+            window.addEventListener('keydown', function (e) { if (box.hidden) return; if (e.key === 'Escape') { e.preventDefault(); close(); } if (e.key !== 'Tab') e.stopImmediatePropagation(); }, true);
+        }
+        var body = document.getElementById('ctMediaBody');
+        document.getElementById('ctMediaTitle').textContent = (btn.dataset.team || '') + ' · ' + (m[2] === 't1' ? '⏱ 시간 도전' : '🎯 높이 도전') + ' ' + (m[3] === 'photo' ? '사진' : '영상');
+        body.innerHTML = '<p class="note">⏳ 불러오는 중…</p>'; box.hidden = false;
+        var r = await CC.mediaGet(c.space, { jo: Number(m[1]), part: m[2], kind: m[3] });
+        if (box.hidden) return;
+        var d = r && r.ok && r.media && String(r.media.data || '');
+        if (!d || !/^data:(image\/(jpeg|webp)|video\/(webm|mp4));base64,/.test(d)) { body.innerHTML = '<p class="note">' + esc(r && !r.ok ? '⚠️ ' + r.error : '아직 없어요 (수업을 마쳐 지웠거나 보내는 중이에요)') + '</p>'; return; }
+        var el = document.createElement(m[3] === 'photo' ? 'img' : 'video');
+        if (m[3] === 'video') { el.controls = true; el.autoplay = true; el.loop = true; el.muted = true; el.playsInline = true; el.setAttribute('playsinline', ''); }
+        else el.alt = (btn.dataset.team || '') + ' 도전 장면';
+        el.src = d; body.innerHTML = ''; body.appendChild(el);
+    }
+    document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-media]'); if (b) { e.preventDefault(); openMedia(b); } });
     // big: true = 크게 보기(진행 화면의 🖥), 'present' = 🎬 발표 화면에 띄운 결과판 (2026-11-23 가상 수업 4차: 관리 표시 🔌·✓ 빼고, 값이 하나도 없는 ⏱·🎯 칸은 숨기고, 💬 생각을 크게)
     function boardTable(rows, big) {
         if (!rows.length) return '<p class="note">아직 들어온 팀이 없어요. 가족이 QR 로 들어와 팀 이름을 정하면 여기에 나와요.</p>';
         var n = function (v, unit) { return v == null || v === '' ? '–' : esc(Math.abs(Number(v))) + unit; };
         var pres = big === 'present', has = function (k) { return !pres || rows.some(function (r) { return r[k] != null && r[k] !== ''; }); };
-        var cT = has('tDiff'), cH = has('hMax'), cHD = has('hDiff');
-        return '<div class="ct-board-wrap' + (pres ? ' ct-board-present' : '') + '"><table class="ct-board"><thead><tr><th>팀</th><th>⭐ 점수</th>' + (cT ? '<th>⏱ 시간 도전</th>' : '') + (cH ? '<th>🚀 최고 높이</th>' : '') + (cHD ? '<th>🎯 높이 도전</th>' : '') + '<th>💬 생각</th>' + (big ? '' : '<th>지금</th>') + '</tr></thead><tbody>' +
+        var cT = has('tDiff'), cHD = has('hDiff');   // 🚀 최고 높이 칸은 2026-11-23 뺌
+        return '<div class="ct-board-wrap' + (pres ? ' ct-board-present' : '') + '"><table class="ct-board"><thead><tr><th>팀</th><th>⭐ 점수</th>' + (cT ? '<th>⏱ 시간 도전</th>' : '') + (cHD ? '<th>🎯 높이 도전</th>' : '') + '<th>💬 생각</th>' + (big ? '' : '<th>지금</th>') + '</tr></thead><tbody>' +
             rows.map(function (r, i) {
                 return '<tr><td>' + (i < 3 && r.score ? ['🥇', '🥈', '🥉'][i] + ' ' : '') + '<b>' + esc(r.name) + '</b>' +
                     (r.off && !pres ? ' <span class="ct-off" title="마지막 신호 ' + esc(CC.agoText(r.state.ago)) + '">🔌 ' + esc(CC.agoText(r.state.ago)) + '</span>' : '') +
                     (big && !pres && r.doneStage ? ' <span class="ct-waitmark">✓ 기다림</span>' : '') + '</td><td><b>' + r.score + '</b></td>' +
-                    (cT ? '<td class="' + (r.tOk ? 'ok' : '') + '">' + (r.tDiff == null ? '–' : (r.tOk ? '🎉 ' : '') + n(r.tDiff, '초 차이')) + '</td>' : '') +
-                    (cH ? '<td>' + (r.hMax == null ? '–' : esc(r.hMax) + '%') + '</td>' : '') +
-                    (cHD ? '<td class="' + (r.hOk ? 'ok' : '') + '">' + (r.hDiff == null ? '–' : (r.hOk ? '🎉 ' : '') + n(r.hDiff, '% 차이')) + '</td>' : '') +
+                    (cT ? '<td class="' + (r.tOk ? 'ok' : '') + '">' + (r.tDiff == null ? '–' : (r.tOk ? '🎉 ' : '') + n(r.tDiff, '초 차이')) + mediaBtns(r, 't1') + '</td>' : '') +
+                    (cHD ? '<td class="' + (r.hOk ? 'ok' : '') + '">' + (r.hDiff == null ? '–' : (r.hOk ? '🎉 ' : '') + n(r.hDiff, '% 차이')) + mediaBtns(r, 't2') + '</td>' : '') +
                     // 💬 은 크게 보기(프로젝터)에도 — 팀 이름은 지금처럼
                     '<td class="note ct-talk">' + (r.talk && r.talk.length ? r.talk.map(function (t) { return '<div>' + esc(t) + '</div>'; }).join('') : '–') + '</td>' +
                     (big ? '' : '<td class="note' + (r.doneStage ? ' ct-waitcell' : '') + (r.behind ? ' ct-behindcell' : '') + '">' + (r.behind ? '↩ ' : '') + esc(r.step) + (r.behind ? ' (앞 단계)' : '') + '</td>') + '</tr>';

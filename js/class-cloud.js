@@ -225,6 +225,9 @@
     // 📱 응답 물음 (③): 학생 답 하나 쓰기·내 답 읽기 (o = { classCode, jo, num, phone, key, choice | text }), 교사가 한 물음의 답 모두 읽기
     function answerSave(url, o, fetchImpl) { return post(url, { action: 'answerSave', 'class': o.classCode, jo: Number(o.jo), num: Number(o.num), phone: !!o.phone, key: String(o.key || ''), choice: o.choice, text: o.text }, fetchImpl, 15000); }
     function answerMine(url, o, fetchImpl) { return post(url, { action: 'answerMine', 'class': o.classCode, jo: Number(o.jo), num: Number(o.num), phone: !!o.phone, key: String(o.key || '') }, fetchImpl, 15000); }
+    // 🎯 필름통 로켓 도전 장면: 팀 폰이 쓰기(o = { classCode, jo, part: t1|t2, kind: photo|video, data }), 교사가 하나 읽기
+    function mediaSave(url, o, fetchImpl) { return post(url, { action: 'mediaSave', 'class': o.classCode, jo: Number(o.jo), part: String(o.part || ''), kind: String(o.kind || ''), data: String(o.data || '') }, fetchImpl, 60000); }
+    function mediaGet(space, o, fetchImpl) { return post('lab:' + space, { action: 'mediaGet', jo: Number(o.jo), part: String(o.part || ''), kind: String(o.kind || '') }, fetchImpl, 60000); }
     function answerList(space, key, fetchImpl) { return post('lab:' + space, { action: 'answerList', key: String(key || '') }, fetchImpl, 15000); }
     function classSetup(space, setup, fetchImpl) { return post('lab:' + space, { action: 'classSetup', setup: setup }, fetchImpl, 20000); }
     function joinInfo(url, classCode, fetchImpl) { return getQ(url, { action: 'joinInfo', 'class': classCode, _: Date.now() }, fetchImpl); }
@@ -251,7 +254,7 @@
         normalizeClass: normalizeClass, isClassCode: isClassCode, splitGroups: splitGroups, groupFor: groupFor,
         studentUrl: studentUrl, readClassParam: readClassParam,
         studentState: studentState, submissionText: submissionText, checkCustom: checkCustom, agoText: agoText, stepName: stepName, summarize: summarize,
-        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, classStage: classStage, classDone: classDone, classLesson: classLesson, answerSave: answerSave, answerMine: answerMine, answerList: answerList, gateSteps: gateSteps, stageInfo: stageInfo, canFlow: canFlow, flowOf: flowOf, STEPS_HD: STEPS_HD, HD_OF: HD_OF, FLOW_NAMES: FLOW_NAMES, STAGE_ALL: STAGE_ALL, heartbeat: heartbeat, leaveSeat: leaveSeat, classStatus: classStatus,
+        ping: ping, createClass: createClass, joinInfo: joinInfo, joinTeam: joinTeam, classInfo: classInfo, classSetup: classSetup, classStage: classStage, classDone: classDone, classLesson: classLesson, answerSave: answerSave, answerMine: answerMine, answerList: answerList, mediaSave: mediaSave, mediaGet: mediaGet, gateSteps: gateSteps, stageInfo: stageInfo, canFlow: canFlow, flowOf: flowOf, STEPS_HD: STEPS_HD, HD_OF: HD_OF, FLOW_NAMES: FLOW_NAMES, STAGE_ALL: STAGE_ALL, heartbeat: heartbeat, leaveSeat: leaveSeat, classStatus: classStatus,
         myClasses: myClasses, classExport: classExport, deleteClass: deleteClass, reopenCode: reopenCode, expireText: expireText
     };
 });

@@ -68,6 +68,9 @@
     // 내가 바꾼 그림 (lessonEdits/{uid}/imgs/{id}): 선생님 기기에서 줄인 WebP·JPEG·PNG data URL, 300KB(글자로 약 41만 자) 아래, 한 실험 40장
     var LESSON_IMG_REF_RE = /^my-img:i[a-z0-9]{15}$/, LESSON_IMG_ID_RE = /^i[a-z0-9]{15}$/, LESSON_IMG_DATA_RE = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+\/=]+$/;
     var LESSON_IMG = { CHARS: 410000, PER_EXP: 40, SIDE: 4000 };
+    // 🎯 필름통 로켓 도전 장면 (팀 폰이 얼굴을 캐릭터로 가린 사진·앞뒤 3초 영상, js/film-rocket.js sendScene): 7일 뒤·수업 마치기·지우기 때 지움
+    var MEDIA = { PHOTO_CHARS: 220000, VIDEO_CHARS: 900000, DAYS: 7 };
+    var MEDIA_RE = { photo: /^data:image\/(jpeg|webp);base64,[A-Za-z0-9+\/=]+$/, video: /^data:video\/(webm|mp4);base64,[A-Za-z0-9+\/=]+$/ };
     var LESSON_EDIT = { STAGES: 20, SLIDES: 60, FIELD: { title: 200, body: 6000, ask: 1500, reveal: 6000, note: 3000 }, VAR: 300, KEEP: 8, BYTES: 600000 };
     function cleanTeamName(v) {
         var s = String(v == null ? '' : v);
@@ -411,11 +414,47 @@
             return { ok: true, lesson: lessonOut(lesson), lessonOpen: open };
         }
         // 교사: '✅ 수업 마치기' 표시 (저절로 판단하지 않음, 되돌릴 수 있음). 학생 화면은 그대로 둠
+        // 마치면 도전 장면(사진·영상)은 바로 지움 (2026-11-23 선생님 결정 '수업이 끝나면 지워져요' — 되돌려도 돌아오지 않음)
         async function classDone(b, auth) {
             var c = await ownedClass(b, auth);
             var done = b.done === true || b.done === 'true';
             await db.update('labClasses/' + c.space, { done: done, doneAt: done ? db.stamp() : null });
-            return { ok: true, done: done };
+            var gone = done ? await mediaClear(c) : 0;
+            return { ok: true, done: done, mediaDeleted: gone };
+        }
+        /* ---------- 🎯 도전 장면 (필름통 로켓 팀 수업): labClasses/{수업}/media/{조}~{t1|t2}~{photo|video} ----------
+           그 팀 자리(teams/{조})를 잡은 폰만 쓰고 고침(다시 도전하면 덮어씀), 주인 교사만 읽고 지움(규칙). 결과판은 누를 때만 하나씩 읽음 */
+        function mediaPath(c, jo, part, kind) { return 'labClasses/' + c.space + '/media/' + jo + '~' + part + '~' + kind; }
+        function mediaArgs(b) {
+            var jo = numIn(b.jo, 1, 99, '팀'), part = String(b.part || ''), kind = String(b.kind || '');
+            if (jo % 1 || !/^t[12]$/.test(part) || !/^(photo|video)$/.test(kind)) fail('도전 장면 번호가 올바르지 않습니다.');
+            return { jo: jo, part: part, kind: kind };
+        }
+        async function mediaSave(b, auth) {
+            needUid(auth);
+            var c = await findClass(b, false);   // 저장해 둔 것 말고 새로 (방금 수업을 마쳤는지)
+            if (!c) fail('그 수업을 찾지 못했습니다.');
+            if (c.mode !== 'team') fail('도전 장면은 팀 이름으로 들어가는 수업에서만 보내요.');
+            if (c.done) fail('수업이 끝나 도전 장면을 받지 않아요.');
+            var a = mediaArgs(b), data = String(b.data || '');
+            var team = await getOrNull('labClasses/' + c.space + '/teams/' + a.jo);
+            if (!team || team.uid !== auth.uid) fail('우리 팀 폰에서만 보낼 수 있어요.');
+            if (!MEDIA_RE[a.kind].test(data)) fail(a.kind === 'photo' ? '사진은 JPEG·WebP 만 보내요.' : '영상은 WebM·MP4 만 보내요.');
+            if (data.length > (a.kind === 'photo' ? MEDIA.PHOTO_CHARS : MEDIA.VIDEO_CHARS)) fail('도전 장면이 너무 커요.');
+            await db.set(mediaPath(c, a.jo, a.part, a.kind), { jo: a.jo, part: a.part, kind: a.kind, data: data, masked: true, uid: auth.uid, at: db.stamp(),
+                expireAt: new Date(db.now().getTime() + MEDIA.DAYS * 86400000) });
+            return { ok: true };
+        }
+        async function mediaGet(b, auth) {
+            var c = await ownedClass(b, auth), a = mediaArgs(b);
+            var d = await getOrNull(mediaPath(c, a.jo, a.part, a.kind));
+            if (!d) return { ok: true, media: null };
+            return { ok: true, media: { jo: a.jo, part: a.part, kind: a.kind, data: String(d.data || ''), at: iso(d.at) } };
+        }
+        async function mediaClear(c) {
+            var rows = await db.query('labClasses/' + c.space + '/media', []);
+            for (var i = 0; i < rows.length; i++) await db.del('labClasses/' + c.space + '/media/' + rows[i].id);
+            return rows.length;
         }
         /* ---------- 📱 응답 물음 (③): 학생 기기마다 띄운 물음의 답 하나. 그 물음을 띄운 동안만 쓰고(규칙도 확인), 같은 문서를 고쳐 씀(2초에 한 번까지) ---------- */
         function answerPath(c, key, jo, num, phone) { return 'labClasses/' + c.space + '/answers/' + key + '~' + jo + '-' + num + (phone ? '-p' : ''); }
@@ -745,7 +784,7 @@
             (await db.query('labClasses/' + c.space + '/progress', [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/progress/' + r.id); });
             (await db.query(itemsPath(c.space), [])).forEach(function (r) { paths.push(itemsPath(c.space) + '/' + r.id); });
             (await db.query('labSpaces/' + c.space + '/raw', [])).forEach(function (r) { paths.push('labSpaces/' + c.space + '/raw/' + r.id); });
-            for (var sub of ['aiAsk', 'reports', 'aiDesk', 'teams', 'answers']) (await db.query('labClasses/' + c.space + '/' + sub, [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/' + sub + '/' + r.id); });
+            for (var sub of ['aiAsk', 'reports', 'aiDesk', 'teams', 'answers', 'media']) (await db.query('labClasses/' + c.space + '/' + sub, [])).forEach(function (r) { paths.push('labClasses/' + c.space + '/' + sub + '/' + r.id); });
             for (var i = 0; i < paths.length; i++) await db.del(paths[i]);
             var look = await db.get('labClassCodes/' + c.classCode);
             if (look && look.space === c.space) await db.del('labClassCodes/' + c.classCode);
@@ -974,6 +1013,8 @@
                 if (a === 'lessonEditReset') return await lessonEditReset(body, auth);
                 if (a === 'lessonEditList') return await lessonEditList(body, auth);
                 if (a === 'answerSave') return await answerSave(body, auth);
+                if (a === 'mediaSave') return await mediaSave(body, auth);
+                if (a === 'mediaGet') return await mediaGet(body, auth);
                 if (a === 'answerMine') return await answerMine(body, auth);
                 if (a === 'answerList') return await answerList(body, auth);
                 if (a === 'lessonImgSave') return await lessonImgSave(body, auth);

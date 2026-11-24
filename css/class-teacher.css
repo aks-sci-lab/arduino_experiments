@@ -463,3 +463,15 @@ button.ct-rp-cell { cursor: pointer; }
 /* 4K: 글자가 화면 높이에 맞춰 커지므로 팝업 폭도 함께 (1600px 고정이면 칸이 좁아짐) */
 .ct-runpop .ct-runpop-box { width: min(94vw, max(1600px, 165vh)); }
 #runPane.in-pop #stageCard .ct-row button, .ct-rp-tabs button { min-height: max(44px, 2.4rem); }
+/* 🎯 도전 장면 (필름통 로켓 결과판): 📷 ▶ 단추 → 누를 때만 읽어 크게 */
+.ct-media { display: inline-flex; gap: 4px; vertical-align: middle; }
+.ct-media-btn { min-height: 0; min-width: 2.2em; padding: 2px 6px; font-size: .95em; line-height: 1.2; background: var(--c-card, #fff); color: var(--c-primary); border: 1px solid var(--c-primary); border-radius: 6px; }
+.ct-media-btn:hover { background: var(--c-primary); color: #fff; }
+.ct-media-no { font-size: .8em; color: var(--c-muted); white-space: nowrap; }
+.ct-media-modal { position: fixed; inset: 0; z-index: 2000; background: rgba(0, 0, 0, .72); display: flex; align-items: center; justify-content: center; padding: 2vh 2vw; }
+.ct-media-modal[hidden] { display: none; }
+.ct-media-in { background: var(--c-card, #fff); border-radius: 12px; padding: var(--sp-3); max-width: 96vw; max-height: 96vh; display: flex; flex-direction: column; gap: var(--sp-2); }
+.ct-media-head { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); }
+.ct-media-body { display: flex; justify-content: center; min-width: min(80vw, 320px); }
+.ct-media-body img, .ct-media-body video { height: 72vh; width: auto; max-width: 90vw; object-fit: contain; border-radius: 8px; background: #000; }
+#ctMediaClose { min-height: 44px; padding: 0 var(--sp-3); font-size: 1rem; }

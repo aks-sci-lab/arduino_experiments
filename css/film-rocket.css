@@ -172,3 +172,14 @@ html.ev-answering .ev-screen .ev-ok, html.ev-answering .ev-screen .ev-no, html.e
 /* 응답 장: 물음과 답 칸만이라 짧음 → 화면 가운데로 (교사 발표 보기 옆 폰 틀·실제 폰 모두 아래가 휑하지 않게).
    --ev-vh = 창 높이 ÷ 배율(js/film-rocket.js) — 발표용 틀은 html 에 zoom 을 걸어 100vh 가 배율만큼 커짐 */
 html.ev-answering .ev-wrap { min-height: var(--ev-vh, 100vh); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }
+/* 🎯 도전 장면: 카메라 아래 얼굴 가리기 한 줄·결과 화면의 보낸 결과 */
+.ev-face { font-weight: 700; padding: var(--sp-1) var(--sp-2); border-radius: 8px; background: var(--c-bg); }
+.ev-face.on { color: var(--c-success); }
+.ev-face.off { color: var(--c-danger); }
+.ev-media-msg { margin-top: var(--sp-2); }
+/* 🎯 도전 장면 확인 (보내기 전 팀이 봄): 사진·영상을 화면 폭에 크게 */
+.ev-chk { display: grid; gap: var(--sp-2); margin: var(--sp-3) 0; }
+.ev-chk.two { grid-template-columns: 1fr 1fr; }
+.ev-chk figure { margin: 0; min-width: 0; }
+.ev-chk figcaption { font-size: .9rem; color: var(--c-muted); text-align: center; margin-top: 2px; }
+.ev-chk-img { display: block; width: 100%; height: 16vh; object-fit: contain; border-radius: 12px; background: #000; }

@@ -284,7 +284,6 @@
         var ch1 = (st.t1 && st.t1.challenge) || [], ch2 = (st.t2 && st.t2.challenge) || [];
         var best = function (list) { var b = null; list.forEach(function (c) { if (isFinite(c.diff) && (!b || Math.abs(c.diff) < Math.abs(b.diff))) b = c; }); return b; };
         var b1 = best(ch1), b2 = best(ch2);
-        var maxPct = t2.concat(ch2).reduce(function (m, t) { return isFinite(t.pct) && t.pct > m ? t.pct : m; }, -1);
         var ch = conceptChanges(st.think && st.think.first, st.think && st.think.last);
         var out = { '팀 점수': sc.points, '퀴즈 맞힘': sc.correct, '열림 측정 수': t1.length + ch1.length };
         if (b1) { out['시간 도전 차이(초)'] = round(b1.diff, 1); out['시간 도전 성공'] = Math.abs(b1.diff) <= s.tolTime + 1e-9 ? 1 : 0; }
@@ -306,7 +305,10 @@
             // 📏 증거: 바꾼 것과 우리 숫자 (예: '물의 온도 30 °C→50 °C: 14.2초→9.8초')
             if (ev) out[n + ' 증거'] = ev.short;
         });
-        if (maxPct >= 0) out['높이 최고(%)'] = Math.round(maxPct);
+        // 🎯 도전 장면 (교사 결과판 📷 ▶): 차시마다 한 글자 — v 사진+영상 · p 사진만 · x 얼굴 가리기를 못 해 안 보냄 · n 팀이 확인하고 안 보냄 · - 없음
+        // (2026-11-23 '결과판에서 최고 높이는 필요 없어' → 그 칸 대신. 요약 칸은 20개까지)
+        var md = st.media || {}, mc = function (k) { return /^[vpxn]$/.test(md[k] || '') ? md[k] : '-'; };
+        if (md.t1 || md.t2) out['도전 장면'] = mc('t1') + mc('t2');
         if (b2) { out['높이 도전 차이(%)'] = Math.round(b2.diff); out['높이 도전 성공'] = Math.abs(b2.diff) <= s.tolPct + 1e-9 ? 1 : 0; }
         out['생각 바뀜 ✨'] = ch.filter(function (c) { return c.sparkle; }).length;
         return out;
