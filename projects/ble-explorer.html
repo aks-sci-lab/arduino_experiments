@@ -50,6 +50,19 @@
         <div id="deviceBox" class="card" hidden>
             <h2 id="devName">기기</h2>
             <p id="vendorNote" class="box ok" hidden></p>
+            <div id="uuidHelpBox" class="box warn" hidden>
+                <p><b>🔎 데이터 서비스가 안 보이나요?</b> 웹 블루투스는 위 ‘열어 볼 서비스’에 적은 UUID 만 열어 줍니다. 제조사 전용 서비스는 아래 방법으로 30초 만에 찾을 수 있어요.</p>
+                <ol>
+                    <li><b>PC 크롬</b>: 새 탭 주소창에 <code>chrome://bluetooth-internals/#devices</code> 입력 → <b>Start Scan</b> → 이 기기 옆 <b>Inspect</b> → <b>Services</b> 아래 UUID 복사</li>
+                    <li><b>스마트폰</b>: 무료 앱 <b>nRF Connect</b> 로 스캔·연결 → 서비스 UUID 복사</li>
+                    <li>복사한 UUID 를 위 <b>‘열어 볼 서비스 고르기 → 직접 넣을 서비스 UUID’</b> 칸에 붙여 넣고 <b>🔍 기기 찾아 연결</b>을 다시 누르세요.</li>
+                </ol>
+                <div class="row">
+                    <button type="button" id="btnCopyBtInternals" class="btn small">📋 chrome://bluetooth-internals/#devices 복사</button>
+                    <button type="button" id="btnOpenSvcBox" class="btn small">📝 UUID 넣는 칸 열기</button>
+                </div>
+                <p id="uuidHelpMsg" class="note" role="status"></p>
+            </div>
             <div id="vernierBox" class="card" hidden>
                 <p class="note">버니어 센서는 연결한 뒤 처음 인사(init) 명령을 받지 못하면 잠시 뒤 스스로 끊는 것 같아요. 공개 도구(godirect-js)가 보내는 것과 같은 명령을 보냅니다. 다른 회사 센서에는 아무 명령도 보내지 않아요.</p>
                 <label class="inline"><input type="checkbox" id="vernierAuto" checked> 연결하면 자동으로 보내기</label>
@@ -83,15 +96,35 @@
         <h3>받은 값 <span class="note">(최근 200개)</span></h3>
         <div class="tbl-wrap"><table id="logTable" class="log"><thead><tr><th>시각(s)</th><th>특성</th><th>길이</th><th>16진수</th></tr></thead><tbody></tbody></table></div>
         <details class="card warn-box" id="writeBox">
-            <summary><b>✏️ 특성에 쓰기 (주의)</b></summary>
-            <p class="note">⚠️ 센서 설정을 바꾸거나 기기가 이상하게 동작할 수 있어요. 무엇을 보내는지 알 때만 쓰세요.</p>
+            <summary><b>✏️ 특성에 쓰기 · 시작 명령 시퀀스 (주의)</b></summary>
+            <p class="note">⚠️ 센서 설정을 바꾸거나 기기가 이상하게 동작할 수 있어요. 무엇을 보내는지 알 때만 쓰세요. 센서를 깨우는 시작 명령을 찾으면 아래 ‘시작 명령 목록’에 저장해 프로필과 함께 쓸 수 있어요.</p>
             <label for="writeChar">쓸 특성</label>
             <select id="writeChar"></select>
-            <label for="writeHex">보낼 바이트 (16진수)</label>
-            <input type="text" id="writeHex" spellcheck="false" placeholder="01 00">
+            <div class="row">
+                <label for="writeMode" class="inline">형식</label>
+                <select id="writeMode">
+                    <option value="hex" selected>16진수 (HEX)</option>
+                    <option value="ascii">글자 (ASCII, \r\n 지원)</option>
+                </select>
+                <label for="writeDelay" class="inline">뒤 대기(ms)</label>
+                <input type="number" id="writeDelay" min="0" max="10000" step="50" value="200">
+            </div>
+            <label for="writeHex">보낼 값</label>
+            <input type="text" id="writeHex" spellcheck="false" placeholder="01 00 (글자 모드 예: START\r\n)">
             <label class="inline"><input type="checkbox" id="writeOk"> 센서 설정을 바꿀 수 있음을 알고 보냅니다</label>
-            <div class="row"><button type="button" id="btnWrite" class="btn danger" disabled>보내기</button></div>
+            <div class="row">
+                <button type="button" id="btnWrite" class="btn danger" disabled>보내기</button>
+                <button type="button" id="btnAddInitCmd" class="btn" disabled>➕ 시작 명령에 추가</button>
+            </div>
             <p id="writeMsg" class="note" role="status"></p>
+            <div id="initCmdWrap">
+                <h3>저장된 시작 명령 순서 <span class="note">(연결 뒤 자동으로 보낼 명령 — ④ 규칙에 함께 저장됨)</span></h3>
+                <ul id="initCmdList" class="saved cmd-list"></ul>
+                <div class="row">
+                    <button type="button" id="btnRunInitCmds" class="btn primary" disabled>▶ 시작 명령 순서대로 보내기</button>
+                </div>
+                <p id="initCmdMsg" class="note" role="status"></p>
+            </div>
         </details>
     </section>
 

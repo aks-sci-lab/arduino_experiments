@@ -128,6 +128,28 @@ test('해석 규칙 파일 검사', () => {
     assert.equal(B.validateDecoder({ schema: 'x', characteristics: [] }).ok, false);
     const bad = B.validateDecoder({ schema: 'sensor-lab-ble-decoder', characteristics: [{ characteristic: '2a6e', fields: [{ offset: 0, format: 'int99' }] }] });
     assert.equal(bad.ok, false);
+
+    // HEX / ASCII 명령 인코딩 및 initCommands 검증
+    assert.deepEqual(Array.from(B.encodeCommand('01 A0', 'hex')), [1, 0xa0]);
+    assert.deepEqual(Array.from(B.encodeCommand('START\\r\\n', 'ascii')), [83, 84, 65, 82, 84, 13, 10]);
+    assert.throws(() => B.encodeCommand('', 'ascii'), /글자/);
+    const withCmd = B.validateDecoder({
+        schema: 'sensor-lab-ble-decoder', name: '명령 필요 센서',
+        characteristics: [{ service: 'fff0', characteristic: 'fff1', mode: 'notify', fields: [{ name: '온도', offset: 2, format: 'int16le', scale: 0.01, unit: '°C' }] }],
+        initCommands: [
+            { service: 'fff0', characteristic: 'fff2', mode: 'ascii', payload: 'START\\r\\n', delayMs: 200 },
+            { service: 'fff0', characteristic: 'fff2', mode: 'hex', payload: '01 00', delayMs: 50 }
+        ]
+    });
+    assert.ok(withCmd.ok, JSON.stringify(withCmd.errors));
+    assert.equal(withCmd.decoder.initCommands.length, 2);
+    assert.equal(withCmd.decoder.initCommands[0].characteristic, '0000fff2-0000-1000-8000-00805f9b34fb');
+    assert.equal(withCmd.decoder.initCommands[0].mode, 'ascii');
+    const badCmd = B.validateDecoder({
+        schema: 'sensor-lab-ble-decoder', characteristics: [],
+        initCommands: [{ characteristic: 'fff2', mode: 'hex', payload: 'ZZ' }]
+    });
+    assert.equal(badCmd.ok, false);
 });
 
 test('기록 CSV·JSON', () => {
