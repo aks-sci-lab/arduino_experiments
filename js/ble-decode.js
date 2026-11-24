@@ -146,6 +146,10 @@
         { uuid: '1819', name: '위치·길찾기', on: false },
         { uuid: '1815', name: '자동화 입출력', on: false },
         { uuid: '6e400001-b5a3-f393-e0a9-e50e24dcca9e', name: 'Nordic UART (여러 센서가 쓰는 글자 통로)', on: true },
+        { uuid: 'ffe0', name: 'BLE 직렬 (HM-10 등 0xFFE0)', on: true },
+        { uuid: 'fff0', name: '사용자 지정 BLE (0xFFF0)', on: true },
+        { uuid: 'ff00', name: '사용자 지정 BLE (0xFF00)', on: true },
+        { uuid: '49535343-fe7d-4ae5-8fa9-9fafd205e455', name: 'Microchip/ISSC UART (듀얼모드 모듈)', on: true },
         { uuid: 'd91714ef-28b9-4f91-ba16-f0d9a604f112', name: 'Vernier Go Direct (공개 방식)', on: true },
         { uuid: '19b10000-e8f2-537e-4f6c-d104768a1214', name: '우리 Pico·Nano 센서 보드 (시험용)', on: false }
     ];
@@ -155,6 +159,8 @@
         '1819': '위치·길찾기', '1815': '자동화 입출력', '2a29': '제조사 이름', '2a24': '모델 번호', '2a25': '일련번호',
         '2a26': '펌웨어 판', '2a27': '하드웨어 판', '2a28': '소프트웨어 판', '2a23': '시스템 ID', '2a19': '배터리 잔량',
         '2a6e': '온도', '2a6f': '습도', '2a6d': '기압', '2a1c': '체온 측정', '2a37': '심박 측정', '2a00': '기기 이름',
+        'ffe0': 'BLE 직렬 (0xFFE0)', 'ffe1': 'BLE 직렬 통로 (0xFFE1)', 'fff0': '사용자 지정 (0xFFF0)', 'ff00': '사용자 지정 (0xFF00)',
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455': 'Microchip/ISSC UART',
         '6e400001-b5a3-f393-e0a9-e50e24dcca9e': 'Nordic UART', '6e400002-b5a3-f393-e0a9-e50e24dcca9e': 'UART 받기(쓰기)',
         '6e400003-b5a3-f393-e0a9-e50e24dcca9e': 'UART 보내기(알림)', '19b10000-e8f2-537e-4f6c-d104768a1214': '우리 센서 보드', 'd91714ef-28b9-4f91-ba16-f0d9a604f112': 'Vernier Go Direct'
     };
