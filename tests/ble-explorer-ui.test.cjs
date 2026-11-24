@@ -116,10 +116,10 @@ test('블루투스 해석 도구: 탐색 → 기록 → 참값 도우미 → 규
         assert.ok(await noSideScroll(page), '나무 표시 가로 스크롤');
         assert.deepEqual(await smallButtons(page), []);
 
-        // 배터리 한 번 읽기, 데이터 특성 알림 켜기
+        // 배터리 한 번 읽기, 데이터 특성 알림은 연결 시 자동으로 켜져 있음
         await page.click('[data-read="00002a19-0000-1000-8000-00805f9b34fb"]');
         await page.waitForFunction(() => /57/.test(document.querySelector('[data-val="00002a19-0000-1000-8000-00805f9b34fb"]').textContent));
-        await page.click(`[data-notify="${CHR}"]`);
+        assert.equal(await page.getAttribute(`[data-notify="${CHR}"]`, 'aria-pressed'), 'true', '연결 시 데이터 알림 자동 켜기');
         await page.waitForFunction(() => /기록 ([2-9]\d|\d{3,})개/.test(document.getElementById('countBadge').textContent));
         if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'ble-1-connect.png'), fullPage: true });
 

@@ -40,22 +40,24 @@
         <details class="card" id="svcBox">
             <summary><b>열어 볼 서비스 고르기</b> <span class="note">(Web Bluetooth 는 여기 적은 서비스만 열 수 있어요)</span></summary>
             <div id="stdServices" class="chk-list"></div>
-            <label for="customUuids"><b>직접 넣을 서비스 UUID</b> <span class="note">한 줄에 하나. nRF Connect 같은 앱으로 찾은 값 (예: 6e400001-b5a3-… 또는 180f)</span></label>
-            <textarea id="customUuids" rows="3" spellcheck="false" placeholder="0000fff0-0000-1000-8000-00805f9b34fb"></textarea>
+            <label for="customUuids"><b>직접 넣을 서비스 UUID (여러 개 가능)</b> <span class="note">줄바꿈·쉼표·공백 모두 가능. 크롬 <code>Services: …</code> 줄을 통째로 붙여 넣어도 자동으로 뽑아요 (0x1800·0x1801 시스템 기본은 자동 제외)</span></label>
+            <textarea id="customUuids" rows="3" spellcheck="false" placeholder="Services: 00001800-..., 0000180a-..., 49535343-fe7d-4ae5-8fa9-9fafd205e455"></textarea>
             <p id="uuidMsg" class="note"></p>
         </details>
         <div class="row">
             <button type="button" id="btnScan" class="btn primary" data-ble-connect>🔍 기기 찾아 연결</button>
+            <label class="inline"><input type="checkbox" id="autoNotify" checked> ⚡ 연결하면 데이터 알림 자동 켜기</label>
         </div>
         <div id="deviceBox" class="card" hidden>
             <h2 id="devName">기기</h2>
             <p id="vendorNote" class="box ok" hidden></p>
+            <div id="autoFeedNote" class="box" hidden></div>
             <div id="uuidHelpBox" class="box warn" hidden>
                 <p><b>🔎 데이터 서비스가 안 보이나요?</b> 웹 블루투스는 위 ‘열어 볼 서비스’에 적은 UUID 만 열어 줍니다. 제조사 전용 서비스는 아래 방법으로 30초 만에 찾을 수 있어요.</p>
                 <ol>
-                    <li><b>PC 크롬</b>: 새 탭 주소창에 <code>chrome://bluetooth-internals/#devices</code> 입력 → <b>Start Scan</b> → 이 기기 옆 <b>Inspect</b> → <b>Services</b> 아래 UUID 복사</li>
+                    <li><b>PC 크롬</b>: 새 탭 주소창에 <code>chrome://bluetooth-internals/#devices</code> 입력 → <b>Start Scan</b> → 이 기기 옆 <b>Inspect</b> → <b>Services: …</b> 줄을 통째로 복사</li>
                     <li><b>스마트폰</b>: 무료 앱 <b>nRF Connect</b> 로 스캔·연결 → 서비스 UUID 복사</li>
-                    <li>복사한 UUID 를 위 <b>‘열어 볼 서비스 고르기 → 직접 넣을 서비스 UUID’</b> 칸에 붙여 넣고 <b>🔍 기기 찾아 연결</b>을 다시 누르세요.</li>
+                    <li>복사한 내용을 위 <b>‘열어 볼 서비스 고르기 → 직접 넣을 서비스 UUID’</b> 칸에 붙여 넣고 <b>🔍 기기 찾아 연결</b>을 다시 누르세요 (여러 개도 한꺼번에 처리돼요).</li>
                 </ol>
                 <div class="row">
                     <button type="button" id="btnCopyBtInternals" class="btn small">📋 chrome://bluetooth-internals/#devices 복사</button>

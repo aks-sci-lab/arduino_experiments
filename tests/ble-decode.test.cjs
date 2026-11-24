@@ -61,7 +61,16 @@ test('16진수·UUID', () => {
     assert.equal(B.normUuid('battery'), null);
     assert.equal(B.shortUuid('0000180f-0000-1000-8000-00805f9b34fb'), '0x180F');
     assert.equal(B.knownName('2a19'), '배터리 잔량');
+    assert.equal(B.knownName('49535343-1e4d-4bd9-ba61-23c647249616'), 'ISSC UART 받기(알림·TX)');
     assert.equal(B.knownName('12345678-1234-1234-1234-123456789abc'), '');
+    // 여러 UUID · 크롬 Services: 줄 통째 붙여넣기
+    const multi = B.parseUuidList('Services: 00001800-0000-1000-8000-00805f9b34fb, 00001801-0000-1000-8000-00805f9b34fb, 0000180a-0000-1000-8000-00805f9b34fb, 49535343-fe7d-4ae5-8fa9-9fafd205e455');
+    assert.deepEqual(multi.uuids, ['0000180a-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4ae5-8fa9-9fafd205e455']);
+    assert.equal(multi.skippedSystem.length, 2);
+    assert.deepEqual(multi.bad, []);
+    const mixed = B.parseUuidList('fff0\nzz-bad');
+    assert.deepEqual(mixed.uuids, ['0000fff0-0000-1000-8000-00805f9b34fb']);
+    assert.deepEqual(mixed.bad, ['zz-bad']);
 });
 
 test('바뀌는 바이트를 길이별로 찾는다', () => {
