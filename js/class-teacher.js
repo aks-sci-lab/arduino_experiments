@@ -207,7 +207,10 @@
     $('btnDone').addEventListener('click', async function () {
         var c = watched(); if (!c) return;
         var to = !c.done;
-        if (to && !confirm('수업 ' + c.classCode + ' 을 ‘마친 수업’으로 표시할까요?\n학생 화면과 자료는 그대로예요. 다시 눌러 되돌릴 수 있어요.')) return;
+        var warn = c.mode === 'team'
+            ? '\n※ 팀들이 보낸 도전 장면 사진·영상은 지금 바로 지워지며 되돌릴 수 없어요. 나머지 기록은 그대로예요.'
+            : '\n학생 화면과 자료는 그대로예요. 다시 눌러 되돌릴 수 있어요.';
+        if (to && !confirm('수업 ' + c.classCode + ' 을 ‘마친 수업’으로 표시할까요?' + warn)) return;
         $('doneMsg').className = 'note'; $('doneMsg').textContent = '⏳ 저장하는 중…';
         var r = await CC.classDone(c.space, to);
         if (!r.ok) { $('doneMsg').className = 'note err'; $('doneMsg').textContent = '⚠️ ' + r.error; return; }
@@ -1059,7 +1062,7 @@
         var c = watched(); if (!answerSlide() || ans.busy) return;
         if (Date.now() - ans.at < 1500) { ans.t = setTimeout(answersFetch, 1500); return; }
         ans.busy = true; ans.at = Date.now();
-        var r = null; try { r = await CC.classExport(c.space); } catch (e) { r = null; }
+        var r = null; try { r = await CC.classExport(c.space, null, true); } catch (e) { r = null; }
         ans.busy = false;
         if (r && r.ok && watched() === c) { ans.space = c.space; ans.data = CTA.payloads(r.items, c.groups); }
         answersPaint();

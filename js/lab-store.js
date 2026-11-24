@@ -188,6 +188,24 @@
     }
     function docKey(exp, group, id) { return (String(exp).replace(/[^A-Za-z0-9_:-]/g, '') + '~' + group + '~' + id).slice(0, 120); }
     function iso(v) { return v instanceof Date ? v.toISOString() : String(v == null ? '' : v); }
+    // mode: 띠 문구 ('look' = 👀 앞 화면을 봐요, 'phone' = ✍️ 내 화면에서 해요 — 장의 mode, js/lesson-slides.js)
+    function cleanQ(q) {
+        if (!q || typeof q !== 'object' || (q.type !== 'pick' && q.type !== 'text')) return null;
+        var t = text(q.text, RESP.TEXT).trim(); if (!t) return null;
+        var out = { type: q.type, text: t };
+        if (q.type === 'pick') {
+            var ch = (Array.isArray(q.choices) ? q.choices : []).slice(0, RESP.CHOICES).map(function (c) { return text(c, RESP.CHOICE).trim(); }).filter(Boolean);
+            if (ch.length < 2) return null;
+            out.choices = ch;
+        }
+        return out;
+    }
+    function lessonOut(L) {
+        if (!L || typeof L !== 'object') return null;
+        var o = { on: L.on === true, stage: String(L.stage || ''), i: Number(L.i) || 0, key: String(L.key || ''), reveal: L.reveal === true, mode: L.mode === 'phone' ? 'phone' : 'look' };
+        var q = cleanQ(L.q); if (q && o.on) o.q = q;
+        return o;
+    }
 
     /* ---------- 핵심: 요청 하나 처리 (db·auth 는 밖에서) ----------
        db: { get(path, opt) → 자료|null, set(path, data), del(path), query(coll, [[필드, 값]…], opt) → [{ id, data }], now() → Date, stamp() }
@@ -318,24 +336,6 @@
             if (!c || (code && c.classCode !== code)) return null;
             return Object.assign({ space: space }, c);
         }
-        // mode: 띠 문구 ('look' = 👀 앞 화면을 봐요, 'phone' = ✍️ 내 화면에서 해요 — 장의 mode, js/lesson-slides.js)
-        function cleanQ(q) {
-            if (!q || typeof q !== 'object' || (q.type !== 'pick' && q.type !== 'text')) return null;
-            var t = text(q.text, RESP.TEXT).trim(); if (!t) return null;
-            var out = { type: q.type, text: t };
-            if (q.type === 'pick') {
-                var ch = (Array.isArray(q.choices) ? q.choices : []).slice(0, RESP.CHOICES).map(function (c) { return text(c, RESP.CHOICE).trim(); }).filter(Boolean);
-                if (ch.length < 2) return null;
-                out.choices = ch;
-            }
-            return out;
-        }
-        function lessonOut(L) {
-            if (!L || typeof L !== 'object') return null;
-            var o = { on: L.on === true, stage: String(L.stage || ''), i: Number(L.i) || 0, key: String(L.key || ''), reveal: L.reveal === true, mode: L.mode === 'phone' ? 'phone' : 'look' };
-            var q = cleanQ(L.q); if (q && o.on) o.q = q;
-            return o;
-        }
         function aiLimitOf(c) { var n = Number(c && c.aiLimit); return c && c.aiLimit != null && isFinite(n) ? n : AI.LIMIT_DEFAULT; }   // 예전 수업(칸 없음)은 기본 20
         function publicClass(c) {
             return { ok: true, classCode: c.classCode, space: c.space, ban: c.ban, nStudents: c.nStudents, groupSize: c.groupSize, exp: c.exp,
@@ -347,8 +347,8 @@
                 lesson: lessonOut(c.lesson), lessonOpen: Array.isArray(c.lessonOpen) ? c.lessonOpen.slice(0, LESSON_OPEN_MAX) : [] };
         }
         // ----- 팀 이름으로 입장 (mode 'team') -----
-        async function teamList(c) {
-            return (await db.query('labClasses/' + c.space + '/teams', [])).map(function (r) { return { jo: Number(r.id), name: String(r.data.name || ''), key: String(r.data.key || ''), uid: String(r.data.uid || '') }; })
+        async function teamList(c, live) {
+            return (await db.query('labClasses/' + c.space + '/teams', [], live ? { live: true } : undefined)).map(function (r) { return { jo: Number(r.id), name: String(r.data.name || ''), key: String(r.data.key || ''), uid: String(r.data.uid || '') }; })
                 .filter(function (t) { return t.jo >= 1; }).sort(function (a, x) { return a.jo - x.jo; });
         }
         async function teamJoin(b, auth) {
@@ -644,8 +644,8 @@
             await db.set('labClassCodes/' + code, { space: space, owner: auth.uid, joinUntil: new Date(now.getTime() + JOIN_DAYS * 86400000), expireAt: exp2 });
             return publicClass(Object.assign({ space: space }, rec));
         }
-        async function getOrNull(path) {
-            try { return await db.get(path); }
+        async function getOrNull(path, opt) {
+            try { return await db.get(path, opt); }
             catch (e) { if (/permission|insufficient/i.test(String(e && (e.code || '') + (e.message || '')))) return null; throw e; }
         }
         // 수업 코드 다시 열기 (주인만): 코드로 찾기를 지금부터 JOIN_DAYS 동안 다시 허용
@@ -749,17 +749,18 @@
             });
             Object.keys(devs).forEach(function (gc) { subs[gc].devices = Object.keys(devs[gc]).length; });
             var out = publicClass(c);
-            if (c.mode === 'team') out.teams = (await teamList(c)).map(function (t) { return { jo: t.jo, name: t.name }; });
+            if (c.mode === 'team') out.teams = (await teamList(c, true)).map(function (t) { return { jo: t.jo, name: t.name }; });
             out.now = db.now().toISOString();
             out.students = students;
             out.submissions = (c.groups || []).map(function (g) { return subs[g.code]; });
             return out;
         }
-        // 교사: 내려받기용 모든 줄 (자료 포함)
+        // 교사: 내려받기용 모든 줄 (자료 포함). b.live === true 면 실시간 캐시 재사용(응답 장 폴링용)
         async function classExport(b, auth) {
             var c = await ownedClass(b, auth);
-            var rows = (await classItems(c, false)).map(function (r) { var o = {}; Object.keys(r.data).forEach(function (k) { o[k] = r.data[k] instanceof Date ? r.data[k].toISOString() : r.data[k]; }); return o; });
-            if (c.exp === 'pendulum') {
+            var live = b.live === true || b.live === 'true';
+            var rows = (await classItems(c, live)).map(function (r) { var o = {}; Object.keys(r.data).forEach(function (k) { o[k] = r.data[k] instanceof Date ? r.data[k].toISOString() : r.data[k]; }); return o; });
+            if (c.exp === 'pendulum' && !live) {
                 for (var i = 0; i < rows.length; i++) {
                     if (!rows[i].hasRaw) continue;
                     var raw = await db.get('labSpaces/' + c.space + '/raw/' + docKey('pendulum', rows[i].group, rows[i].id));
@@ -767,7 +768,7 @@
                 }
             }
             var out = publicClass(c);
-            if (c.mode === 'team') out.teams = (await teamList(c)).map(function (t) { return { jo: t.jo, name: t.name }; });
+            if (c.mode === 'team') out.teams = (await teamList(c, live)).map(function (t) { return { jo: t.jo, name: t.name }; });
             out.items = rows.filter(function (d) { return c.exp === 'planck' ? Number(d.nIV) + Number(d.nGlow) > 0 : c.exp === 'pendulum' ? true : Number(d.n) > 0; });
             return out;
         }
@@ -870,7 +871,7 @@
             needUid(auth);
             var c = await joinedClass(b);
             var rows = await db.query(classPath(c, 'aiAsk'), [['uid', auth.uid]], { live: true });
-            var desk = await getOrNull(classPath(c, 'aiDesk') + '/status');
+            var desk = await getOrNull(classPath(c, 'aiDesk') + '/status', { live: true });
             return { ok: true, limit: aiLimitOf(c), now: db.now().toISOString(), desk: deskInfo(desk),
                 asks: rows.map(function (r) { return publicAsk(r.id, r.data, false); }).sort(byTime) };
         }
@@ -1183,9 +1184,9 @@
     }
     function notify(u) { if (fakeUrl()) userListeners.forEach(function (cb) { try { cb(u); } catch (e) { /* 무시 */ } }); }
 
-    // Firestore 어댑터: live 질문은 실시간 듣기로 한 번 붙여 두고 그 뒤로는 받아 둔 것을 돌려준다 (몇 초마다 불러와도 읽기 횟수가 늘지 않음)
+    // Firestore 어댑터: live 질문·문서는 실시간 듣기로 한 번 붙여 두고 그 뒤로는 받아 둔 것을 돌려준다 (몇 초마다 불러와도 읽기 횟수가 늘지 않음)
     function firestoreDb(fb) {
-        var fs = fb.firestore(), live = {}, cacheDocs = {}, LIVE_MAX = 30, order = [];   // 30: 교사 화면이 수업 여러 개의 AI 질문을 함께 들음
+        var fs = fb.firestore(), live = {}, liveDocs = {}, cacheDocs = {}, LIVE_MAX = 30, DOC_MAX = 20, order = [], docOrder = [];   // 30: 교사 화면이 수업 여러 개의 AI 질문을 함께 들음
         function conv(v) {
             if (v && typeof v.toDate === 'function') return v.toDate();
             if (Array.isArray(v)) return v.map(conv);
@@ -1209,10 +1210,26 @@
             while (order.length > LIVE_MAX) { var old = order.shift(); if (live[old] && old !== key) { try { live[old].off(); } catch (e) { /* 무시 */ } delete live[old]; } }
             return L.ready.then(function () { return L.rows; });
         }
+        function liveDoc(path) {
+            var L = liveDocs[path];
+            if (L) { L.used = Date.now(); return L.ready.then(function () { return L.data; }); }
+            L = liveDocs[path] = { data: null, used: Date.now() };
+            L.ready = new Promise(function (res, rej) {
+                var first = true;
+                L.off = fs.doc(path).onSnapshot(function (d) {
+                    L.data = d.exists ? conv(d.data({ serverTimestamps: 'estimate' })) : null;
+                    if (first) { first = false; res(); }
+                }, function (err) { delete liveDocs[path]; if (first) { first = false; rej(err); } });
+            });
+            docOrder.push(path);
+            while (docOrder.length > DOC_MAX) { var old = docOrder.shift(); if (liveDocs[old] && old !== path) { try { liveDocs[old].off(); } catch (e) { /* 무시 */ } delete liveDocs[old]; } }
+            return L.ready.then(function () { return L.data; });
+        }
         return {
             now: function () { return new Date(); },
             stamp: function () { return fb.raw.firestore.FieldValue.serverTimestamp(); },
             get: function (path, opt) {
+                if (opt && opt.live) return liveDoc(path);
                 if (opt && opt.cache && cacheDocs[path]) return cacheDocs[path];
                 var p = fs.doc(path).get().then(function (d) { return d.exists ? conv(d.data()) : null; });
                 if (opt && opt.cache) { cacheDocs[path] = p; p.then(function (v) { if (!v) delete cacheDocs[path]; }, function () { delete cacheDocs[path]; }); }
@@ -1281,7 +1298,7 @@
             return await browserDb.subscribe('labSpaces/' + space + '/items', [['exp', exp && exp !== 'pendulum' ? exp : 'pendulum'], ['group', group]], cb);
         } catch (e) { return null; }
     }
-    /* 수업 문서(열린 단계·행사 설정)를 실시간으로: cb({ stage, setup }) — 가짜 서버면 null (부르는 쪽이 몇 초마다 classInfo) */
+    /* 수업 문서(열린 단계·행사 설정·설명 장·응답 물음)를 실시간으로: cb({ stage, setup, lesson, lessonOpen }) — 가짜 서버면 null */
     async function watchClassDoc(url, cb) {
         if (fakeUrl()) return null;
         try {
@@ -1289,7 +1306,7 @@
             await getCore();
             return browserDb.subscribeDoc ? browserDb.subscribeDoc('labClasses/' + space, function (d) {
                 if (d) cb({ stage: d.stage == null ? null : Number(d.stage), setup: d.setup || null,
-                    lesson: d.lesson && typeof d.lesson === 'object' ? { on: d.lesson.on === true, stage: String(d.lesson.stage || ''), i: Number(d.lesson.i) || 0, key: String(d.lesson.key || ''), reveal: d.lesson.reveal === true, mode: d.lesson.mode === 'phone' ? 'phone' : 'look' } : null,
+                    lesson: lessonOut(d.lesson),
                     lessonOpen: Array.isArray(d.lessonOpen) ? d.lessonOpen.slice(0, LESSON_OPEN_MAX) : [] });
             }) : null;
         } catch (e) { return null; }
@@ -1388,7 +1405,7 @@
     return {
         AI: AI, aiCsv: aiCsv, reportCsv: reportCsv,
         VERSION: VERSION, TTL_DAYS: TTL_DAYS, SPACE_RE: SPACE_RE, JOIN_DAYS: JOIN_DAYS,
-        core: core, memoryDb: memoryDb, firestoreDb: firestoreDb, call: call, watch: watch, watchClass: watchClass, watchClassDoc: watchClassDoc, STAGE_ALL: STAGE_ALL,
+        core: core, memoryDb: memoryDb, firestoreDb: firestoreDb, lessonOut: lessonOut, call: call, watch: watch, watchClass: watchClass, watchClassDoc: watchClassDoc, STAGE_ALL: STAGE_ALL,
         newSpace: newSpace, isSpace: isSpace, isLabUrl: isLabUrl, urlOf: urlOf, spaceOf: spaceOf, groupSpace: groupSpace, parseUrl: parseUrl, docKey: docKey,
         ensureUser: ensureUser, currentUser: currentUser, signInGoogle: signInGoogle, signOut: signOut, onUser: onUser, isTeacher: isTeacher,
         cleanTeamName: cleanTeamName, teamKey: teamKey, cleanSetup: cleanSetup, TEAM: TEAM,

@@ -52,7 +52,7 @@
     $('aiOn').checked = get(ls, 'on') !== '0';
     $('aiOn').addEventListener('change', function () {
         put(ls, 'on', $('aiOn').checked ? '1' : '0');
-        state.beats = {};   // 바로 켜짐/꺼짐 신호
+        Object.keys(state.beats).forEach(function (k) { state.beats[k].at = 0; });   // 바로 켜짐/꺼짐 신호
         state.pauseUntil = 0; renderDesk(); tick();
     });
     $('aiTest').addEventListener('click', async function () {
@@ -72,7 +72,7 @@
     LS.onUser(function (u) { state.user = u && u.google ? u : null; renderDesk(); });
     function workClasses() {
         var now = Date.now();
-        return state.classes.filter(function (c) { return !c.expireAt || Date.parse(c.expireAt) > now; }).slice(0, MAX_CLASSES);
+        return state.classes.filter(function (c) { return !c.done && (!c.expireAt || Date.parse(c.expireAt) > now); }).slice(0, MAX_CLASSES);
     }
     function ready() { return !!(state.user && $('aiOn').checked && keyNow() && $('aiModel').value.trim()); }
     function renderDesk() {
@@ -97,10 +97,10 @@
         state.busy = true;
         try {
             var list = workClasses(), on = ready(), now = Date.now();
-            // 켜짐 신호 (1분마다, 켜고 끌 때 바로)
+            // 켜짐 신호: 켜져 있을 때만 1분마다 갱신. 꺼져 있을 때는 직전에 켜져 있던 수업만 한 번 '꺼짐'을 알리고 유휴 쓰기를 하지 않음
             for (var i = 0; i < list.length; i++) {
                 var c = list[i], b = state.beats[c.space];
-                if (!b || b.on !== on || now - b.at > BEAT_MS) {
+                if (on ? (!b || !b.on || now - b.at > BEAT_MS) : (b && b.on)) {
                     var rb = await call(c.space, { action: 'aiDeskBeat', on: on, provider: prov(), model: $('aiModel').value.trim() });
                     if (rb.ok) state.beats[c.space] = { on: on, at: now };
                 }

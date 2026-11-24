@@ -369,7 +369,7 @@
         all.forEach(function (s) {
             $m('#rai-t-' + s.key).value = st.sections[s.key] || '';
             $m('#rai-p-' + s.key).value = st.prompts[s.key] || '';
-            var a = st.attach[s.key] || { draft: true, calc: s.key === 'analysis' || s.key === 'conclusion' };
+            var a = st.attach[s.key] || { draft: true, calc: s.key === 'analysis' || s.key === 'conclusion' || s.key === 'verdict' };
             mount.querySelectorAll('input[data-sec="' + s.key + '"]').forEach(function (cb) { cb.checked = !!a[cb.dataset.att]; });
         });
         mount.querySelectorAll('.rai-ext').forEach(function (t) { t.value = st.external[t.dataset.ext] || ''; });
