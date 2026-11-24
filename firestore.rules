@@ -3,39 +3,43 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // User roles helper function
+    function isGoogle() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
     function isTeacher(request) {
-      return request.auth.token.email == "lany0665@gmail.com" ||
+      return isGoogle() && (
+             request.auth.token.email == "lany0665@gmail.com" ||
              (exists(/databases/$(database)/documents/roles/$(request.auth.uid)) &&
-              get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.isTeacher == true);
+              get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.isTeacher == true));
     }
 
-    // Experiments collection
+    // Experiments collection (구글 로그인 사용자 전용 — 익명 학생 차단)
     match /experiments/{docId} {
       // Create: user must be authenticated, owner of the data, valid fields
-      allow create: if request.auth != null &&
+      allow create: if isGoogle() &&
                     request.resource.data.userId == request.auth.uid &&
                     request.resource.data.keys().hasAll(['userId', 'userEmail', 'timestamp', 'tab', 'weatherSample', 'stargazingSample']) &&
                     request.resource.data.stargazingSample is list &&
                     request.resource.data.stargazingSample.size() <= 14;
 
       // Read / Update / Delete: owner OR teacher
-      allow read, update, delete: if request.auth != null &&
+      allow read, update, delete: if isGoogle() &&
                                      (resource.data.userId == request.auth.uid || isTeacher(request));
     }
 
     // 걷기·뛰기 판정기 AI 설정 (Gemini 모델·API 키)
-    // 읽기: 로그인한 사용자 중 교사, 또는 교사가 학생 사용을 허용(allowStudents)한 경우. 쓰기: 교사만.
+    // 읽기: 구글 로그인 사용자 중 교사, 또는 교사가 학생 사용을 허용(allowStudents)한 경우. 쓰기: 교사만. (익명 차단)
     match /appConfig/{docId} {
-      allow read: if request.auth != null &&
+      allow read: if isGoogle() &&
                      (isTeacher(request) || resource.data.allowStudents == true);
-      allow write: if request.auth != null && isTeacher(request);
+      allow write: if isGoogle() && isTeacher(request);
     }
 
-    // 걷기·뛰기 판정기 학습 데이터: 로그인한 사용자만 읽고, 본인 이름으로만 올리며, 본인 또는 교사만 삭제.
-    // 라벨은 학생이 만든 이름도 허용(1~10자). 교사만 evalSet(평가용 지정) 값을 바꿀 수 있다.
+    // 걷기·뛰기 판정기 학습 데이터: 구글 로그인 사용자만 읽고, 본인 이름으로만 올리며, 본인 또는 교사만 삭제.
+    // 라벨은 학생이 만든 이름도 허용(1~10자). 교사만 evalSet(평가용) 값을 바꿀 수 있다.
     match /walkRunData/{docId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null &&
+      allow read: if isGoogle();
+      allow create: if isGoogle() &&
                     request.resource.data.userId == request.auth.uid &&
                     request.resource.data.label is string &&
                     request.resource.data.label.size() >= 1 &&
@@ -44,28 +48,28 @@ service cloud.firestore {
                     request.resource.data.m.size() >= 200 &&
                     request.resource.data.m.size() <= 6000 &&
                     request.resource.data.evalSet == false;
-      allow update: if request.auth != null && isTeacher(request) &&
+      allow update: if isGoogle() && isTeacher(request) &&
                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evalSet']);
-      allow delete: if request.auth != null &&
+      allow delete: if isGoogle() &&
                     (resource.data.userId == request.auth.uid || isTeacher(request));
     }
 
-    // 조별 모델: 학생 한 명당 문서 하나(문서 id = 본인 uid). 로그인한 사용자 읽기, 본인만 쓰기, 본인 또는 교사 삭제.
+    // 조별 모델: 학생 한 명당 문서 하나(문서 id = 본인 uid). 구글 로그인 사용자 읽기, 본인만 쓰기, 본인 또는 교사 삭제.
     match /walkRunGroupModels/{uid} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && request.auth.uid == uid &&
+      allow read: if isGoogle();
+      allow create, update: if isGoogle() && request.auth.uid == uid &&
                             request.resource.data.json is string &&
                             request.resource.data.json.size() < 900000 &&
                             request.resource.data.group is string &&
                             request.resource.data.group.size() >= 1 &&
                             request.resource.data.group.size() <= 12;
-      allow delete: if request.auth != null && (request.auth.uid == uid || isTeacher(request));
+      allow delete: if isGoogle() && (request.auth.uid == uid || isTeacher(request));
     }
 
-    // 교사가 게시하는 반 공용 모델: 로그인한 사용자 읽기, 교사만 쓰기
+    // 교사가 게시하는 반 공용 모델: 구글 로그인 사용자 읽기, 교사만 쓰기
     match /walkRunModel/{docId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && isTeacher(request);
+      allow read: if isGoogle();
+      allow write: if isGoogle() && isTeacher(request);
     }
 
     // 화면 편집 내용(문구·숨김·순서): 누구나 읽고(민감 정보 없음), 교사만 저장
@@ -113,7 +117,6 @@ service cloud.firestore {
     // 공간: c…24자(수업), p…24자(노트북↔폰 짝), g<조 코드>(조 코드만 넣어 쓸 때). 공간 id 를 아는 기기만 읽고 쓴다(목록 조회 불가).
     // 모든 문서에 expireAt(만든 때 + 183일): TTL 정책·정리 작업이 지운다. 200일 넘게 늦출 수 없다.
     function signedIn() { return request.auth != null; }
-    function isGoogle() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com'; }
     function okSpace(s) { return s.matches('^([cp][a-z0-9]{23}|g[0-9]{1,2}-[0-9]{1,2}-[0-9]{4})$'); }
     function okExpire(d) { return d.expireAt is timestamp && d.expireAt > request.time && d.expireAt < request.time + duration.value(200, 'd'); }
     function shortStr(v, n) { return v is string && v.size() <= n; }
@@ -358,10 +361,10 @@ service cloud.firestore {
                             shortStr(request.resource.data.data, 270000) && okExpire(request.resource.data);
     }
 
-    // Roles collection (read-only for clients, managed by Admin SDK)
+    // Roles collection (read-only for clients, managed by Admin SDK; 구글 로그인한 본인 또는 교사만 단일 조회)
     match /roles/{uid} {
-      allow read: if request.auth != null;
-      allow write: if false;
+      allow get: if isGoogle() && (request.auth.uid == uid || isTeacher(request));
+      allow list, write: if false;
     }
   }
 }

@@ -495,6 +495,6 @@
 <script src="../js/ideal-gas.js"></script>
 <link rel="stylesheet" href="../css/report-ai.css">
 <script src="../js/report-ai.js"></script>
-<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'idealgas', mount: '#report-ai', vars: {vars:[{key:"vol",name:"부피 (실험 1)"},{key:"temp",name:"온도 (실험 2)"},{key:"amount",name:"기체의 양 (새지 않게 밀폐)"},{key:"device",name:"용기·센서"}],choose:["vol","temp"],measure:"압력 P",predictQ:"— {var}을(를) 늘리면 압력 P 는?",predict:[{key:"up",label:"커진다"},{key:"down",label:"작아진다"},{key:"same",label:"거의 같다"},{key:"unknown",label:"잘 모르겠다"}]}, contextFrom: '#concl-sum, #res-boyle, #res-gay, #res-comb' }); });</script>
+<script>document.addEventListener('DOMContentLoaded', function () { ReportAI.init({ exp: 'idealgas', mount: '#report-ai', vars: {vars:[{key:"pres",name:"용기 압력 P (실험 1 — 감압)"},{key:"temp",name:"온도 t (실험 2 — 가열·냉각)"},{key:"amount",name:"기체의 양 (새지 않게 밀폐)"},{key:"device",name:"용기·주사기·센서"}],choose:["pres","temp"],measure:"주사기 부피 V (실험 1) / 압력 P (실험 2)",predictQ:"— {var}을(를) 늘리면 잴 값(실험 1 부피 V · 실험 2 압력 P)은?",predict:[{key:"up",label:"커진다"},{key:"down",label:"작아진다"},{key:"same",label:"거의 같다"},{key:"unknown",label:"잘 모르겠다"}]}, contextFrom: '#concl-sum, #res-boyle, #res-gay, #res-comb' }); });</script>
 </body>
 </html>

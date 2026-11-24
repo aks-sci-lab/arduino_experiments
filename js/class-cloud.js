@@ -242,7 +242,7 @@
     function classStatus(url, classCode, key, fetchImpl) { return post(url, { action: 'classStatus', 'class': classCode, key: key }, fetchImpl, 20000); }
     // 교사(구글 로그인): 내 수업 목록·내려받기·지우기 (Firestore)
     function myClasses(fetchImpl) { return post('lab:', { action: 'myClasses' }, fetchImpl, 20000); }
-    function classExport(space, fetchImpl) { return post('lab:' + space, { action: 'classExport' }, fetchImpl, 60000); }
+    function classExport(space, fetchImpl, live) { return post('lab:' + space, live ? { action: 'classExport', live: true } : { action: 'classExport' }, fetchImpl, 60000); }
     function deleteClass(space, fetchImpl) { return post('lab:' + space, { action: 'deleteClass' }, fetchImpl, 60000); }
     function reopenCode(space, fetchImpl) { return post('lab:' + space, { action: 'reopenCode' }, fetchImpl, 20000); }
     // 지워지는 날 (만든 때 + 183일): '2027년 5월 20일'
