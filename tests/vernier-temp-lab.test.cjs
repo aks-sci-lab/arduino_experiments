@@ -21,6 +21,8 @@ test('vernier-temp-lab.html 정적 점검: 로컬 godirect·ble-help·noindex·C
     assert.doesNotMatch(html, /unpkg\.com\/@vernier\/godirect/);
     assert.doesNotMatch(html, /jsdelivr\.net\/npm\/@vernier\/godirect/);
     assert.match(html, /id="btnConnectBle"[^>]*data-ble-connect/);
+    assert.match(html, /acceptAllDevices:\s*true/);
+    assert.doesNotMatch(html, /selectDevice\(\s*true\s*\)/);
     assert.match(html, /getBatteryLevel/);
     assert.match(html, /BSD 3-Clause/);
     assert.match(html, /Vernier Software &amp; Technology/);
@@ -33,7 +35,7 @@ test('vernier-temp-lab.html 정적 점검: 로컬 godirect·ble-help·noindex·C
     assert.equal(cardMatches, null, '메인 실험 목록 카드에는 아직 넣지 않음');
 });
 
-test('vernier-temp-lab.html 화면 시험: 가짜 BLE 센서(배터리·온도)·단위 변환·시뮬레이션·일시 중지·마커·CSV', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
+test('vernier-temp-lab.html 화면 시험: 가짜 BLE 센서(이름 필터 없음·배터리·온도)·단위 변환·시뮬레이션·일시 중지·마커·CSV', { skip: !chromium && 'playwright 없음', timeout: 60000 }, async () => {
     const stat = http.createServer((req, res) => {
         const p = path.join(REPO, decodeURIComponent(new URL(req.url, 'http://x').pathname));
         fs.readFile(p, (e, d) => {
@@ -50,16 +52,19 @@ test('vernier-temp-lab.html 화면 시험: 가짜 BLE 센서(배터리·온도)�
     try {
         const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
         await ctx.route(/cdn\.jsdelivr\.net/, r => r.abort());
-        await ctx.addInitScript(fakeGoDirect, { install: true, name: 'GDX-TMP 0A1000999' });
+        await ctx.addInitScript(fakeGoDirect, { install: true, name: 'CUSTOM-TMP-01' });
         const page = await ctx.newPage();
         page.on('pageerror', e => errors.push(e.message));
         await page.goto(ROOT + 'projects/vernier-temp-lab.html');
 
-        // 1. 가짜 BLE 연결 → 배터리 87%, 실시간 온도 표시
+        // 1. 가짜 BLE 연결 (GDX 아닌 이름도 이름 필터 없이 검색·연결) → 배터리 87%, 실시간 온도 표시
         await page.evaluate(() => { window.__gdx.force = 25.0; });
         await page.click('#btnConnectBle');
         await page.waitForFunction(() => document.getElementById('deviceBattery').textContent === '87%');
-        assert.match(await page.textContent('#deviceName'), /GDX-TMP/);
+        const reqOpts = await page.evaluate(() => window.__gdx.requestOpts);
+        assert.equal(reqOpts.acceptAllDevices, true);
+        assert.equal(reqOpts.filters, undefined);
+        assert.match(await page.textContent('#deviceName'), /CUSTOM-TMP-01/);
         await page.waitForFunction(() => document.getElementById('currentTemp').textContent === '25.00');
 
         // 2. 기록 시작 전 대기 상태에서 단위 전환(°C → °F → K) 시 표시 온도·상하한선·수동 Y축 변환 확인

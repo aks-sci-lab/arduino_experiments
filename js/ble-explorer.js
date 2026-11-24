@@ -21,6 +21,7 @@
         meta: { deviceName: '', maker: '', model: '', firmware: '' },
         candidates: [],
         events: [],              // 연결 기록: { at(ISO), kind, text } — 끊긴 시각을 선생님이 보내 줄 수 있게
+        initCommands: [],        // 연결 뒤 순서대로 보낼 시작 명령 목록 (규칙 JSON 에 함께 저장)
         connectedAt: null,
         gdxCounter: 0xff,
         dirty: true
@@ -148,6 +149,10 @@
             }
             await readDeviceInfo();
             renderTree(tree);
+            // 0x180A(기기 정보)·0x180F(배터리) 외에 실제 데이터 서비스가 없으면 숨긴 UUID 찾기 안내 표시
+            const infoOnly = new Set([B.normUuid('180a'), B.normUuid('180f')]);
+            const hasDataSvc = tree.some(t => !infoOnly.has(t.uuid) && t.chars.length > 0);
+            if ($('uuidHelpBox')) $('uuidHelpBox').hidden = hasDataSvc;
             // 공개된 연결 방식이 있는 센서면 해석할 필요가 없다고 알림
             const vendor = B.knownVendor(device.name, tree.map(t => t.uuid));
             $('vendorNote').hidden = !vendor;
@@ -364,6 +369,8 @@
         $('writeChar').disabled = !writable.length;
         $('ruleEmpty').hidden = list.length > 0;
         $('btnWrite').disabled = !(writable.length && $('writeOk').checked);
+        if ($('btnAddInitCmd')) $('btnAddInitCmd').disabled = !writable.length;
+        if ($('btnRunInitCmds')) $('btnRunInitCmds').disabled = !(S.initCommands.length && writable.length && $('writeOk').checked);
         S.dirty = true;
     }
 
@@ -410,20 +417,77 @@
             '</td><td class="hex">' + hexWithMarks(r.bytes, groups[r.char + '|' + r.bytes.length]) + '</td></tr>').join('');
     }
 
+    async function sendBytesToChar(c, bytes) {
+        for (let i = 0; i < bytes.length; i += 20) {
+            const part = bytes.slice(i, i + 20);
+            if (c.props.write && c.obj.writeValueWithResponse) await c.obj.writeValueWithResponse(part);
+            else if (c.obj.writeValueWithoutResponse) await c.obj.writeValueWithoutResponse(part);
+            else await c.obj.writeValue(part);
+        }
+    }
+
     async function writeChar() {
         const msg = $('writeMsg');
         const c = S.chars.get($('writeChar').value);
         if (!c) { msg.textContent = '쓸 수 있는 특성이 없어요. 먼저 연결하세요.'; return; }
         if (!$('writeOk').checked) { msg.textContent = '확인 칸에 표시해야 보낼 수 있어요.'; return; }
+        const mode = $('writeMode') ? $('writeMode').value : 'hex';
         let bytes;
-        try { bytes = B.parseHex($('writeHex').value); } catch (e) { msg.textContent = '⚠️ ' + e.message; return; }
+        try { bytes = B.encodeCommand($('writeHex').value, mode); } catch (e) { msg.textContent = '⚠️ ' + e.message; return; }
         if (!confirm(charLabel(c.uuid) + ' 에 ' + B.toHex(bytes) + ' 를 보낼까요?\n센서 설정이 바뀔 수 있어요.')) return;
         try {
-            if (c.props.write && c.obj.writeValueWithResponse) await c.obj.writeValueWithResponse(bytes);
-            else if (c.obj.writeValueWithoutResponse) await c.obj.writeValueWithoutResponse(bytes);
-            else await c.obj.writeValue(bytes);
-            msg.textContent = '✓ 보냈어요: ' + B.toHex(bytes);
+            await sendBytesToChar(c, bytes);
+            msg.textContent = '✓ 보냈어요: ' + B.toHex(bytes) + (mode === 'ascii' ? ' (' + $('writeHex').value + ')' : '');
+            logEvent('write', B.shortUuid(c.uuid) + ' ← ' + B.toHex(bytes));
         } catch (e) { msg.textContent = '⚠️ 보내기 실패: ' + (e && e.message || e); }
+    }
+
+    function renderInitCommands() {
+        const ul = $('initCmdList');
+        if (!ul) return;
+        ul.innerHTML = S.initCommands.length ? S.initCommands.map((cmd, i) => '<li><b>' + (i + 1) + '. ' + esc(B.shortUuid(cmd.characteristic)) + '</b> ' +
+            '<code class="mono">' + esc(cmd.mode === 'ascii' ? 'ASCII: ' + cmd.payload : cmd.payload) + '</code>' +
+            '<span class="note">대기 ' + (cmd.delayMs || 0) + 'ms</span>' +
+            '<button type="button" class="btn small" data-delcmd="' + i + '" aria-label="' + (i + 1) + '번 시작 명령 지우기">🗑</button></li>').join('')
+            : '<li class="note">저장된 시작 명령이 없어요. (센서가 연결만으로 값을 보내면 비워 두세요)</li>';
+        const writable = Array.from(S.chars.values()).some(c => c.props.write || c.props.writeWithoutResponse);
+        if ($('btnRunInitCmds')) $('btnRunInitCmds').disabled = !(S.initCommands.length && writable && $('writeOk').checked);
+    }
+
+    function addInitCommand() {
+        const msg = $('writeMsg');
+        const charUuid = $('writeChar').value;
+        const c = S.chars.get(charUuid);
+        if (!c) { msg.textContent = '먼저 쓸 특성을 고르세요.'; return; }
+        const mode = $('writeMode') ? $('writeMode').value : 'hex';
+        const payload = $('writeHex').value.trim();
+        try { B.encodeCommand(payload, mode); } catch (e) { msg.textContent = '⚠️ ' + e.message; return; }
+        const delayMs = Math.max(0, Math.min(10000, Math.round(Number($('writeDelay') && $('writeDelay').value) || 0)));
+        S.initCommands.push({ service: c.service || S.charService[charUuid] || '', characteristic: charUuid, mode, payload, delayMs, label: '' });
+        saveDraft();
+        renderInitCommands();
+        msg.textContent = '✓ 시작 명령 ' + S.initCommands.length + '번으로 추가했어요. ④ 저장 시 프로필에 함께 들어갑니다.';
+    }
+
+    async function runInitCommands() {
+        const msg = $('initCmdMsg');
+        if (!S.initCommands.length) { msg.textContent = '저장된 시작 명령이 없어요.'; return; }
+        if (!$('writeOk').checked) { msg.textContent = '위 확인 칸에 표시해야 보낼 수 있어요.'; return; }
+        if (!confirm('저장된 시작 명령 ' + S.initCommands.length + '개를 순서대로 보낼까요?')) return;
+        try {
+            for (let i = 0; i < S.initCommands.length; i++) {
+                const cmd = S.initCommands[i];
+                const c = S.chars.get(cmd.characteristic);
+                if (!c) throw new Error((i + 1) + '번 특성(' + B.shortUuid(cmd.characteristic) + ')을 찾지 못했어요.');
+                const bytes = B.encodeCommand(cmd.payload, cmd.mode);
+                await sendBytesToChar(c, bytes);
+                logEvent('write', '시작명령 ' + (i + 1) + ': ' + B.shortUuid(c.uuid) + ' ← ' + B.toHex(bytes));
+                if (cmd.delayMs > 0) await new Promise(r => setTimeout(r, cmd.delayMs));
+            }
+            msg.textContent = '✓ 시작 명령 ' + S.initCommands.length + '개를 순서대로 보냈어요.';
+        } catch (e) {
+            msg.textContent = '⚠️ 실행 실패: ' + (e && e.message || e);
+        }
     }
 
     // ---------- ③ 해석 규칙 ----------
@@ -558,28 +622,34 @@
             const notify = c ? (c.props.notify || c.props.indicate) : S.records.filter(r => r.char === u).length > 1;
             return { service: S.charService[u] || '', characteristic: u, mode: notify ? 'notify' : 'read', fields: S.rules[u] };
         });
-        return {
+        const dec = {
             schema: B.SCHEMA, version: 1, name: $('sensorName').value.trim() || S.meta.deviceName || '이름 없는 센서',
             device: { namePrefix: S.meta.deviceName || '', maker: S.meta.maker || '', model: S.meta.model || '', firmware: S.meta.firmware || '' },
             characteristics, notes: $('ruleNotes').value, savedAt: new Date().toISOString()
         };
+        if (S.initCommands.length) dec.initCommands = S.initCommands.map(cmd => Object.assign({}, cmd));
+        return dec;
     }
     function saveDraft() {
-        store(KEY_DRAFT, { rules: S.rules, charService: S.charService, meta: S.meta, name: $('sensorName').value, notes: $('ruleNotes').value });
+        store(KEY_DRAFT, { rules: S.rules, charService: S.charService, initCommands: S.initCommands, meta: S.meta, name: $('sensorName').value, notes: $('ruleNotes').value });
     }
     function applyDecoder(dec) {
         S.rules = {};
         dec.characteristics.forEach(c => { S.rules[c.characteristic] = c.fields.map(f => Object.assign({}, f)); if (c.service) S.charService[c.characteristic] = c.service; });
+        S.initCommands = Array.isArray(dec.initCommands) ? dec.initCommands.map(cmd => Object.assign({}, cmd)) : [];
         $('sensorName').value = dec.name;
         $('ruleNotes').value = dec.notes || '';
         if (!S.device) S.meta = { deviceName: dec.device.namePrefix, maker: dec.device.maker, model: dec.device.model, firmware: dec.device.firmware };
         saveDraft();
         refreshCharSelects();
+        renderInitCommands();
         renderFields();
     }
     function renderSaved() {
         const list = load(KEY_SAVED, []);
-        $('savedRules').innerHTML = list.length ? list.map((d, i) => '<li><b>' + esc(d.name) + '</b><span class="note">특성 ' + d.characteristics.length + '개 · ' + esc((d.savedAt || '').slice(0, 10)) + '</span>' +
+        $('savedRules').innerHTML = list.length ? list.map((d, i) => '<li><b>' + esc(d.name) + '</b><span class="note">특성 ' + d.characteristics.length + '개' +
+            (d.initCommands && d.initCommands.length ? ' · 명령 ' + d.initCommands.length + '개' : '') + ' · ' + esc((d.savedAt || '').slice(0, 10)) + '</span>' +
+            '<a class="btn small primary" href="vernier-temp-lab.html?profile=' + encodeURIComponent(d.name) + '">📊 대시보드</a>' +
             '<button type="button" class="btn small" data-loadrule="' + i + '">불러오기</button><button type="button" class="btn small" data-delrule="' + i + '" aria-label="' + esc(d.name) + ' 지우기">🗑</button></li>').join('')
             : '<li class="note">아직 저장한 규칙이 없어요.</li>';
         $('rulePreview').textContent = JSON.stringify(buildDecoder(), null, 2);
@@ -624,6 +694,7 @@
         if (draft) {
             S.rules = draft.rules || {};
             S.charService = draft.charService || {};
+            S.initCommands = Array.isArray(draft.initCommands) ? draft.initCommands : [];
             S.meta = Object.assign(S.meta, draft.meta || {});
             $('sensorName').value = draft.name || '';
             $('ruleNotes').value = draft.notes || '';
@@ -632,11 +703,27 @@
         ruleTabs = LabUI.initTabs('#ruleTabs', { key: 'ble-explorer-rule', onShow: () => { S.chartKey = null; S.dirty = true; render(); } });
         LabUI.initTabs('#saveTabs', { key: 'ble-explorer-save' });
         refreshCharSelects();
+        renderInitCommands();
         renderFields();
 
         $('stdServices').addEventListener('change', saveServiceChoices);
         $('customUuids').addEventListener('input', saveServiceChoices);
         $('btnScan').addEventListener('click', scan);
+        if ($('btnCopyBtInternals')) {
+            $('btnCopyBtInternals').addEventListener('click', () => {
+                const url = 'chrome://bluetooth-internals/#devices';
+                const done = () => { $('uuidHelpMsg').textContent = '✓ 주소를 복사했어요. 크롬 새 탭 주소창에 붙여 넣고 Enter 를 누르세요.'; };
+                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => { $('uuidHelpMsg').textContent = url; });
+                else $('uuidHelpMsg').textContent = url;
+            });
+        }
+        if ($('btnOpenSvcBox')) {
+            $('btnOpenSvcBox').addEventListener('click', () => {
+                $('svcBox').open = true;
+                $('customUuids').focus();
+                $('svcBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
         $('btnReconnect').addEventListener('click', () => { if (S.device) { setStatus('다시 연결하는 중…'); connectDevice(S.device); } });
         $('btnVernierInit').addEventListener('click', vernierInit);
         try { $('vernierAuto').checked = localStorage.getItem('ble-explorer:vernierAuto') !== '0'; } catch (e) { /* 기본 켬 */ }
@@ -669,6 +756,17 @@
         });
         $('writeOk').addEventListener('change', refreshCharSelects);
         $('btnWrite').addEventListener('click', writeChar);
+        if ($('btnAddInitCmd')) $('btnAddInitCmd').addEventListener('click', addInitCommand);
+        if ($('btnRunInitCmds')) $('btnRunInitCmds').addEventListener('click', runInitCommands);
+        if ($('initCmdList')) {
+            $('initCmdList').addEventListener('click', e => {
+                const d = e.target.closest('[data-delcmd]');
+                if (!d) return;
+                S.initCommands.splice(Number(d.dataset.delcmd), 1);
+                saveDraft();
+                renderInitCommands();
+            });
+        }
 
         $('ruleChar').addEventListener('change', () => { S.ruleCharChosen = true; $('candTable').hidden = true; $('findMsg').textContent = ''; renderFields(); render(); });
         $('btnAddField').addEventListener('click', () => { if (!curChar()) { $('ruleEmpty').hidden = false; return; } addField(); });

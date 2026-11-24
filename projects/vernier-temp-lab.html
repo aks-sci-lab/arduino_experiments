@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex, nofollow" />
   <title>Vernier Go Direct 무선 온도 센서 실험실</title>
   <script src="../js/ble-help.js"></script>
+  <script src="../js/ble-decode.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -521,6 +522,7 @@
     <div class="header-inner">
       <div class="brand">
         <a class="back-link" href="../index.html">← 메인으로</a>
+        <a class="back-link" href="ble-explorer.html">🔍 센서 역추적</a>
         <div class="brand-badge">GDX</div>
         <div>
           <h1>Vernier Go Direct 과학 실험 대시보드</h1>
@@ -536,8 +538,12 @@
     <section class="card">
       <div class="toolbar">
         <div class="btn-group">
+          <select class="select" id="profileSelect" title="센서 연결 방식 또는 ble-explorer 역추적 프로필 선택">
+            <option value="">자동 (Vernier · 표준 BLE)</option>
+          </select>
           <button class="btn btn-primary" id="btnConnectBle" data-ble-connect>블루투스 연결 (BLE)</button>
           <button class="btn" id="btnConnectUsb">USB 연결 (WebHID)</button>
+          <label class="btn" title="ble-explorer 에서 저장한 해석 규칙 JSON 불러오기">📂 규칙 JSON<input type="file" id="profileFileIn" accept=".json,application/json" hidden /></label>
           <button class="btn btn-sim" id="btnToggleSim">시뮬레이션 시작</button>
           <select class="select" id="simPreset" title="시뮬레이션 실험 프리셋">
             <option value="room">프리셋: 실온 안정 (~23.5°C)</option>
@@ -741,6 +747,19 @@
     };
 
     const GODIRECT_LIB_SRC = '../vendor/godirect/godirect.min.umd.js';
+    const VERNIER_SERVICE_UUID = 'd91714ef-28b9-4f91-ba16-f0d9a604f112';
+    const BLE_OPTIONAL_SERVICES = [
+      VERNIER_SERVICE_UUID,
+      0x181a, // Environmental Sensing (Temperature 0x2A6E)
+      0x1809, // Health Thermometer (Temperature 0x2A1C)
+      0x180f, // Battery Service
+      0x180a, // Device Information
+      '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
+      0xffe0, // HM-10 등 흔한 BLE 직렬 서비스
+      0xfff0, // 흔한 커스텀 BLE 서비스
+      0xff00, // 흔한 커스텀 BLE 서비스
+      '49535343-fe7d-4ae5-8fa9-9fafd205e455'  // Microchip/ISSC Transparent UART
+    ];
 
     // =========================================================
     // 2. App State
@@ -760,6 +779,9 @@
       device: null,
       activeSensor: null,
       sensorHandler: null,
+      genericCleanup: null,
+      genericRestart: null,
+      profiles: [],
       simTimer: null,
       simElapsed: 0,
       lastBeepTime: 0,
@@ -772,6 +794,8 @@
     const $ = (id) => document.getElementById(id);
     const els = {
       sensorTabs: $('sensorTabs'),
+      profileSelect: $('profileSelect'),
+      profileFileIn: $('profileFileIn'),
       btnConnectBle: $('btnConnectBle'),
       btnConnectUsb: $('btnConnectUsb'),
       btnToggleSim: $('btnToggleSim'),
@@ -820,7 +844,8 @@
       els.toast.textContent = msg;
       els.toast.classList.add('show');
       clearTimeout(showToast._t);
-      showToast._t = setTimeout(() => els.toast.classList.remove('show'), 2800);
+      const ms = String(msg || '').length > 40 ? 5000 : 2800;
+      showToast._t = setTimeout(() => els.toast.classList.remove('show'), ms);
     }
 
     function escapeHtml(str) {
@@ -1197,6 +1222,286 @@
       return state.godirectPromise;
     }
 
+    function decodeHealthThermometerC(dv) {
+      if (!dv || dv.byteLength < 5) return NaN;
+      const flags = dv.getUint8(0);
+      const isFahrenheit = (flags & 0x01) !== 0;
+      // IEEE-11073 32-bit FLOAT (little-endian: 24-bit signed mantissa + 8-bit signed exponent)
+      let mantissa = dv.getUint8(1) | (dv.getUint8(2) << 8) | (dv.getUint8(3) << 16);
+      if (mantissa & 0x800000) mantissa -= 0x1000000;
+      const exponent = dv.getInt8(4);
+      const val = mantissa * Math.pow(10, exponent);
+      return isFahrenheit ? (val - 32) * 5 / 9 : val;
+    }
+
+    async function tryConnectStandardBleTemp(bleDevice, server) {
+      let char = null;
+      let parser = null;
+      let channelLabel = '';
+
+      // 1) Environmental Sensing (0x181A) -> Temperature (0x2A6E, int16 LE × 0.01 °C)
+      try {
+        const envSvc = await server.getPrimaryService(0x181a);
+        char = await envSvc.getCharacteristic(0x2a6e);
+        parser = (dv) => (dv && dv.byteLength >= 2 ? dv.getInt16(0, true) / 100 : NaN);
+        channelLabel = 'BLE 환경 온도 (0x2A6E, °C)';
+      } catch (e) {}
+
+      // 2) Health Thermometer (0x1809) -> Temperature Measurement (0x2A1C)
+      if (!char) {
+        try {
+          const htSvc = await server.getPrimaryService(0x1809);
+          char = await htSvc.getCharacteristic(0x2a1c);
+          parser = decodeHealthThermometerC;
+          channelLabel = 'BLE 표준 온도계 (0x2A1C, °C)';
+        } catch (e) {}
+      }
+
+      if (!char || !parser) return false;
+
+      let batteryText = '-';
+      try {
+        const batSvc = await server.getPrimaryService(0x180f);
+        const batChar = await batSvc.getCharacteristic(0x2a19);
+        const bv = await batChar.readValue();
+        if (bv && bv.byteLength >= 1) batteryText = `${bv.getUint8(0)}%`;
+      } catch (e) {}
+
+      state.mode = 'device';
+      els.deviceName.textContent = bleDevice.name || 'BLE 온도 센서';
+      els.deviceBattery.textContent = batteryText;
+      els.deviceChannel.textContent = channelLabel;
+
+      const onDisconnected = () => {
+        if (state.mode !== 'device') return;
+        disconnectAll();
+        showToast('센서 연결이 종료되었습니다.');
+      };
+      bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+      const onCharValue = (ev) => {
+        const val = parser(ev.target.value);
+        if (Number.isFinite(val)) handleTemperatureSample(val);
+      };
+
+      let pollTimer = null;
+      const startPolling = () => {
+        clearInterval(pollTimer);
+        const readOnce = async () => {
+          try {
+            const dv = await char.readValue();
+            const val = parser(dv);
+            if (Number.isFinite(val)) handleTemperatureSample(val);
+          } catch (e) {}
+        };
+        readOnce();
+        pollTimer = setInterval(readOnce, state.intervalMs);
+      };
+
+      const props = char.properties || {};
+      if (props.notify || props.indicate) {
+        char.addEventListener('characteristicvaluechanged', onCharValue);
+        await char.startNotifications();
+        if (props.read) {
+          try {
+            const dv = await char.readValue();
+            const val = parser(dv);
+            if (Number.isFinite(val)) handleTemperatureSample(val);
+          } catch (e) {}
+        }
+      } else if (props.read) {
+        startPolling();
+        state.genericRestart = startPolling;
+      }
+
+      state.genericCleanup = () => {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        try { char.removeEventListener('characteristicvaluechanged', onCharValue); } catch (e) {}
+        try { if (props.notify || props.indicate) Promise.resolve(char.stopNotifications()).catch(() => {}); } catch (e) {}
+        try { bleDevice.removeEventListener('gattserverdisconnected', onDisconnected); } catch (e) {}
+        try { if (bleDevice.gatt && bleDevice.gatt.connected) bleDevice.gatt.disconnect(); } catch (e) {}
+      };
+
+      updateConnectionUI();
+      showToast(`${bleDevice.name || 'BLE 온도 센서'} 연결 완료!`);
+      return true;
+    }
+
+    const SAVED_PROFILES_KEY = 'ble-explorer:saved:v1';
+
+    function loadSavedProfiles(selectName) {
+      const B = window.BleDecode;
+      if (!B) return;
+      let raw = [];
+      try {
+        const parsed = JSON.parse(localStorage.getItem(SAVED_PROFILES_KEY) || '[]');
+        if (Array.isArray(parsed)) raw = parsed;
+      } catch (e) {}
+
+      const valid = [];
+      for (const item of raw) {
+        const res = B.validateDecoder(item);
+        if (res.ok && res.decoder.characteristics.length && res.decoder.characteristics[0].fields.length) {
+          valid.push(res.decoder);
+        }
+      }
+      state.profiles = valid;
+
+      const prev = selectName !== undefined ? selectName : els.profileSelect.value;
+      els.profileSelect.innerHTML = '<option value="">자동 (Vernier · 표준 BLE)</option>';
+      valid.forEach((p, i) => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = `규칙: ${p.name}`;
+        els.profileSelect.appendChild(opt);
+      });
+
+      if (typeof selectName === 'string' && selectName) {
+        const idx = valid.findIndex((p) => p.name === selectName);
+        if (idx >= 0) els.profileSelect.value = String(idx);
+      } else if (prev !== '' && valid[Number(prev)]) {
+        els.profileSelect.value = prev;
+      }
+    }
+
+    function getSelectedProfile() {
+      const v = els.profileSelect.value;
+      if (v === '') return null;
+      return state.profiles[Number(v)] || null;
+    }
+
+    async function findCharacteristic(server, serviceUuid, charUuid) {
+      if (serviceUuid) {
+        try {
+          const svc = await server.getPrimaryService(serviceUuid);
+          return await svc.getCharacteristic(charUuid);
+        } catch (e) {}
+      }
+      const svcs = await server.getPrimaryServices();
+      for (const svc of svcs) {
+        try {
+          return await svc.getCharacteristic(charUuid);
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    async function writeProfileBytes(char, bytes) {
+      const props = char.properties || {};
+      for (let i = 0; i < bytes.length; i += 20) {
+        const part = bytes.slice(i, i + 20);
+        if (props.write && char.writeValueWithResponse) await char.writeValueWithResponse(part);
+        else if (char.writeValueWithoutResponse) await char.writeValueWithoutResponse(part);
+        else await char.writeValue(part);
+      }
+    }
+
+    async function connectWithProfile(profile) {
+      const B = window.BleDecode;
+      if (!B) throw new Error('해석 도구(ble-decode.js)를 불러오지 못했습니다.');
+
+      const chRule = profile.characteristics[0];
+      const field = chRule && chRule.fields && chRule.fields[0];
+      if (!chRule || !field) throw new Error('이 프로필에 읽을 필드가 없습니다.');
+
+      const optServices = Array.from(new Set([
+        ...BLE_OPTIONAL_SERVICES,
+        ...profile.characteristics.map((c) => c.service).filter(Boolean),
+        ...(profile.initCommands || []).map((c) => c.service).filter(Boolean)
+      ]));
+
+      const bleDevice = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: optServices
+      });
+
+      let server = null;
+      try {
+        server = await bleDevice.gatt.connect();
+        const dataChar = await findCharacteristic(server, chRule.service, chRule.characteristic);
+        if (!dataChar) {
+          throw new Error(`"${bleDevice.name || '선택한 기기'}"에서 규칙 특성(${B.shortUuid(chRule.characteristic)})을 찾지 못했습니다.`);
+        }
+
+        let batteryText = '-';
+        try {
+          const batSvc = await server.getPrimaryService(0x180f);
+          const batChar = await batSvc.getCharacteristic(0x2a19);
+          const bv = await batChar.readValue();
+          if (bv && bv.byteLength >= 1) batteryText = `${bv.getUint8(0)}%`;
+        } catch (e) {}
+
+        state.mode = 'device';
+        els.deviceName.textContent = bleDevice.name || profile.name;
+        els.deviceBattery.textContent = batteryText;
+        els.deviceChannel.textContent = `${profile.name} · ${field.name}${field.unit ? ` (${field.unit})` : ''}`;
+
+        const onDisconnected = () => {
+          if (state.mode !== 'device') return;
+          disconnectAll();
+          showToast('센서 연결이 종료되었습니다.');
+        };
+        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+        const handleDv = (dv) => {
+          if (!dv) return;
+          const bytes = new Uint8Array(dv.buffer, dv.byteOffset || 0, dv.byteLength);
+          const val = B.readField(bytes, field);
+          if (typeof val === 'number' && Number.isFinite(val)) handleTemperatureSample(val);
+        };
+        const onCharValue = (ev) => handleDv(ev.target.value);
+
+        let pollTimer = null;
+        const startPolling = () => {
+          clearInterval(pollTimer);
+          const readOnce = async () => {
+            try { handleDv(await dataChar.readValue()); } catch (e) {}
+          };
+          readOnce();
+          pollTimer = setInterval(readOnce, state.intervalMs);
+        };
+
+        const props = dataChar.properties || {};
+        if (chRule.mode !== 'read' && (props.notify || props.indicate)) {
+          dataChar.addEventListener('characteristicvaluechanged', onCharValue);
+          await dataChar.startNotifications();
+        } else if (props.read) {
+          startPolling();
+          state.genericRestart = startPolling;
+        }
+
+        state.genericCleanup = () => {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          try { dataChar.removeEventListener('characteristicvaluechanged', onCharValue); } catch (e) {}
+          try { if (chRule.mode !== 'read' && (props.notify || props.indicate)) Promise.resolve(dataChar.stopNotifications()).catch(() => {}); } catch (e) {}
+          try { bleDevice.removeEventListener('gattserverdisconnected', onDisconnected); } catch (e) {}
+          try { if (bleDevice.gatt && bleDevice.gatt.connected) bleDevice.gatt.disconnect(); } catch (e) {}
+        };
+
+        // 프로필에 저장된 시작 명령이 있으면 순서대로 전송
+        if (Array.isArray(profile.initCommands) && profile.initCommands.length) {
+          for (const cmd of profile.initCommands) {
+            const wChar = await findCharacteristic(server, cmd.service, cmd.characteristic);
+            if (!wChar) throw new Error(`시작 명령 특성(${B.shortUuid(cmd.characteristic)})을 찾지 못했습니다.`);
+            const bytes = B.encodeCommand(cmd.payload, cmd.mode);
+            await writeProfileBytes(wChar, bytes);
+            if (cmd.delayMs > 0) await new Promise((r) => setTimeout(r, cmd.delayMs));
+          }
+        }
+
+        updateConnectionUI();
+        showToast(`${bleDevice.name || profile.name} 연결 완료! (규칙: ${profile.name})`);
+      } catch (err) {
+        if (state.genericCleanup) disconnectAll();
+        else if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
+          try { bleDevice.gatt.disconnect(); } catch (e) {}
+        }
+        throw err;
+      }
+    }
+
     async function connectVernierDevice(useBluetooth) {
       if (state.isConnecting) return;
 
@@ -1214,15 +1519,58 @@
       state.isConnecting = true;
       disconnectAll();
       let openedDevice = null;
+      let rawBleDevice = null;
 
       try {
-        showToast(useBluetooth ? '블루투스 센서를 검색합니다...' : 'USB 센서를 검색합니다...');
-        const godirect = await loadGoDirect();
-        const device = await godirect.selectDevice(useBluetooth);
-        openedDevice = device;
+        const selectedProfile = useBluetooth ? getSelectedProfile() : null;
+        if (selectedProfile) {
+          showToast(`"${selectedProfile.name}" 규칙으로 블루투스 센서를 검색합니다...`);
+          await connectWithProfile(selectedProfile);
+          return;
+        }
 
-        // selectDevice() starts default measurements immediately; stop cleanly before configuring
-        try { device.stop(); } catch (e) {}
+        showToast(useBluetooth ? '블루투스 센서를 검색합니다... (모든 기기 표시)' : 'USB 센서를 검색합니다...');
+        const godirect = await loadGoDirect();
+        let device = null;
+
+        if (useBluetooth) {
+          // 블루투스 이름 필터 없이 모든 기기를 표시한다 (GDX 외 이름·타사 센서도 검색 가능)
+          const bleDevice = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: BLE_OPTIONAL_SERVICES
+          });
+          rawBleDevice = bleDevice;
+
+          const server = await bleDevice.gatt.connect();
+          let hasVernier = false;
+          try {
+            await server.getPrimaryService(VERNIER_SERVICE_UUID);
+            hasVernier = true;
+          } catch (e) {
+            hasVernier = false;
+          }
+
+          if (hasVernier) {
+            device = await godirect.createDevice(bleDevice, { open: true, startMeasurements: false });
+          } else {
+            const okStd = await tryConnectStandardBleTemp(bleDevice, server);
+            if (okStd) {
+              rawBleDevice = null;
+              return;
+            }
+            const label = bleDevice.name || '선택한 기기';
+            throw new Error(
+              `"${label}"에서 Vernier Go Direct·표준 온도 서비스를 찾지 못했습니다. 상단 '🔍 센서 역추적'에서 규칙을 만든 뒤 선택해 보세요.`
+            );
+          }
+        } else {
+          device = await godirect.selectDevice(false);
+          // selectDevice() starts default measurements immediately; stop cleanly before configuring
+          try { device.stop(); } catch (e) {}
+        }
+
+        openedDevice = device;
+        rawBleDevice = null;
 
         state.device = device;
         state.mode = 'device';
@@ -1279,6 +1627,8 @@
         if (openedDevice) {
           state.device = openedDevice;
           disconnectAll();
+        } else if (rawBleDevice && rawBleDevice.gatt && rawBleDevice.gatt.connected) {
+          try { rawBleDevice.gatt.disconnect(); } catch (e) {}
         }
         const isCancel = err && (err.name === 'NotFoundError' || /No device selected/i.test(err.message || ''));
         if (isCancel) {
@@ -1562,10 +1912,52 @@
       showToast('CSV 파일을 다운로드했습니다.');
     });
 
+    els.profileFileIn.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const obj = JSON.parse(String(reader.result));
+          const B = window.BleDecode;
+          const check = B && B.validateDecoder(obj);
+          if (!check || !check.ok) {
+            showToast(`규칙 파일 오류: ${check ? check.errors.join(' ') : '해석 도구가 없습니다.'}`);
+            return;
+          }
+          if (!check.decoder.characteristics.length || !check.decoder.characteristics[0].fields.length) {
+            showToast('필드가 있는 특성이 없는 규칙 파일입니다.');
+            return;
+          }
+          let saved = [];
+          try { saved = JSON.parse(localStorage.getItem(SAVED_PROFILES_KEY) || '[]'); } catch (err) {}
+          if (!Array.isArray(saved)) saved = [];
+          saved = saved.filter((d) => d && d.name !== check.decoder.name);
+          saved.unshift(check.decoder);
+          try { localStorage.setItem(SAVED_PROFILES_KEY, JSON.stringify(saved.slice(0, 30))); } catch (err) {}
+          loadSavedProfiles(check.decoder.name);
+          showToast(`"${check.decoder.name}" 규칙을 불러왔습니다. '블루투스 연결'을 눌러 사용하세요.`);
+        } catch (err) {
+          showToast('올바른 JSON 파일이 아닙니다.');
+        } finally {
+          e.target.value = '';
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === SAVED_PROFILES_KEY) loadSavedProfiles();
+    });
     window.addEventListener('pagehide', () => disconnectAll());
 
     // Init
     renderSensorTabs();
+    const urlProfile = new URLSearchParams(location.search).get('profile') || undefined;
+    loadSavedProfiles(urlProfile);
+    if (urlProfile && getSelectedProfile()) {
+      showToast(`"${urlProfile}" 규칙을 선택했습니다. '블루투스 연결'을 누르세요.`);
+    }
     updateConnectionUI();
   </script>
 </body>
