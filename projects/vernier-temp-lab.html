@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Vernier Go Direct 무선 온도 센서 실험실</title>
+  <script src="../js/ble-help.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --surface-alt: #f8fafc;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* Header & Sensor Module Tabs */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+
+    .header-inner {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .back-link {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      white-space: nowrap;
+    }
+
+    .back-link:hover {
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .brand-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      color: #fff;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .brand h1 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .sensor-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .sensor-tab {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .sensor-tab.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .sensor-tab:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    /* Main Container */
+    main {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px 18px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Connection & Control Bar */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button, select, input[type="number"], input[type="text"] {
+      font-family: inherit;
+      font-size: 13px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover:not(:disabled) { background: var(--surface-alt); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+    .btn-success { background: var(--success); border-color: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #059669; }
+
+    .btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .btn-danger:hover:not(:disabled) { background: #dc2626; }
+
+    .btn-sim { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+    .btn-sim:hover:not(:disabled) { background: #6d28d9; }
+
+    .select, .input {
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .status-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--border);
+      font-size: 12.5px;
+      color: var(--text-muted);
+      align-items: center;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .status-pill.connected { background: #dcfce7; color: #166534; }
+    .status-pill.sim { background: #ede9fe; color: #5b21b6; }
+    .status-pill.recording { background: #fee2e2; color: #991b1b; }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Dashboard Main Grid */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    @media (max-width: 980px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Digital Thermometer & Gauge */
+    .readout-box {
+      text-align: center;
+      padding: 18px 12px;
+      border-radius: 10px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .readout-box.alert-active {
+      background: #fef2f2;
+      border-color: #fca5a5;
+    }
+
+    .readout-value {
+      font-size: 54px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+
+    .readout-unit {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-left: 4px;
+    }
+
+    .unit-switcher {
+      display: inline-flex;
+      background: #e2e8f0;
+      padding: 3px;
+      border-radius: 8px;
+      gap: 2px;
+    }
+
+    .unit-btn {
+      border: none;
+      background: transparent;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .unit-btn.active {
+      background: #fff;
+      color: var(--primary);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+
+    .gauge-wrap { margin-bottom: 16px; }
+
+    .gauge-bar {
+      height: 14px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 25%, #10b981 50%, #f59e0b 75%, #ef4444 100%);
+      position: relative;
+      overflow: visible;
+    }
+
+    .gauge-thumb {
+      position: absolute;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid #0f172a;
+      transform: translate(-50%, -50%);
+      left: 30%;
+      transition: left 0.2s ease;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    }
+
+    .gauge-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .stat-item {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .stat-label { font-size: 11.5px; color: var(--text-muted); }
+    .stat-val {
+      font-size: 17px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      margin-top: 2px;
+    }
+
+    /* Threshold & Alert Panel */
+    .threshold-box {
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .threshold-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .field input { width: 100%; }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12.5px;
+    }
+
+    /* Chart Card */
+    .chart-container {
+      position: relative;
+      height: 410px;
+      width: 100%;
+    }
+
+    .scale-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+    }
+
+    .scale-controls input[type="number"] {
+      width: 72px;
+      padding: 5px 8px;
+    }
+
+    /* Bottom Grid: Markers & Data Log */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 980px) {
+      .bottom-grid { grid-template-columns: 1fr; }
+    }
+
+    .marker-form {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .marker-form input { flex: 1; }
+
+    .table-wrap {
+      max-height: 240px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    th, td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--surface-alt);
+      position: sticky;
+      top: 0;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    .empty-row {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 20px !important;
+    }
+
+    .license-footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 4px 8px 16px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #0f172a;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: all 0.2s ease;
+      z-index: 100;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <a class="back-link" href="../index.html">← 메인으로</a>
+        <div class="brand-badge">GDX</div>
+        <div>
+          <h1>Vernier Go Direct 과학 실험 대시보드</h1>
+          <p>Web Bluetooth / WebHID 실시간 센서 계측 및 데이터 분석</p>
+        </div>
+      </div>
+      <nav class="sensor-tabs" id="sensorTabs" aria-label="센서 모듈 선택"></nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Connection & Experiment Control Card -->
+    <section class="card">
+      <div class="toolbar">
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btnConnectBle" data-ble-connect>블루투스 연결 (BLE)</button>
+          <button class="btn" id="btnConnectUsb">USB 연결 (WebHID)</button>
+          <button class="btn btn-sim" id="btnToggleSim">시뮬레이션 시작</button>
+          <select class="select" id="simPreset" title="시뮬레이션 실험 프리셋">
+            <option value="room">프리셋: 실온 안정 (~23.5°C)</option>
+            <option value="heating">프리셋: 물 가열 곡선 (22°C → 100°C)</option>
+            <option value="cooling">프리셋: 냉각 곡선 (85°C → 24°C)</option>
+            <option value="ice">프리셋: 얼음물 녹는점 (-5°C → 0°C → 상승)</option>
+          </select>
+          <button class="btn" id="btnDisconnect" disabled>연결 해제</button>
+        </div>
+
+        <div class="btn-group">
+          <label for="sampleInterval" style="font-size:12.5px; color:var(--text-muted); font-weight:600;">측정 간격</label>
+          <select class="select" id="sampleInterval">
+            <option value="200">0.2초 (5 Hz)</option>
+            <option value="500" selected>0.5초 (2 Hz)</option>
+            <option value="1000">1.0초 (1 Hz)</option>
+            <option value="2000">2.0초 (0.5 Hz)</option>
+          </select>
+          <button class="btn btn-success" id="btnStartStop" disabled>측정 시작</button>
+          <button class="btn" id="btnClear">초기화</button>
+          <button class="btn" id="btnExportCsv">CSV 내보내기</button>
+        </div>
+      </div>
+
+      <div class="status-strip">
+        <span class="status-pill" id="connStatus"><span class="dot"></span>미연결</span>
+        <span><strong>장치:</strong> <span id="deviceName">-</span></span>
+        <span><strong>배터리:</strong> <span id="deviceBattery">-</span></span>
+        <span><strong>활성 채널:</strong> <span id="deviceChannel">-</span></span>
+        <span><strong>경과 시간:</strong> <span id="elapsedTime">0.0 s</span></span>
+      </div>
+    </section>
+
+    <!-- Main Dashboard Grid -->
+    <section class="dashboard-grid">
+      <!-- Left: Digital Thermometer, Gauge, Stats, Alerts -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">실시간 온도계</div>
+          <div class="unit-switcher" id="unitSwitcher">
+            <button class="unit-btn active" data-unit="C">°C</button>
+            <button class="unit-btn" data-unit="F">°F</button>
+            <button class="unit-btn" data-unit="K">K</button>
+          </div>
+        </div>
+
+        <div class="readout-box" id="readoutBox">
+          <span class="readout-value" id="currentTemp">--.-</span>
+          <span class="readout-unit" id="currentUnit">°C</span>
+        </div>
+
+        <div class="gauge-wrap">
+          <div class="gauge-bar">
+            <div class="gauge-thumb" id="gaugeThumb"></div>
+          </div>
+          <div class="gauge-labels">
+            <span id="gaugeMin">-20°C</span>
+            <span id="gaugeMid">50°C</span>
+            <span id="gaugeMax">120°C</span>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-label">최댓값 (Max)</div>
+            <div class="stat-val" id="statMax">-</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">최솟값 (Min)</div>
+            <div class="stat-val" id="statMin">-</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">평균값 (Avg)</div>
+            <div class="stat-val" id="statAvg">-</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">온도 변화 (ΔT)</div>
+            <div class="stat-val" id="statDelta">-</div>
+          </div>
+          <div class="stat-item" style="grid-column: span 2;">
+            <div class="stat-label">수집된 데이터 수</div>
+            <div class="stat-val" id="statCount">0 개</div>
+          </div>
+        </div>
+
+        <div class="threshold-box">
+          <div class="card-title" style="font-size:13px;">온도 알림 설정</div>
+          <div class="threshold-row">
+            <div class="field">
+              <label for="lowLimit">하한선 (<span class="unit-label">°C</span>)</label>
+              <input class="input" type="number" id="lowLimit" step="0.5" placeholder="예: 0" />
+            </div>
+            <div class="field">
+              <label for="highLimit">상한선 (<span class="unit-label">°C</span>)</label>
+              <input class="input" type="number" id="highLimit" step="0.5" placeholder="예: 80" />
+            </div>
+          </div>
+          <div class="checkbox-row">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="enableBeep" checked />
+              임계값 초과 시 비프음 알림
+            </label>
+            <button class="btn" id="btnTestBeep" style="padding:4px 10px; font-size:12px;">소리 테스트</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Real-time Chart -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">시간-온도 실시간 그래프</div>
+          <div class="scale-controls">
+            <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
+              <input type="checkbox" id="autoScale" checked />
+              자동 Y축
+            </label>
+            <input class="input" type="number" id="yMin" value="0" step="5" disabled title="Y축 최솟값" />
+            <span>~</span>
+            <input class="input" type="number" id="yMax" value="100" step="5" disabled title="Y축 최댓값" />
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="tempChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom Grid: Markers & Recent Data -->
+    <section class="bottom-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">실험 마커 및 메모 기록</div>
+        </div>
+        <div class="marker-form">
+          <input class="input" type="text" id="markerNote" placeholder="예: 가열 시작, 얼음 투입, 끓기 시작함" />
+          <button class="btn btn-primary" id="btnAddMarker">마커 추가</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>시간 (s)</th>
+                <th>온도</th>
+                <th>메모</th>
+              </tr>
+            </thead>
+            <tbody id="markerTableBody">
+              <tr><td colspan="3" class="empty-row">기록된 마커가 없습니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">최근 측정 데이터 (최신 50건)</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>시각</th>
+                <th>경과 (s)</th>
+                <th>온도 (<span class="unit-label">°C</span>)</th>
+              </tr>
+            </thead>
+            <tbody id="dataTableBody">
+              <tr><td colspan="4" class="empty-row">측정 데이터가 없습니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer class="license-footer">
+      버니어가 공개한 연결 도구 godirect-js (BSD 3-Clause, © Vernier Software &amp; Technology)로 연결합니다.
+      Vernier·Go Direct 는 버니어의 상표이며, 이 도구는 교육용으로 의료·산업 측정용이 아닙니다.
+    </footer>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    // =========================================================
+    // 1. Extensible Sensor Module Registry
+    // =========================================================
+    const SENSOR_MODULES = {
+      temp: {
+        id: 'temp',
+        name: '온도 (GDX-TMP)',
+        available: true,
+        defaultUnit: 'C',
+        minGaugeC: -20,
+        maxGaugeC: 120
+      },
+      ph: { id: 'ph', name: 'pH (GDX-PH)', available: false },
+      force: { id: 'force', name: '힘/가속도 (GDX-FOR)', available: false },
+      pressure: { id: 'pressure', name: '기체 압력 (GDX-GP)', available: false },
+      motion: { id: 'motion', name: '운동 검출기 (GDX-MD)', available: false }
+    };
+
+    const GODIRECT_LIB_SRC = '../vendor/godirect/godirect.min.umd.js';
+
+    // =========================================================
+    // 2. App State
+    // =========================================================
+    const state = {
+      activeModule: 'temp',
+      mode: 'idle', // 'idle' | 'device' | 'sim'
+      isConnecting: false,
+      isRecording: false,
+      unit: 'C', // 'C' | 'F' | 'K'
+      intervalMs: 500,
+      recordedElapsedMs: 0,
+      resumeTime: null,
+      lastTempC: null,
+      records: [], // { index, timestamp, elapsedSec, tempC, memo }
+      markers: [], // { elapsedSec, tempC, memo }
+      device: null,
+      activeSensor: null,
+      sensorHandler: null,
+      simTimer: null,
+      simElapsed: 0,
+      lastBeepTime: 0,
+      godirectPromise: null
+    };
+
+    // =========================================================
+    // 3. DOM Elements
+    // =========================================================
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      sensorTabs: $('sensorTabs'),
+      btnConnectBle: $('btnConnectBle'),
+      btnConnectUsb: $('btnConnectUsb'),
+      btnToggleSim: $('btnToggleSim'),
+      simPreset: $('simPreset'),
+      btnDisconnect: $('btnDisconnect'),
+      sampleInterval: $('sampleInterval'),
+      btnStartStop: $('btnStartStop'),
+      btnClear: $('btnClear'),
+      btnExportCsv: $('btnExportCsv'),
+      connStatus: $('connStatus'),
+      deviceName: $('deviceName'),
+      deviceBattery: $('deviceBattery'),
+      deviceChannel: $('deviceChannel'),
+      elapsedTime: $('elapsedTime'),
+      readoutBox: $('readoutBox'),
+      currentTemp: $('currentTemp'),
+      currentUnit: $('currentUnit'),
+      unitSwitcher: $('unitSwitcher'),
+      gaugeThumb: $('gaugeThumb'),
+      gaugeMin: $('gaugeMin'),
+      gaugeMid: $('gaugeMid'),
+      gaugeMax: $('gaugeMax'),
+      statMax: $('statMax'),
+      statMin: $('statMin'),
+      statAvg: $('statAvg'),
+      statDelta: $('statDelta'),
+      statCount: $('statCount'),
+      lowLimit: $('lowLimit'),
+      highLimit: $('highLimit'),
+      enableBeep: $('enableBeep'),
+      btnTestBeep: $('btnTestBeep'),
+      autoScale: $('autoScale'),
+      yMin: $('yMin'),
+      yMax: $('yMax'),
+      markerNote: $('markerNote'),
+      btnAddMarker: $('btnAddMarker'),
+      markerTableBody: $('markerTableBody'),
+      dataTableBody: $('dataTableBody'),
+      toast: $('toast')
+    };
+
+    // =========================================================
+    // 4. Utilities & Unit Conversion
+    // =========================================================
+    function showToast(msg) {
+      els.toast.textContent = msg;
+      els.toast.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => els.toast.classList.remove('show'), 2800);
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function convertFromC(tempC, unit = state.unit) {
+      if (unit === 'F') return tempC * 9 / 5 + 32;
+      if (unit === 'K') return tempC + 273.15;
+      return tempC;
+    }
+
+    function convertToC(val, unit = state.unit) {
+      if (unit === 'F') return (val - 32) * 5 / 9;
+      if (unit === 'K') return val - 273.15;
+      return val;
+    }
+
+    function convertUnit(val, fromUnit, toUnit) {
+      if (fromUnit === toUnit) return val;
+      return convertFromC(convertToC(val, fromUnit), toUnit);
+    }
+
+    function convertDeltaFromC(deltaC, unit = state.unit) {
+      if (unit === 'F') return deltaC * 9 / 5;
+      return deltaC;
+    }
+
+    function unitSuffix(unit = state.unit) {
+      return unit === 'K' ? 'K' : `°${unit}`;
+    }
+
+    function formatVal(val, digits = 2) {
+      return Number.isFinite(val) ? val.toFixed(digits) : '-';
+    }
+
+    function convertNumericInput(inputEl, fromUnit, toUnit) {
+      if (inputEl.value === '') return;
+      const num = parseFloat(inputEl.value);
+      if (!Number.isFinite(num)) return;
+      const converted = convertUnit(num, fromUnit, toUnit);
+      inputEl.value = String(Number(converted.toFixed(2)));
+    }
+
+    // Web Audio API Beep
+    let audioCtx = null;
+    function playBeep(freq = 880, duration = 0.16) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        console.warn('AudioContext error:', e);
+      }
+    }
+
+    // =========================================================
+    // 5. Render Sensor Module Tabs
+    // =========================================================
+    function renderSensorTabs() {
+      els.sensorTabs.innerHTML = '';
+      Object.values(SENSOR_MODULES).forEach((mod) => {
+        const btn = document.createElement('button');
+        btn.className = 'sensor-tab' + (mod.id === state.activeModule ? ' active' : '');
+        btn.textContent = mod.available ? mod.name : `${mod.name} · 예정`;
+        btn.disabled = !mod.available;
+        btn.addEventListener('click', () => {
+          state.activeModule = mod.id;
+          renderSensorTabs();
+        });
+        els.sensorTabs.appendChild(btn);
+      });
+    }
+
+    // =========================================================
+    // 6. Chart.js Setup with Threshold & Marker Overlay Plugin
+    // =========================================================
+    const overlayPlugin = {
+      id: 'thresholdAndMarkers',
+      afterDatasetsDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        if (!chartArea || !scales.x || !scales.y) return;
+        const { left, right, top, bottom } = chartArea;
+
+        ctx.save();
+
+        // Draw Threshold Lines (Low / High)
+        const lowVal = parseFloat(els.lowLimit.value);
+        const highVal = parseFloat(els.highLimit.value);
+
+        const drawHLine = (val, color, label) => {
+          if (!Number.isFinite(val)) return;
+          const y = scales.y.getPixelForValue(val);
+          if (y < top || y > bottom) return;
+          ctx.beginPath();
+          ctx.setLineDash([6, 4]);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.5;
+          ctx.moveTo(left, y);
+          ctx.lineTo(right, y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = color;
+          ctx.font = '600 11px sans-serif';
+          ctx.fillText(`${label}: ${val}${unitSuffix()}`, left + 6, y - 5);
+        };
+
+        drawHLine(highVal, '#ef4444', '상한');
+        drawHLine(lowVal, '#3b82f6', '하한');
+
+        // Draw Vertical Marker Lines
+        state.markers.forEach((m) => {
+          const x = scales.x.getPixelForValue(m.elapsedSec);
+          if (x < left || x > right) return;
+          ctx.beginPath();
+          ctx.setLineDash([3, 3]);
+          ctx.strokeStyle = '#7c3aed';
+          ctx.lineWidth = 1.4;
+          ctx.moveTo(x, top);
+          ctx.lineTo(x, bottom);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.fillStyle = '#7c3aed';
+          ctx.font = '600 11px sans-serif';
+          const shortNote = m.memo.length > 10 ? m.memo.slice(0, 10) + '…' : m.memo;
+          ctx.fillText(shortNote, x + 4, top + 14);
+        });
+
+        ctx.restore();
+      }
+    };
+
+    const chart = typeof window.Chart === 'function'
+      ? new window.Chart($('tempChart').getContext('2d'), {
+          type: 'line',
+          data: {
+            datasets: [{
+              label: '온도 (°C)',
+              data: [],
+              borderColor: '#2563eb',
+              backgroundColor: 'rgba(37, 99, 235, 0.1)',
+              borderWidth: 2.2,
+              pointRadius: 2,
+              pointHoverRadius: 5,
+              tension: 0.18,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: { mode: 'nearest', intersect: false },
+            scales: {
+              x: {
+                type: 'linear',
+                title: { display: true, text: '시간 (s)', font: { weight: 'bold' } },
+                grid: { color: '#f1f5f9' }
+              },
+              y: {
+                title: { display: true, text: '온도 (°C)', font: { weight: 'bold' } },
+                grid: { color: '#f1f5f9' }
+              }
+            },
+            plugins: {
+              legend: { display: false }
+            }
+          },
+          plugins: [overlayPlugin]
+        })
+      : {
+          data: { datasets: [{ label: '', data: [] }] },
+          options: { scales: { y: { title: { text: '' } } } },
+          update() {}
+        };
+
+    function refreshChartScaleAndUnit() {
+      const suffix = unitSuffix();
+      chart.data.datasets[0].label = `온도 (${suffix})`;
+      chart.options.scales.y.title.text = `온도 (${suffix})`;
+      chart.data.datasets[0].data = state.records.map((r) => ({
+        x: r.elapsedSec,
+        y: convertFromC(r.tempC)
+      }));
+
+      if (els.autoScale.checked) {
+        delete chart.options.scales.y.min;
+        delete chart.options.scales.y.max;
+      } else {
+        const minV = parseFloat(els.yMin.value);
+        const maxV = parseFloat(els.yMax.value);
+        chart.options.scales.y.min = Number.isFinite(minV) ? minV : convertFromC(0);
+        chart.options.scales.y.max = Number.isFinite(maxV) ? maxV : convertFromC(100);
+      }
+      chart.update('none');
+    }
+
+    function updateAlertState(displayVal, allowBeep = true) {
+      const lowLimit = parseFloat(els.lowLimit.value);
+      const highLimit = parseFloat(els.highLimit.value);
+      const isAlert =
+        Number.isFinite(displayVal) &&
+        ((Number.isFinite(lowLimit) && displayVal < lowLimit) ||
+          (Number.isFinite(highLimit) && displayVal > highLimit));
+
+      els.readoutBox.classList.toggle('alert-active', isAlert);
+      if (allowBeep && isAlert && els.enableBeep.checked) {
+        const now = Date.now();
+        if (now - state.lastBeepTime > 1500) {
+          playBeep(Number.isFinite(highLimit) && displayVal > highLimit ? 1046 : 523, 0.16);
+          state.lastBeepTime = now;
+        }
+      }
+    }
+
+    // =========================================================
+    // 7. Data Ingestion & UI Update
+    // =========================================================
+    function handleTemperatureSample(tempC) {
+      if (!Number.isFinite(tempC)) return;
+      const now = Date.now();
+      state.lastTempC = tempC;
+      const displayVal = convertFromC(tempC);
+
+      // Update Digital Readout & Gauge
+      els.currentTemp.textContent = displayVal.toFixed(2);
+      const minC = SENSOR_MODULES.temp.minGaugeC;
+      const maxC = SENSOR_MODULES.temp.maxGaugeC;
+      const pct = Math.max(0, Math.min(100, ((tempC - minC) / (maxC - minC)) * 100));
+      els.gaugeThumb.style.left = `${pct}%`;
+
+      // Check Alerts
+      updateAlertState(displayVal, true);
+
+      if (!state.isRecording) return;
+
+      if (state.resumeTime === null) state.resumeTime = now;
+      const elapsedMs = state.recordedElapsedMs + (now - state.resumeTime);
+      const elapsedSec = Number((elapsedMs / 1000).toFixed(2));
+      els.elapsedTime.textContent = `${elapsedSec.toFixed(1)} s`;
+
+      const record = {
+        index: state.records.length + 1,
+        timestamp: new Date(now).toLocaleTimeString('ko-KR', { hour12: false }),
+        elapsedSec,
+        tempC,
+        memo: ''
+      };
+      state.records.push(record);
+
+      chart.data.datasets[0].data.push({ x: elapsedSec, y: displayVal });
+      chart.update('none');
+
+      updateStats();
+      updateRecentTable();
+    }
+
+    function updateStats() {
+      const n = state.records.length;
+      els.statCount.textContent = `${n} 개`;
+      if (n === 0) {
+        els.statMax.textContent = '-';
+        els.statMin.textContent = '-';
+        els.statAvg.textContent = '-';
+        els.statDelta.textContent = '-';
+        return;
+      }
+      let minC = Infinity, maxC = -Infinity, sumC = 0;
+      for (const r of state.records) {
+        if (r.tempC < minC) minC = r.tempC;
+        if (r.tempC > maxC) maxC = r.tempC;
+        sumC += r.tempC;
+      }
+      const avgC = sumC / n;
+      const deltaC = state.records[n - 1].tempC - state.records[0].tempC;
+      const s = unitSuffix();
+
+      els.statMax.textContent = `${formatVal(convertFromC(maxC))} ${s}`;
+      els.statMin.textContent = `${formatVal(convertFromC(minC))} ${s}`;
+      els.statAvg.textContent = `${formatVal(convertFromC(avgC))} ${s}`;
+      const sign = deltaC >= 0 ? '+' : '';
+      els.statDelta.textContent = `${sign}${formatVal(convertDeltaFromC(deltaC))} ${s}`;
+    }
+
+    function updateRecentTable() {
+      if (state.records.length === 0) {
+        els.dataTableBody.innerHTML = '<tr><td colspan="4" class="empty-row">측정 데이터가 없습니다.</td></tr>';
+        return;
+      }
+      const recent = state.records.slice(-50).reverse();
+      els.dataTableBody.innerHTML = recent.map((r) => `
+        <tr>
+          <td>${r.index}</td>
+          <td>${escapeHtml(r.timestamp)}</td>
+          <td>${r.elapsedSec.toFixed(2)}</td>
+          <td><strong>${convertFromC(r.tempC).toFixed(2)}</strong></td>
+        </tr>
+      `).join('');
+    }
+
+    function updateMarkerTable() {
+      if (state.markers.length === 0) {
+        els.markerTableBody.innerHTML = '<tr><td colspan="3" class="empty-row">기록된 마커가 없습니다.</td></tr>';
+        return;
+      }
+      const s = unitSuffix();
+      els.markerTableBody.innerHTML = state.markers.slice().reverse().map((m) => `
+        <tr>
+          <td>${m.elapsedSec.toFixed(2)} s</td>
+          <td><strong>${convertFromC(m.tempC).toFixed(2)} ${s}</strong></td>
+          <td>${escapeHtml(m.memo)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function updateConnectionUI() {
+      els.connStatus.className = 'status-pill';
+      if (state.mode === 'device') {
+        els.connStatus.classList.add(state.isRecording ? 'recording' : 'connected');
+        els.connStatus.innerHTML = `<span class="dot"></span>${state.isRecording ? '센서 측정 중' : '센서 연결됨'}`;
+      } else if (state.mode === 'sim') {
+        els.connStatus.classList.add(state.isRecording ? 'recording' : 'sim');
+        els.connStatus.innerHTML = `<span class="dot"></span>${state.isRecording ? '시뮬레이션 측정 중' : '시뮬레이션 대기'}`;
+      } else {
+        els.connStatus.innerHTML = '<span class="dot"></span>미연결';
+      }
+
+      const active = state.mode !== 'idle';
+      els.btnDisconnect.disabled = !active;
+      els.btnStartStop.disabled = !active;
+      els.btnStartStop.textContent = state.isRecording ? '측정 중지' : '측정 시작';
+      els.btnStartStop.className = state.isRecording ? 'btn btn-danger' : 'btn btn-success';
+      els.btnToggleSim.textContent = state.mode === 'sim' ? '시뮬레이션 종료' : '시뮬레이션 시작';
+    }
+
+    // =========================================================
+    // 8. Vernier Go Direct (local vendor/godirect) Integration
+    // =========================================================
+    function loadGoDirect() {
+      if (window.godirect) return Promise.resolve(window.godirect);
+      if (state.godirectPromise) return state.godirectPromise;
+      state.godirectPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = GODIRECT_LIB_SRC;
+        script.onload = () => {
+          if (window.godirect) {
+            resolve(window.godirect);
+          } else {
+            state.godirectPromise = null;
+            reject(new Error('버니어 연결 도구(godirect)를 초기화하지 못했습니다.'));
+          }
+        };
+        script.onerror = () => {
+          state.godirectPromise = null;
+          reject(new Error('버니어 연결 도구를 불러올 수 없습니다. 페이지를 새로고침하세요.'));
+        };
+        document.head.appendChild(script);
+      });
+      return state.godirectPromise;
+    }
+
+    async function connectVernierDevice(useBluetooth) {
+      if (state.isConnecting) return;
+
+      if (useBluetooth) {
+        if (window.BleHelp && !window.BleHelp.guard()) return;
+        if (!navigator.bluetooth) {
+          showToast('이 브라우저는 Web Bluetooth를 지원하지 않습니다. Chrome 또는 Edge를 사용하세요.');
+          return;
+        }
+      } else if (!navigator.hid) {
+        showToast('이 브라우저는 WebHID(USB)를 지원하지 않습니다. Chrome 또는 Edge를 사용하세요.');
+        return;
+      }
+
+      state.isConnecting = true;
+      disconnectAll();
+      let openedDevice = null;
+
+      try {
+        showToast(useBluetooth ? '블루투스 센서를 검색합니다...' : 'USB 센서를 검색합니다...');
+        const godirect = await loadGoDirect();
+        const device = await godirect.selectDevice(useBluetooth);
+        openedDevice = device;
+
+        // selectDevice() starts default measurements immediately; stop cleanly before configuring
+        try { device.stop(); } catch (e) {}
+
+        state.device = device;
+        state.mode = 'device';
+
+        device.on('device-closed', () => {
+          if (state.device !== device) return;
+          state.device = null;
+          disconnectAll();
+          showToast('센서 연결이 종료되었습니다.');
+        });
+
+        device.enableDefaultSensors();
+        const enabledSensors = device.sensors.filter((s) => s.enabled);
+        const tempSensor =
+          enabledSensors.find((s) => /temp/i.test(s.name)) ||
+          device.sensors.find((s) => /temp/i.test(s.name)) ||
+          enabledSensors[0] ||
+          device.sensors[0];
+
+        if (!tempSensor) {
+          throw new Error('활성화할 수 있는 센서 채널을 찾을 수 없습니다.');
+        }
+
+        device.sensors.forEach((s) => s.setEnabled(s === tempSensor));
+        state.activeSensor = tempSensor;
+
+        els.deviceName.textContent = device.name || 'Vernier Go Direct';
+        els.deviceBattery.textContent = '확인 중';
+        els.deviceChannel.textContent = `${tempSensor.name} (${tempSensor.unit || '°C'})`;
+
+        try {
+          const battery = typeof device.getBatteryLevel === 'function'
+            ? await device.getBatteryLevel()
+            : device.batteryLevel;
+          if (state.device === device) {
+            els.deviceBattery.textContent = typeof battery === 'number' && Number.isFinite(battery)
+              ? `${battery}%`
+              : '-';
+          }
+        } catch (e) {
+          if (state.device === device) els.deviceBattery.textContent = '-';
+        }
+
+        const onValueChanged = (sensor) => {
+          handleTemperatureSample(sensor.value);
+        };
+        state.sensorHandler = onValueChanged;
+        tempSensor.on('value-changed', onValueChanged);
+
+        device.start(state.intervalMs);
+        updateConnectionUI();
+        showToast(`${device.name || 'Vernier 센서'} 연결 완료!`);
+      } catch (err) {
+        if (openedDevice) {
+          state.device = openedDevice;
+          disconnectAll();
+        }
+        const isCancel = err && (err.name === 'NotFoundError' || /No device selected/i.test(err.message || ''));
+        if (isCancel) {
+          showToast('장치를 선택하지 않았습니다.');
+        } else {
+          console.error(err);
+          showToast(`연결 오류: ${err && err.message ? err.message : err}`);
+        }
+      } finally {
+        state.isConnecting = false;
+      }
+    }
+
+    // =========================================================
+    // 9. Simulation Mode (4 Presets)
+    // =========================================================
+    function getSimulatedTempC(preset, tSec) {
+      const noise = (Math.random() - 0.5) * 0.18;
+      switch (preset) {
+        case 'heating': {
+          // 22°C -> 100°C over ~60s then boiling plateau
+          const target = 22 + 78 * (1 - Math.exp(-tSec / 24));
+          return Math.min(100.1, target) + noise;
+        }
+        case 'cooling': {
+          // Newton's cooling: 85°C -> 24°C
+          return 24 + 61 * Math.exp(-tSec / 32) + noise;
+        }
+        case 'ice': {
+          // -5°C -> 0°C (0~12s), 0°C plateau (12~35s), rising (35s+)
+          if (tSec < 12) return -5 + (5 / 12) * tSec + noise;
+          if (tSec < 35) return 0 + noise * 0.6;
+          return Math.min(24, (tSec - 35) * 0.45) + noise;
+        }
+        case 'room':
+        default:
+          return 23.5 + Math.sin(tSec / 8) * 0.25 + noise;
+      }
+    }
+
+    function runSimTick() {
+      if (state.isRecording) {
+        state.simElapsed += state.intervalMs / 1000;
+      }
+      const val = getSimulatedTempC(els.simPreset.value, state.simElapsed);
+      handleTemperatureSample(val);
+    }
+
+    function startSimulation() {
+      if (state.device) disconnectAll();
+      state.mode = 'sim';
+      state.simElapsed = 0;
+      els.deviceName.textContent = '시뮬레이터 (가상 GDX-TMP)';
+      els.deviceBattery.textContent = '100% (가상)';
+      els.deviceChannel.textContent = 'Temperature (°C)';
+
+      state.isRecording = true;
+      state.resumeTime = Date.now();
+      clearInterval(state.simTimer);
+      state.simTimer = setInterval(runSimTick, state.intervalMs);
+
+      updateConnectionUI();
+      showToast('시뮬레이션 측정을 시작했습니다.');
+    }
+
+    function stopSimulation() {
+      clearInterval(state.simTimer);
+      state.simTimer = null;
+      if (state.mode === 'sim') {
+        if (state.isRecording && state.resumeTime !== null) {
+          state.recordedElapsedMs += Date.now() - state.resumeTime;
+          state.resumeTime = null;
+        }
+        state.mode = 'idle';
+        state.isRecording = false;
+      }
+    }
+
+    function disconnectAll() {
+      stopSimulation();
+      if (state.activeSensor && state.sensorHandler && typeof state.activeSensor.off === 'function') {
+        try { state.activeSensor.off('value-changed', state.sensorHandler); } catch (e) {}
+      }
+      state.sensorHandler = null;
+      state.activeSensor = null;
+
+      if (state.isRecording && state.resumeTime !== null) {
+        state.recordedElapsedMs += Date.now() - state.resumeTime;
+        state.resumeTime = null;
+      }
+
+      const dev = state.device;
+      state.device = null;
+      if (dev) {
+        try { dev.stop(); } catch (e) {}
+        try { Promise.resolve(dev.close()).catch(() => {}); } catch (e) {}
+      }
+      state.mode = 'idle';
+      state.isRecording = false;
+      els.deviceName.textContent = '-';
+      els.deviceBattery.textContent = '-';
+      els.deviceChannel.textContent = '-';
+      updateConnectionUI();
+    }
+
+    // =========================================================
+    // 10. Event Listeners
+    // =========================================================
+    els.btnConnectBle.addEventListener('click', () => connectVernierDevice(true));
+    els.btnConnectUsb.addEventListener('click', () => connectVernierDevice(false));
+
+    els.btnToggleSim.addEventListener('click', () => {
+      if (state.mode === 'sim') {
+        disconnectAll();
+        showToast('시뮬레이션을 종료했습니다.');
+      } else {
+        startSimulation();
+      }
+    });
+
+    els.simPreset.addEventListener('change', () => {
+      if (state.mode === 'sim') {
+        state.simElapsed = 0;
+        showToast('시뮬레이션 프리셋을 변경했습니다.');
+      }
+    });
+
+    els.btnDisconnect.addEventListener('click', () => {
+      disconnectAll();
+      showToast('연결을 해제했습니다.');
+    });
+
+    els.sampleInterval.addEventListener('change', () => {
+      state.intervalMs = Number(els.sampleInterval.value);
+      if (state.mode === 'device' && state.device) {
+        state.device.stop();
+        state.device.start(state.intervalMs);
+      } else if (state.mode === 'sim') {
+        clearInterval(state.simTimer);
+        state.simTimer = setInterval(runSimTick, state.intervalMs);
+      }
+      showToast(`측정 간격을 ${(state.intervalMs / 1000).toFixed(1)}초로 변경했습니다.`);
+    });
+
+    els.btnStartStop.addEventListener('click', () => {
+      if (state.mode === 'idle') return;
+      if (state.isRecording) {
+        if (state.resumeTime !== null) {
+          state.recordedElapsedMs += Date.now() - state.resumeTime;
+          state.resumeTime = null;
+        }
+        state.isRecording = false;
+      } else {
+        state.resumeTime = Date.now();
+        state.isRecording = true;
+      }
+      updateConnectionUI();
+      showToast(state.isRecording ? '데이터 기록을 시작합니다.' : '데이터 기록을 일시 중지했습니다.');
+    });
+
+    els.btnClear.addEventListener('click', () => {
+      state.records = [];
+      state.markers = [];
+      state.recordedElapsedMs = 0;
+      state.resumeTime = state.isRecording ? Date.now() : null;
+      state.simElapsed = 0;
+      els.elapsedTime.textContent = '0.0 s';
+      chart.data.datasets[0].data = [];
+      chart.update('none');
+      updateStats();
+      updateRecentTable();
+      updateMarkerTable();
+      showToast('측정 데이터를 초기화했습니다.');
+    });
+
+    // Unit Switcher
+    els.unitSwitcher.addEventListener('click', (e) => {
+      const btn = e.target.closest('.unit-btn');
+      if (!btn) return;
+      const nextUnit = btn.dataset.unit;
+      const prevUnit = state.unit;
+      if (!nextUnit || nextUnit === prevUnit) return;
+
+      state.unit = nextUnit;
+      els.unitSwitcher.querySelectorAll('.unit-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      const suffix = unitSuffix();
+      els.currentUnit.textContent = suffix;
+      document.querySelectorAll('.unit-label').forEach((el) => (el.textContent = suffix));
+
+      // Convert threshold and manual Y-axis inputs to the new unit
+      convertNumericInput(els.lowLimit, prevUnit, nextUnit);
+      convertNumericInput(els.highLimit, prevUnit, nextUnit);
+      convertNumericInput(els.yMin, prevUnit, nextUnit);
+      convertNumericInput(els.yMax, prevUnit, nextUnit);
+
+      // Update gauge labels
+      els.gaugeMin.textContent = `${Math.round(convertFromC(SENSOR_MODULES.temp.minGaugeC))}${suffix}`;
+      els.gaugeMid.textContent = `${Math.round(convertFromC(50))}${suffix}`;
+      els.gaugeMax.textContent = `${Math.round(convertFromC(SENSOR_MODULES.temp.maxGaugeC))}${suffix}`;
+
+      const refTempC = state.lastTempC !== null
+        ? state.lastTempC
+        : (state.records.length > 0 ? state.records[state.records.length - 1].tempC : null);
+      if (refTempC !== null) {
+        const displayVal = convertFromC(refTempC);
+        els.currentTemp.textContent = displayVal.toFixed(2);
+        updateAlertState(displayVal, false);
+      }
+
+      refreshChartScaleAndUnit();
+      updateStats();
+      updateRecentTable();
+      updateMarkerTable();
+    });
+
+    // Y-axis Scale Controls
+    const updateScaleControls = () => {
+      const auto = els.autoScale.checked;
+      els.yMin.disabled = auto;
+      els.yMax.disabled = auto;
+      refreshChartScaleAndUnit();
+    };
+    els.autoScale.addEventListener('change', updateScaleControls);
+    els.yMin.addEventListener('input', refreshChartScaleAndUnit);
+    els.yMax.addEventListener('input', refreshChartScaleAndUnit);
+    const onThresholdInput = () => {
+      if (state.lastTempC !== null) updateAlertState(convertFromC(state.lastTempC), false);
+      chart.update('none');
+    };
+    els.lowLimit.addEventListener('input', onThresholdInput);
+    els.highLimit.addEventListener('input', onThresholdInput);
+
+    els.btnTestBeep.addEventListener('click', () => playBeep(880, 0.18));
+
+    // Add Marker
+    els.btnAddMarker.addEventListener('click', () => {
+      if (state.records.length === 0) {
+        showToast('측정 데이터가 있을 때 마커를 추가할 수 있습니다.');
+        return;
+      }
+      const memo = els.markerNote.value.trim() || `마커 #${state.markers.length + 1}`;
+      const last = state.records[state.records.length - 1];
+      last.memo = last.memo ? `${last.memo} / ${memo}` : memo;
+      state.markers.push({
+        elapsedSec: last.elapsedSec,
+        tempC: last.tempC,
+        memo
+      });
+      els.markerNote.value = '';
+      updateMarkerTable();
+      chart.update('none');
+      showToast(`마커 "${memo}" 기록 완료`);
+    });
+
+    // Export CSV (UTF-8 BOM for Excel Korean compatibility)
+    els.btnExportCsv.addEventListener('click', () => {
+      if (state.records.length === 0) {
+        showToast('내보낼 측정 데이터가 없습니다.');
+        return;
+      }
+      const unit = state.unit;
+      const suffix = unitSuffix(unit);
+      const header = ['번호', '시각', '경과시간(s)', '온도(°C)', `표시온도(${suffix})`, '메모'];
+      const rows = state.records.map((r) => [
+        r.index,
+        r.timestamp,
+        r.elapsedSec.toFixed(2),
+        r.tempC.toFixed(3),
+        convertFromC(r.tempC, unit).toFixed(3),
+        `"${(r.memo || '').replace(/"/g, '""')}"`
+      ]);
+      const csv = '\uFEFF' + [header.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      a.href = url;
+      a.download = `vernier-temp-data-${stamp}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('CSV 파일을 다운로드했습니다.');
+    });
+
+    window.addEventListener('pagehide', () => disconnectAll());
+
+    // Init
+    renderSensorTabs();
+    updateConnectionUI();
+  </script>
+</body>
+</html>
