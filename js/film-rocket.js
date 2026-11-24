@@ -368,7 +368,7 @@
         if (M.QUIZ[k] && SCREENS['q-' + k]) return st.quiz[k] && st.quiz[k].tries ? 'sent' : 'q-' + k;   // 고르면 바로 ✅ 보냈어요 (점수 계산은 그대로)
         if (k === 'end-think') {
             for (var i = 0; i < M.CONCEPTS.length; i++) { var z = st.quiz['end_' + M.CONCEPTS[i].key]; if (!(z && z.tries)) return 'end-' + M.CONCEPTS[i].key; }
-            return 'sent';
+            return lessonNow().reveal || !held('end-think') ? 'end-compare' : 'sent';
         }
         if (k === 'end-cause') return st.sentKeys && st.sentKeys['end-cause'] ? 'sent' : 'end-sentence';
         return 'wait';
@@ -472,9 +472,30 @@
         return { html: '<div class="ev-hero ev-wait"><div class="ev-hero-ic" aria-hidden="true">👀</div><h2>앞 화면을 봐요</h2>' +
             '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : PRESENT ? '팀 이름' : '') + '</b></p></div>' + sentList() };
     };
+    // 선생님이 앞 화면에서 풀이를 열었을 때: 지금 장의 핵심 개념 정의(힘·가속도·압력 등)를 폰에도 함께 보여 줌
+    function revealedDef() {
+        var L = lessonNow(), k = L && L.key;
+        if (!k || !(L.reveal || !held(k))) return '';
+        var c = conceptOf(k);
+        if (c) {
+            var easy = M.KEY_WORDS[k] ? M.easyLine(M.KEY_WORDS[k]) : '';
+            return '<div class="ev-sent-def"><div class="ev-def ev-keep"><span class="ev-def-w">📘 ' + esc(c.word) + '의 과학적 정의</span><p>' + esc(c.def) + '</p>' +
+                (easy ? '<p class="ev-easy ev-keep">🧒 쉬운 말 · ' + esc(easy) + '</p>' : '') + '</div>' +
+                (c.ex ? '<p class="ev-ex ev-keep">💡 ' + esc(c.ex) + '</p>' : '') + '</div>';
+        }
+        var Q = M.QUIZ[k];
+        if (Q && Q.def) {
+            var easy2 = M.KEY_WORDS[k] ? M.easyLine(M.KEY_WORDS[k]) : '';
+            return '<div class="ev-sent-def"><div class="ev-def ev-keep"><span class="ev-def-w">📘 ' + esc(Q.word) + '</span><p>' + esc(Q.def) + '</p>' +
+                (easy2 ? '<p class="ev-easy ev-keep">🧒 쉬운 말 · ' + esc(easy2) + '</p>' : '') + '</div></div>';
+        }
+        return '';
+    }
     SCREENS['sent'] = function () {
-        return { html: '<div class="ev-hero ev-wait"><div class="ev-hero-ic" aria-hidden="true">✅</div><h2>보냈어요</h2><p class="ev-wait-sub">앞 화면을 봐요</p>' +
-            '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : '') + '</b></p></div>' + sentList() };
+        var L = lessonNow(), def = revealedDef();
+        var sub = L && L.key === 'end-think' && !L.reveal ? '앞 화면에서 풀이를 열면 처음 생각 → 지금 생각 비교가 나와요' : '앞 화면을 봐요';
+        return { html: '<div class="ev-hero ev-wait"><div class="ev-hero-ic" aria-hidden="true">✅</div><h2>보냈어요</h2><p class="ev-wait-sub">' + sub + '</p>' +
+            '<p class="ev-wait-team">👨‍👩‍👧 <b>' + esc(st.team ? st.team.name : '') + '</b></p></div>' + def + sentList() };
     };
     // 우리가 낸 답: 선생님이 띄운 응답 장에서 고른(보낸) 답을 폰에만 적어 둠 (선생님께 보내는 자료는 그대로)
     function logAnswer(word, text) {
@@ -616,7 +637,7 @@
         if (already && !st.team.problem) {
             html += card('<p>👨‍👩‍👧 우리 팀: <b>' + esc(st.team.name) + '</b></p><p class="ev-small">' + (PAST ? '📂 수업이 끝난 뒤 이 폰에 남은 기록이에요. 선생님께는 보내지 않아요.' : '이 폰에 저장된 곳부터 이어서 해요.') + '</p>') +
                 '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-continue">' + (PAST ? '📋 기록 보기 →' : '이어서 하기 →') + '</button>' +
-                (PAST ? '<button type="button" class="ev-next secondary" data-go="end-card">🖼 결과 카드</button><button type="button" class="ev-next secondary" data-go="t1-graph">📈 1차시 그래프</button>' : '') + '</div>' + (PAST ? '' : pastBox());
+                (PAST ? '<button type="button" class="ev-next secondary" data-go="end-card">🖼 결과 카드</button><button type="button" class="ev-next secondary" data-go="t1-graph">📊 1차시 결과 비교</button>' : '') + '</div>' + (PAST ? '' : pastBox());
             return { html: html, mount: function () { $('#ev-continue').addEventListener('click', function () { show(st.lastScreen && st.lastScreen !== 'enter' ? st.lastScreen : 'think-intro'); }); } };
         }
         html += '<h2>팀 이름을 정해요</h2>' +
@@ -793,7 +814,7 @@
                 '<div class="ev-def"><p class="ev-def-w">🦺 안전 다시 확인</p><p>' + (t1 ? '🥽 보안경 · 🙅 얼굴 멀리 · 🏃 닫고 바로 물러나기 · ✋ 안 열리면 들여다보지 않고 선생님 부르기'
                     : '🥽 보안경 · 🏃 발사대에서 물러나기 · 🙅 로켓 위로 얼굴 내밀지 않기 · ✋ 안 날아가면 선생님 부르기') + '</p></div>' +
                 '<div class="ev-nav col"><button type="button" class="ev-next good" data-go="' + part + '-cond">✅ 안전 확인 · 조건 고르고 ' + (t1 ? '재기' : '발사하기') + ' →</button>' +
-                (n ? '<button type="button" class="ev-next secondary" data-go="' + part + '-graph">📈 그래프 보기</button><button type="button" class="ev-next secondary" data-go="' + part + '-challenge">🎯 목표 도전</button>' : '') +
+                (n ? '<button type="button" class="ev-next secondary" data-go="' + part + '-graph">📊 결과 비교 보기</button><button type="button" class="ev-next secondary" data-go="' + part + '-challenge">🎯 목표 도전</button>' : '') +
                 '<button type="button" class="ev-next secondary" data-go="' + part + '-intro">처음부터 보기</button></div>';
             return { html: html };
         };
@@ -892,7 +913,7 @@
                 (p.changed ? '<h3>같게 할 조건 🔒 <small>(①·② 둘 다 똑같이)</small></h3>' + Object.keys(defs).filter(function (k) { return k !== p.changed; }).map(function (k) {
                     return stepper(k, defs[k].short || defs[k].name, defs[k].label(p.base[k]), { locked: true });
                 }).join('') : '') +
-                (p.trials.length && p.changed ? '<p class="ev-small">바꿀 조건을 바꾸면 지금까지 잰 값은 그대로 두고, 그래프는 새 조건으로 그려요.</p>' : '') +
+                (p.trials.length && p.changed ? '<p class="ev-small">바꿀 조건을 바꾸면 지금까지 잰 값은 그대로 두고, 결과 비교 표는 새 조건으로 보여 줘요.</p>' : '') +
                 (p.changed && !okG ? '<p class="ev-small ev-need-guess">' + (okP ? '🔮 예측을 골라야 다음으로 가요' : '✋ ①과 ②를 서로 다른 값으로 정해야 다음으로 가요') + '</p>' : '') +
                 nav(next, '다음 →', okG ? '' : ' disabled');
             return { html: html, mount: function (el) {
@@ -965,11 +986,11 @@
             var countOf = function () { return p.trials.filter(function (t) { return t.value === p.value; }).length; }, count = countOf();
             var html = '<p class="ev-kicker">' + (challenge ? '🎯 도전' : (part === 't1' ? '1차시' : '2차시') + ' · 이번 조건') + '</p>' +
                 '<h2>' + esc(d.short || d.name) + '을(를) 얼마로 할까요?</h2>' +
-                (challenge ? '<p class="ev-target">목표: <b>' + (part === 't1' ? esc(s.targetTime) + '초' : '아이 키만큼 (' + esc(s.targetPct) + '%)') + '</b> · 그래프를 보고 정해요</p>' : planBar(part, { pickable: true })) +
+                (challenge ? '<p class="ev-target">목표: <b>' + (part === 't1' ? esc(s.targetTime) + '초' : '아이 키만큼 (' + esc(s.targetPct) + '%)') + '</b> · 우리 결과 표를 보고 정해요</p>' : planBar(part, { pickable: true })) +
                 stepper(p.changed, d.short || d.name, d.label(p.value), {}) +
                 '<h3>같게 할 조건 🔒</h3>' + Object.keys(defs).filter(function (k) { return k !== p.changed; }).map(function (k) { return stepper(k, defs[k].short || defs[k].name, defs[k].label(p.base[k]), { locked: true }); }).join('') +
                 (!challenge && part === 't1' ? '<p class="ev-small">같은 조건으로 <b>' + s.repeats + '번</b> 재서 평균' + easySpan('평균') + '을 내요. 이 조건은 지금까지 <b id="ev-count">' + count + '</b>번 쟀어요.</p>' : '') +
-                (challenge && part === 't1' ? '<div id="ev-mini"></div>' : '') +
+                (challenge ? '<div id="ev-mini"></div>' : '') +
                 (!challenge && p.mustChange != null ? '<p class="ev-small" id="ev-must">🔧 지난번(<b>' + esc(d.label(p.mustChange)) + '</b>)과 <b>다른 값</b>으로 비교해요.' + (p.value === p.mustChange ? ' + 나 − 또는 위 계획에서 골라요.' : ' 지금 <b>' + esc(d.label(p.value)) + '</b>로 준비됐어요!') + '</p>' : '') +
                 nav(next, '이 조건으로 →');
             return { html: html, mount: function (el) {
@@ -993,7 +1014,7 @@
                     var v = p.plan[Number(b.dataset.pickPlan)];
                     if (v != null) { p.value = v; save(); syncVal(); }
                 });
-                if (challenge && part === 't1') miniTable(el.querySelector('#ev-mini'), 't1');
+                if (challenge) miniTable(el.querySelector('#ev-mini'), part);
                 // '바꿔서 다시'로 왔는데 값을 안 바꾸면 받지 않음
                 var go = el.querySelector('.ev-next[data-go]');
                 if (go && !challenge) go.addEventListener('click', function (e) {
@@ -1195,7 +1216,7 @@
             '<div class="ev-nav col">' + (same.length < s.repeats ? '<button type="button" class="ev-next good" id="ev-again">🔁 같은 조건으로 한 번 더 (' + same.length + '/' + s.repeats + ')</button>' : '<p class="ev-ok">✅ 같은 조건으로 ' + s.repeats + '번 쟀어요!</p>') +
             (oneKind ? moreHint('t1', r.value) : '') +
             '<button type="button" class="ev-next ' + (same.length < s.repeats ? 'secondary' : 'good') + '" id="ev-change">' + changeBtn + '</button>' +
-            (oneKind ? '' : '<button type="button" class="ev-next secondary" data-go="t1-graph">📈 그래프 보기</button>') + '</div>' +
+            (oneKind ? '' : '<button type="button" class="ev-next secondary" data-go="t1-graph">📊 결과 비교 보기</button>') + '</div>' +
             '<p class="ev-small">잘못 잰 값이면 <button type="button" class="ev-link" id="ev-undo">이 기록 지우기</button></p>';
         return { html: html, mount: function () {
             var ag = $('#ev-again');
@@ -1209,56 +1230,35 @@
         } };
     };
 
-    // ---------- 그래프 (Chart.js, 없으면 표만) ----------
-    var charts = [];
-    function chart(canvas, part, opt) {
-        opt = opt || {};
-        var defs = ensureBase(part), p = st[part], d = defs[p.changed], s = setup();
-        if (!d) return;
-        var trials = p.trials.filter(function (t) { return d.values.indexOf(t.value) >= 0; });
-        var pts = trials.map(function (t) { return { x: M.axisValue(d, t.value), y: part === 't1' ? t.y : t.pct }; });
-        var rows = M.byValue(trials.map(function (t) { return { value: t.value, y: part === 't1' ? t.y : t.pct }; }), d);
-        var means = rows.map(function (r) { return { x: M.axisValue(d, r.value), y: M.round(r.mean, 1) }; });
-        var target = part === 't1' ? s.targetTime : s.targetPct;
-        if (typeof window.Chart !== 'function') { canvas.replaceWith(Object.assign(document.createElement('p'), { className: 'ev-small', textContent: '그래프 도구를 불러오지 못했어요(인터넷). 아래 표를 보세요.' })); return; }
-        var xs = d.values.map(function (v) { return M.axisValue(d, v); });
-        var ds = [
-            { type: 'scatter', label: '잰 값', data: pts, pointRadius: 6, backgroundColor: 'rgba(21,101,192,0.35)', borderColor: '#1565c0' },
-            { type: 'line', label: '평균', data: means, borderColor: '#e65100', backgroundColor: '#e65100', pointRadius: 7, borderWidth: 3, tension: 0 }
-        ];
-        // ↕ 반복 범위 막대 (2026-11-21 비계 4): 같은 조건으로 여러 번 잰 값의 가장 작은 값 ~ 가장 큰 값
-        M.spread(rows).rows.forEach(function (r, i) {
-            if (r.n < 2) return;
-            var x = M.axisValue(d, r.value);
-            ds.push({ type: 'line', label: i && ds.some(function (z) { return z.label === '반복 범위'; }) ? '' : '반복 범위', data: [{ x: x, y: r.lo }, { x: x, y: r.hi }],
-                borderColor: 'rgba(84,110,122,0.75)', borderWidth: 8, pointRadius: 0, pointStyle: 'line', tension: 0 });
-        });
-        if (opt.target) ds.push({ type: 'line', label: '목표', data: [{ x: Math.min.apply(null, xs), y: target }, { x: Math.max.apply(null, xs), y: target }], borderColor: '#2e7d32', borderDash: [8, 6], pointRadius: 0, borderWidth: 2 });
-        var c = new window.Chart(canvas, {
-            data: { datasets: ds },
-            options: { responsive: true, maintainAspectRatio: false, animation: false,
-                plugins: { legend: { labels: { font: { size: 14 }, filter: function (it) { return !!it.text; } } } },
-                scales: {
-                    x: { type: 'linear', min: Math.min.apply(null, xs) - (d.cat ? 0.5 : 0), max: Math.max.apply(null, xs) + (d.cat ? 0.5 : 0), title: { display: true, text: d.short || d.name, font: { size: 15 } },
-                        ticks: { font: { size: 13 }, stepSize: d.cat ? 1 : undefined, callback: function (v) { return d.cat ? (d.values[v] != null ? d.label(d.values[v]) : '') : d.label(v); } } },
-                    y: { beginAtZero: true, title: { display: true, text: part === 't1' ? '열리는 시간 (초)' : '아이 키의 몇 % (%)', font: { size: 15 } }, ticks: { font: { size: 13 } } }
-                } }
-        });
-        charts.push(c);
-        cleanup.push(function () { charts.forEach(function (x) { try { x.destroy(); } catch (e) { /* 무시 */ } }); charts = []; });
+    // ---------- 결과 비교 (가족 체험형: 그래프 대신 ① vs ② 평균 비교 표 + 핵심 개념 연결) ----------
+    function conceptLinkBox(part) {
+        if (part === 't1') {
+            return '<div class="ev-def ev-concept-link"><span class="ev-def-w">📘 오늘의 핵심 개념 · 압력</span>' +
+                '<p>' + esc(M.DEF.pressure) + '</p>' +
+                '<p class="ev-easy">🧒 쉬운 말 · ' + esc(M.easyLine(M.KEY_WORDS.pressure)) + '</p>' +
+                '<p class="ev-small">기체가 빨리·많이 쌓일수록 뚜껑 안쪽의 같은 넓이를 더 세게 밀어 <b>압력</b>이 커지고, 뚜껑이 더 빨리 ‘펑’ 열려요.</p></div>';
+        }
+        return '<div class="ev-def ev-concept-link"><span class="ev-def-w">📘 오늘의 핵심 개념 · 힘과 가속도</span>' +
+            '<p><b>힘</b>: ' + esc(M.DEF.force) + '</p>' +
+            '<p><b>가속도</b>: ' + esc(M.DEF.accel) + '</p>' +
+            '<p class="ev-easy">🧒 쉬운 말 · ' + esc(M.easyLine(['가속도', '반작용', '질량'])) + '</p>' +
+            '<p class="ev-small">물과 기체를 아래로 밀어내는 <b>반작용(힘)</b>으로 로켓이 위로 솟고, 같은 힘이라도 무거울수록 <b>가속도</b>가 작아 덜 높이 올라요.</p></div>';
     }
-    function graphScreen(part, next, nextLabel) {
+    function compareScreen(part, next, nextLabel) {
         return function () {
             var defs = ensureBase(part), p = st[part], d = defs[p.changed];
-            var html = '<h2>📈 ' + (part === 't1' ? '바꾼 조건 → 열리는 시간' : '바꾼 조건 → 오른 높이') + '</h2>' +
+            var html = '<h2>📊 ' + (part === 't1' ? '바꾼 조건 → 열리는 시간 비교' : '바꾼 조건 → 오른 높이 비교') + '</h2>' +
                 (d ? '<p>' + esc(d.short || d.name) + '을(를) 바꾸면 ' + (part === 't1' ? '열리는 시간이' : '높이가') + ' 어떻게 달라졌나요?</p>' : '') +
-                '<div class="ev-chart"><canvas id="ev-chart" aria-label="그래프"></canvas></div><div id="ev-mini"></div>' +
+                planBar(part) +
+                (guessLine(part) ? '<p class="ev-small">' + guessLine(part).replace(/ · $/, '') + '</p>' : '') +
+                '<div id="ev-mini"></div>' +
+                conceptLinkBox(part) +
                 '<div class="ev-nav col"><button type="button" class="ev-next secondary" data-go="' + part + '-cond">➕ 더 재기</button></div>' + nav(next, nextLabel);
-            return { html: html, mount: function (el) { chart(el.querySelector('#ev-chart'), part, { target: true }); miniTable(el.querySelector('#ev-mini'), part); } };
+            return { html: html, mount: function (el) { miniTable(el.querySelector('#ev-mini'), part); } };
         };
     }
-    SCREENS['t1-graph'] = graphScreen('t1', 't1-why', '다음: 왜 달랐을까? →');
-    // 그래프·도전 앞에서: 값을 두 가지 넘게 재야 넘어감
+    SCREENS['t1-graph'] = compareScreen('t1', 't1-why', '다음: 왜 달랐을까? →');
+    // 결과 비교·도전 앞에서: 값을 두 가지 넘게 재야 넘어감
     var NEED_KINDS = { 't1-graph': 't1', 't1-why': 't1', 't1-challenge': 't1', 't1-ch-cond': 't1', 't2-graph': 't2', 't2-challenge': 't2', 't2-ch-cond': 't2' };
     function moreScreen(part) {
         return function () {
@@ -1271,14 +1271,14 @@
             var html = '<p class="ev-kicker">' + (t1 ? '1차시' : '2차시') + ' · 한 번 더</p><h2>🔧 ' + (np && d ? '정해 둔 ' + (np.idx === 0 ? '① ' : '② ') + esc(d.label(np.val)) + ' 로 재요' : '하나만 바꿔 한 번 더 재요') + '</h2>' +
                 card((n && d ? '<p>지금은 <b>' + esc(name) + '</b>을(를) <b>' + esc(d.label(one.value)) + '</b> 하나로만 ' + n + '번 쟀어요.</p>' : '<p>아직 잰 값이 없어요.</p>') +
                     planBar(part) +
-                    '<p class="ev-why">💡 값을 바꿔서 한 번 더 재야 무엇 때문에 ' + (t1 ? '열리는 시간이' : '높이가') + ' 달라지는지 그래프로 볼 수 있어요.</p>') +
+                    '<p class="ev-why">💡 값을 바꿔서 한 번 더 재야 무엇 때문에 ' + (t1 ? '열리는 시간이' : '높이가') + ' 달라지는지 결과 표로 비교할 수 있어요.</p>') +
                 '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-change">' + btnTxt + '</button>' +
                 // 다음 단계가 아직 잠겨 있으면 그리로 가는 단추는 두지 않음
                 (stageLocked(t1 ? 't2' : 'end') ? '' : '<button type="button" class="ev-next secondary" data-go="' + (t1 ? 't2-intro' : 'end-intro') + '">' + (t1 ? '2차시로 가기 →' : '정리로 가기 →') + '</button>') + '</div>';
             return { html: html, mount: function () { $('#ev-change').addEventListener('click', function () { mustChange(part, one ? one.value : null, np ? np.val : null); }); } };
         };
     }
-    // 결과 화면에서 바로: 한 값으로만 쟀으면 '정해 둔 ② 로' (그래프를 안 눌러도)
+    // 결과 화면에서 바로: 한 값으로만 쟀으면 '정해 둔 ② 로' (결과 비교를 안 눌러도)
     function moreHint(part, curVal) {
         var p = st[part], d = ensureBase(part)[p.changed], np = curVal != null ? nextPlanned(part, curVal) : null;
         var lead = np && d
@@ -1316,7 +1316,7 @@
     SCREENS['t1-challenge'] = function () {
         var s = setup();
         var html = '<p class="ev-kicker">🎯 도전</p><h2>' + esc(s.targetTime) + '초에 ‘펑’ 하게 만들어요!</h2>' +
-            card('<p>선생님이 낸 목표 시간: <b class="ev-big">' + esc(s.targetTime) + '초</b></p><p>그래프를 보고 조건을 정한 뒤, 예측하고 재요. 목표와 <b>' + esc(s.tolTime) + '초</b> 안으로 맞으면 성공!</p>') +
+            card('<p>선생님이 낸 목표 시간: <b class="ev-big">' + esc(s.targetTime) + '초</b></p><p>우리 결과 표를 보고 조건을 정한 뒤 재요. 목표와 <b>' + esc(s.tolTime) + '초</b> 안으로 맞으면 성공!</p>') +
             challengeList('t1') + '<p class="ev-small" id="ev-ch-msg" role="status"></p>' + nav('t1-ch-cond', '도전하기 →') +
             '<div class="ev-nav col"><button type="button" class="ev-next secondary" data-go="t2-intro">2차시로 가기 →</button></div>';
         return { html: html, mount: function () {
@@ -1464,7 +1464,7 @@
     SCREENS['t2-hand'] = function () {
         var html = '<p class="ev-kicker">눈으로 보고 고르기' + (st.t2.ch ? ' · 🎯 도전' : '') + '</p><h2>로켓이 얼마나 올랐나요?</h2>' +
             '<div class="ev-choices">' + Object.keys(M.HAND).map(function (k) { return '<button type="button" class="ev-choice big" data-k="' + k + '">' + ({ high: '⬆️ ', same: '↔️ ', low: '⬇️ ' })[k] + esc(M.HAND[k].label) + '</button>'; }).join('') + '</div>' +
-            '<p class="ev-small">눈으로 본 값은 그래프에 대략(높다 120%, 비슷 100%, 낮다 70%)으로 그려요.</p>' + nav(null);
+            '<p class="ev-small">눈으로 본 값은 결과 표에 대략(높다 120%, 비슷 100%, 낮다 70%)으로 적어요.</p>' + nav(null);
         return { html: html, mount: function (el) {
             el.querySelector('.ev-choices').addEventListener('click', function (e) { var b = e.target.closest('[data-k]'); if (b) saveHeight({ pct: M.handPct(b.dataset.k), method: 'hand', hand: b.dataset.k }); });
         } };
@@ -1497,7 +1497,7 @@
             '<p class="ev-small" id="ev-cm">' + (st.childCm ? '로켓 높이 약 ' + M.cmFrom(r.pct, st.childCm) + ' cm' : '+ 를 누르면 넣어요. 선생님께는 %만 보내요.') + '</p></details>' +
             '<div class="ev-nav col">' + (same.length < reps ? '<button type="button" class="ev-next good" id="ev-again2">🔁 같은 조건으로 한 번 더 (' + same.length + '/' + reps + ')</button>' : '<p class="ev-ok">✅ 같은 조건으로 ' + reps + '번 쐈어요!</p>') +
             (M.valueKinds(p.trials) < 2 && same.length >= reps ? moreHint('t2', r.value) : '') + '<button type="button" class="ev-next ' + (same.length < reps ? 'secondary' : 'good') + '" id="ev-change">' + changeBtn + '</button>' +
-            (M.valueKinds(p.trials) < 2 ? '' : '<button type="button" class="ev-next secondary" data-go="t2-graph">📈 그래프 보기</button>') + '</div>' +
+            (M.valueKinds(p.trials) < 2 ? '' : '<button type="button" class="ev-next secondary" data-go="t2-graph">📊 결과 비교 보기</button>') + '</div>' +
             '<p class="ev-small">잘못 잰 값이면 <button type="button" class="ev-link" id="ev-undo">이 기록 지우기</button></p>';
         return { html: html, mount: function (el) {
             $('#ev-change').addEventListener('click', function () { mustChange('t2', r.value, np ? np.val : null); });
@@ -1516,11 +1516,11 @@
             });
         } };
     };
-    SCREENS['t2-graph'] = graphScreen('t2', 't2-challenge', '🎯 도전: 딱 아이 키만큼! →');
+    SCREENS['t2-graph'] = compareScreen('t2', 't2-challenge', '🎯 도전: 딱 아이 키만큼! →');
     SCREENS['t2-challenge'] = function () {
         var s = setup();
         var html = '<p class="ev-kicker">🎯 도전</p><h2>딱 아이 키만큼 (' + esc(s.targetPct) + '%) 올려요!</h2>' +
-            card('<p>그래프를 보고 조건을 정한 뒤 발사해요. 목표와 <b>' + esc(s.tolPct) + '%</b> 안으로 맞으면 성공!</p>') + challengeList('t2') +
+            card('<p>우리 결과 표를 보고 조건을 정한 뒤 발사해요. 목표와 <b>' + esc(s.tolPct) + '%</b> 안으로 맞으면 성공!</p>') + challengeList('t2') +
             '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-ch2">도전하기 →</button><button type="button" class="ev-next secondary" id="ev-end">정리로 가기 →</button></div>';
         return { html: html, mount: function () {
             $('#ev-ch2').addEventListener('click', function () { st.t2.ch = true; save(); show('t2-ch-cond'); });
@@ -1547,10 +1547,12 @@
     SCREENS['end-compare'] = function () {
         var ch = M.conceptChanges(st.think.first, st.think.last);
         var html = '<h2>✨ 처음 생각 → 지금 생각</h2><div class="ev-compare">' + ch.map(function (c, i) {
-            var opts = M.CONCEPTS[i].opts;
+            var opts = M.CONCEPTS[i].opts, k = M.CONCEPTS[i].key;
+            var easy = M.KEY_WORDS[k] ? M.easyLine(M.KEY_WORDS[k]) : '';
             return '<div class="ev-cmp' + (c.sparkle ? ' spark' : '') + '"><h3>' + esc(c.word) + (c.sparkle ? ' ✨' : '') + '</h3>' +
                 '<p><span class="ev-tag">처음</span> ' + esc(M.optText(opts, c.first) || '–') + '</p><p><span class="ev-tag now">지금</span> ' + esc(M.optText(opts, c.last) || '–') + (c.lastOk ? ' ⭕' : '') + '</p>' +
-                '<p class="ev-small" data-lesson-answer="' + M.CONCEPTS[i].key + '">📘 ' + esc(M.CONCEPTS[i].def) + '</p></div>';
+                '<p class="ev-small ev-keep" data-lesson-answer="' + k + '">📘 <b>' + esc(c.word) + '</b> = ' + esc(M.CONCEPTS[i].def) + '</p>' +
+                (easy ? '<p class="ev-easy ev-keep">🧒 쉬운 말 · ' + esc(easy) + '</p>' : '') + '</div>';
         }).join('') + '</div>' + nav('end-sentence', '다음: 우리 팀 정리 문장 →');
         return { html: html };
     };

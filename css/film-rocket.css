@@ -171,8 +171,11 @@ html.ev-answering .ev-screen .ev-nav:not(.ev-follow-only) { display: none !impor
 /* 수업 중 팀 폰: 대기·응답 화면에는 '👀 앞 화면을 봐요'·팀 이름·우리가 낸 답·물음과 답 칸만 (2026-11-23 선생님 '응답한 답과 화면을 보세요만')
    위 띠(팀·⭐ 점수·보냄)·'🏫 선생님 연결 · 도움말'·겹치는 '👀 앞 화면을 봐요 — 선생님이 설명 중이에요' 띠·정의·설명 글은 숨김 (측정 장은 그대로) */
 html.ev-answering #ev-top, html.ev-answering .ev-foot, html.ev-answering .cs-look-band { display: none !important; }
-html.ev-answering .ev-screen .ev-small, html.ev-answering .ev-screen .ev-def, html.ev-answering .ev-screen .ev-ex, html.ev-answering .ev-screen .ev-easy,
-html.ev-answering .ev-screen .ev-ok, html.ev-answering .ev-screen .ev-no, html.ev-answering .ev-screen .ev-hold, html.ev-answering .ev-screen [data-lesson-answer] { display: none !important; }
+html.ev-answering .ev-screen .ev-small:not(.ev-keep), html.ev-answering .ev-screen .ev-def:not(.ev-keep), html.ev-answering .ev-screen .ev-ex:not(.ev-keep), html.ev-answering .ev-screen .ev-easy:not(.ev-keep),
+html.ev-answering .ev-screen .ev-ok, html.ev-answering .ev-screen .ev-no, html.ev-answering .ev-screen .ev-hold, html.ev-answering .ev-screen [data-lesson-answer]:not(.ev-keep) { display: none !important; }
+.ev-sent-def { margin: var(--sp-3) 0 0; text-align: left; }
+.ev-sent-def .ev-def { margin: 0; }
+.ev-sent-def .ev-ex { margin: var(--sp-2) 0 0; font-size: 1rem; }
 .ev-sentlist { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: var(--sp-1); }
 .ev-sentlist li { padding: var(--sp-2) var(--sp-3); border-radius: 12px; background: var(--c-ok-bg); color: var(--c-ok-text); font-size: 1.05rem; }
 /* 📶 연결이 끊겼어요 (끊겼을 때만) */

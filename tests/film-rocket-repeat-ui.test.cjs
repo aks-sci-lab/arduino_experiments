@@ -75,14 +75,13 @@ test('로켓: 다시 재기 바로 가기·반복 측정·끊긴 채 새로고�
         await A.click('#ev-sw1'); await A.waitForTimeout(300); await A.click('#ev-sw2'); await A.click('#ev-sw3');
         await go('t1-result');
         assert.match(await A.textContent('.ev-screen'), /이 조건: 2번째/);
-        // ④ 조건 화면: 같은 값은 2번, + 로 바꾸면 그 값은 0번
+        // ④ 조건 화면: 정해 둔 ② 로 자동 맞춤(0번), − 로 ① 로 가면 2번, 다시 + 로 ② 로 가면 0번
         await A.click('#ev-change'); await go('t1-cond');
-        assert.equal(await A.textContent('#ev-count'), '2');
+        assert.equal(await A.textContent('#ev-count'), '0', '정해 둔 ② 로 자동 맞춤');
+        await A.click('.ev-stepper:not(.locked) [data-pm="-1"]');
+        assert.equal(await A.textContent('#ev-count'), '2', '① 값 기준');
         await A.click('.ev-stepper:not(.locked) [data-pm="1"]');
         assert.equal(await A.textContent('#ev-count'), '0', '바꾼 값 기준');
-        await A.click('.ev-stepper:not(.locked) [data-pm="-1"]');
-        assert.equal(await A.textContent('#ev-count'), '2');
-        await A.click('.ev-stepper:not(.locked) [data-pm="1"]');
         // 조건을 바꾸면 방법을 다시 고름 ('몇 초?' 예측 화면은 2026-11-23 에 뺌)
         await next(); await go('t1-measure');
         assert.equal(await A.isVisible('#ev-m-sw'), true, '조건을 바꾸면 방법도 다시 고름');

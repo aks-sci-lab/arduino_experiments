@@ -113,14 +113,15 @@ test('로켓 비계 4: 아직 말할 수 없어요·변인별 보기·우리 숫
         assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을\(를\) 10 mL 로 했더니 평균 12초/);
         assert.equal(await box1.locator('[data-go="t1-again"]').count(), 1, '바꿔서 재러 가기');
 
-        // ③ 값을 바꿔 재기(15 mL 3번, 겹침 없음) → 그래프에 반복 범위 막대·'흔들림보다 큰가요?'
+        // ③ 값을 바꿔 재기(15 mL 3번, 겹침 없음) → 가족 체험형은 그래프 없이 결과 비교 표·'흔들림보다 큰가요?'·핵심 개념 연결
         await A.evaluate(() => { const s = window.__filmRocket.state(); s.t1.trials = s.t1.trials.concat([15, 16, 17].map(y => ({ value: 15, y, predict: 12, method: 'stopwatch' }))); });
         await show(A, 't1-graph');
-        assert.match(await A.textContent('.ev-teamq'), /우리 팀 물음/, '그래프 화면에도 물음 줄');
-        const bars = await A.evaluate(() => window.__charts[window.__charts.length - 1].data.datasets.filter(d => d.label === '반복 범위' || (d.label === '' && d.borderWidth === 8)).map(d => d.data.map(p => p.y)));
-        assert.deepEqual(bars, [[11, 13], [15, 17]], '값마다 가장 작은 값~가장 큰 값 막대');
+        assert.match(await A.textContent('.ev-teamq'), /우리 팀 물음/, '결과 비교 화면에도 물음 줄');
+        assert.equal(await A.locator('#ev-chart').count(), 0, '가족 체험형은 그래프 캔버스 없음');
+        assert.match(await A.textContent('.ev-concept-link'), /압력[\s\S]*일정한 넓이에 작용하는 힘/);
         assert.match(await A.textContent('.ev-spread'), /차이가 흔들림보다 큰가요\?.*겹치지 않아요/);
         assert.match(await A.textContent('#ev-mini'), /11\.0초~13\.0초|11초~13초/);
+        assert.match(await A.textContent('#ev-mini'), /15\.0초~17\.0초|15초~17초/);
         // 겹치면 '말하기 어려워요'
         await A.evaluate(() => { const s = window.__filmRocket.state(); s.t1.trials.push({ value: 15, y: 12, predict: 12, method: 'stopwatch' }); });
         await show(A, 't1-graph');

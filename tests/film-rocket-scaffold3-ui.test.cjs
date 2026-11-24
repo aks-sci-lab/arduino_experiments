@@ -83,8 +83,8 @@ test('로켓: 예측을 골라야 다음·늦게 고른 팀 5점', { skip: !chro
             await C.evaluate(() => window.scrollTo(0, 0));
             assert.equal(await C.isDisabled('.ev-screen .ev-next[data-go]'), true, scr + ': 예측 고르기 전 꺼짐');
             assert.match(await C.textContent('.ev-need-guess'), /예측을 골라야/);
-            const box = await C.evaluate(() => { const r = document.querySelector('[data-guess] [data-dir="same"]').getBoundingClientRect(); return { bottom: r.bottom, vh: window.innerHeight }; });
-            assert.ok(box.bottom <= box.vh, scr + ': 예측 고르기가 첫 화면에 보임 ' + JSON.stringify(box));
+            const box = await C.evaluate(() => { const r = document.querySelector('[data-plan]').getBoundingClientRect(); return { bottom: r.bottom, vh: window.innerHeight }; });
+            assert.ok(box.bottom <= box.vh, scr + ': ①→② 정하기가 첫 화면에 보임 ' + JSON.stringify(box));
             await C.click('[data-guess] [data-dir="up"]');
             assert.equal(await C.isDisabled('.ev-screen .ev-next[data-go]'), false, scr + ': 고르면 켜짐 (까닭은 안 써도)');
             assert.equal(await C.locator('.ev-need-guess').count(), 0);
