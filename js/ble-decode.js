@@ -142,6 +142,20 @@
         if (u.endsWith(BASE) && u.startsWith('0000')) return '0x' + u.slice(4, 8).toUpperCase();
         return u.slice(0, 8) + '…';
     }
+    // 여러 UUID 를 쉼표·줄바꿈·공백으로 붙여 넣어도 자동 추출 ('Services: 00001800-..., 49535343-...' 형태 지원)
+    const SYSTEM_UUIDS = new Set([normUuid('1800'), normUuid('1801')]);
+    function parseUuidList(text) {
+        const cleaned = String(text || '').replace(/^\s*services\s*:\s*/gim, '');
+        const tokens = cleaned.split(/[\n,\s;]+/).map(s => s.trim()).filter(Boolean);
+        const uuids = [], skippedSystem = [], bad = [];
+        tokens.forEach(tok => {
+            const u = normUuid(tok);
+            if (!u) { bad.push(tok); return; }
+            if (SYSTEM_UUIDS.has(u)) { if (!skippedSystem.includes(u)) skippedSystem.push(u); return; }
+            if (!uuids.includes(u)) uuids.push(u);
+        });
+        return { uuids, skippedSystem, bad };
+    }
 
     // 자주 쓰는 표준 서비스 (Web Bluetooth 는 여기 적은 서비스만 열 수 있음)
     const STANDARD_SERVICES = [
@@ -162,7 +176,7 @@
         { uuid: 'fee0', name: '사용자 지정 BLE (0xFEE0)', on: true },
         { uuid: 'fe00', name: '사용자 지정 BLE (0xFE00)', on: true },
         { uuid: 'ffa0', name: '사용자 지정 BLE (0xFFA0)', on: false },
-        { uuid: '49535343-fe7d-4ae5-8fa9-9fafd205e455', name: 'Microchip/ISSC UART (듀얼모드 모듈)', on: true },
+        { uuid: '49535343-fe7d-4ae5-8fa9-9fafd205e455', name: 'Microchip/ISSC UART (사이언스큐브·듀얼모드)', on: true },
         { uuid: 'd91714ef-28b9-4f91-ba16-f0d9a604f112', name: 'Vernier Go Direct (공개 방식)', on: true },
         { uuid: '19b10000-e8f2-537e-4f6c-d104768a1214', name: '우리 Pico·Nano 센서 보드 (시험용)', on: false }
     ];
@@ -175,6 +189,9 @@
         'ffe0': 'BLE 직렬 (0xFFE0)', 'ffe1': 'BLE 직렬 통로 (0xFFE1)', 'fff0': '사용자 지정 (0xFFF0)', 'ff00': '사용자 지정 (0xFF00)',
         'fee0': '사용자 지정 (0xFEE0)', 'fe00': '사용자 지정 (0xFE00)', 'ffa0': '사용자 지정 (0xFFA0)',
         '49535343-fe7d-4ae5-8fa9-9fafd205e455': 'Microchip/ISSC UART',
+        '49535343-1e4d-4bd9-ba61-23c647249616': 'ISSC UART 받기(알림·TX)',
+        '49535343-8841-43f4-a8d4-ecbe34729bb3': 'ISSC UART 보내기(쓰기·RX)',
+        '49535343-4c8a-39b3-2f49-511cff073b7e': 'ISSC UART 제어',
         '6e400001-b5a3-f393-e0a9-e50e24dcca9e': 'Nordic UART', '6e400002-b5a3-f393-e0a9-e50e24dcca9e': 'UART 받기(쓰기)',
         '6e400003-b5a3-f393-e0a9-e50e24dcca9e': 'UART 보내기(알림)', '19b10000-e8f2-537e-4f6c-d104768a1214': '우리 센서 보드', 'd91714ef-28b9-4f91-ba16-f0d9a604f112': 'Vernier Go Direct'
     };
@@ -422,7 +439,7 @@
     const api = {
         knownVendor, KNOWN_VENDORS, VERNIER, vernierCommand,
         FORMATS, FORMAT_BY_ID, STANDARD_SERVICES, DEVICE_INFO_CHARS, SCHEMA,
-        toBytes, readRaw, parseMask, readField, decodePacket, toHex, parseHex, encodeCommand, normUuid, shortUuid, knownName,
+        toBytes, readRaw, parseMask, readField, decodePacket, toHex, parseHex, encodeCommand, normUuid, shortUuid, parseUuidList, knownName,
         changingBytes, fitLine, niceNumber, findCandidates, candidateToField, validateDecoder,
         recordsToCsv, recordsToJson, recordsFromJson, csvCell
     };

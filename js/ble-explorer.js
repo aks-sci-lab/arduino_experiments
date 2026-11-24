@@ -73,15 +73,23 @@
         checkCustom();
     }
     function checkCustom() {
-        const lines = $('customUuids').value.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-        const bad = lines.filter(l => !B.normUuid(l));
-        $('uuidMsg').textContent = bad.length ? '⚠️ UUID 모양이 아니에요: ' + bad.join(', ') + ' (4자리 16진수 또는 8-4-4-4-12 모양)' : (lines.length ? '✓ 직접 넣은 서비스 ' + lines.length + '개' : '');
-        return lines.map(B.normUuid).filter(Boolean);
+        const res = B.parseUuidList($('customUuids').value);
+        const parts = [];
+        if (res.bad.length) parts.push('⚠️ UUID 모양이 아니에요: ' + res.bad.join(', ') + ' (4자리 16진수 또는 8-4-4-4-12 모양)');
+        if (res.uuids.length) parts.push('✓ 직접 넣은 서비스 ' + res.uuids.length + '개');
+        if (res.skippedSystem.length) parts.push('시스템 기본(' + res.skippedSystem.map(B.shortUuid).join('·') + ') 자동 제외');
+        $('uuidMsg').textContent = parts.join(' · ');
+        return res.uuids;
     }
     function selectedServices() {
         const list = [];
         document.querySelectorAll('#stdServices input[data-svc]:checked').forEach(c => list.push(c.dataset.svc));
         checkCustom().forEach(u => { if (!list.includes(u)) list.push(u); });
+        // 저장해 둔 규칙의 서비스 UUID 도 자동으로 optionalServices 에 포함
+        load(KEY_SAVED, []).forEach(d => {
+            (d && d.characteristics || []).forEach(c => { const u = B.normUuid(c && c.service); if (u && !list.includes(u)) list.push(u); });
+            (d && d.initCommands || []).forEach(c => { const u = B.normUuid(c && c.service); if (u && !list.includes(u)) list.push(u); });
+        });
         return list;
     }
 
@@ -120,8 +128,30 @@
         await connectDevice(device);
     }
 
+    let autoFeedTimer = null;
+    function updateAutoFeedNote(startedCount, waitedSilent) {
+        const box = $('autoFeedNote');
+        if (!box) return;
+        if (!startedCount) { box.hidden = true; return; }
+        const got = S.records.length;
+        box.hidden = false;
+        if (got > 0) {
+            box.className = 'box ok';
+            box.innerHTML = '<span>✓ 알림 ' + startedCount + '개를 자동으로 켰고 데이터 <b>' + got + '개</b>를 받고 있어요!</span> ' +
+                '<div class="row"><button type="button" class="btn small primary" id="btnGoLog">📊 ② 기록 탭에서 바이트 보기</button></div>';
+        } else if (waitedSilent) {
+            box.className = 'box warn';
+            box.innerHTML = '<span>⏳ 알림 ' + startedCount + '개를 자동으로 켰지만 3초 동안 들어온 값이 없어요. <b>시작 명령</b>을 보내야 값을 내보내는 센서일 수 있어요.</span> ' +
+                '<div class="row"><button type="button" class="btn small primary" id="btnGoWrite">✏️ ② 기록 탭에서 시작 명령 보내기</button></div>';
+        } else {
+            box.className = 'box';
+            box.innerHTML = '<span>⚡ 알림 ' + startedCount + '개를 자동으로 켰어요. 센서에서 오는 데이터를 기다리는 중…</span>';
+        }
+    }
+
     // 고른 기기에 연결해 서비스·특성을 읽는다 (다시 연결할 때도 이것만 다시 부름 — 기기 고르는 창 없이)
     async function connectDevice(device) {
+        clearTimeout(autoFeedTimer);
         device.removeEventListener('gattserverdisconnected', onDisconnected);
         device.addEventListener('gattserverdisconnected', onDisconnected);
         $('btnReconnect').hidden = true;
@@ -164,7 +194,36 @@
             $('btnDisconnect').disabled = false;
             $('vernierBox').hidden = !(vendor && vendor.id === 'vernier');
             if (vendor && vendor.id === 'vernier' && $('vernierAuto').checked) await vernierInit();
-            setStatus('✓ 연결됨: ' + (device.name || '이름 없는 기기') + ' · 서비스 ' + tree.length + '개', 'ok');
+
+            // 목록에서 센서를 선택하면 데이터 서비스의 알림을 자동으로 켜고 수신 여부를 안내한다
+            let autoStarted = 0;
+            if ((!vendor || vendor.id !== 'vernier') && $('autoNotify') && $('autoNotify').checked) {
+                const skipSvc = B.normUuid('180a');
+                for (const c of S.chars.values()) {
+                    if (c.service === skipSvc) continue;
+                    if ((c.props.notify || c.props.indicate) && !c.notifying) {
+                        const btn = document.querySelector('[data-notify="' + CSS.escape(c.uuid) + '"]');
+                        await toggleNotify(c.uuid, btn);
+                        if (c.notifying) autoStarted++;
+                    }
+                }
+                if (autoStarted > 0) {
+                    logEvent('auto-notify', '데이터 알림 ' + autoStarted + '개 자동 켜기');
+                    S.autoStarted = autoStarted;
+                    updateAutoFeedNote(autoStarted, false);
+                    autoFeedTimer = setTimeout(() => {
+                        if (S.device === device) updateAutoFeedNote(autoStarted, true);
+                    }, 3000);
+                } else {
+                    S.autoStarted = 0;
+                    updateAutoFeedNote(0, false);
+                }
+            } else {
+                S.autoStarted = 0;
+                updateAutoFeedNote(0, false);
+            }
+
+            setStatus('✓ 연결됨: ' + (device.name || '이름 없는 기기') + ' · 서비스 ' + tree.length + '개' + (autoStarted ? ' · 알림 ' + autoStarted + '개 자동 켜짐' : ''), 'ok');
             if (!tree.length) setStatus('연결됐지만 열 수 있는 서비스가 없어요. 서비스 UUID 를 직접 넣고 다시 연결해 보세요.', 'error');
             refreshCharSelects();
         } catch (e) {
@@ -678,6 +737,7 @@
         S.dirty = false;
         $('countBadge').textContent = '기록 ' + S.records.length + '개' + (S.paused ? ' · 멈춤' : '');
         const tab = mainTabs && mainTabs.current();
+        if (tab === 'connect' && S.autoStarted > 0 && S.records.length > 0) updateAutoFeedNote(S.autoStarted, false);
         if (tab === 'log') renderLog();
         if (tab === 'rules') {
             renderDecoded();
@@ -709,6 +769,20 @@
         $('stdServices').addEventListener('change', saveServiceChoices);
         $('customUuids').addEventListener('input', saveServiceChoices);
         $('btnScan').addEventListener('click', scan);
+        if ($('autoNotify')) {
+            try { $('autoNotify').checked = localStorage.getItem('ble-explorer:autoNotify') !== '0'; } catch (e) {}
+            $('autoNotify').addEventListener('change', () => { try { localStorage.setItem('ble-explorer:autoNotify', $('autoNotify').checked ? '1' : '0'); } catch (e) {} });
+        }
+        if ($('autoFeedNote')) {
+            $('autoFeedNote').addEventListener('click', e => {
+                if (e.target.closest('#btnGoLog')) mainTabs.show('log', true);
+                if (e.target.closest('#btnGoWrite')) {
+                    mainTabs.show('log', true);
+                    if ($('writeBox')) $('writeBox').open = true;
+                    if ($('writeHex')) $('writeHex').focus();
+                }
+            });
+        }
         if ($('btnCopyBtInternals')) {
             $('btnCopyBtInternals').addEventListener('click', () => {
                 const url = 'chrome://bluetooth-internals/#devices';

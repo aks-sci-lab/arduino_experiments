@@ -1397,7 +1397,7 @@
       }
     }
 
-    async function connectWithProfile(profile) {
+    async function attachProfileToServer(profile, bleDevice, server) {
       const B = window.BleDecode;
       if (!B) throw new Error('해석 도구(ble-decode.js)를 불러오지 못했습니다.');
 
@@ -1405,6 +1405,106 @@
       const field = chRule && chRule.fields && chRule.fields[0];
       if (!chRule || !field) throw new Error('이 프로필에 읽을 필드가 없습니다.');
 
+      const dataChar = await findCharacteristic(server, chRule.service, chRule.characteristic);
+      if (!dataChar) {
+        throw new Error(`"${bleDevice.name || '선택한 기기'}"에서 규칙 특성(${B.shortUuid(chRule.characteristic)})을 찾지 못했습니다.`);
+      }
+
+      let batteryText = '-';
+      try {
+        const batSvc = await server.getPrimaryService(0x180f);
+        const batChar = await batSvc.getCharacteristic(0x2a19);
+        const bv = await batChar.readValue();
+        if (bv && bv.byteLength >= 1) batteryText = `${bv.getUint8(0)}%`;
+      } catch (e) {}
+
+      state.mode = 'device';
+      els.deviceName.textContent = bleDevice.name || profile.name;
+      els.deviceBattery.textContent = batteryText;
+      els.deviceChannel.textContent = `${profile.name} · ${field.name}${field.unit ? ` (${field.unit})` : ''}`;
+
+      const onDisconnected = () => {
+        if (state.mode !== 'device') return;
+        disconnectAll();
+        showToast('센서 연결이 종료되었습니다.');
+      };
+      bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+      const handleDv = (dv) => {
+        if (!dv) return;
+        const bytes = new Uint8Array(dv.buffer, dv.byteOffset || 0, dv.byteLength);
+        const val = B.readField(bytes, field);
+        if (typeof val === 'number' && Number.isFinite(val)) handleTemperatureSample(val);
+      };
+      const onCharValue = (ev) => handleDv(ev.target.value);
+
+      let pollTimer = null;
+      const startPolling = () => {
+        clearInterval(pollTimer);
+        const readOnce = async () => {
+          try { handleDv(await dataChar.readValue()); } catch (e) {}
+        };
+        readOnce();
+        pollTimer = setInterval(readOnce, state.intervalMs);
+      };
+
+      const props = dataChar.properties || {};
+      if (chRule.mode !== 'read' && (props.notify || props.indicate)) {
+        dataChar.addEventListener('characteristicvaluechanged', onCharValue);
+        await dataChar.startNotifications();
+      } else if (props.read) {
+        startPolling();
+        state.genericRestart = startPolling;
+      }
+
+      state.genericCleanup = () => {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        try { dataChar.removeEventListener('characteristicvaluechanged', onCharValue); } catch (e) {}
+        try { if (chRule.mode !== 'read' && (props.notify || props.indicate)) Promise.resolve(dataChar.stopNotifications()).catch(() => {}); } catch (e) {}
+        try { bleDevice.removeEventListener('gattserverdisconnected', onDisconnected); } catch (e) {}
+        try { if (bleDevice.gatt && bleDevice.gatt.connected) bleDevice.gatt.disconnect(); } catch (e) {}
+      };
+
+      // 프로필에 저장된 시작 명령이 있으면 순서대로 전송
+      if (Array.isArray(profile.initCommands) && profile.initCommands.length) {
+        for (const cmd of profile.initCommands) {
+          const wChar = await findCharacteristic(server, cmd.service, cmd.characteristic);
+          if (!wChar) throw new Error(`시작 명령 특성(${B.shortUuid(cmd.characteristic)})을 찾지 못했습니다.`);
+          const bytes = B.encodeCommand(cmd.payload, cmd.mode);
+          await writeProfileBytes(wChar, bytes);
+          if (cmd.delayMs > 0) await new Promise((r) => setTimeout(r, cmd.delayMs));
+        }
+      }
+
+      updateConnectionUI();
+      showToast(`${bleDevice.name || profile.name} 연결 완료! (규칙: ${profile.name})`);
+    }
+
+    async function tryAutoMatchProfile(bleDevice, server) {
+      if (!state.profiles.length) return false;
+      const devName = String(bleDevice.name || '');
+      // 1) 이름 접두사가 맞는 프로필 우선, 2) 나머지 프로필 순서로 특성 존재 여부 확인
+      const ordered = state.profiles.slice().sort((a, b) => {
+        const aHit = a.device && a.device.namePrefix && devName.startsWith(a.device.namePrefix) ? 1 : 0;
+        const bHit = b.device && b.device.namePrefix && devName.startsWith(b.device.namePrefix) ? 1 : 0;
+        return bHit - aHit;
+      });
+      for (const prof of ordered) {
+        const ch = prof.characteristics[0];
+        if (!ch) continue;
+        const found = await findCharacteristic(server, ch.service, ch.characteristic);
+        if (found) {
+          const idx = state.profiles.indexOf(prof);
+          if (idx >= 0) els.profileSelect.value = String(idx);
+          await attachProfileToServer(prof, bleDevice, server);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    async function connectWithProfile(profile) {
       const optServices = Array.from(new Set([
         ...BLE_OPTIONAL_SERVICES,
         ...profile.characteristics.map((c) => c.service).filter(Boolean),
@@ -1416,83 +1516,9 @@
         optionalServices: optServices
       });
 
-      let server = null;
       try {
-        server = await bleDevice.gatt.connect();
-        const dataChar = await findCharacteristic(server, chRule.service, chRule.characteristic);
-        if (!dataChar) {
-          throw new Error(`"${bleDevice.name || '선택한 기기'}"에서 규칙 특성(${B.shortUuid(chRule.characteristic)})을 찾지 못했습니다.`);
-        }
-
-        let batteryText = '-';
-        try {
-          const batSvc = await server.getPrimaryService(0x180f);
-          const batChar = await batSvc.getCharacteristic(0x2a19);
-          const bv = await batChar.readValue();
-          if (bv && bv.byteLength >= 1) batteryText = `${bv.getUint8(0)}%`;
-        } catch (e) {}
-
-        state.mode = 'device';
-        els.deviceName.textContent = bleDevice.name || profile.name;
-        els.deviceBattery.textContent = batteryText;
-        els.deviceChannel.textContent = `${profile.name} · ${field.name}${field.unit ? ` (${field.unit})` : ''}`;
-
-        const onDisconnected = () => {
-          if (state.mode !== 'device') return;
-          disconnectAll();
-          showToast('센서 연결이 종료되었습니다.');
-        };
-        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-
-        const handleDv = (dv) => {
-          if (!dv) return;
-          const bytes = new Uint8Array(dv.buffer, dv.byteOffset || 0, dv.byteLength);
-          const val = B.readField(bytes, field);
-          if (typeof val === 'number' && Number.isFinite(val)) handleTemperatureSample(val);
-        };
-        const onCharValue = (ev) => handleDv(ev.target.value);
-
-        let pollTimer = null;
-        const startPolling = () => {
-          clearInterval(pollTimer);
-          const readOnce = async () => {
-            try { handleDv(await dataChar.readValue()); } catch (e) {}
-          };
-          readOnce();
-          pollTimer = setInterval(readOnce, state.intervalMs);
-        };
-
-        const props = dataChar.properties || {};
-        if (chRule.mode !== 'read' && (props.notify || props.indicate)) {
-          dataChar.addEventListener('characteristicvaluechanged', onCharValue);
-          await dataChar.startNotifications();
-        } else if (props.read) {
-          startPolling();
-          state.genericRestart = startPolling;
-        }
-
-        state.genericCleanup = () => {
-          clearInterval(pollTimer);
-          pollTimer = null;
-          try { dataChar.removeEventListener('characteristicvaluechanged', onCharValue); } catch (e) {}
-          try { if (chRule.mode !== 'read' && (props.notify || props.indicate)) Promise.resolve(dataChar.stopNotifications()).catch(() => {}); } catch (e) {}
-          try { bleDevice.removeEventListener('gattserverdisconnected', onDisconnected); } catch (e) {}
-          try { if (bleDevice.gatt && bleDevice.gatt.connected) bleDevice.gatt.disconnect(); } catch (e) {}
-        };
-
-        // 프로필에 저장된 시작 명령이 있으면 순서대로 전송
-        if (Array.isArray(profile.initCommands) && profile.initCommands.length) {
-          for (const cmd of profile.initCommands) {
-            const wChar = await findCharacteristic(server, cmd.service, cmd.characteristic);
-            if (!wChar) throw new Error(`시작 명령 특성(${B.shortUuid(cmd.characteristic)})을 찾지 못했습니다.`);
-            const bytes = B.encodeCommand(cmd.payload, cmd.mode);
-            await writeProfileBytes(wChar, bytes);
-            if (cmd.delayMs > 0) await new Promise((r) => setTimeout(r, cmd.delayMs));
-          }
-        }
-
-        updateConnectionUI();
-        showToast(`${bleDevice.name || profile.name} 연결 완료! (규칙: ${profile.name})`);
+        const server = await bleDevice.gatt.connect();
+        await attachProfileToServer(profile, bleDevice, server);
       } catch (err) {
         if (state.genericCleanup) disconnectAll();
         else if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
@@ -1534,10 +1560,18 @@
         let device = null;
 
         if (useBluetooth) {
+          // 저장된 모든 역추적 프로필의 서비스 UUID 도 자동 포함 (목록에서 고르면 자동 매칭)
+          const savedServices = [];
+          state.profiles.forEach((p) => {
+            (p.characteristics || []).forEach((c) => { if (c.service) savedServices.push(c.service); });
+            (p.initCommands || []).forEach((c) => { if (c.service) savedServices.push(c.service); });
+          });
+          const optServices = Array.from(new Set([...BLE_OPTIONAL_SERVICES, ...savedServices]));
+
           // 블루투스 이름 필터 없이 모든 기기를 표시한다 (GDX 외 이름·타사 센서도 검색 가능)
           const bleDevice = await navigator.bluetooth.requestDevice({
             acceptAllDevices: true,
-            optionalServices: BLE_OPTIONAL_SERVICES
+            optionalServices: optServices
           });
           rawBleDevice = bleDevice;
 
@@ -1553,6 +1587,12 @@
           if (hasVernier) {
             device = await godirect.createDevice(bleDevice, { open: true, startMeasurements: false });
           } else {
+            // 1) 저장된 역추적 프로필 자동 매칭 → 2) 표준 BLE 온도
+            const okProfile = await tryAutoMatchProfile(bleDevice, server);
+            if (okProfile) {
+              rawBleDevice = null;
+              return;
+            }
             const okStd = await tryConnectStandardBleTemp(bleDevice, server);
             if (okStd) {
               rawBleDevice = null;
@@ -1560,7 +1600,7 @@
             }
             const label = bleDevice.name || '선택한 기기';
             throw new Error(
-              `"${label}"에서 Vernier Go Direct·표준 온도 서비스를 찾지 못했습니다. 상단 '🔍 센서 역추적'에서 규칙을 만든 뒤 선택해 보세요.`
+              `"${label}"에서 Vernier Go Direct·저장된 규칙·표준 온도 서비스를 찾지 못했습니다. 상단 '🔍 센서 역추적'에서 규칙을 만든 뒤 연결해 보세요.`
             );
           }
         } else {
