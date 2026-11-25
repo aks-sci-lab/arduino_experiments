@@ -557,10 +557,14 @@
         <div class="btn-group">
           <label for="sampleInterval" style="font-size:12.5px; color:var(--text-muted); font-weight:600;">측정 간격</label>
           <select class="select" id="sampleInterval">
+            <option value="100">0.1초 (10 Hz)</option>
             <option value="200">0.2초 (5 Hz)</option>
             <option value="500" selected>0.5초 (2 Hz)</option>
             <option value="1000">1.0초 (1 Hz)</option>
             <option value="2000">2.0초 (0.5 Hz)</option>
+            <option value="5000">5.0초 (0.2 Hz)</option>
+            <option value="10000">10초</option>
+            <option value="30000">30초</option>
           </select>
           <button class="btn btn-success" id="btnStartStop" disabled>측정 시작</button>
           <button class="btn" id="btnClear">초기화</button>
@@ -573,6 +577,7 @@
         <span><strong>장치:</strong> <span id="deviceName">-</span></span>
         <span><strong>배터리:</strong> <span id="deviceBattery">-</span></span>
         <span><strong>활성 채널:</strong> <span id="deviceChannel">-</span></span>
+        <span><strong>수신 주기:</strong> <span id="deviceRate">-</span></span>
         <span><strong>경과 시간:</strong> <span id="elapsedTime">0.0 s</span></span>
       </div>
     </section>
@@ -781,6 +786,9 @@
       sensorHandler: null,
       genericCleanup: null,
       genericRestart: null,
+      genericRateApply: null,
+      lastRecordAt: 0,
+      sampleTimes: [],
       profiles: [],
       simTimer: null,
       simElapsed: 0,
@@ -809,6 +817,7 @@
       deviceName: $('deviceName'),
       deviceBattery: $('deviceBattery'),
       deviceChannel: $('deviceChannel'),
+      deviceRate: $('deviceRate'),
       elapsedTime: $('elapsedTime'),
       readoutBox: $('readoutBox'),
       currentTemp: $('currentTemp'),
@@ -1082,6 +1091,17 @@
     function handleTemperatureSample(tempC) {
       if (!Number.isFinite(tempC)) return;
       const now = Date.now();
+      state.sampleTimes.push(now);
+      if (state.sampleTimes.length > 6) state.sampleTimes.shift();
+      if (state.sampleTimes.length >= 2 && els.deviceRate) {
+        const span = state.sampleTimes[state.sampleTimes.length - 1] - state.sampleTimes[0];
+        if (span > 0) {
+          const avgMs = span / (state.sampleTimes.length - 1);
+          const hz = 1000 / avgMs;
+          els.deviceRate.textContent = `${hz >= 10 ? hz.toFixed(0) : hz.toFixed(1)} Hz (${(avgMs / 1000).toFixed(2)}초)`;
+        }
+      }
+
       state.lastTempC = tempC;
       const displayVal = convertFromC(tempC);
 
@@ -1096,6 +1116,12 @@
       updateAlertState(displayVal, true);
 
       if (!state.isRecording) return;
+
+      // 타사/규칙 BLE(notify) 센서는 설정한 측정 간격보다 자주 들어오면 간격에 맞춰 기록 (10% 지터 허용)
+      if (!state.device && state.mode === 'device' && !state.genericRestart) {
+        if (state.lastRecordAt > 0 && (now - state.lastRecordAt) < state.intervalMs * 0.9) return;
+      }
+      state.lastRecordAt = now;
 
       if (state.resumeTime === null) state.resumeTime = now;
       const elapsedMs = state.recordedElapsedMs + (now - state.resumeTime);
@@ -1502,6 +1528,20 @@
         }
       }
 
+      // 프로필에 하드웨어 주기 변경 명령(rateCommand)이 있으면 측정 간격 바꿀 때마다 자동 전송
+      if (profile.rateCommand && typeof B.buildRateCommand === 'function') {
+        const applyRate = async (ms) => {
+          const built = B.buildRateCommand(profile.rateCommand, ms);
+          if (!built) return false;
+          const wChar = await findCharacteristic(server, built.service, built.characteristic);
+          if (!wChar) throw new Error(`주기 변경 특성(${B.shortUuid(built.characteristic)})을 찾지 못했습니다.`);
+          await writeProfileBytes(wChar, built.bytes);
+          return true;
+        };
+        state.genericRateApply = applyRate;
+        try { await applyRate(state.intervalMs); } catch (e) { console.warn('초기 주기 명령 전송 실패:', e); }
+      }
+
       updateConnectionUI();
       showToast(`${bleDevice.name || profile.name} 연결 완료! (규칙: ${profile.name})`);
     }
@@ -1535,7 +1575,8 @@
       const optServices = Array.from(new Set([
         ...BLE_OPTIONAL_SERVICES,
         ...profile.characteristics.map((c) => c.service).filter(Boolean),
-        ...(profile.initCommands || []).map((c) => c.service).filter(Boolean)
+        ...(profile.initCommands || []).map((c) => c.service).filter(Boolean),
+        ...(profile.rateCommand && profile.rateCommand.service ? [profile.rateCommand.service] : [])
       ]));
 
       const bleDevice = await navigator.bluetooth.requestDevice({
@@ -1592,6 +1633,7 @@
           state.profiles.forEach((p) => {
             (p.characteristics || []).forEach((c) => { if (c.service) savedServices.push(c.service); });
             (p.initCommands || []).forEach((c) => { if (c.service) savedServices.push(c.service); });
+            if (p.rateCommand && p.rateCommand.service) savedServices.push(p.rateCommand.service);
           });
           const optServices = Array.from(new Set([...BLE_OPTIONAL_SERVICES, ...savedServices]));
 
@@ -1787,6 +1829,14 @@
         state.resumeTime = null;
       }
 
+      const cleanup = state.genericCleanup;
+      state.genericCleanup = null;
+      state.genericRestart = null;
+      state.genericRateApply = null;
+      if (typeof cleanup === 'function') {
+        try { cleanup(); } catch (e) {}
+      }
+
       const dev = state.device;
       state.device = null;
       if (dev) {
@@ -1795,9 +1845,12 @@
       }
       state.mode = 'idle';
       state.isRecording = false;
+      state.lastRecordAt = 0;
+      state.sampleTimes = [];
       els.deviceName.textContent = '-';
       els.deviceBattery.textContent = '-';
       els.deviceChannel.textContent = '-';
+      if (els.deviceRate) els.deviceRate.textContent = '-';
       updateConnectionUI();
     }
 
@@ -1828,16 +1881,33 @@
       showToast('연결을 해제했습니다.');
     });
 
-    els.sampleInterval.addEventListener('change', () => {
+    els.sampleInterval.addEventListener('change', async () => {
       state.intervalMs = Number(els.sampleInterval.value);
+      state.lastRecordAt = 0;
+      const secText = state.intervalMs >= 1000 ? `${Number((state.intervalMs / 1000).toFixed(1))}초` : `${(state.intervalMs / 1000).toFixed(1)}초`;
       if (state.mode === 'device' && state.device) {
         state.device.stop();
         state.device.start(state.intervalMs);
+        showToast(`측정 간격을 ${secText}로 변경했습니다.`);
+      } else if (state.mode === 'device' && state.genericRateApply) {
+        try {
+          await state.genericRateApply(state.intervalMs);
+          showToast(`센서에 측정 간격 ${secText} 변경 명령을 보냈습니다.`);
+        } catch (err) {
+          showToast(`주기 변경 명령 실패: ${err && err.message ? err.message : err}`);
+        }
+      } else if (state.mode === 'device' && state.genericRestart) {
+        state.genericRestart();
+        showToast(`읽기 간격을 ${secText}로 변경했습니다.`);
+      } else if (state.mode === 'device') {
+        showToast(`기록 간격을 ${secText}로 변경했습니다. (센서 전송보다 느리게 기록 가능)`);
       } else if (state.mode === 'sim') {
         clearInterval(state.simTimer);
         state.simTimer = setInterval(runSimTick, state.intervalMs);
+        showToast(`측정 간격을 ${secText}로 변경했습니다.`);
+      } else {
+        showToast(`측정 간격을 ${secText}로 설정했습니다.`);
       }
-      showToast(`측정 간격을 ${(state.intervalMs / 1000).toFixed(1)}초로 변경했습니다.`);
     });
 
     els.btnStartStop.addEventListener('click', () => {
@@ -1849,6 +1919,7 @@
         }
         state.isRecording = false;
       } else {
+        state.lastRecordAt = 0;
         state.resumeTime = Date.now();
         state.isRecording = true;
       }
@@ -1860,6 +1931,7 @@
       state.records = [];
       state.markers = [];
       state.recordedElapsedMs = 0;
+      state.lastRecordAt = 0;
       state.resumeTime = state.isRecording ? Date.now() : null;
       state.simElapsed = 0;
       els.elapsedTime.textContent = '0.0 s';

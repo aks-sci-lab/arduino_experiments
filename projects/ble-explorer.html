@@ -89,6 +89,17 @@
         <div class="row">
             <label for="logChar" class="inline"><b>특성</b></label>
             <select id="logChar"><option value="">모든 특성</option></select>
+            <label for="logMinMs" class="inline"><b>기록 간격</b></label>
+            <select id="logMinMs">
+                <option value="0" selected>모두 기록</option>
+                <option value="100">0.1초 (10 Hz)</option>
+                <option value="200">0.2초 (5 Hz)</option>
+                <option value="500">0.5초 (2 Hz)</option>
+                <option value="1000">1.0초 (1 Hz)</option>
+                <option value="2000">2.0초</option>
+                <option value="5000">5.0초</option>
+                <option value="10000">10초</option>
+            </select>
             <button type="button" id="btnClear" class="btn danger">🗑 기록 지우기</button>
         </div>
         <p class="note">같은 길이의 패킷끼리 비교해 <mark class="chg">값이 바뀌는 바이트</mark>를 칠합니다. 측정값이 들어 있을 가능성이 큰 자리예요.</p>
@@ -125,8 +136,8 @@
         <h3>받은 값 <span class="note">(최근 200개)</span></h3>
         <div class="tbl-wrap"><table id="logTable" class="log"><thead><tr><th>시각(s)</th><th>특성</th><th>길이</th><th>16진수</th></tr></thead><tbody></tbody></table></div>
         <details class="card warn-box" id="writeBox">
-            <summary><b>✏️ 특성에 쓰기 · 시작 명령 시퀀스 (주의)</b></summary>
-            <p class="note">⚠️ 센서 설정을 바꾸거나 기기가 이상하게 동작할 수 있어요. 무엇을 보내는지 알 때만 쓰세요. 센서를 깨우는 시작 명령을 찾으면 아래 ‘시작 명령 목록’에 저장해 프로필과 함께 쓸 수 있어요.</p>
+            <summary><b>✏️ 특성에 쓰기 · 시작·주기 변경 명령 (주의)</b></summary>
+            <p class="note">⚠️ 센서 설정을 바꾸거나 기기가 이상하게 동작할 수 있어요. 무엇을 보내는지 알 때만 쓰세요. 센서를 깨우는 시작 명령이나 주기 변경 명령을 찾으면 프로필에 함께 저장해 대시보드에서 자동 실행할 수 있어요.</p>
             <label for="writeChar">쓸 특성</label>
             <select id="writeChar"></select>
             <div class="row">
@@ -153,6 +164,32 @@
                     <button type="button" id="btnRunInitCmds" class="btn primary" disabled>▶ 시작 명령 순서대로 보내기</button>
                 </div>
                 <p id="initCmdMsg" class="note" role="status"></p>
+            </div>
+            <div id="rateCmdWrap">
+                <h3>⏱ 하드웨어 주기 변경 명령 <span class="note">(대시보드에서 ‘측정 간격’을 바꿀 때 센서에 자동 전송 — <code>{{ms}}</code>·<code>{{hz}}</code>·<code>{{sec}}</code> 지원)</span></h3>
+                <div class="row">
+                    <label for="rateCmdMode" class="inline">형식</label>
+                    <select id="rateCmdMode">
+                        <option value="ascii" selected>글자 (ASCII)</option>
+                        <option value="hex">16진수 (HEX)</option>
+                    </select>
+                    <label for="rateCmdTestMs" class="inline">시험 간격</label>
+                    <select id="rateCmdTestMs">
+                        <option value="100">0.1초 (10 Hz)</option>
+                        <option value="200">0.2초 (5 Hz)</option>
+                        <option value="500" selected>0.5초 (2 Hz)</option>
+                        <option value="1000">1.0초 (1 Hz)</option>
+                        <option value="2000">2.0초 (0.5 Hz)</option>
+                    </select>
+                </div>
+                <label for="rateCmdTpl">주기 명령 템플릿 <span class="note">위 ‘쓸 특성’으로 보냅니다</span></label>
+                <input type="text" id="rateCmdTpl" maxlength="200" spellcheck="false" placeholder="예: SET_SENSOR_RATE:{{ms}}\r\n 또는 RATE:{{hz}}\n">
+                <div class="row">
+                    <button type="button" id="btnSaveRateCmd" class="btn" disabled>💾 주기 명령 저장</button>
+                    <button type="button" id="btnTestRateCmd" class="btn danger" disabled>▶ 시험 전송</button>
+                    <button type="button" id="btnClearRateCmd" class="btn small">🗑 지우기</button>
+                </div>
+                <p id="rateCmdMsg" class="note" role="status"></p>
             </div>
         </details>
     </section>
