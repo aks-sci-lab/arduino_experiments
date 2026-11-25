@@ -326,15 +326,19 @@
             return { ok: false, error: 'AI 답에서 해석 규칙 JSON 을 읽지 못했어요. 다시 시도해 보세요.', rawText: String(text || '') };
         }
         const pre = B.normalizePreprocess(obj.preprocess);
-        const fields = Array.isArray(obj.fields) ? obj.fields.map((f, i) => ({
-            name: String((f && f.name) || ('값' + (i + 1))).slice(0, 40),
-            offset: Math.max(0, Math.round(Number(f && f.offset) || 0)),
-            format: String((f && f.format) || ''),
-            scale: f && f.scale !== undefined && f.scale !== '' ? Number(f.scale) : 1,
-            add: f && f.add !== undefined && f.add !== '' ? Number(f.add) : 0,
-            unit: String((f && f.unit) || '').slice(0, 20),
-            mask: f && f.mask !== undefined && f.mask !== null ? String(f.mask).slice(0, 20) : ''
-        })) : [];
+        const fields = Array.isArray(obj.fields) ? obj.fields.map((f, i) => {
+            const out = {
+                name: String((f && f.name) || ('값' + (i + 1))).slice(0, 40),
+                offset: Math.max(0, Math.round(Number(f && f.offset) || 0)),
+                format: String((f && f.format) || ''),
+                scale: f && f.scale !== undefined && f.scale !== '' ? Number(f.scale) : 1,
+                add: f && f.add !== undefined && f.add !== '' ? Number(f.add) : 0,
+                unit: String((f && f.unit) || '').slice(0, 20),
+                mask: f && f.mask !== undefined && f.mask !== null ? String(f.mask).slice(0, 20) : ''
+            };
+            if (f && f.match && typeof f.match === 'object') out.match = { offset: Number(f.match.offset), value: Number(f.match.value) };
+            return out;
+        }) : [];
         const initCommands = Array.isArray(obj.initCommands) ? obj.initCommands.filter(c => c && c.characteristic && c.payload).map(c => ({
             service: String(c.service || ''),
             characteristic: String(c.characteristic || ''),
@@ -345,6 +349,8 @@
         })) : [];
         const rateCommand = (obj.rateCommand && typeof obj.rateCommand === 'object' && obj.rateCommand.characteristic && (obj.rateCommand.template || (obj.rateCommand.map && Object.keys(obj.rateCommand.map).length)))
             ? Object.assign({}, obj.rateCommand) : null;
+        const pollCommand = (obj.pollCommand && typeof obj.pollCommand === 'object' && obj.pollCommand.characteristic && obj.pollCommand.payload)
+            ? Object.assign({}, obj.pollCommand) : null;
         const conf = ['high', 'medium', 'low'].includes(obj.confidence) ? obj.confidence : 'medium';
         return {
             ok: true,
@@ -356,6 +362,7 @@
                 fields,
                 initCommands,
                 rateCommand,
+                pollCommand,
                 nextStep: String(obj.nextStep || '').slice(0, 300)
             }
         };
@@ -395,6 +402,9 @@
         }
         if (proposal && proposal.rateCommand) {
             rawDecoder.rateCommand = proposal.rateCommand;
+        }
+        if (proposal && proposal.pollCommand) {
+            rawDecoder.pollCommand = proposal.pollCommand;
         }
 
         const check = B.validateDecoder(rawDecoder);

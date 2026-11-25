@@ -175,6 +175,9 @@
                     </select>
                     <label for="rateCmdTestMs" class="inline">시험 간격</label>
                     <select id="rateCmdTestMs">
+                        <option value="10">0.01초 (100 Hz)</option>
+                        <option value="20">0.02초 (50 Hz)</option>
+                        <option value="50">0.05초 (20 Hz)</option>
                         <option value="100">0.1초 (10 Hz)</option>
                         <option value="200">0.2초 (5 Hz)</option>
                         <option value="500" selected>0.5초 (2 Hz)</option>
@@ -190,6 +193,33 @@
                     <button type="button" id="btnClearRateCmd" class="btn small">🗑 지우기</button>
                 </div>
                 <p id="rateCmdMsg" class="note" role="status"></p>
+            </div>
+            <div id="pollCmdWrap">
+                <h3>⚡ 고속 반복 요청(폴링) 시험 · 저장 <span class="note">(최대 100 Hz · 요청할 때마다 값을 돌려주는 센서용)</span></h3>
+                <div class="row">
+                    <label for="pollCmdMode" class="inline">형식</label>
+                    <select id="pollCmdMode">
+                        <option value="ascii" selected>글자 (ASCII)</option>
+                        <option value="hex">16진수 (HEX)</option>
+                    </select>
+                    <label for="pollCmdMs" class="inline">반복 간격</label>
+                    <select id="pollCmdMs">
+                        <option value="10">0.01초 (100 Hz)</option>
+                        <option value="20">0.02초 (50 Hz)</option>
+                        <option value="50">0.05초 (20 Hz)</option>
+                        <option value="100" selected>0.1초 (10 Hz)</option>
+                        <option value="200">0.2초 (5 Hz)</option>
+                        <option value="500">0.5초 (2 Hz)</option>
+                    </select>
+                </div>
+                <label for="pollCmdPayload">반복 보낼 명령 <span class="note">사이언스큐브 S 요청: <code>{{UwAAAAAAAAAAAABT}}</code></span></label>
+                <input type="text" id="pollCmdPayload" maxlength="200" spellcheck="false" placeholder="{{UwAAAAAAAAAAAABT}}">
+                <div class="row">
+                    <button type="button" id="btnPollToggle" class="btn danger" disabled>▶ 반복 요청 시작</button>
+                    <button type="button" id="btnSavePollCmd" class="btn" disabled>💾 폴링 규칙 저장</button>
+                    <button type="button" id="btnClearPollCmd" class="btn small">🗑 지우기</button>
+                </div>
+                <p id="pollCmdMsg" class="note" role="status"></p>
             </div>
         </details>
     </section>

@@ -295,4 +295,64 @@ test('하드웨어 주기 변경 명령(rateCommand) 생성 및 검사', () => {
     assert.equal(bad.ok, false);
 });
 
+test('조건부 바이트 매칭(field.match) · 고속 폴링(pollCommand) · ScienceCube s/t 양쪽 디코딩', () => {
+    const enc = s => Uint8Array.from(s, c => c.charCodeAt(0));
+    const toB64 = bytes => Buffer.from(bytes).toString('base64');
+
+    // ScienceCube 's' (0x73) 고속 폴링 응답 프레임 조립 (offset 2 float32le = 27.75 °C + sum8)
+    const sRaw = new Uint8Array(12);
+    sRaw[0] = 0x73; // 's'
+    sRaw[1] = 0x00;
+    new DataView(sRaw.buffer).setFloat32(2, 27.75, true);
+    sRaw[11] = sRaw.slice(0, 11).reduce((a, b) => a + b, 0) & 0xFF;
+    const sWire = enc('{{' + toB64(sRaw) + '}}');
+
+    // 실측 't' (0x74) 1Hz 대기 방송 프레임 (32.22 °C)
+    const tWire = enc('{{dAkAVADgAEIAAADz}}');
+
+    // 내장 SC:TEMP 규칙 검사: pollCommand + 두 조건 필드 모두 통과
+    const scRule = B.BUILTIN_PROFILES[0];
+    const v = B.validateDecoder(scRule);
+    assert.ok(v.ok, JSON.stringify(v.errors));
+    assert.ok(v.decoder.pollCommand);
+    assert.equal(v.decoder.pollCommand.characteristic, '49535343-8841-43f4-a8d4-ecbe34729bb3');
+    assert.equal(v.decoder.pollCommand.mode, 'ascii');
+    assert.equal(v.decoder.pollCommand.payload, '{{UwAAAAAAAAAAAABT}}');
+    assert.equal(v.decoder.pollCommand.onlyFasterThanMs, 1000);
+    // pollCommand 페이로드가 entry-hw tx_b ('S' + 0x00*10 + sum8=0x53)인지 검증
+    const pollInner = B.preprocessPacket(B.encodeCommand(v.decoder.pollCommand.payload, 'ascii'), v.decoder.characteristics[0].preprocess);
+    assert.ok(pollInner);
+    assert.equal(pollInner[0], 0x53); // 'S'
+    assert.equal(pollInner[11], 0x53);
+
+    // 같은 규칙으로 's' 응답과 't' 대기 방송 모두 정확히 '온도'로 디코딩
+    const chRule = v.decoder.characteristics[0];
+    const decS = B.decodeCharPacket(sWire, chRule);
+    assert.equal(Number(decS['온도'].toFixed(2)), 27.75);
+    const decT = B.decodeCharPacket(tWire, chRule);
+    assert.equal(Number(decT['온도'].toFixed(2)), 32.22);
+
+    // 조건 불일치 바이트는 null
+    const otherRaw = new Uint8Array(12);
+    otherRaw[0] = 0x6E; // 'n' (모델명 응답 등)
+    otherRaw[11] = 0x6E;
+    assert.equal(B.readField(otherRaw, chRule.fields[0]), null);
+    assert.equal(B.readField(otherRaw, chRule.fields[1]), null);
+
+    // 잘못된 match / pollCommand 는 검증 실패
+    const badMatch = B.validateDecoder({
+        schema: B.SCHEMA,
+        characteristics: [{ characteristic: '2a6e', fields: [{ name: 'x', offset: 0, format: 'uint8', match: { offset: 0, value: 300 } }] }]
+    });
+    assert.equal(badMatch.ok, false);
+
+    const badPoll = B.validateDecoder({
+        schema: B.SCHEMA,
+        characteristics: [],
+        pollCommand: { characteristic: 'fff2', mode: 'hex', payload: 'GG' }
+    });
+    assert.equal(badPoll.ok, false);
+});
+
+
 
