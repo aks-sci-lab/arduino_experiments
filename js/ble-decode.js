@@ -585,9 +585,37 @@
         return decodePacket(unpacked, charRule.fields);
     }
 
+    // ---------- 하드웨어 주기 변경 명령 (rateCommand) ----------
+    // { service?, characteristic, mode:'ascii'|'hex', template?:'RATE:{{ms}}\r\n', map?:{ '100':'01 0A' } }
+    function buildRateCommand(rateCommand, intervalMs) {
+        if (!rateCommand || typeof rateCommand !== 'object') return null;
+        const ms = Math.max(10, Math.min(3600000, Math.round(Number(intervalMs) || 0)));
+        if (!Number.isFinite(ms) || ms <= 0) return null;
+        const characteristic = normUuid(rateCommand.characteristic);
+        if (!characteristic) return null;
+        const service = normUuid(rateCommand.service) || '';
+        const mode = rateCommand.mode === 'hex' ? 'hex' : 'ascii';
+        let payload = '';
+        if (rateCommand.map && typeof rateCommand.map === 'object' && rateCommand.map[String(ms)] !== undefined) {
+            payload = String(rateCommand.map[String(ms)]);
+        } else if (rateCommand.template) {
+            const hz = Number((1000 / ms).toFixed(3));
+            const sec = Number((ms / 1000).toFixed(3));
+            payload = String(rateCommand.template)
+                .replace(/\{\{\s*ms\s*\}\}/gi, String(ms))
+                .replace(/\{\{\s*hz\s*\}\}/gi, String(hz))
+                .replace(/\{\{\s*sec\s*\}\}/gi, String(sec));
+        } else {
+            return null;
+        }
+        const bytes = encodeCommand(payload, mode);
+        return { service, characteristic, mode, payload, bytes };
+    }
+
     // ---------- 해석 규칙 파일 ----------
     // { schema:'sensor-lab-ble-decoder', version:1, name, device:{ namePrefix, maker, model, firmware },
-    //   characteristics:[{ service, characteristic, mode:'notify'|'read', preprocess?:{type,prefix,suffix,checksum}, fields:[필드…] }], notes }
+    //   characteristics:[{ service, characteristic, mode:'notify'|'read', preprocess?:{type,prefix,suffix,checksum}, fields:[필드…] }],
+    //   initCommands?:[…], rateCommand?:{ service?, characteristic, mode, template?, map? }, notes }
     const SCHEMA = 'sensor-lab-ble-decoder';
     function validateDecoder(obj) {
         const errors = [];
@@ -638,6 +666,42 @@
                 initCommands.push({ service, characteristic, mode, payload, delayMs, label: String((cmd && cmd.label) || '').slice(0, 40) });
             });
         }
+        let rateCommand = null;
+        if (obj.rateCommand !== undefined && obj.rateCommand !== null) {
+            const rc = obj.rateCommand;
+            if (typeof rc !== 'object' || Array.isArray(rc)) {
+                errors.push('rateCommand 모양이 잘못됐어요.');
+            } else {
+                const characteristic = normUuid(rc.characteristic);
+                const service = normUuid(rc.service) || '';
+                const mode = rc.mode === 'hex' ? 'hex' : 'ascii';
+                const template = rc.template ? String(rc.template).slice(0, 200) : '';
+                const map = {};
+                if (rc.map && typeof rc.map === 'object' && !Array.isArray(rc.map)) {
+                    Object.keys(rc.map).slice(0, 20).forEach(k => {
+                        const ms = parseInt(k, 10);
+                        if (!Number.isInteger(ms) || ms < 10 || ms > 3600000) {
+                            errors.push('rateCommand.map 의 간격(' + k + 'ms)이 잘못됐어요.');
+                            return;
+                        }
+                        const pay = String(rc.map[k] || '').slice(0, 200);
+                        try { encodeCommand(pay, mode); map[String(ms)] = pay; } catch (e) { errors.push('rateCommand.map[' + k + ']: ' + e.message); }
+                    });
+                }
+                if (!characteristic) {
+                    errors.push('rateCommand 의 특성 UUID 가 잘못됐어요.');
+                } else if (!template && !Object.keys(map).length) {
+                    errors.push('rateCommand 에 template 또는 map 이 필요해요.');
+                } else {
+                    if (template) {
+                        try { buildRateCommand({ service, characteristic, mode, template }, 1000); } catch (e) { errors.push('rateCommand.template: ' + e.message); }
+                    }
+                    rateCommand = { service, characteristic, mode };
+                    if (template) rateCommand.template = template;
+                    if (Object.keys(map).length) rateCommand.map = map;
+                }
+            }
+        }
         if (errors.length) return { ok: false, errors };
         const d = obj.device || {};
         const clean = {
@@ -649,6 +713,7 @@
             characteristics: chars, notes: String(obj.notes || '').slice(0, 2000)
         };
         if (initCommands.length) clean.initCommands = initCommands;
+        if (rateCommand) clean.rateCommand = rateCommand;
         if (obj.builtin) clean.builtin = true;
         if (obj.savedAt) clean.savedAt = String(obj.savedAt).slice(0, 40);
         return { ok: true, decoder: clean };
@@ -755,7 +820,7 @@
         FORMATS, FORMAT_BY_ID, STANDARD_SERVICES, DEVICE_INFO_CHARS, SCHEMA, PREPROCESS_TYPES, CHECKSUM_TYPES,
         toBytes, readRaw, parseMask, readField, decodePacket, decodeCharPacket,
         base64ToBytes, verifyChecksum, normalizePreprocess, preprocessPacket, createFramer, detectFraming,
-        toHex, parseHex, encodeCommand, normUuid, shortUuid, parseUuidList, knownName,
+        toHex, parseHex, encodeCommand, buildRateCommand, normUuid, shortUuid, parseUuidList, knownName,
         changingBytes, fitLine, niceNumber, findCandidates, candidateToField, validateDecoder,
         recordsToCsv, recordsToJson, recordsFromJson, csvCell
     };

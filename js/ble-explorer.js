@@ -25,6 +25,10 @@
         candidates: [],
         events: [],              // 연결 기록: { at(ISO), kind, text } — 끊긴 시각을 선생님이 보내 줄 수 있게
         initCommands: [],        // 연결 뒤 순서대로 보낼 시작 명령 목록 (규칙 JSON 에 함께 저장)
+        rateCommand: null,       // 하드웨어 주기 변경 명령 ({ service, characteristic, mode, template, map })
+        logMinMs: 0,             // 기록 최소 간격(ms, 0 = 모두 기록)
+        lastRecAt: {},           // 특성 UUID → 마지막 기록 시각(ms)
+        arrivalTimes: {},        // 특성 UUID → 최근 도착 시각(ms) 배열 (실제 Hz 표시용)
         connectedAt: null,
         gdxCounter: 0xff,
         dirty: true
@@ -388,6 +392,10 @@
 
     function addRecord(uuid, dv, force) {
         const bytes = new Uint8Array(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength));
+        const now = performance.now();
+        const arr = (S.arrivalTimes[uuid] = S.arrivalTimes[uuid] || []);
+        arr.push(now);
+        if (arr.length > 8) arr.shift();
         const c = S.chars.get(uuid);
         if (c) {
             c.lastHex = B.toHex(bytes);
@@ -395,9 +403,14 @@
             if (el) { const t = printable(bytes); el.textContent = c.lastHex + (t ? '  “' + t + '”' : ''); }
         }
         if (S.paused && !force) return;
-        if (S.t0 === null) S.t0 = performance.now();
+        if (!force && S.logMinMs > 0 && S.lastRecAt[uuid] && (now - S.lastRecAt[uuid]) < S.logMinMs * 0.9) {
+            S.dirty = true;
+            return;
+        }
+        S.lastRecAt[uuid] = now;
+        if (S.t0 === null) S.t0 = now;
         const isNew = !S.records.some(r => r.char === uuid);
-        S.records.push({ t: (performance.now() - S.t0) / 1000, at: new Date().toISOString(), char: uuid, bytes });
+        S.records.push({ t: (now - S.t0) / 1000, at: new Date().toISOString(), char: uuid, bytes });
         if (S.records.length > MAX_RECORDS) S.records.splice(0, S.records.length - MAX_RECORDS);
         if (isNew) refreshCharSelects();
         S.dirty = true;
@@ -470,6 +483,8 @@
         $('btnWrite').disabled = !(writable.length && $('writeOk').checked);
         if ($('btnAddInitCmd')) $('btnAddInitCmd').disabled = !writable.length;
         if ($('btnRunInitCmds')) $('btnRunInitCmds').disabled = !(S.initCommands.length && writable.length && $('writeOk').checked);
+        if ($('btnSaveRateCmd')) $('btnSaveRateCmd').disabled = !writable.length;
+        if ($('btnTestRateCmd')) $('btnTestRateCmd').disabled = !(writable.length && $('writeOk').checked);
         S.dirty = true;
     }
 
@@ -833,6 +848,67 @@
             '</td><td><button type="button" class="btn small primary" data-usecand="' + i + '">필드로</button></td></tr>').join('');
     }
 
+    // ---------- ⏱ 하드웨어 주기 변경 명령 ----------
+    function renderRateCommandUi() {
+        const rc = S.rateCommand;
+        if ($('rateCmdMode') && rc) $('rateCmdMode').value = rc.mode === 'hex' ? 'hex' : 'ascii';
+        if ($('rateCmdTpl') && rc && document.activeElement !== $('rateCmdTpl')) $('rateCmdTpl').value = rc.template || '';
+        if ($('rateCmdMsg')) {
+            $('rateCmdMsg').textContent = rc
+                ? '✓ 저장됨: ' + B.shortUuid(rc.characteristic) + ' · ' + (rc.template || ('간격별 ' + Object.keys(rc.map || {}).length + '개'))
+                : '';
+        }
+    }
+    function saveRateCommand() {
+        const msg = $('rateCmdMsg');
+        const charUuid = $('writeChar').value;
+        const c = S.chars.get(charUuid);
+        if (!c) { msg.textContent = '먼저 위 ‘쓸 특성’을 고르세요.'; return; }
+        const mode = $('rateCmdMode') ? $('rateCmdMode').value : 'ascii';
+        const template = $('rateCmdTpl') ? $('rateCmdTpl').value.trim() : '';
+        if (!template) { msg.textContent = '⚠️ 주기 명령 템플릿을 넣어 주세요 (예: SET_RATE:{{ms}}\\r\\n).'; return; }
+        const rc = { service: c.service || S.charService[charUuid] || '', characteristic: charUuid, mode, template };
+        try {
+            B.buildRateCommand(rc, Number($('rateCmdTestMs') && $('rateCmdTestMs').value) || 500);
+        } catch (e) {
+            msg.textContent = '⚠️ ' + e.message; return;
+        }
+        S.rateCommand = rc;
+        saveDraft();
+        renderRateCommandUi();
+    }
+    async function testRateCommand() {
+        const msg = $('rateCmdMsg');
+        const charUuid = $('writeChar').value;
+        const c = S.chars.get(charUuid);
+        if (!c) { msg.textContent = '쓸 수 있는 특성이 없어요. 먼저 연결하세요.'; return; }
+        if (!$('writeOk').checked) { msg.textContent = '위 확인 칸에 표시해야 보낼 수 있어요.'; return; }
+        const mode = $('rateCmdMode') ? $('rateCmdMode').value : 'ascii';
+        const template = $('rateCmdTpl') ? $('rateCmdTpl').value.trim() : '';
+        const testMs = Number($('rateCmdTestMs') && $('rateCmdTestMs').value) || 500;
+        let built;
+        try {
+            built = B.buildRateCommand({ service: c.service || '', characteristic: charUuid, mode, template }, testMs);
+        } catch (e) {
+            msg.textContent = '⚠️ ' + e.message; return;
+        }
+        if (!built) { msg.textContent = '⚠️ 주기 명령 템플릿을 넣어 주세요.'; return; }
+        if (!confirm(charLabel(c.uuid) + ' 에 주기 변경 시험 명령(' + built.payload + ' → ' + B.toHex(built.bytes) + ')을 보낼까요?')) return;
+        try {
+            await sendBytesToChar(c, built.bytes);
+            logEvent('write', '주기시험(' + testMs + 'ms): ' + B.shortUuid(c.uuid) + ' ← ' + B.toHex(built.bytes));
+            msg.textContent = '✓ 시험 전송 완료 (' + testMs + 'ms): ' + B.toHex(built.bytes) + ' — 상단 수신 Hz 가 바뀌는지 확인하세요.';
+        } catch (e) {
+            msg.textContent = '⚠️ 전송 실패: ' + (e && e.message || e);
+        }
+    }
+    function clearRateCommand() {
+        S.rateCommand = null;
+        if ($('rateCmdTpl')) $('rateCmdTpl').value = '';
+        saveDraft();
+        renderRateCommandUi();
+    }
+
     // ---------- ④ 저장 ----------
     function buildDecoder() {
         const characteristics = Object.keys(S.rules).filter(u => (S.rules[u] || []).length).map(u => {
@@ -849,10 +925,11 @@
             characteristics, notes: $('ruleNotes').value, savedAt: new Date().toISOString()
         };
         if (S.initCommands.length) dec.initCommands = S.initCommands.map(cmd => Object.assign({}, cmd));
+        if (S.rateCommand) dec.rateCommand = Object.assign({}, S.rateCommand);
         return dec;
     }
     function saveDraft() {
-        store(KEY_DRAFT, { rules: S.rules, preprocess: S.preprocess, charService: S.charService, initCommands: S.initCommands, meta: S.meta, name: $('sensorName').value, notes: $('ruleNotes').value });
+        store(KEY_DRAFT, { rules: S.rules, preprocess: S.preprocess, charService: S.charService, initCommands: S.initCommands, rateCommand: S.rateCommand, meta: S.meta, name: $('sensorName').value, notes: $('ruleNotes').value });
     }
     function applyDecoder(dec) {
         S.rules = {};
@@ -863,18 +940,21 @@
             if (c.preprocess && c.preprocess.type !== 'none') S.preprocess[c.characteristic] = B.normalizePreprocess(c.preprocess);
         });
         S.initCommands = Array.isArray(dec.initCommands) ? dec.initCommands.map(cmd => Object.assign({}, cmd)) : [];
+        S.rateCommand = dec.rateCommand ? Object.assign({}, dec.rateCommand) : null;
         $('sensorName').value = dec.name;
         $('ruleNotes').value = dec.notes || '';
         if (!S.device) S.meta = { deviceName: dec.device.namePrefix, maker: dec.device.maker, model: dec.device.model, firmware: dec.device.firmware };
         saveDraft();
         refreshCharSelects();
         renderInitCommands();
+        renderRateCommandUi();
         renderFields();
     }
     function renderSaved() {
         const list = load(KEY_SAVED, []);
         $('savedRules').innerHTML = list.length ? list.map((d, i) => '<li><b>' + esc(d.name) + '</b><span class="note">특성 ' + d.characteristics.length + '개' +
-            (d.initCommands && d.initCommands.length ? ' · 명령 ' + d.initCommands.length + '개' : '') + ' · ' + esc((d.savedAt || '').slice(0, 10)) + '</span>' +
+            (d.initCommands && d.initCommands.length ? ' · 명령 ' + d.initCommands.length + '개' : '') +
+            (d.rateCommand ? ' · 주기 제어' : '') + ' · ' + esc((d.savedAt || '').slice(0, 10)) + '</span>' +
             '<a class="btn small primary" href="vernier-temp-lab.html?profile=' + encodeURIComponent(d.name) + '">📊 대시보드</a>' +
             '<button type="button" class="btn small" data-loadrule="' + i + '">불러오기</button><button type="button" class="btn small" data-delrule="' + i + '" aria-label="' + esc(d.name) + ' 지우기">🗑</button></li>').join('')
             : '<li class="note">아직 저장한 규칙이 없어요.</li>';
@@ -897,12 +977,23 @@
         r.readAsText(file);
     }
 
+    function currentRateText() {
+        const target = activeLogChar();
+        const times = (target && S.arrivalTimes[target]) || [];
+        if (times.length < 2) return '';
+        const spanMs = times[times.length - 1] - times[0];
+        if (spanMs <= 0) return '';
+        const avgMs = spanMs / (times.length - 1);
+        const hz = 1000 / avgMs;
+        return ' · ' + (hz >= 10 ? hz.toFixed(0) : hz.toFixed(1)) + ' Hz (' + (avgMs / 1000).toFixed(2) + '초)';
+    }
+
     // ---------- 그리기 (자주 오는 알림에도 화면이 버벅이지 않게 0.25초마다) ----------
     let mainTabs = null, ruleTabs = null;
     function render() {
         if (!S.dirty) return;
         S.dirty = false;
-        $('countBadge').textContent = '기록 ' + S.records.length + '개' + (S.paused ? ' · 멈춤' : '');
+        $('countBadge').textContent = '기록 ' + S.records.length + '개' + currentRateText() + (S.paused ? ' · 멈춤' : '');
         const tab = mainTabs && mainTabs.current();
         if (tab === 'connect' && S.autoStarted > 0 && S.records.length > 0) updateAutoFeedNote(S.autoStarted, false);
         if (tab === 'log') renderLog();
@@ -1148,6 +1239,7 @@
             S.preprocess = draft.preprocess && typeof draft.preprocess === 'object' ? draft.preprocess : {};
             S.charService = draft.charService || {};
             S.initCommands = Array.isArray(draft.initCommands) ? draft.initCommands : [];
+            S.rateCommand = draft.rateCommand && typeof draft.rateCommand === 'object' ? draft.rateCommand : null;
             S.meta = Object.assign(S.meta, draft.meta || {});
             $('sensorName').value = draft.name || '';
             $('ruleNotes').value = draft.notes || '';
@@ -1157,6 +1249,7 @@
         LabUI.initTabs('#saveTabs', { key: 'ble-explorer-save' });
         refreshCharSelects();
         renderInitCommands();
+        renderRateCommandUi();
         renderFields();
 
         $('stdServices').addEventListener('change', saveServiceChoices);
@@ -1248,9 +1341,15 @@
             if (n) toggleNotify(n.dataset.notify, n);
         });
         $('logChar').addEventListener('change', () => { S.dirty = true; render(); });
+        if ($('logMinMs')) {
+            $('logMinMs').addEventListener('change', () => {
+                S.logMinMs = Math.max(0, Number($('logMinMs').value) || 0);
+                S.lastRecAt = {};
+            });
+        }
         $('btnClear').addEventListener('click', () => {
             if (S.records.length && !confirm('기록 ' + S.records.length + '개를 지울까요? (해석 규칙·참값은 남아요)')) return;
-            S.records = []; S.t0 = null;
+            S.records = []; S.t0 = null; S.lastRecAt = {}; S.arrivalTimes = {};
             refreshCharSelects();
             render();
         });
@@ -1258,6 +1357,9 @@
         $('btnWrite').addEventListener('click', writeChar);
         if ($('btnAddInitCmd')) $('btnAddInitCmd').addEventListener('click', addInitCommand);
         if ($('btnRunInitCmds')) $('btnRunInitCmds').addEventListener('click', runInitCommands);
+        if ($('btnSaveRateCmd')) $('btnSaveRateCmd').addEventListener('click', saveRateCommand);
+        if ($('btnTestRateCmd')) $('btnTestRateCmd').addEventListener('click', testRateCommand);
+        if ($('btnClearRateCmd')) $('btnClearRateCmd').addEventListener('click', clearRateCommand);
         if ($('initCmdList')) {
             $('initCmdList').addEventListener('click', e => {
                 const d = e.target.closest('[data-delcmd]');

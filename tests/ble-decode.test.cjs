@@ -266,3 +266,33 @@ test('포장 풀기·자동 감지·스트림 프레이머 (SC:TEMP-304 실측 �
     assert.equal(badPre.ok, false);
 });
 
+test('하드웨어 주기 변경 명령(rateCommand) 생성 및 검사', () => {
+    const asciiRc = { service: 'fff0', characteristic: 'fff2', mode: 'ascii', template: 'SET_RATE:{{ms}}:{{hz}}\\r\\n' };
+    const built = B.buildRateCommand(asciiRc, 200);
+    assert.equal(built.payload, 'SET_RATE:200:5\\r\\n');
+    assert.equal(new TextDecoder().decode(built.bytes), 'SET_RATE:200:5\r\n');
+
+    const mapRc = { characteristic: 'fff2', mode: 'hex', map: { '100': '01 0A', '1000': '01 01' } };
+    const b100 = B.buildRateCommand(mapRc, 100);
+    assert.deepEqual(Array.from(b100.bytes), [1, 10]);
+    assert.equal(B.buildRateCommand(mapRc, 500), null);
+
+    const ok = B.validateDecoder({
+        schema: B.SCHEMA,
+        name: '주기 제어 센서',
+        characteristics: [{ service: 'fff0', characteristic: 'fff1', mode: 'notify', fields: [{ name: '온도', offset: 0, format: 'int16le', scale: 0.01, unit: '°C' }] }],
+        rateCommand: asciiRc
+    });
+    assert.ok(ok.ok, JSON.stringify(ok.errors));
+    assert.equal(ok.decoder.rateCommand.characteristic, '0000fff2-0000-1000-8000-00805f9b34fb');
+    assert.equal(ok.decoder.rateCommand.template, 'SET_RATE:{{ms}}:{{hz}}\\r\\n');
+
+    const bad = B.validateDecoder({
+        schema: B.SCHEMA,
+        characteristics: [],
+        rateCommand: { characteristic: 'fff2', mode: 'hex', template: 'ZZ' }
+    });
+    assert.equal(bad.ok, false);
+});
+
+

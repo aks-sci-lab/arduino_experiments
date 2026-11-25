@@ -343,6 +343,8 @@
             delayMs: Math.max(0, Math.min(10000, Math.round(Number(c.delayMs) || 200))),
             label: String(c.label || '').slice(0, 40)
         })) : [];
+        const rateCommand = (obj.rateCommand && typeof obj.rateCommand === 'object' && obj.rateCommand.characteristic && (obj.rateCommand.template || (obj.rateCommand.map && Object.keys(obj.rateCommand.map).length)))
+            ? Object.assign({}, obj.rateCommand) : null;
         const conf = ['high', 'medium', 'low'].includes(obj.confidence) ? obj.confidence : 'medium';
         return {
             ok: true,
@@ -353,6 +355,7 @@
                 preprocess: pre,
                 fields,
                 initCommands,
+                rateCommand,
                 nextStep: String(obj.nextStep || '').slice(0, 300)
             }
         };
@@ -389,6 +392,9 @@
         };
         if (proposal && Array.isArray(proposal.initCommands) && proposal.initCommands.length) {
             rawDecoder.initCommands = proposal.initCommands;
+        }
+        if (proposal && proposal.rateCommand) {
+            rawDecoder.rateCommand = proposal.rateCommand;
         }
 
         const check = B.validateDecoder(rawDecoder);
