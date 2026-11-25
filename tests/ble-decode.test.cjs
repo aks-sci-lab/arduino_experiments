@@ -62,7 +62,16 @@ test('16진수·UUID', () => {
     assert.equal(B.shortUuid('0000180f-0000-1000-8000-00805f9b34fb'), '0x180F');
     assert.equal(B.knownName('2a19'), '배터리 잔량');
     assert.equal(B.knownName('49535343-1e4d-4bd9-ba61-23c647249616'), 'ISSC UART 받기(알림·TX)');
+    assert.equal(B.knownName('4a5c0000-0000-0000-0000-5c1e741f1c00'), 'PASCO 장치 제어');
+    assert.equal(B.knownName('4a5c0001-0000-0000-0000-5c1e741f1c00'), 'PASCO 센서 채널 1');
+    assert.equal(B.knownName('4a5c0001-0002-0000-0000-5c1e741f1c00'), 'PASCO 채널 1 명령 보내기(쓰기)');
+    assert.equal(B.knownName('4a5c0001-0003-0000-0000-5c1e741f1c00'), 'PASCO 채널 1 데이터·응답(알림)');
+    assert.equal(B.knownName('4a5c0000-0005-0000-0000-5c1e741f1c00'), 'PASCO 장치 확인(ACK)');
     assert.equal(B.knownName('12345678-1234-1234-1234-123456789abc'), '');
+    assert.ok(B.STANDARD_SERVICES.some(s => s.uuid === '4a5c0000-0000-0000-0000-5c1e741f1c00' && s.on));
+    assert.equal(B.knownVendor('Temperature 123-456', ['4a5c0000-0000-0000-0000-5c1e741f1c00']).id, 'pasco');
+    assert.equal(B.knownVendor('GDX-TMP 0A1234', []).id, 'vernier');
+    assert.equal(B.knownVendor('SC:TEMP-304', ['49535343-fe7d-4ae5-8fa9-9fafd205e455']), null);
     // 여러 UUID · 크롬 Services: 줄 통째 붙여넣기
     const multi = B.parseUuidList('Services: 00001800-0000-1000-8000-00805f9b34fb, 00001801-0000-1000-8000-00805f9b34fb, 0000180a-0000-1000-8000-00805f9b34fb, 49535343-fe7d-4ae5-8fa9-9fafd205e455');
     assert.deepEqual(multi.uuids, ['0000180a-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4ae5-8fa9-9fafd205e455']);

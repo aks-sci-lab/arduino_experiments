@@ -213,6 +213,8 @@
             $('vendorNote').hidden = !vendor;
             if (vendor && vendor.id === 'vernier') {
                 $('vendorNote').textContent = '✅ 이 센서는 버니어 공개 방식(Go Direct)으로 바로 쓸 수 있어요. 해석하지 않아도 됩니다 — 선생님이 만든 실험의 센서 기능에서 "Vernier Go Direct 센서"를 고르세요.';
+            } else if (vendor && vendor.id === 'pasco') {
+                $('vendorNote').textContent = 'ℹ️ PASCO 무선 센서가 감지됐어요. 서비스 4a5c0000(장치 제어)·4a5c0001~0004(센서 채널)의 -0002(명령 쓰기)·-0003(알림 받기) 특성을 사용합니다 (PASCO 교육용 공개 프로토콜 참고).';
             }
             S.connectedAt = performance.now();
             logEvent('connect', '연결됨: ' + (device.name || '이름 없는 기기') + ' · 서비스 ' + tree.length + '개');
