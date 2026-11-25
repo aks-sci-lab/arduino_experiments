@@ -26,6 +26,7 @@
         events: [],              // 연결 기록: { at(ISO), kind, text } — 끊긴 시각을 선생님이 보내 줄 수 있게
         initCommands: [],        // 연결 뒤 순서대로 보낼 시작 명령 목록 (규칙 JSON 에 함께 저장)
         rateCommand: null,       // 하드웨어 주기 변경 명령 ({ service, characteristic, mode, template, map })
+        pollCommand: null,       // 고속 반복 요청 명령 ({ service, characteristic, mode, payload, onlyFasterThanMs })
         logMinMs: 0,             // 기록 최소 간격(ms, 0 = 모두 기록)
         lastRecAt: {},           // 특성 UUID → 마지막 기록 시각(ms)
         arrivalTimes: {},        // 특성 UUID → 최근 도착 시각(ms) 배열 (실제 Hz 표시용)
@@ -428,8 +429,10 @@
         setStatus('⚠ ' + how + ' — 기록은 그대로 있어요. 🔄 다시 연결을 누르세요.', 'error');
         logEvent('disconnect', how);
         $('btnReconnect').hidden = !S.device;
+        stopPollLoop();
     }
     async function disconnect(quiet) {
+        stopPollLoop();
         const d = S.device;
         if (!d) return;
         d.removeEventListener('gattserverdisconnected', onDisconnected);
@@ -485,6 +488,8 @@
         if ($('btnRunInitCmds')) $('btnRunInitCmds').disabled = !(S.initCommands.length && writable.length && $('writeOk').checked);
         if ($('btnSaveRateCmd')) $('btnSaveRateCmd').disabled = !writable.length;
         if ($('btnTestRateCmd')) $('btnTestRateCmd').disabled = !(writable.length && $('writeOk').checked);
+        if ($('btnSavePollCmd')) $('btnSavePollCmd').disabled = !writable.length;
+        if ($('btnPollToggle')) $('btnPollToggle').disabled = !(pollLoopToken > 0 || (writable.length && $('writeOk').checked));
         S.dirty = true;
     }
 
@@ -909,6 +914,98 @@
         renderRateCommandUi();
     }
 
+    // ---------- ⚡ 고속 반복 요청(폴링) 시험 · 저장 ----------
+    var pollLoopToken = 0;
+    var pollLoopTimer = null;
+    async function sendBytesFast(c, bytes) {
+        for (let i = 0; i < bytes.length; i += 20) {
+            const part = bytes.slice(i, i + 20);
+            if (c.props.writeWithoutResponse && c.obj.writeValueWithoutResponse) await c.obj.writeValueWithoutResponse(part);
+            else if (c.props.write && c.obj.writeValueWithResponse) await c.obj.writeValueWithResponse(part);
+            else if (c.obj.writeValueWithoutResponse) await c.obj.writeValueWithoutResponse(part);
+            else await c.obj.writeValue(part);
+        }
+    }
+    function stopPollLoop() {
+        const wasRunning = pollLoopToken > 0;
+        pollLoopToken = 0;
+        clearTimeout(pollLoopTimer);
+        pollLoopTimer = null;
+        if ($('btnPollToggle')) {
+            $('btnPollToggle').textContent = '▶ 반복 요청 시작';
+            $('btnPollToggle').classList.remove('on');
+        }
+        if (wasRunning && $('pollCmdMsg')) $('pollCmdMsg').textContent = '⏹ 반복 요청을 중지했어요.';
+    }
+    function renderPollCommandUi() {
+        const pc = S.pollCommand;
+        if ($('pollCmdMode') && pc) $('pollCmdMode').value = pc.mode === 'hex' ? 'hex' : 'ascii';
+        if ($('pollCmdPayload') && pc && document.activeElement !== $('pollCmdPayload')) $('pollCmdPayload').value = pc.payload || '';
+        if ($('pollCmdMsg') && pollLoopToken === 0) {
+            $('pollCmdMsg').textContent = pc
+                ? '✓ 폴링 규칙 저장됨: ' + B.shortUuid(pc.characteristic) + ' ← ' + pc.payload
+                : '';
+        }
+    }
+    function togglePollLoop() {
+        if (pollLoopToken > 0) { stopPollLoop(); refreshCharSelects(); return; }
+        const msg = $('pollCmdMsg');
+        const charUuid = $('writeChar').value;
+        const c = S.chars.get(charUuid);
+        if (!c) { msg.textContent = '쓸 수 있는 특성이 없어요. 먼저 연결하세요.'; return; }
+        if (!$('writeOk').checked) { msg.textContent = '위 확인 칸에 표시해야 보낼 수 있어요.'; return; }
+        const mode = $('pollCmdMode') ? $('pollCmdMode').value : 'ascii';
+        const payload = $('pollCmdPayload') ? $('pollCmdPayload').value.trim() : '';
+        let bytes;
+        try { bytes = B.encodeCommand(payload, mode); } catch (e) { msg.textContent = '⚠️ ' + e.message; return; }
+        const ms = Math.max(10, Number($('pollCmdMs') && $('pollCmdMs').value) || 100);
+        const myToken = Date.now();
+        pollLoopToken = myToken;
+        if ($('btnPollToggle')) {
+            $('btnPollToggle').textContent = '⏹ 반복 요청 중지';
+            $('btnPollToggle').classList.add('on');
+            $('btnPollToggle').disabled = false;
+        }
+        let sent = 0;
+        const tick = async () => {
+            if (pollLoopToken !== myToken || !S.device) return;
+            const t0 = performance.now();
+            try {
+                await sendBytesFast(c, bytes);
+                sent++;
+                if (sent === 1 || sent % 10 === 0) {
+                    msg.textContent = '⚡ 반복 요청 중 (' + (1000 / ms).toFixed(0) + ' Hz 목표 · 전송 ' + sent + '회' + currentRateText() + ')';
+                }
+            } catch (e) {
+                if (pollLoopToken !== myToken) return;
+                if (!S.device || !S.device.gatt || !S.device.gatt.connected) { stopPollLoop(); return; }
+            }
+            if (pollLoopToken !== myToken || !S.device) return;
+            const wait = Math.max(0, ms - (performance.now() - t0));
+            pollLoopTimer = setTimeout(tick, wait);
+        };
+        tick();
+    }
+    function savePollCommand() {
+        const msg = $('pollCmdMsg');
+        const charUuid = $('writeChar').value;
+        const c = S.chars.get(charUuid);
+        if (!c) { msg.textContent = '먼저 위 ‘쓸 특성’을 고르세요.'; return; }
+        const mode = $('pollCmdMode') ? $('pollCmdMode').value : 'ascii';
+        const payload = $('pollCmdPayload') ? $('pollCmdPayload').value.trim() : '';
+        try { B.encodeCommand(payload, mode); } catch (e) { msg.textContent = '⚠️ ' + e.message; return; }
+        S.pollCommand = { service: c.service || S.charService[charUuid] || '', characteristic: charUuid, mode, payload, onlyFasterThanMs: 1000 };
+        saveDraft();
+        renderPollCommandUi();
+    }
+    function clearPollCommand() {
+        stopPollLoop();
+        S.pollCommand = null;
+        if ($('pollCmdPayload')) $('pollCmdPayload').value = '';
+        saveDraft();
+        renderPollCommandUi();
+    }
+
     // ---------- ④ 저장 ----------
     function buildDecoder() {
         const characteristics = Object.keys(S.rules).filter(u => (S.rules[u] || []).length).map(u => {
@@ -926,10 +1023,11 @@
         };
         if (S.initCommands.length) dec.initCommands = S.initCommands.map(cmd => Object.assign({}, cmd));
         if (S.rateCommand) dec.rateCommand = Object.assign({}, S.rateCommand);
+        if (S.pollCommand) dec.pollCommand = Object.assign({}, S.pollCommand);
         return dec;
     }
     function saveDraft() {
-        store(KEY_DRAFT, { rules: S.rules, preprocess: S.preprocess, charService: S.charService, initCommands: S.initCommands, rateCommand: S.rateCommand, meta: S.meta, name: $('sensorName').value, notes: $('ruleNotes').value });
+        store(KEY_DRAFT, { rules: S.rules, preprocess: S.preprocess, charService: S.charService, initCommands: S.initCommands, rateCommand: S.rateCommand, pollCommand: S.pollCommand, meta: S.meta, name: $('sensorName').value, notes: $('ruleNotes').value });
     }
     function applyDecoder(dec) {
         S.rules = {};
@@ -941,6 +1039,7 @@
         });
         S.initCommands = Array.isArray(dec.initCommands) ? dec.initCommands.map(cmd => Object.assign({}, cmd)) : [];
         S.rateCommand = dec.rateCommand ? Object.assign({}, dec.rateCommand) : null;
+        S.pollCommand = dec.pollCommand ? Object.assign({}, dec.pollCommand) : null;
         $('sensorName').value = dec.name;
         $('ruleNotes').value = dec.notes || '';
         if (!S.device) S.meta = { deviceName: dec.device.namePrefix, maker: dec.device.maker, model: dec.device.model, firmware: dec.device.firmware };
@@ -948,13 +1047,14 @@
         refreshCharSelects();
         renderInitCommands();
         renderRateCommandUi();
+        renderPollCommandUi();
         renderFields();
     }
     function renderSaved() {
         const list = load(KEY_SAVED, []);
         $('savedRules').innerHTML = list.length ? list.map((d, i) => '<li><b>' + esc(d.name) + '</b><span class="note">특성 ' + d.characteristics.length + '개' +
             (d.initCommands && d.initCommands.length ? ' · 명령 ' + d.initCommands.length + '개' : '') +
-            (d.rateCommand ? ' · 주기 제어' : '') + ' · ' + esc((d.savedAt || '').slice(0, 10)) + '</span>' +
+            (d.rateCommand || d.pollCommand ? ' · 고속 주기' : '') + ' · ' + esc((d.savedAt || '').slice(0, 10)) + '</span>' +
             '<a class="btn small primary" href="vernier-temp-lab.html?profile=' + encodeURIComponent(d.name) + '">📊 대시보드</a>' +
             '<button type="button" class="btn small" data-loadrule="' + i + '">불러오기</button><button type="button" class="btn small" data-delrule="' + i + '" aria-label="' + esc(d.name) + ' 지우기">🗑</button></li>').join('')
             : '<li class="note">아직 저장한 규칙이 없어요.</li>';
@@ -1240,6 +1340,7 @@
             S.charService = draft.charService || {};
             S.initCommands = Array.isArray(draft.initCommands) ? draft.initCommands : [];
             S.rateCommand = draft.rateCommand && typeof draft.rateCommand === 'object' ? draft.rateCommand : null;
+            S.pollCommand = draft.pollCommand && typeof draft.pollCommand === 'object' ? draft.pollCommand : null;
             S.meta = Object.assign(S.meta, draft.meta || {});
             $('sensorName').value = draft.name || '';
             $('ruleNotes').value = draft.notes || '';
@@ -1250,6 +1351,7 @@
         refreshCharSelects();
         renderInitCommands();
         renderRateCommandUi();
+        renderPollCommandUi();
         renderFields();
 
         $('stdServices').addEventListener('change', saveServiceChoices);
@@ -1360,6 +1462,9 @@
         if ($('btnSaveRateCmd')) $('btnSaveRateCmd').addEventListener('click', saveRateCommand);
         if ($('btnTestRateCmd')) $('btnTestRateCmd').addEventListener('click', testRateCommand);
         if ($('btnClearRateCmd')) $('btnClearRateCmd').addEventListener('click', clearRateCommand);
+        if ($('btnPollToggle')) $('btnPollToggle').addEventListener('click', togglePollLoop);
+        if ($('btnSavePollCmd')) $('btnSavePollCmd').addEventListener('click', savePollCommand);
+        if ($('btnClearPollCmd')) $('btnClearPollCmd').addEventListener('click', clearPollCommand);
         if ($('initCmdList')) {
             $('initCmdList').addEventListener('click', e => {
                 const d = e.target.closest('[data-delcmd]');

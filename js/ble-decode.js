@@ -74,11 +74,16 @@
         return Number.isFinite(n) && n > 0 && n <= 0xffffffff ? n : null;
     }
 
-    // 필드 하나 = { name, offset, format, scale, add, unit, mask }
+    // 필드 하나 = { name, offset, format, scale, add, unit, mask, match?:{ offset, value } }
     // 값 = ((날것 & 마스크) >> 마스크 아래쪽 0 개수) × 배율 + 더할 값
     function readField(bytes, field) {
         if (!field) return null;
-        let raw = readRaw(bytes, Number(field.offset), field.format);
+        const b = toBytes(bytes);
+        if (field.match && typeof field.match === 'object') {
+            const mo = Number(field.match.offset), mv = Number(field.match.value);
+            if (!Number.isInteger(mo) || mo < 0 || mo >= b.length || b[mo] !== mv) return null;
+        }
+        let raw = readRaw(b, Number(field.offset), field.format);
         if (raw === null || !Number.isFinite(raw)) return null;
         const mask = parseMask(field.mask);
         if (mask !== null && FORMAT_BY_ID[field.format].int) {
@@ -94,7 +99,11 @@
 
     function decodePacket(bytes, fields) {
         const out = {};
-        (fields || []).forEach((f, i) => { out[f.name || ('값' + (i + 1))] = readField(bytes, f); });
+        (fields || []).forEach((f, i) => {
+            const key = f.name || ('값' + (i + 1));
+            const v = readField(bytes, f);
+            if (v !== null || out[key] === undefined) out[key] = v;
+        });
         return out;
     }
 
@@ -643,10 +652,19 @@
                 const scale = f.scale === undefined || f.scale === '' ? 1 : Number(f.scale);
                 const add = f.add === undefined || f.add === '' ? 0 : Number(f.add);
                 if (!Number.isFinite(scale) || !Number.isFinite(add)) { errors.push((i + 1) + '번째 특성 ' + (j + 1) + '번째 필드 배율·더할 값이 숫자가 아니에요.'); return; }
-                fields.push({
+                const cleanField = {
                     name: String(f.name || ('값' + (j + 1))).slice(0, 40), offset, format: f.format, scale, add,
                     unit: String(f.unit || '').slice(0, 20), mask: f.mask === undefined || f.mask === null ? '' : String(f.mask).slice(0, 20)
-                });
+                };
+                if (f.match && typeof f.match === 'object') {
+                    const mo = Number(f.match.offset), mv = Number(f.match.value);
+                    if (!Number.isInteger(mo) || mo < 0 || mo > 511 || !Number.isInteger(mv) || mv < 0 || mv > 255) {
+                        errors.push((i + 1) + '번째 특성 ' + (j + 1) + '번째 필드의 조건(match)이 잘못됐어요.');
+                        return;
+                    }
+                    cleanField.match = { offset: mo, value: mv };
+                }
+                fields.push(cleanField);
             });
             const entry = { service: service || '', characteristic, mode: c.mode === 'read' ? 'read' : 'notify', fields };
             if (preprocess) entry.preprocess = preprocess;
@@ -702,6 +720,28 @@
                 }
             }
         }
+        let pollCommand = null;
+        if (obj.pollCommand !== undefined && obj.pollCommand !== null) {
+            const pc = obj.pollCommand;
+            if (typeof pc !== 'object' || Array.isArray(pc)) {
+                errors.push('pollCommand 모양이 잘못됐어요.');
+            } else {
+                const characteristic = normUuid(pc.characteristic);
+                const service = normUuid(pc.service) || '';
+                const mode = pc.mode === 'hex' ? 'hex' : 'ascii';
+                const payload = String(pc.payload !== undefined ? pc.payload : '').slice(0, 200);
+                const onlyFasterThanMs = Math.max(0, Math.min(60000, Math.round(Number(pc.onlyFasterThanMs) || 0)));
+                if (!characteristic) errors.push('pollCommand 의 특성 UUID 가 잘못됐어요.');
+                else {
+                    try {
+                        encodeCommand(payload, mode);
+                        pollCommand = { service, characteristic, mode, payload, onlyFasterThanMs };
+                    } catch (e) {
+                        errors.push('pollCommand: ' + e.message);
+                    }
+                }
+            }
+        }
         if (errors.length) return { ok: false, errors };
         const d = obj.device || {};
         const clean = {
@@ -714,6 +754,7 @@
         };
         if (initCommands.length) clean.initCommands = initCommands;
         if (rateCommand) clean.rateCommand = rateCommand;
+        if (pollCommand) clean.pollCommand = pollCommand;
         if (obj.builtin) clean.builtin = true;
         if (obj.savedAt) clean.savedAt = String(obj.savedAt).slice(0, 40);
         return { ok: true, decoder: clean };
@@ -764,7 +805,7 @@
         };
     }
 
-    // 실측 역추적으로 확인된 기본 내장 규칙 (기기 이름 접두사가 맞을 때 자동 매칭)
+    // 실측 역추적 및 공개 MIT 규격(entrylabs/entry-hw sciencecube.js) 기반 기본 내장 규칙
     const BUILTIN_PROFILES = [
         {
             schema: SCHEMA,
@@ -777,9 +818,19 @@
                 characteristic: '49535343-1e4d-4bd9-ba61-23c647249616',
                 mode: 'notify',
                 preprocess: { type: 'base64', prefix: '{{', suffix: '}}', checksum: 'sum8' },
-                fields: [{ name: '온도', offset: 4, format: 'float32le', scale: 1, add: 0, unit: '°C', mask: '' }]
+                fields: [
+                    { name: '온도', offset: 2, format: 'float32le', scale: 1, add: 0, unit: '°C', mask: '', match: { offset: 0, value: 0x73 } },
+                    { name: '온도', offset: 4, format: 'float32le', scale: 1, add: 0, unit: '°C', mask: '', match: { offset: 0, value: 0x74 } }
+                ]
             }],
-            notes: '실측 패킷 역추적: {{Base64}} → 12바이트, offset 4 float32 LE (°C), 끝 바이트 8비트 합 체크섬'
+            pollCommand: {
+                service: '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+                characteristic: '49535343-8841-43f4-a8d4-ecbe34729bb3',
+                mode: 'ascii',
+                payload: '{{UwAAAAAAAAAAAABT}}',
+                onlyFasterThanMs: 1000
+            },
+            notes: '실측 역추적 + entrylabs/entry-hw sciencecube.js(MIT) 참고: {{Base64}}→12B(sum8). 1초 미만 고속 측정 시 S요청({{UwAAAAAAAAAAAABT}}) 폴링 → s(0x73) 응답 offset 2 float32le, 기본 1Hz t(0x74) 응답 offset 4 float32le'
         }
     ];
 
