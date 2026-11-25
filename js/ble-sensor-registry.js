@@ -260,6 +260,8 @@
         var optSet = new Set(STD_OPTIONAL);
         (profile.characteristics || []).forEach(function (c) { if (c.service) optSet.add(c.service); });
         (profile.initCommands || []).forEach(function (c) { if (c.service) optSet.add(c.service); });
+        if (profile.rateCommand && profile.rateCommand.service) optSet.add(profile.rateCommand.service);
+        if (profile.pollCommand && profile.pollCommand.service) optSet.add(profile.pollCommand.service);
 
         cb.onStatus && cb.onStatus('"' + profile.name + '" 센서를 고르세요…');
         var device = await nav.bluetooth.requestDevice({
@@ -273,18 +275,37 @@
             throw new Error('선택한 기기에서 특성(' + B.shortUuid(chRule.characteristic) + ')을 찾지 못했습니다.');
         }
 
-        var closed = false, pollTimer = null;
+        var closed = false, pollTimer = null, cmdPollTimer = null;
+        var framer = (B.createFramer && chRule.preprocess && chRule.preprocess.type && chRule.preprocess.type !== 'none')
+            ? B.createFramer(chRule.preprocess) : null;
+        var emitDecoded = function (frameBytes) {
+            if (B.decodeCharPacket) {
+                var dec = B.decodeCharPacket(frameBytes, chRule);
+                if (dec) {
+                    var v = dec[field.name];
+                    if (typeof v === 'number' && isFinite(v)) { cb.onValue && cb.onValue(v); return; }
+                }
+                return;
+            }
+            var val = B.readField(frameBytes, field);
+            if (typeof val === 'number' && isFinite(val)) cb.onValue && cb.onValue(val);
+        };
         var handleDv = function (dv) {
             if (!dv) return;
             var bytes = new Uint8Array(dv.buffer, dv.byteOffset || 0, dv.byteLength);
-            var val = B.readField(bytes, field);
-            if (typeof val === 'number' && isFinite(val)) cb.onValue && cb.onValue(val);
+            if (framer) {
+                var frames = framer.push(bytes);
+                for (var fi = 0; fi < frames.length; fi++) emitDecoded(frames[fi]);
+            } else {
+                emitDecoded(bytes);
+            }
         };
         var onChar = function (ev) { handleDv(ev.target.value); };
         var onDisc = function () {
             if (closed) return;
             closed = true;
             clearInterval(pollTimer);
+            clearInterval(cmdPollTimer);
             cb.onDisconnect && cb.onDisconnect('연결 끊김');
         };
         device.addEventListener('gattserverdisconnected', onDisc);
@@ -308,9 +329,30 @@
                     if (ic.delayMs > 0) await new Promise(function (r) { setTimeout(r, ic.delayMs); });
                 }
             }
+            if (profile.rateCommand && B.buildRateCommand) {
+                var rChar = await findCharacteristic(server, profile.rateCommand.service, profile.rateCommand.characteristic);
+                if (rChar) {
+                    var rBytes = B.buildRateCommand(profile.rateCommand, Math.max(200, cb.intervalMs || 1000));
+                    if (rBytes && rBytes.length) await writeChunked(rChar, rBytes);
+                }
+            }
+            if (profile.pollCommand) {
+                var pc = profile.pollCommand;
+                var wantMs = Math.max(200, cb.intervalMs || 1000);
+                if (!pc.onlyFasterThanMs || wantMs < pc.onlyFasterThanMs) {
+                    var pChar = await findCharacteristic(server, pc.service, pc.characteristic);
+                    if (pChar) {
+                        var pBytes = B.encodeCommand(pc.payload, pc.mode);
+                        var sendPoll = function () { if (!closed) writeChunked(pChar, pBytes).catch(function () {}); };
+                        sendPoll();
+                        cmdPollTimer = setInterval(sendPoll, wantMs);
+                    }
+                }
+            }
         } catch (err) {
             closed = true;
             clearInterval(pollTimer);
+            clearInterval(cmdPollTimer);
             try { dataChar.removeEventListener('characteristicvaluechanged', onChar); } catch (e) {}
             try { device.removeEventListener('gattserverdisconnected', onDisc); } catch (e) {}
             try { if (device.gatt && device.gatt.connected) device.gatt.disconnect(); } catch (e) {}
@@ -323,6 +365,7 @@
             disconnect: function () {
                 closed = true;
                 clearInterval(pollTimer);
+                clearInterval(cmdPollTimer);
                 try { dataChar.removeEventListener('characteristicvaluechanged', onChar); } catch (e) {}
                 try { if (chRule.mode !== 'read' && (dataChar.properties.notify || dataChar.properties.indicate)) Promise.resolve(dataChar.stopNotifications()).catch(function () {}); } catch (e) {}
                 try { device.removeEventListener('gattserverdisconnected', onDisc); } catch (e) {}

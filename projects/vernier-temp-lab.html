@@ -557,10 +557,17 @@
         <div class="btn-group">
           <label for="sampleInterval" style="font-size:12.5px; color:var(--text-muted); font-weight:600;">측정 간격</label>
           <select class="select" id="sampleInterval">
+            <option value="10">0.01초 (100 Hz)</option>
+            <option value="20">0.02초 (50 Hz)</option>
+            <option value="50">0.05초 (20 Hz)</option>
+            <option value="100">0.1초 (10 Hz)</option>
             <option value="200">0.2초 (5 Hz)</option>
             <option value="500" selected>0.5초 (2 Hz)</option>
             <option value="1000">1.0초 (1 Hz)</option>
             <option value="2000">2.0초 (0.5 Hz)</option>
+            <option value="5000">5.0초 (0.2 Hz)</option>
+            <option value="10000">10초</option>
+            <option value="30000">30초</option>
           </select>
           <button class="btn btn-success" id="btnStartStop" disabled>측정 시작</button>
           <button class="btn" id="btnClear">초기화</button>
@@ -573,6 +580,7 @@
         <span><strong>장치:</strong> <span id="deviceName">-</span></span>
         <span><strong>배터리:</strong> <span id="deviceBattery">-</span></span>
         <span><strong>활성 채널:</strong> <span id="deviceChannel">-</span></span>
+        <span><strong>수신 주기:</strong> <span id="deviceRate">-</span></span>
         <span><strong>경과 시간:</strong> <span id="elapsedTime">0.0 s</span></span>
       </div>
     </section>
@@ -781,6 +789,10 @@
       sensorHandler: null,
       genericCleanup: null,
       genericRestart: null,
+      genericRateApply: null,
+      genericPollActive: false,
+      lastRecordAt: 0,
+      sampleTimes: [],
       profiles: [],
       simTimer: null,
       simElapsed: 0,
@@ -809,6 +821,7 @@
       deviceName: $('deviceName'),
       deviceBattery: $('deviceBattery'),
       deviceChannel: $('deviceChannel'),
+      deviceRate: $('deviceRate'),
       elapsedTime: $('elapsedTime'),
       readoutBox: $('readoutBox'),
       currentTemp: $('currentTemp'),
@@ -1079,9 +1092,39 @@
     // =========================================================
     // 7. Data Ingestion & UI Update
     // =========================================================
+    let uiRedrawTimer = null;
+    function flushRecordUI() {
+      clearTimeout(uiRedrawTimer);
+      uiRedrawTimer = null;
+      chart.update('none');
+      updateStats();
+      updateRecentTable();
+    }
+    function scheduleRecordUI() {
+      if (state.intervalMs >= 100) {
+        flushRecordUI();
+        return;
+      }
+      if (!uiRedrawTimer) {
+        uiRedrawTimer = setTimeout(flushRecordUI, 80);
+      }
+    }
+
     function handleTemperatureSample(tempC) {
       if (!Number.isFinite(tempC)) return;
       const now = Date.now();
+      state.sampleTimes.push(now);
+      if (state.sampleTimes.length > 16) state.sampleTimes.shift();
+      if (state.sampleTimes.length >= 2 && els.deviceRate) {
+        const span = state.sampleTimes[state.sampleTimes.length - 1] - state.sampleTimes[0];
+        if (span > 0) {
+          const avgMs = span / (state.sampleTimes.length - 1);
+          const hz = 1000 / avgMs;
+          const secDigits = avgMs < 100 ? 3 : 2;
+          els.deviceRate.textContent = `${hz >= 10 ? hz.toFixed(0) : hz.toFixed(1)} Hz (${(avgMs / 1000).toFixed(secDigits)}초)`;
+        }
+      }
+
       state.lastTempC = tempC;
       const displayVal = convertFromC(tempC);
 
@@ -1097,9 +1140,15 @@
 
       if (!state.isRecording) return;
 
+      // 타사/규칙 BLE(notify) 센서는 설정한 측정 간격보다 자주 들어오면 간격에 맞춰 기록 (고속 폴링 루프 활성 시에는 그대로 기록)
+      if (!state.device && state.mode === 'device' && !state.genericRestart && !state.genericPollActive) {
+        if (state.lastRecordAt > 0 && (now - state.lastRecordAt) < state.intervalMs * 0.9) return;
+      }
+      state.lastRecordAt = now;
+
       if (state.resumeTime === null) state.resumeTime = now;
       const elapsedMs = state.recordedElapsedMs + (now - state.resumeTime);
-      const elapsedSec = Number((elapsedMs / 1000).toFixed(2));
+      const elapsedSec = Number((elapsedMs / 1000).toFixed(state.intervalMs < 100 ? 3 : 2));
       els.elapsedTime.textContent = `${elapsedSec.toFixed(1)} s`;
 
       const record = {
@@ -1112,10 +1161,7 @@
       state.records.push(record);
 
       chart.data.datasets[0].data.push({ x: elapsedSec, y: displayVal });
-      chart.update('none');
-
-      updateStats();
-      updateRecentTable();
+      scheduleRecordUI();
     }
 
     function updateStats() {
@@ -1151,11 +1197,12 @@
         return;
       }
       const recent = state.records.slice(-50).reverse();
+      const tDigits = state.intervalMs < 100 ? 3 : 2;
       els.dataTableBody.innerHTML = recent.map((r) => `
         <tr>
           <td>${r.index}</td>
           <td>${escapeHtml(r.timestamp)}</td>
-          <td>${r.elapsedSec.toFixed(2)}</td>
+          <td>${r.elapsedSec.toFixed(tDigits)}</td>
           <td><strong>${convertFromC(r.tempC).toFixed(2)}</strong></td>
         </tr>
       `).join('');
@@ -1340,23 +1387,34 @@
       } catch (e) {}
 
       const valid = [];
+      const seenNames = new Set();
       for (const item of raw) {
         const res = B.validateDecoder(item);
         if (res.ok && res.decoder.characteristics.length && res.decoder.characteristics[0].fields.length) {
           const exps = res.decoder.experiments;
           if (!Array.isArray(exps) || exps.length === 0 || exps.includes('tempdash')) {
             valid.push(res.decoder);
+            seenNames.add(res.decoder.name);
           }
+        }
+      }
+      // 기본 내장 규칙(ScienceCube SC:TEMP 등) 추가 (사용자가 같은 이름으로 저장했으면 사용자 규칙 우선)
+      for (const item of (B.BUILTIN_PROFILES || [])) {
+        if (seenNames.has(item.name)) continue;
+        const res = B.validateDecoder(item);
+        if (res.ok && res.decoder.characteristics.length && res.decoder.characteristics[0].fields.length) {
+          res.decoder.builtin = true;
+          valid.push(res.decoder);
         }
       }
       state.profiles = valid;
 
       const prev = selectName !== undefined ? selectName : els.profileSelect.value;
-      els.profileSelect.innerHTML = '<option value="">자동 (Vernier · 표준 BLE)</option>';
+      els.profileSelect.innerHTML = '<option value="">자동 (Vernier · ScienceCube · 규칙 · 표준 BLE)</option>';
       valid.forEach((p, i) => {
         const opt = document.createElement('option');
         opt.value = String(i);
-        opt.textContent = `규칙: ${p.name}`;
+        opt.textContent = p.builtin ? `내장: ${p.name}` : `규칙: ${p.name}`;
         els.profileSelect.appendChild(opt);
       });
 
@@ -1400,13 +1458,32 @@
       }
     }
 
+    async function writeProfileBytesFast(char, bytes) {
+      const props = char.properties || {};
+      for (let i = 0; i < bytes.length; i += 20) {
+        const part = bytes.slice(i, i + 20);
+        if (props.writeWithoutResponse && char.writeValueWithoutResponse) await char.writeValueWithoutResponse(part);
+        else if (props.write && char.writeValueWithResponse) await char.writeValueWithResponse(part);
+        else if (char.writeValueWithoutResponse) await char.writeValueWithoutResponse(part);
+        else await char.writeValue(part);
+      }
+    }
+
+    function profileValueToC(val, unit) {
+      const u = String(unit || '').trim().toUpperCase();
+      if (u === '°F' || u === 'F') return (val - 32) * 5 / 9;
+      if (u === 'K') return val - 273.15;
+      return val;
+    }
+
     async function attachProfileToServer(profile, bleDevice, server) {
       const B = window.BleDecode;
       if (!B) throw new Error('해석 도구(ble-decode.js)를 불러오지 못했습니다.');
 
       const chRule = profile.characteristics[0];
-      const field = chRule && chRule.fields && chRule.fields[0];
-      if (!chRule || !field) throw new Error('이 프로필에 읽을 필드가 없습니다.');
+      const fields = chRule && Array.isArray(chRule.fields) ? chRule.fields : [];
+      const primaryField = fields[0];
+      if (!chRule || !primaryField) throw new Error('이 프로필에 읽을 필드가 없습니다.');
 
       const dataChar = await findCharacteristic(server, chRule.service, chRule.characteristic);
       if (!dataChar) {
@@ -1424,7 +1501,7 @@
       state.mode = 'device';
       els.deviceName.textContent = bleDevice.name || profile.name;
       els.deviceBattery.textContent = batteryText;
-      els.deviceChannel.textContent = `${profile.name} · ${field.name}${field.unit ? ` (${field.unit})` : ''}`;
+      els.deviceChannel.textContent = `${profile.name} · ${primaryField.name}${primaryField.unit ? ` (${primaryField.unit})` : ''}`;
 
       const onDisconnected = () => {
         if (state.mode !== 'device') return;
@@ -1433,11 +1510,29 @@
       };
       bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
 
+      // 고속 폴링(pollCommand) 상태 추적: 폴링 응답(첫 번째 조건 필드)이 들어오면 1Hz 대기 방송 중복 무시
+      let cmdPollActive = false;
+      let lastPrimaryHitAt = 0;
+      const hasMultiMatch = fields.length >= 2 && Boolean(fields[0].match);
+
+      const framer = typeof B.createFramer === 'function' ? B.createFramer(chRule.preprocess) : null;
       const handleDv = (dv) => {
         if (!dv) return;
         const bytes = new Uint8Array(dv.buffer, dv.byteOffset || 0, dv.byteLength);
-        const val = B.readField(bytes, field);
-        if (typeof val === 'number' && Number.isFinite(val)) handleTemperatureSample(val);
+        const frames = framer ? framer.push(bytes) : [bytes];
+        const now = Date.now();
+        for (const frame of frames) {
+          for (let fi = 0; fi < fields.length; fi++) {
+            const f = fields[fi];
+            const val = B.readField(frame, f);
+            if (typeof val === 'number' && Number.isFinite(val)) {
+              if (hasMultiMatch && fi === 0) lastPrimaryHitAt = now;
+              if (hasMultiMatch && cmdPollActive && fi > 0 && (now - lastPrimaryHitAt) < 1500) break;
+              handleTemperatureSample(profileValueToC(val, f.unit));
+              break;
+            }
+          }
+        }
       };
       const onCharValue = (ev) => handleDv(ev.target.value);
 
@@ -1451,6 +1546,48 @@
         pollTimer = setInterval(readOnce, state.intervalMs);
       };
 
+      // 고속 명령 폴링(pollCommand) 비겹침 비동기 루프 (최대 100Hz / 10ms)
+      let cmdPollToken = 0;
+      let cmdPollTimer = null;
+      let pollCharCache = null;
+      const stopCmdPoll = () => {
+        cmdPollToken++;
+        cmdPollActive = false;
+        state.genericPollActive = false;
+        clearTimeout(cmdPollTimer);
+        cmdPollTimer = null;
+      };
+      const applyCmdPoll = async (ms) => {
+        stopCmdPoll();
+        const pc = profile.pollCommand;
+        if (!pc) return false;
+        if (pc.onlyFasterThanMs > 0 && ms >= pc.onlyFasterThanMs) return false;
+        const bytes = B.encodeCommand(pc.payload, pc.mode);
+        if (!pollCharCache) {
+          pollCharCache = await findCharacteristic(server, pc.service, pc.characteristic);
+        }
+        if (!pollCharCache) throw new Error(`폴링 쓰기 특성(${B.shortUuid(pc.characteristic)})을 찾지 못했습니다.`);
+        const myToken = ++cmdPollToken;
+        cmdPollActive = true;
+        state.genericPollActive = true;
+        const tick = async () => {
+          if (myToken !== cmdPollToken || state.mode !== 'device') return;
+          const t0 = performance.now();
+          try {
+            await writeProfileBytesFast(pollCharCache, bytes);
+          } catch (e) {
+            if (myToken !== cmdPollToken) return;
+            // 일시적 GATT busy 는 다음 주기에 재시도, 연결 끊김이면 중단
+            if (!bleDevice.gatt || !bleDevice.gatt.connected) { stopCmdPoll(); return; }
+          }
+          if (myToken !== cmdPollToken || state.mode !== 'device') return;
+          const wait = Math.max(0, ms - (performance.now() - t0));
+          cmdPollTimer = setTimeout(tick, wait);
+        };
+        tick();
+        return true;
+      };
+
       const props = dataChar.properties || {};
       if (chRule.mode !== 'read' && (props.notify || props.indicate)) {
         dataChar.addEventListener('characteristicvaluechanged', onCharValue);
@@ -1461,8 +1598,11 @@
       }
 
       state.genericCleanup = () => {
+        stopCmdPoll();
         clearInterval(pollTimer);
         pollTimer = null;
+        pollCharCache = null;
+        if (framer) framer.reset();
         try { dataChar.removeEventListener('characteristicvaluechanged', onCharValue); } catch (e) {}
         try { if (chRule.mode !== 'read' && (props.notify || props.indicate)) Promise.resolve(dataChar.stopNotifications()).catch(() => {}); } catch (e) {}
         try { bleDevice.removeEventListener('gattserverdisconnected', onDisconnected); } catch (e) {}
@@ -1480,6 +1620,29 @@
         }
       }
 
+      // 프로필에 하드웨어 주기 변경 명령(rateCommand) 또는 고속 폴링(pollCommand)이 있으면 측정 간격 변경 시 자동 실행
+      if (profile.rateCommand || profile.pollCommand) {
+        const applyRate = async (ms) => {
+          let sent = false;
+          if (profile.rateCommand && typeof B.buildRateCommand === 'function') {
+            const built = B.buildRateCommand(profile.rateCommand, ms);
+            if (built) {
+              const wChar = await findCharacteristic(server, built.service, built.characteristic);
+              if (!wChar) throw new Error(`주기 변경 특성(${B.shortUuid(built.characteristic)})을 찾지 못했습니다.`);
+              await writeProfileBytes(wChar, built.bytes);
+              sent = true;
+            }
+          }
+          if (profile.pollCommand) {
+            const polling = await applyCmdPoll(ms);
+            if (polling) sent = true;
+          }
+          return sent;
+        };
+        state.genericRateApply = applyRate;
+        try { await applyRate(state.intervalMs); } catch (e) { console.warn('초기 주기 설정 실패:', e); }
+      }
+
       updateConnectionUI();
       showToast(`${bleDevice.name || profile.name} 연결 완료! (규칙: ${profile.name})`);
     }
@@ -1487,13 +1650,15 @@
     async function tryAutoMatchProfile(bleDevice, server) {
       if (!state.profiles.length) return false;
       const devName = String(bleDevice.name || '');
-      // 1) 이름 접두사가 맞는 프로필 우선, 2) 나머지 프로필 순서로 특성 존재 여부 확인
-      const ordered = state.profiles.slice().sort((a, b) => {
-        const aHit = a.device && a.device.namePrefix && devName.startsWith(a.device.namePrefix) ? 1 : 0;
-        const bHit = b.device && b.device.namePrefix && devName.startsWith(b.device.namePrefix) ? 1 : 0;
-        return bHit - aHit;
-      });
-      for (const prof of ordered) {
+      const nameHit = (p) => Boolean(p.device && p.device.namePrefix && devName.startsWith(p.device.namePrefix));
+      // 1) 이름 접두사가 맞는 사용자 규칙 → 2) 이름 접두사가 맞는 내장 규칙 → 3) 나머지 사용자 규칙
+      // (내장 규칙은 이름 접두사가 맞을 때만 자동 매칭해 다른 UART 기기 오탐 방지)
+      const candidates = [
+        ...state.profiles.filter((p) => !p.builtin && nameHit(p)),
+        ...state.profiles.filter((p) => p.builtin && nameHit(p)),
+        ...state.profiles.filter((p) => !p.builtin && !nameHit(p))
+      ];
+      for (const prof of candidates) {
         const ch = prof.characteristics[0];
         if (!ch) continue;
         const found = await findCharacteristic(server, ch.service, ch.characteristic);
@@ -1511,7 +1676,9 @@
       const optServices = Array.from(new Set([
         ...BLE_OPTIONAL_SERVICES,
         ...profile.characteristics.map((c) => c.service).filter(Boolean),
-        ...(profile.initCommands || []).map((c) => c.service).filter(Boolean)
+        ...(profile.initCommands || []).map((c) => c.service).filter(Boolean),
+        ...(profile.rateCommand && profile.rateCommand.service ? [profile.rateCommand.service] : []),
+        ...(profile.pollCommand && profile.pollCommand.service ? [profile.pollCommand.service] : [])
       ]));
 
       const bleDevice = await navigator.bluetooth.requestDevice({
@@ -1568,6 +1735,8 @@
           state.profiles.forEach((p) => {
             (p.characteristics || []).forEach((c) => { if (c.service) savedServices.push(c.service); });
             (p.initCommands || []).forEach((c) => { if (c.service) savedServices.push(c.service); });
+            if (p.rateCommand && p.rateCommand.service) savedServices.push(p.rateCommand.service);
+            if (p.pollCommand && p.pollCommand.service) savedServices.push(p.pollCommand.service);
           });
           const optServices = Array.from(new Set([...BLE_OPTIONAL_SERVICES, ...savedServices]));
 
@@ -1763,6 +1932,15 @@
         state.resumeTime = null;
       }
 
+      const cleanup = state.genericCleanup;
+      state.genericCleanup = null;
+      state.genericRestart = null;
+      state.genericRateApply = null;
+      state.genericPollActive = false;
+      if (typeof cleanup === 'function') {
+        try { cleanup(); } catch (e) {}
+      }
+
       const dev = state.device;
       state.device = null;
       if (dev) {
@@ -1771,9 +1949,12 @@
       }
       state.mode = 'idle';
       state.isRecording = false;
+      state.lastRecordAt = 0;
+      state.sampleTimes = [];
       els.deviceName.textContent = '-';
       els.deviceBattery.textContent = '-';
       els.deviceChannel.textContent = '-';
+      if (els.deviceRate) els.deviceRate.textContent = '-';
       updateConnectionUI();
     }
 
@@ -1804,16 +1985,39 @@
       showToast('연결을 해제했습니다.');
     });
 
-    els.sampleInterval.addEventListener('change', () => {
+    els.sampleInterval.addEventListener('change', async () => {
       state.intervalMs = Number(els.sampleInterval.value);
+      state.lastRecordAt = 0;
+      state.sampleTimes = [];
+      const hz = Math.round((1000 / state.intervalMs) * 10) / 10;
+      const secText = state.intervalMs < 100
+        ? `${(state.intervalMs / 1000).toFixed(2)}초 (${hz} Hz)`
+        : (state.intervalMs >= 1000 ? `${Number((state.intervalMs / 1000).toFixed(1))}초` : `${(state.intervalMs / 1000).toFixed(1)}초 (${hz} Hz)`);
       if (state.mode === 'device' && state.device) {
         state.device.stop();
         state.device.start(state.intervalMs);
+        showToast(`측정 간격을 ${secText}로 변경했습니다.`);
+      } else if (state.mode === 'device' && state.genericRateApply) {
+        try {
+          const active = await state.genericRateApply(state.intervalMs);
+          showToast(active
+            ? `고속 수집 ${secText} 모드로 전환했습니다. (상단 ‘수신 주기’에서 실제 달성 Hz 확인)`
+            : `기록 간격을 ${secText}로 변경했습니다.`);
+        } catch (err) {
+          showToast(`주기 변경 실패: ${err && err.message ? err.message : err}`);
+        }
+      } else if (state.mode === 'device' && state.genericRestart) {
+        state.genericRestart();
+        showToast(`읽기 간격을 ${secText}로 변경했습니다.`);
+      } else if (state.mode === 'device') {
+        showToast(`기록 간격을 ${secText}로 변경했습니다. (센서 전송보다 느리게 기록 가능)`);
       } else if (state.mode === 'sim') {
         clearInterval(state.simTimer);
         state.simTimer = setInterval(runSimTick, state.intervalMs);
+        showToast(`측정 간격을 ${secText}로 변경했습니다.`);
+      } else {
+        showToast(`측정 간격을 ${secText}로 설정했습니다.`);
       }
-      showToast(`측정 간격을 ${(state.intervalMs / 1000).toFixed(1)}초로 변경했습니다.`);
     });
 
     els.btnStartStop.addEventListener('click', () => {
@@ -1824,7 +2028,9 @@
           state.resumeTime = null;
         }
         state.isRecording = false;
+        flushRecordUI();
       } else {
+        state.lastRecordAt = 0;
         state.resumeTime = Date.now();
         state.isRecording = true;
       }
@@ -1833,9 +2039,11 @@
     });
 
     els.btnClear.addEventListener('click', () => {
+      if (uiRedrawTimer) { clearTimeout(uiRedrawTimer); uiRedrawTimer = null; }
       state.records = [];
       state.markers = [];
       state.recordedElapsedMs = 0;
+      state.lastRecordAt = 0;
       state.resumeTime = state.isRecording ? Date.now() : null;
       state.simElapsed = 0;
       els.elapsedTime.textContent = '0.0 s';

@@ -74,11 +74,16 @@
         return Number.isFinite(n) && n > 0 && n <= 0xffffffff ? n : null;
     }
 
-    // 필드 하나 = { name, offset, format, scale, add, unit, mask }
+    // 필드 하나 = { name, offset, format, scale, add, unit, mask, match?:{ offset, value } }
     // 값 = ((날것 & 마스크) >> 마스크 아래쪽 0 개수) × 배율 + 더할 값
     function readField(bytes, field) {
         if (!field) return null;
-        let raw = readRaw(bytes, Number(field.offset), field.format);
+        const b = toBytes(bytes);
+        if (field.match && typeof field.match === 'object') {
+            const mo = Number(field.match.offset), mv = Number(field.match.value);
+            if (!Number.isInteger(mo) || mo < 0 || mo >= b.length || b[mo] !== mv) return null;
+        }
+        let raw = readRaw(b, Number(field.offset), field.format);
         if (raw === null || !Number.isFinite(raw)) return null;
         const mask = parseMask(field.mask);
         if (mask !== null && FORMAT_BY_ID[field.format].int) {
@@ -94,7 +99,11 @@
 
     function decodePacket(bytes, fields) {
         const out = {};
-        (fields || []).forEach((f, i) => { out[f.name || ('값' + (i + 1))] = readField(bytes, f); });
+        (fields || []).forEach((f, i) => {
+            const key = f.name || ('값' + (i + 1));
+            const v = readField(bytes, f);
+            if (v !== null || out[key] === undefined) out[key] = v;
+        });
         return out;
     }
 
@@ -310,9 +319,17 @@
                 });
             }
         }
-        const TIE = 1e-6;
+        const TIE = 1e-5;
+        const cleanScore = c => {
+            let s = 0;
+            if (c.niceScale !== null) { s += 2; if (Math.abs(c.niceScale) === 1) s += 1; }
+            if (Math.abs(c.add) < Math.max(1e-6, Math.abs(c.scale) * 0.5)) s += 1;
+            return s;
+        };
         out.sort((a, b) => {
             if (Math.abs(b.r2 - a.r2) > TIE) return b.r2 - a.r2;
+            const cs = cleanScore(b) - cleanScore(a);
+            if (cs !== 0) return cs;
             if (a.size !== b.size) return a.size - b.size;
             if (a.order !== b.order) return a.order - b.order;
             return a.offset - b.offset;
@@ -328,9 +345,286 @@
         return { name: name || '값', offset: c.offset, format: c.format, scale, add, unit: unit || '', mask: '' };
     }
 
+    // ---------- 포장 풀기(전처리: Base64 · ASCII 16진수 · 텍스트 숫자) ----------
+    const PREPROCESS_TYPES = ['none', 'base64', 'ascii-hex', 'ascii-number'];
+    const CHECKSUM_TYPES = ['none', 'sum8', 'xor8'];
+
+    function unescapeMarker(s) {
+        return String(s || '').replace(/\\([rnt\\])/g, (_, ch) => ({ r: '\r', n: '\n', t: '\t', '\\': '\\' }[ch]));
+    }
+    function bytesToAscii(bytes) {
+        const b = toBytes(bytes);
+        let out = '';
+        for (let i = 0; i < b.length; i++) out += String.fromCharCode(b[i]);
+        return out;
+    }
+    function base64ToBytes(str) {
+        const clean = String(str || '').replace(/\s+/g, '');
+        if (!clean || clean.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(clean)) return null;
+        try {
+            if (typeof atob === 'function') {
+                const bin = atob(clean);
+                const out = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+                return out;
+            }
+            if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(clean, 'base64'));
+        } catch (e) { return null; }
+        return null;
+    }
+    function verifyChecksum(bytes, kind) {
+        const b = toBytes(bytes);
+        if (!kind || kind === 'none') return true;
+        if (b.length < 2) return false;
+        if (kind === 'sum8') {
+            let s = 0;
+            for (let i = 0; i < b.length - 1; i++) s = (s + b[i]) & 0xff;
+            return s === b[b.length - 1];
+        }
+        if (kind === 'xor8') {
+            let x = 0;
+            for (let i = 0; i < b.length - 1; i++) x ^= b[i];
+            return (x & 0xff) === b[b.length - 1];
+        }
+        return true;
+    }
+    function normalizePreprocess(pre) {
+        if (!pre || typeof pre !== 'object' || !PREPROCESS_TYPES.includes(pre.type) || pre.type === 'none') {
+            return { type: 'none', prefix: '', suffix: '', checksum: 'none' };
+        }
+        return {
+            type: pre.type,
+            prefix: String(pre.prefix || '').slice(0, 16),
+            suffix: String(pre.suffix || '').slice(0, 16),
+            checksum: CHECKSUM_TYPES.includes(pre.checksum) ? pre.checksum : 'none'
+        };
+    }
+    function extractInnerText(text, pre) {
+        const pfx = unescapeMarker(pre.prefix);
+        const sfx = unescapeMarker(pre.suffix);
+        let s = text;
+        if (pfx) {
+            const idx = s.indexOf(pfx);
+            if (idx < 0) return null;
+            s = s.slice(idx + pfx.length);
+        }
+        if (sfx) {
+            const end = s.indexOf(sfx);
+            if (end < 0) return null;
+            s = s.slice(0, end);
+        } else if (!pfx) {
+            s = s.trim();
+        }
+        return s;
+    }
+    // 원본 패킷 바이트 → 포장 푼 바이트 (실패·체크섬 불일치면 null)
+    function preprocessPacket(bytes, pre) {
+        const raw = toBytes(bytes);
+        const p = normalizePreprocess(pre);
+        if (p.type === 'none') return raw;
+        const inner = extractInnerText(bytesToAscii(raw), p);
+        if (inner === null || !inner.length) return null;
+        if (p.type === 'base64') {
+            const out = base64ToBytes(inner);
+            if (!out || !out.length) return null;
+            return verifyChecksum(out, p.checksum) ? out : null;
+        }
+        if (p.type === 'ascii-hex') {
+            let out;
+            try { out = parseHex(inner); } catch (e) { return null; }
+            if (!out.length) return null;
+            return verifyChecksum(out, p.checksum) ? out : null;
+        }
+        if (p.type === 'ascii-number') {
+            const nums = (inner.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi) || []).map(Number).filter(Number.isFinite);
+            if (!nums.length) return null;
+            const out = new Uint8Array(nums.length * 4);
+            const dv = new DataView(out.buffer);
+            nums.forEach((n, i) => dv.setFloat32(i * 4, n, true));
+            return out;
+        }
+        return raw;
+    }
+    // 실시간 스트림 프레이머: BLE UART 가 한 프레임({{…}})을 여러 조각으로 나눠 보내도 이어 붙여 풀기
+    function createFramer(pre) {
+        const p = normalizePreprocess(pre);
+        const pfx = unescapeMarker(p.prefix);
+        const sfx = unescapeMarker(p.suffix);
+        let buf = '';
+        return {
+            reset() { buf = ''; },
+            push(chunkBytes) {
+                const raw = toBytes(chunkBytes);
+                if (p.type === 'none' || (!pfx && !sfx)) {
+                    const out = preprocessPacket(raw, p);
+                    return out ? [out] : [];
+                }
+                buf += bytesToAscii(raw);
+                if (buf.length > 4096) buf = buf.slice(-2048);
+                const frames = [];
+                while (true) {
+                    let start = 0;
+                    if (pfx) {
+                        start = buf.indexOf(pfx);
+                        if (start < 0) {
+                            buf = buf.slice(-(pfx.length - 1));
+                            break;
+                        }
+                    }
+                    const bodyStart = start + pfx.length;
+                    let end;
+                    if (sfx) {
+                        end = buf.indexOf(sfx, bodyStart);
+                        if (end < 0) {
+                            if (start > 0) buf = buf.slice(start);
+                            break;
+                        }
+                        const frameText = buf.slice(start, end + sfx.length);
+                        buf = buf.slice(end + sfx.length);
+                        const frameBytes = Uint8Array.from(frameText, ch => ch.charCodeAt(0) & 0xff);
+                        const out = preprocessPacket(frameBytes, p);
+                        if (out) frames.push(out);
+                    } else {
+                        // 접두어만 있는 경우 다음 접두어가 올 때까지 대기
+                        const next = buf.indexOf(pfx, bodyStart);
+                        if (next < 0) {
+                            if (start > 0) buf = buf.slice(start);
+                            break;
+                        }
+                        const frameText = buf.slice(start, next);
+                        buf = buf.slice(next);
+                        const frameBytes = Uint8Array.from(frameText, ch => ch.charCodeAt(0) & 0xff);
+                        const out = preprocessPacket(frameBytes, p);
+                        if (out) frames.push(out);
+                    }
+                }
+                return frames;
+            }
+        };
+    }
+    // 받은 패킷 묶음에서 Base64·ASCII 16진수·텍스트 숫자 포장을 자동 감지
+    function detectFraming(packets) {
+        const list = (packets || []).slice(-30).map(toBytes).filter(b => b.length >= 2);
+        if (!list.length) return null;
+        const ascii = list.filter(b => Array.from(b).every(x => x === 9 || x === 10 || x === 13 || (x >= 32 && x < 127)));
+        if (ascii.length < Math.max(1, Math.ceil(list.length * 0.7))) return null;
+        const texts = ascii.map(bytesToAscii);
+
+        // 1) Base64 감싸기 확인 ({{...}}, {...}, [...], <...>, 줄바꿈 등)
+        const pairs = [['{{', '}}'], ['{', '}'], ['[', ']'], ['<', '>'], ['', '\\r\\n'], ['', '\\n'], ['', '']];
+        for (const [prefix, suffix] of pairs) {
+            const p = { type: 'base64', prefix, suffix, checksum: 'none' };
+            const decoded = [];
+            for (let i = 0; i < texts.length; i++) {
+                const inner = extractInnerText(texts[i], p);
+                if (!inner || inner.length < 8 || inner.length % 4 !== 0) continue;
+                // 내부 공백이 있거나 순수 16진수·숫자 문자열이면 Base64 오탐 방지
+                if (/\s/.test(inner) || !/[G-Zg-z+/=]/.test(inner)) continue;
+                const b = base64ToBytes(inner);
+                if (b && b.length >= 4) decoded.push(b);
+            }
+            if (decoded.length >= Math.max(1, Math.ceil(texts.length * 0.7))) {
+                let checksum = 'none';
+                if (decoded.length >= 2) {
+                    const sumOk = decoded.filter(b => verifyChecksum(b, 'sum8')).length;
+                    const xorOk = decoded.filter(b => verifyChecksum(b, 'xor8')).length;
+                    if (sumOk >= Math.ceil(decoded.length * 0.9)) checksum = 'sum8';
+                    else if (xorOk >= Math.ceil(decoded.length * 0.9)) checksum = 'xor8';
+                }
+                const wrapTxt = (prefix || suffix) ? (prefix + '…' + suffix) : '문자열';
+                const csTxt = checksum === 'sum8' ? ' · 끝 바이트 합 체크섬 일치' : checksum === 'xor8' ? ' · 끝 바이트 XOR 체크섬 일치' : '';
+                return {
+                    type: 'base64', prefix, suffix, checksum,
+                    decodedLength: decoded[0].length,
+                    label: 'Base64 (' + wrapTxt + ')',
+                    reason: wrapTxt + ' 안의 Base64 (풀면 ' + decoded[0].length + '바이트' + csTxt + ')'
+                };
+            }
+        }
+
+        // 2) ASCII 16진수 글자 확인 (예: "A5 01 2E 09" 또는 "A5012E09\r\n")
+        for (const [prefix, suffix] of [['{{', '}}'], ['<', '>'], ['', '\\r\\n'], ['', '\\n'], ['', '']]) {
+            const p = { type: 'ascii-hex', prefix, suffix, checksum: 'none' };
+            const decoded = [];
+            for (let i = 0; i < texts.length; i++) {
+                const inner = extractInnerText(texts[i], p);
+                if (!inner || inner.length < 8) continue;
+                if (!/^[0-9a-fA-F\s,:-]+$/.test(inner)) continue;
+                if (!/[a-fA-F]/.test(inner) && !/\s/.test(inner.trim())) continue;
+                try {
+                    const b = parseHex(inner);
+                    if (b.length >= 4) decoded.push(b);
+                } catch (e) { /* 무시 */ }
+            }
+            if (decoded.length >= Math.max(1, Math.ceil(texts.length * 0.7))) {
+                return {
+                    type: 'ascii-hex', prefix, suffix, checksum: 'none',
+                    decodedLength: decoded[0].length,
+                    label: 'ASCII 16진수',
+                    reason: '16진수 글자열 (풀면 ' + decoded[0].length + '바이트)'
+                };
+            }
+        }
+
+        // 3) 텍스트·CSV 숫자 확인 (예: "23.45\r\n", "T:23.4,H:48.2")
+        const numCounts = [];
+        for (let i = 0; i < texts.length; i++) {
+            const trimmed = texts[i].trim();
+            if (!trimmed) continue;
+            const nums = trimmed.match(/-?\d+(?:\.\d+)?/g);
+            if (nums && nums.length >= 1 && nums.length <= 8) numCounts.push(nums.length);
+        }
+        if (numCounts.length >= Math.max(1, Math.ceil(texts.length * 0.7))) {
+            const sample = texts[texts.length - 1].trim().slice(0, 32);
+            return {
+                type: 'ascii-number', prefix: '', suffix: '', checksum: 'none',
+                decodedLength: numCounts[0] * 4,
+                count: numCounts[0],
+                label: '텍스트·CSV 숫자',
+                reason: '글자 속 숫자 ' + numCounts[0] + '개 (예: "' + sample + '") → float32 LE 로 변환'
+            };
+        }
+        return null;
+    }
+
+    function decodeCharPacket(bytes, charRule) {
+        if (!charRule) return null;
+        const unpacked = preprocessPacket(bytes, charRule.preprocess);
+        if (!unpacked) return null;
+        return decodePacket(unpacked, charRule.fields);
+    }
+
+    // ---------- 하드웨어 주기 변경 명령 (rateCommand) ----------
+    // { service?, characteristic, mode:'ascii'|'hex', template?:'RATE:{{ms}}\r\n', map?:{ '100':'01 0A' } }
+    function buildRateCommand(rateCommand, intervalMs) {
+        if (!rateCommand || typeof rateCommand !== 'object') return null;
+        const ms = Math.max(10, Math.min(3600000, Math.round(Number(intervalMs) || 0)));
+        if (!Number.isFinite(ms) || ms <= 0) return null;
+        const characteristic = normUuid(rateCommand.characteristic);
+        if (!characteristic) return null;
+        const service = normUuid(rateCommand.service) || '';
+        const mode = rateCommand.mode === 'hex' ? 'hex' : 'ascii';
+        let payload = '';
+        if (rateCommand.map && typeof rateCommand.map === 'object' && rateCommand.map[String(ms)] !== undefined) {
+            payload = String(rateCommand.map[String(ms)]);
+        } else if (rateCommand.template) {
+            const hz = Number((1000 / ms).toFixed(3));
+            const sec = Number((ms / 1000).toFixed(3));
+            payload = String(rateCommand.template)
+                .replace(/\{\{\s*ms\s*\}\}/gi, String(ms))
+                .replace(/\{\{\s*hz\s*\}\}/gi, String(hz))
+                .replace(/\{\{\s*sec\s*\}\}/gi, String(sec));
+        } else {
+            return null;
+        }
+        const bytes = encodeCommand(payload, mode);
+        return { service, characteristic, mode, payload, bytes };
+    }
+
     // ---------- 해석 규칙 파일 ----------
     // { schema:'sensor-lab-ble-decoder', version:1, name, device:{ namePrefix, maker, model, firmware },
-    //   characteristics:[{ service, characteristic, mode:'notify'|'read', fields:[필드…] }], notes }
+    //   characteristics:[{ service, characteristic, mode:'notify'|'read', preprocess?:{type,prefix,suffix,checksum}, fields:[필드…] }],
+    //   initCommands?:[…], rateCommand?:{ service?, characteristic, mode, template?, map? }, notes }
     const SCHEMA = 'sensor-lab-ble-decoder';
     function validateDecoder(obj) {
         const errors = [];
@@ -341,6 +635,15 @@
         (obj.characteristics || []).forEach((c, i) => {
             const service = normUuid(c && c.service), characteristic = normUuid(c && c.characteristic);
             if (!characteristic) { errors.push((i + 1) + '번째 특성 UUID 가 잘못됐어요.'); return; }
+            let preprocess = null;
+            if (c && c.preprocess !== undefined && c.preprocess !== null) {
+                if (typeof c.preprocess !== 'object' || !PREPROCESS_TYPES.includes(c.preprocess.type)) {
+                    errors.push((i + 1) + '번째 특성의 포장 풀기(preprocess) 형식이 잘못됐어요.');
+                    return;
+                }
+                const np = normalizePreprocess(c.preprocess);
+                if (np.type !== 'none') preprocess = np;
+            }
             const fields = [];
             (Array.isArray(c.fields) ? c.fields : []).forEach((f, j) => {
                 if (!f || !FORMAT_BY_ID[f.format]) { errors.push((i + 1) + '번째 특성 ' + (j + 1) + '번째 필드 형식이 잘못됐어요.'); return; }
@@ -349,12 +652,23 @@
                 const scale = f.scale === undefined || f.scale === '' ? 1 : Number(f.scale);
                 const add = f.add === undefined || f.add === '' ? 0 : Number(f.add);
                 if (!Number.isFinite(scale) || !Number.isFinite(add)) { errors.push((i + 1) + '번째 특성 ' + (j + 1) + '번째 필드 배율·더할 값이 숫자가 아니에요.'); return; }
-                fields.push({
+                const cleanField = {
                     name: String(f.name || ('값' + (j + 1))).slice(0, 40), offset, format: f.format, scale, add,
                     unit: String(f.unit || '').slice(0, 20), mask: f.mask === undefined || f.mask === null ? '' : String(f.mask).slice(0, 20)
-                });
+                };
+                if (f.match && typeof f.match === 'object') {
+                    const mo = Number(f.match.offset), mv = Number(f.match.value);
+                    if (!Number.isInteger(mo) || mo < 0 || mo > 511 || !Number.isInteger(mv) || mv < 0 || mv > 255) {
+                        errors.push((i + 1) + '번째 특성 ' + (j + 1) + '번째 필드의 조건(match)이 잘못됐어요.');
+                        return;
+                    }
+                    cleanField.match = { offset: mo, value: mv };
+                }
+                fields.push(cleanField);
             });
-            chars.push({ service: service || '', characteristic, mode: c.mode === 'read' ? 'read' : 'notify', fields });
+            const entry = { service: service || '', characteristic, mode: c.mode === 'read' ? 'read' : 'notify', fields };
+            if (preprocess) entry.preprocess = preprocess;
+            chars.push(entry);
         });
         const initCommands = [];
         if (obj.initCommands !== undefined) {
@@ -369,6 +683,64 @@
                 const delayMs = Math.max(0, Math.min(10000, Math.round(Number(cmd && cmd.delayMs) || 0)));
                 initCommands.push({ service, characteristic, mode, payload, delayMs, label: String((cmd && cmd.label) || '').slice(0, 40) });
             });
+        }
+        let rateCommand = null;
+        if (obj.rateCommand !== undefined && obj.rateCommand !== null) {
+            const rc = obj.rateCommand;
+            if (typeof rc !== 'object' || Array.isArray(rc)) {
+                errors.push('rateCommand 모양이 잘못됐어요.');
+            } else {
+                const characteristic = normUuid(rc.characteristic);
+                const service = normUuid(rc.service) || '';
+                const mode = rc.mode === 'hex' ? 'hex' : 'ascii';
+                const template = rc.template ? String(rc.template).slice(0, 200) : '';
+                const map = {};
+                if (rc.map && typeof rc.map === 'object' && !Array.isArray(rc.map)) {
+                    Object.keys(rc.map).slice(0, 20).forEach(k => {
+                        const ms = parseInt(k, 10);
+                        if (!Number.isInteger(ms) || ms < 10 || ms > 3600000) {
+                            errors.push('rateCommand.map 의 간격(' + k + 'ms)이 잘못됐어요.');
+                            return;
+                        }
+                        const pay = String(rc.map[k] || '').slice(0, 200);
+                        try { encodeCommand(pay, mode); map[String(ms)] = pay; } catch (e) { errors.push('rateCommand.map[' + k + ']: ' + e.message); }
+                    });
+                }
+                if (!characteristic) {
+                    errors.push('rateCommand 의 특성 UUID 가 잘못됐어요.');
+                } else if (!template && !Object.keys(map).length) {
+                    errors.push('rateCommand 에 template 또는 map 이 필요해요.');
+                } else {
+                    if (template) {
+                        try { buildRateCommand({ service, characteristic, mode, template }, 1000); } catch (e) { errors.push('rateCommand.template: ' + e.message); }
+                    }
+                    rateCommand = { service, characteristic, mode };
+                    if (template) rateCommand.template = template;
+                    if (Object.keys(map).length) rateCommand.map = map;
+                }
+            }
+        }
+        let pollCommand = null;
+        if (obj.pollCommand !== undefined && obj.pollCommand !== null) {
+            const pc = obj.pollCommand;
+            if (typeof pc !== 'object' || Array.isArray(pc)) {
+                errors.push('pollCommand 모양이 잘못됐어요.');
+            } else {
+                const characteristic = normUuid(pc.characteristic);
+                const service = normUuid(pc.service) || '';
+                const mode = pc.mode === 'hex' ? 'hex' : 'ascii';
+                const payload = String(pc.payload !== undefined ? pc.payload : '').slice(0, 200);
+                const onlyFasterThanMs = Math.max(0, Math.min(60000, Math.round(Number(pc.onlyFasterThanMs) || 0)));
+                if (!characteristic) errors.push('pollCommand 의 특성 UUID 가 잘못됐어요.');
+                else {
+                    try {
+                        encodeCommand(payload, mode);
+                        pollCommand = { service, characteristic, mode, payload, onlyFasterThanMs };
+                    } catch (e) {
+                        errors.push('pollCommand: ' + e.message);
+                    }
+                }
+            }
         }
         if (errors.length) return { ok: false, errors };
         const d = obj.device || {};
@@ -389,6 +761,9 @@
             clean.experiments = exps.slice(0, 20);
         }
         if (initCommands.length) clean.initCommands = initCommands;
+        if (rateCommand) clean.rateCommand = rateCommand;
+        if (pollCommand) clean.pollCommand = pollCommand;
+        if (obj.builtin) clean.builtin = true;
         if (obj.savedAt) clean.savedAt = String(obj.savedAt).slice(0, 40);
         return { ok: true, decoder: clean };
     }
@@ -406,9 +781,10 @@
         if (/^[=+\-@]/.test(s) && !/^-?\d/.test(s)) s = "'" + s;   // 표 프로그램 수식 막기
         return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     }
-    // records: [{ t(초), at(ISO), char(uuid), bytes }], decoders: { uuid: fields[] } (있으면 해석 값 열 추가)
-    function recordsToCsv(records, decoders) {
+    // records: [{ t(초), at(ISO), char(uuid), bytes }], decoders: { uuid: fields[] }, preprocessors?: { uuid: pre }
+    function recordsToCsv(records, decoders, preprocessors) {
         decoders = decoders || {};
+        preprocessors = preprocessors || {};
         const names = [];
         Object.keys(decoders).forEach(u => (decoders[u] || []).forEach((f, i) => {
             const n = f.name || ('값' + (i + 1));
@@ -417,7 +793,11 @@
         const head = ['t_s', 'time', 'characteristic', 'length', 'hex'].concat(names);
         const lines = [head.map(csvCell).join(',')];
         (records || []).forEach(r => {
-            const dec = decoders[r.char] ? decodePacket(r.bytes, decoders[r.char]) : {};
+            let dec = {};
+            if (decoders[r.char]) {
+                const unpacked = preprocessPacket(r.bytes, preprocessors[r.char]);
+                if (unpacked) dec = decodePacket(unpacked, decoders[r.char]);
+            }
             const row = [Number(r.t).toFixed(3), r.at || '', r.char, toBytes(r.bytes).length, toHex(r.bytes)]
                 .concat(names.map(n => (dec[n] === undefined || dec[n] === null ? '' : Number(dec[n].toPrecision(10)))));
             lines.push(row.map(csvCell).join(','));
@@ -438,6 +818,35 @@
             records: obj.records.map(r => ({ t: Number(r.t) || 0, at: String(r.at || ''), char: normUuid(r.char) || String(r.char || ''), bytes: r.hex ? parseHex(r.hex) : new Uint8Array(0) }))
         };
     }
+
+    // 실측 역추적 및 공개 MIT 규격(entrylabs/entry-hw sciencecube.js) 기반 기본 내장 규칙
+    const BUILTIN_PROFILES = [
+        {
+            schema: SCHEMA,
+            version: 1,
+            name: 'ScienceCube 온도 센서 (SC:TEMP)',
+            builtin: true,
+            device: { namePrefix: 'SC:TEMP', maker: 'ScienceCube', model: 'WL100T', firmware: '' },
+            characteristics: [{
+                service: '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+                characteristic: '49535343-1e4d-4bd9-ba61-23c647249616',
+                mode: 'notify',
+                preprocess: { type: 'base64', prefix: '{{', suffix: '}}', checksum: 'sum8' },
+                fields: [
+                    { name: '온도', offset: 2, format: 'float32le', scale: 1, add: 0, unit: '°C', mask: '', match: { offset: 0, value: 0x73 } },
+                    { name: '온도', offset: 4, format: 'float32le', scale: 1, add: 0, unit: '°C', mask: '', match: { offset: 0, value: 0x74 } }
+                ]
+            }],
+            pollCommand: {
+                service: '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+                characteristic: '49535343-8841-43f4-a8d4-ecbe34729bb3',
+                mode: 'ascii',
+                payload: '{{UwAAAAAAAAAAAABT}}',
+                onlyFasterThanMs: 1000
+            },
+            notes: '실측 역추적 + entrylabs/entry-hw sciencecube.js(MIT) 참고: {{Base64}}→12B(sum8). 1초 미만 고속 측정 시 S요청({{UwAAAAAAAAAAAABT}}) 폴링 → s(0x73) 응답 offset 2 float32le, 기본 1Hz t(0x74) 응답 offset 4 float32le'
+        }
+    ];
 
     // 해석하지 않아도 공개된 연결 방식으로 바로 쓸 수 있는 센서인지 (기기 이름·서비스로 판단). 없으면 null
     const KNOWN_VENDORS = [
@@ -472,9 +881,11 @@
     }
 
     const api = {
-        knownVendor, KNOWN_VENDORS, VERNIER, vernierCommand, SENSOR_EXPERIMENTS,
-        FORMATS, FORMAT_BY_ID, STANDARD_SERVICES, DEVICE_INFO_CHARS, SCHEMA,
-        toBytes, readRaw, parseMask, readField, decodePacket, toHex, parseHex, encodeCommand, normUuid, shortUuid, parseUuidList, knownName,
+        knownVendor, KNOWN_VENDORS, VERNIER, vernierCommand, BUILTIN_PROFILES, SENSOR_EXPERIMENTS,
+        FORMATS, FORMAT_BY_ID, STANDARD_SERVICES, DEVICE_INFO_CHARS, SCHEMA, PREPROCESS_TYPES, CHECKSUM_TYPES,
+        toBytes, readRaw, parseMask, readField, decodePacket, decodeCharPacket,
+        base64ToBytes, verifyChecksum, normalizePreprocess, preprocessPacket, createFramer, detectFraming,
+        toHex, parseHex, encodeCommand, buildRateCommand, normUuid, shortUuid, parseUuidList, knownName,
         changingBytes, fitLine, niceNumber, findCandidates, candidateToField, validateDecoder,
         recordsToCsv, recordsToJson, recordsFromJson, csvCell
     };
