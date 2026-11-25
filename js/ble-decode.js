@@ -177,6 +177,11 @@
         { uuid: 'fe00', name: '사용자 지정 BLE (0xFE00)', on: true },
         { uuid: 'ffa0', name: '사용자 지정 BLE (0xFFA0)', on: false },
         { uuid: '49535343-fe7d-4ae5-8fa9-9fafd205e455', name: 'Microchip/ISSC UART (사이언스큐브·듀얼모드)', on: true },
+        { uuid: '4a5c0000-0000-0000-0000-5c1e741f1c00', name: 'PASCO 무선 센서 (장치 제어)', on: true },
+        { uuid: '4a5c0001-0000-0000-0000-5c1e741f1c00', name: 'PASCO 센서 채널 1', on: true },
+        { uuid: '4a5c0002-0000-0000-0000-5c1e741f1c00', name: 'PASCO 센서 채널 2', on: true },
+        { uuid: '4a5c0003-0000-0000-0000-5c1e741f1c00', name: 'PASCO 센서 채널 3', on: true },
+        { uuid: '4a5c0004-0000-0000-0000-5c1e741f1c00', name: 'PASCO 센서 채널 4', on: true },
         { uuid: 'd91714ef-28b9-4f91-ba16-f0d9a604f112', name: 'Vernier Go Direct (공개 방식)', on: true },
         { uuid: '19b10000-e8f2-537e-4f6c-d104768a1214', name: '우리 Pico·Nano 센서 보드 (시험용)', on: false }
     ];
@@ -199,6 +204,17 @@
         const u = normUuid(uuid);
         if (!u) return '';
         if (KNOWN_NAMES[u]) return KNOWN_NAMES[u];
+        // PASCO 무선 센서 공식 UUID 규칙 (4a5c000<채널>-000<특성>-0000-0000-5c1e741f1c00)
+        const pasco = /^4a5c000([0-9])-000([0-9])-0000-0000-5c1e741f1c00$/.exec(u);
+        if (pasco) {
+            const ch = Number(pasco[1]), cid = Number(pasco[2]);
+            const head = ch === 0 ? 'PASCO 장치' : ('PASCO 채널 ' + ch);
+            if (cid === 0) return ch === 0 ? 'PASCO 장치 제어' : ('PASCO 센서 채널 ' + ch);
+            if (cid === 2) return head + ' 명령 보내기(쓰기)';
+            if (cid === 3) return head + ' 데이터·응답(알림)';
+            if (cid === 5) return head + ' 확인(ACK)';
+            return head + ' 특성 ' + cid;
+        }
         if (u.endsWith(BASE) && u.startsWith('0000')) return KNOWN_NAMES[u.slice(4, 8)] || '';
         return '';
     }
@@ -411,7 +427,8 @@
 
     // 해석하지 않아도 공개된 연결 방식으로 바로 쓸 수 있는 센서인지 (기기 이름·서비스로 판단). 없으면 null
     const KNOWN_VENDORS = [
-        { id: 'vernier', name: 'Vernier Go Direct', service: 'd91714ef-28b9-4f91-ba16-f0d9a604f112', namePrefix: 'GDX' }
+        { id: 'vernier', name: 'Vernier Go Direct', service: 'd91714ef-28b9-4f91-ba16-f0d9a604f112', namePrefix: 'GDX' },
+        { id: 'pasco', name: 'PASCO Wireless', service: '4a5c0000-0000-0000-0000-5c1e741f1c00', servicePattern: /^4a5c000[0-9]-0000-0000-0000-5c1e741f1c00$/ }
     ];
     // 버니어 Go Direct 명령 묶음 (공개 도구 godirect-js, BSD 3-Clause 의 Device._sendCommand 와 같은 모양):
     // [0x58, 전체 길이, 순번, 합계, …명령]. 합계 = 모든 바이트 합(합계 칸 0) 의 아래 8비트
@@ -432,8 +449,12 @@
         return b;
     }
     function knownVendor(deviceName, serviceUuids) {
-        const svcs = (serviceUuids || []).map(normUuid);
-        return KNOWN_VENDORS.find(v => svcs.includes(v.service) || String(deviceName || '').startsWith(v.namePrefix)) || null;
+        const svcs = (serviceUuids || []).map(normUuid).filter(Boolean);
+        return KNOWN_VENDORS.find(v =>
+            svcs.includes(v.service) ||
+            (v.servicePattern && svcs.some(s => v.servicePattern.test(s))) ||
+            (v.namePrefix && String(deviceName || '').startsWith(v.namePrefix))
+        ) || null;
     }
 
     const api = {

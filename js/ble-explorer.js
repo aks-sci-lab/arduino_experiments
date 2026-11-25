@@ -114,6 +114,7 @@
         if (!checkSupport()) return;
         saveServiceChoices();
         const services = selectedServices();
+        S.lastServices = services;
         let device;
         try {
             setStatus('기기 고르는 창을 열었어요…');
@@ -149,18 +150,42 @@
         }
     }
 
+    // Microchip/ISSC UART 서비스 안에서는 데이터 TX 특성만 자동 알림 (제어 특성은 일부 모듈에서 연결이 끊기거나 멈춤)
+    const ISSC_SERVICE = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
+    const ISSC_TX = '49535343-1e4d-4bd9-ba61-23c647249616';
+    function withTimeout(promise, ms) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('시간 초과 (' + ms + 'ms)')), ms))
+        ]);
+    }
+
     // 고른 기기에 연결해 서비스·특성을 읽는다 (다시 연결할 때도 이것만 다시 부름 — 기기 고르는 창 없이)
     async function connectDevice(device) {
         clearTimeout(autoFeedTimer);
         device.removeEventListener('gattserverdisconnected', onDisconnected);
         device.addEventListener('gattserverdisconnected', onDisconnected);
         $('btnReconnect').hidden = true;
+        $('devName').textContent = '📶 ' + (device.name || '이름 없는 기기');
+        $('deviceBox').hidden = false;
         S.chars.clear();
         try {
             setStatus('"' + (device.name || '이름 없는 기기') + '" 에 연결하는 중…');
+            logEvent('try', '연결 시도: ' + (device.name || '이름 없는 기기'));
             const server = await device.gatt.connect();
             let svcs = [];
             try { svcs = await server.getPrimaryServices(); } catch (e) { svcs = []; }
+            // 윈도우 크롬 등에서 getPrimaryServices() 가 커스텀 서비스를 놓칠 때를 대비해 개별 조회 보완
+            const seenSvc = new Set(svcs.map(s => B.normUuid(s.uuid) || s.uuid));
+            if (typeof server.getPrimaryService === 'function') {
+                for (const u of (S.lastServices || [])) {
+                    if (seenSvc.has(u)) continue;
+                    try {
+                        const s = await server.getPrimaryService(u);
+                        if (s) { svcs.push(s); seenSvc.add(B.normUuid(s.uuid) || s.uuid); }
+                    } catch (e) { /* 없는 서비스는 정상 */ }
+                }
+            }
             const tree = [];
             for (const svc of svcs) {
                 let chars = [];
@@ -188,29 +213,42 @@
             $('vendorNote').hidden = !vendor;
             if (vendor && vendor.id === 'vernier') {
                 $('vendorNote').textContent = '✅ 이 센서는 버니어 공개 방식(Go Direct)으로 바로 쓸 수 있어요. 해석하지 않아도 됩니다 — 선생님이 만든 실험의 센서 기능에서 "Vernier Go Direct 센서"를 고르세요.';
+            } else if (vendor && vendor.id === 'pasco') {
+                $('vendorNote').textContent = 'ℹ️ PASCO 무선 센서가 감지됐어요. 서비스 4a5c0000(장치 제어)·4a5c0001~0004(센서 채널)의 -0002(명령 쓰기)·-0003(알림 받기) 특성을 사용합니다 (PASCO 교육용 공개 프로토콜 참고).';
             }
             S.connectedAt = performance.now();
             logEvent('connect', '연결됨: ' + (device.name || '이름 없는 기기') + ' · 서비스 ' + tree.length + '개');
             $('btnDisconnect').disabled = false;
             $('vernierBox').hidden = !(vendor && vendor.id === 'vernier');
+            setStatus('✓ 연결됨: ' + (device.name || '이름 없는 기기') + ' · 서비스 ' + tree.length + '개', 'ok');
+            if (!tree.length) setStatus('연결됐지만 열 수 있는 서비스가 없어요. 서비스 UUID 를 직접 넣고 다시 연결해 보세요.', 'error');
+            refreshCharSelects();
+
             if (vendor && vendor.id === 'vernier' && $('vernierAuto').checked) await vernierInit();
 
-            // 목록에서 센서를 선택하면 데이터 서비스의 알림을 자동으로 켜고 수신 여부를 안내한다
+            // 목록에서 센서를 선택하면 데이터 서비스의 알림을 자동으로 켜고 수신 여부를 안내한다 (연결 완료 표시 뒤 안전하게 실행)
             let autoStarted = 0;
             if ((!vendor || vendor.id !== 'vernier') && $('autoNotify') && $('autoNotify').checked) {
                 const skipSvc = B.normUuid('180a');
                 for (const c of S.chars.values()) {
+                    if (S.device !== device) break;
                     if (c.service === skipSvc) continue;
+                    if (c.service === ISSC_SERVICE && c.uuid !== ISSC_TX) continue;
                     if ((c.props.notify || c.props.indicate) && !c.notifying) {
                         const btn = document.querySelector('[data-notify="' + CSS.escape(c.uuid) + '"]');
-                        await toggleNotify(c.uuid, btn);
-                        if (c.notifying) autoStarted++;
+                        try {
+                            await withTimeout(toggleNotify(c.uuid, btn), 3000);
+                            if (c.notifying) autoStarted++;
+                        } catch (e) {
+                            logEvent('warn', '자동 알림 건너뜀 (' + B.shortUuid(c.uuid) + '): ' + (e && e.message || e));
+                        }
                     }
                 }
-                if (autoStarted > 0) {
+                if (autoStarted > 0 && S.device === device) {
                     logEvent('auto-notify', '데이터 알림 ' + autoStarted + '개 자동 켜기');
                     S.autoStarted = autoStarted;
                     updateAutoFeedNote(autoStarted, false);
+                    setStatus('✓ 연결됨: ' + (device.name || '이름 없는 기기') + ' · 서비스 ' + tree.length + '개 · 알림 ' + autoStarted + '개 자동 켜짐', 'ok');
                     autoFeedTimer = setTimeout(() => {
                         if (S.device === device) updateAutoFeedNote(autoStarted, true);
                     }, 3000);
@@ -222,13 +260,10 @@
                 S.autoStarted = 0;
                 updateAutoFeedNote(0, false);
             }
-
-            setStatus('✓ 연결됨: ' + (device.name || '이름 없는 기기') + ' · 서비스 ' + tree.length + '개' + (autoStarted ? ' · 알림 ' + autoStarted + '개 자동 켜짐' : ''), 'ok');
-            if (!tree.length) setStatus('연결됐지만 열 수 있는 서비스가 없어요. 서비스 UUID 를 직접 넣고 다시 연결해 보세요.', 'error');
-            refreshCharSelects();
         } catch (e) {
-            setStatus('연결 실패: ' + (e && e.message || e), 'error');
-            logEvent('error', '연결 실패: ' + (e && e.message || e));
+            const detail = e && e.message ? e.message : String(e);
+            setStatus('연결 실패: ' + detail + ' (다른 탭·bluetooth-internals 를 닫고 센서 전원을 껐다 켜 보세요)', 'error');
+            logEvent('error', '연결 실패: ' + detail);
             $('btnReconnect').hidden = false;
         }
     }
