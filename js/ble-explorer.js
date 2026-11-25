@@ -17,6 +17,9 @@
         t0: null,
         paused: false,
         rules: {},               // 특성 UUID → 필드 목록
+        preprocess: {},          // 특성 UUID → 포장 풀기 설정 { type, prefix, suffix, checksum }
+        detectedFraming: null,   // 자동 감지된 포장 제안 { char, det }
+        framingDismissed: {},    // 사용자가 닫은 특성 UUID
         truths: {},              // 특성 UUID → [{ truth, bytes, t }]
         meta: { deviceName: '', maker: '', model: '', firmware: '' },
         candidates: [],
@@ -468,6 +471,66 @@
         S.dirty = true;
     }
 
+    // ---------- 포장 풀기(전처리) ----------
+    function getPre(u) {
+        return B.normalizePreprocess(u && S.preprocess[u]);
+    }
+    function preSummary(pre) {
+        const p = B.normalizePreprocess(pre);
+        if (p.type === 'none') return '그대로 (원본 바이트)';
+        const label = p.type === 'base64' ? 'Base64' : p.type === 'ascii-hex' ? 'ASCII 16진수' : '텍스트·CSV 숫자';
+        const wrap = (p.prefix || p.suffix) ? ' ' + p.prefix + '…' + p.suffix : '';
+        const cs = p.checksum && p.checksum !== 'none' ? ' · ' + p.checksum : '';
+        return label + wrap + cs;
+    }
+    function unpackBytes(bytes, charUuid) {
+        return B.preprocessPacket(bytes, getPre(charUuid));
+    }
+    function activeLogChar() {
+        const f = $('logChar') && $('logChar').value;
+        if (f) return f;
+        if (S.records.length) return S.records[S.records.length - 1].char;
+        return curChar();
+    }
+    function syncPrepControls() {
+        const target = activeLogChar();
+        const p = getPre(target);
+        if ($('prepType') && document.activeElement !== $('prepType')) $('prepType').value = p.type;
+        if ($('prepPrefix') && document.activeElement !== $('prepPrefix')) $('prepPrefix').value = p.prefix;
+        if ($('prepSuffix') && document.activeElement !== $('prepSuffix')) $('prepSuffix').value = p.suffix;
+        if ($('prepChecksum') && document.activeElement !== $('prepChecksum')) $('prepChecksum').value = p.checksum;
+        if ($('prepBadge')) $('prepBadge').textContent = preSummary(p);
+        const rp = getPre(curChar());
+        const rNote = $('rulePrepNote');
+        if (rNote) {
+            rNote.hidden = rp.type === 'none';
+            if (rp.type !== 'none') {
+                rNote.textContent = '📦 포장 풀기 적용 중: ' + preSummary(rp) + ' — 아래 시작 위치(offset)·참값 맞추기·그래프는 풀린 바이트 기준입니다.';
+            }
+        }
+    }
+    function setPreForChar(charUuid, pre) {
+        if (!charUuid) return;
+        const p = B.normalizePreprocess(pre);
+        if (p.type === 'none') delete S.preprocess[charUuid];
+        else S.preprocess[charUuid] = p;
+        saveDraft();
+        S.chartKey = null;
+        S.dirty = true;
+        syncPrepControls();
+        render();
+    }
+    function onPrepChange() {
+        const target = activeLogChar();
+        if (!target) return;
+        setPreForChar(target, {
+            type: $('prepType').value,
+            prefix: $('prepPrefix').value,
+            suffix: $('prepSuffix').value,
+            checksum: $('prepChecksum').value
+        });
+    }
+
     // ---------- ② 기록 ----------
     function hexWithMarks(bytes, changing) {
         return Array.from(bytes, (b, i) => {
@@ -476,39 +539,91 @@
         }).join(' ');
     }
     function renderLog() {
+        syncPrepControls();
         const filter = $('logChar').value;
         const recs = filter ? S.records.filter(r => r.char === filter) : S.records;
-        // 특성·길이별로 바뀌는 바이트 (최근 300개 기준)
+        const target = filter || (recs.length ? recs[recs.length - 1].char : '');
+
+        // 포장 자동 감지 (아직 전처리가 꺼져 있을 때만 제안)
+        const sugBox = $('framingSuggest');
+        if (sugBox) {
+            const tPre = getPre(target);
+            if (target && tPre.type === 'none' && !S.framingDismissed[target]) {
+                const rawList = S.records.filter(r => r.char === target).slice(-30).map(r => r.bytes);
+                const det = B.detectFraming(rawList);
+                if (det) {
+                    S.detectedFraming = { char: target, det };
+                    sugBox.hidden = false;
+                    sugBox.innerHTML = '<span>💡 <b>포장된 데이터 감지</b>: ' + esc(det.reason) + '</span>' +
+                        '<div class="row"><button type="button" class="btn small primary" id="btnApplyFraming">📦 자동으로 포장 풀기 적용</button>' +
+                        '<button type="button" class="btn small" id="btnDismissFraming">닫기</button></div>';
+                } else {
+                    S.detectedFraming = null;
+                    sugBox.hidden = true;
+                }
+            } else {
+                S.detectedFraming = null;
+                sugBox.hidden = true;
+            }
+        }
+
+        // 특성·길이별로 바뀌는 바이트 (최근 300개 기준, 포장 풀기 적용)
         const groups = {};
         const chars = filter ? [filter] : Array.from(new Set(recs.map(r => r.char)));
         const summary = [];
+        let targetFail = 0;
         chars.forEach(u => {
             const mine = S.records.filter(r => r.char === u).slice(-300);
-            B.changingBytes(mine.map(r => r.bytes)).forEach(g => {
+            const pre = getPre(u);
+            const unpacked = [];
+            let failed = 0;
+            mine.forEach(r => {
+                const b = unpackBytes(r.bytes, u);
+                if (b && b.length) unpacked.push(b);
+                else failed++;
+            });
+            if (u === target) targetFail = failed;
+            const lastRaw = mine.length ? mine[mine.length - 1].bytes : null;
+            const txt = lastRaw ? printable(lastRaw).replace(/[\r\n]+/g, ' ').trim() : '';
+            B.changingBytes(unpacked).forEach(g => {
                 groups[u + '|' + g.length] = g.changing;
                 const pos = g.changing.map((c, i) => (c ? i : -1)).filter(i => i >= 0);
-                summary.push('<p><b>' + esc(charLabel(u)) + '</b> · ' + g.length + '바이트 × ' + g.count + '개 → ' +
-                    (g.count < 2 ? '패킷이 더 필요해요' : pos.length ? '바뀌는 자리 <mark class="chg">' + pos.join(', ') + '</mark>' : '바뀌는 자리 없음 (값을 바꿔 보세요)') + '</p>');
+                summary.push('<p><b>' + esc(charLabel(u)) + '</b>' + (pre.type !== 'none' ? ' [' + esc(preSummary(pre)) + ']' : '') +
+                    ' · ' + g.length + '바이트 × ' + g.count + '개 → ' +
+                    (g.count < 2 ? '패킷이 더 필요해요' : pos.length ? '바뀌는 자리 <mark class="chg">' + pos.join(', ') + '</mark>' : '바뀌는 자리 없음 (값을 바꿔 보세요)') +
+                    (txt ? ' <span class="note mono">글자: ' + esc(txt.slice(0, 48)) + '</span>' : '') + '</p>');
             });
+            if (!unpacked.length && mine.length) {
+                summary.push('<p><b>' + esc(charLabel(u)) + '</b> · 포장 풀기(' + esc(preSummary(pre)) + ')와 맞는 패킷이 없어요 (' + failed + '개 건너뜀).</p>');
+            }
         });
         $('chgSummary').innerHTML = summary.join('') || '<p class="note">아직 기록이 없어요. ① 연결에서 🔔 알림을 켜세요.</p>';
+        if ($('prepMsg')) {
+            const tPre = getPre(target);
+            $('prepMsg').textContent = (tPre.type !== 'none' && targetFail > 0) ? '⚠️ 설정과 맞지 않아 건너뛴 패킷 ' + targetFail + '개' : '';
+        }
 
-        // 바이트별 10진수: 한 특성(골랐거나 마지막에 받은 것)의 가장 흔한 길이
-        const target = filter || (recs.length ? recs[recs.length - 1].char : '');
+        // 바이트별 10진수: 한 특성(골랐거나 마지막에 받은 것)의 가장 흔한 길이 (포장 풀기 적용)
         const tbl = $('byteTable');
         if (target) {
-            const mine = S.records.filter(r => r.char === target);
+            const mine = S.records.filter(r => r.char === target).map(r => ({ t: r.t, bytes: unpackBytes(r.bytes, target) })).filter(x => x.bytes && x.bytes.length);
             const g = B.changingBytes(mine.slice(-300).map(r => r.bytes))[0];
-            const rows = mine.filter(r => r.bytes.length === g.length).slice(-30).reverse();
-            const head = '<thead><tr><th>시각</th>' + g.changing.map((c, i) => '<th' + (c ? ' class="chg"' : '') + '>' + i + '</th>').join('') + '</tr></thead>';
-            tbl.innerHTML = head + '<tbody>' + rows.map(r => '<tr><td>' + r.t.toFixed(2) + '</td>' +
-                Array.from(r.bytes, (b, i) => '<td' + (g.changing[i] ? ' class="chg"' : '') + '>' + b + '</td>').join('') + '</tr>').join('') + '</tbody>';
-            tbl.setAttribute('aria-label', charLabel(target) + ' 바이트별 값');
+            if (g) {
+                const rows = mine.filter(r => r.bytes.length === g.length).slice(-30).reverse();
+                const head = '<thead><tr><th>시각</th>' + g.changing.map((c, i) => '<th' + (c ? ' class="chg"' : '') + '>' + i + '</th>').join('') + '</tr></thead>';
+                tbl.innerHTML = head + '<tbody>' + rows.map(r => '<tr><td>' + r.t.toFixed(2) + '</td>' +
+                    Array.from(r.bytes, (b, i) => '<td' + (g.changing[i] ? ' class="chg"' : '') + '>' + b + '</td>').join('') + '</tr>').join('') + '</tbody>';
+                tbl.setAttribute('aria-label', charLabel(target) + ' 바이트별 값');
+            } else tbl.innerHTML = '';
         } else tbl.innerHTML = '';
 
         const last = recs.slice(-200).reverse();
-        $('logTable').tBodies[0].innerHTML = last.map(r => '<tr><td>' + r.t.toFixed(3) + '</td><td>' + esc(B.shortUuid(r.char)) + '</td><td>' + r.bytes.length +
-            '</td><td class="hex">' + hexWithMarks(r.bytes, groups[r.char + '|' + r.bytes.length]) + '</td></tr>').join('');
+        $('logTable').tBodies[0].innerHTML = last.map(r => {
+            const ub = unpackBytes(r.bytes, r.char);
+            if (!ub) return '<tr><td>' + r.t.toFixed(3) + '</td><td>' + esc(B.shortUuid(r.char)) + '</td><td>0</td><td class="note">(포장 불일치: ' + esc(B.toHex(r.bytes)) + ')</td></tr>';
+            return '<tr><td>' + r.t.toFixed(3) + '</td><td>' + esc(B.shortUuid(r.char)) + '</td><td>' + ub.length +
+                '</td><td class="hex">' + hexWithMarks(ub, groups[r.char + '|' + ub.length]) + '</td></tr>';
+        }).join('');
     }
 
     async function sendBytesToChar(c, bytes) {
@@ -591,6 +706,7 @@
     const formatOptions = sel => B.FORMATS.map(f => '<option value="' + f.id + '"' + (f.id === sel ? ' selected' : '') + '>' + esc(f.label) + '</option>').join('');
 
     function renderFields() {
+        syncPrepControls();
         const u = curChar();
         const list = $('fieldList');
         if (!u) { list.innerHTML = ''; renderTruths(); return; }
@@ -632,18 +748,21 @@
     }
 
     function renderDecoded() {
+        syncPrepControls();
         const u = curChar();
         const fields = u ? curFields() : [];
         const p = u ? lastPacket(u) : null;
+        const ub = p ? unpackBytes(p.bytes, u) : null;
         const el = $('latestDecoded');
         if (!p) { el.textContent = ''; }
+        else if (!ub) { el.textContent = '⚠️ 최근 패킷이 포장 풀기(' + preSummary(getPre(u)) + ') 형식과 맞지 않아요: ' + B.toHex(p.bytes); }
         else {
-            const vals = fields.map(f => (f.name || '값') + ' = ' + fmtNum(B.readField(p.bytes, f)) + (f.unit ? ' ' + f.unit : ''));
-            el.textContent = '최근 패킷 ' + B.toHex(p.bytes) + (vals.length ? '\n→ ' + vals.join(',  ') : '');
+            const vals = fields.map(f => (f.name || '값') + ' = ' + fmtNum(B.readField(ub, f)) + (f.unit ? ' ' + f.unit : ''));
+            el.textContent = '최근 패킷' + (getPre(u).type !== 'none' ? ' (풀림)' : '') + ' ' + B.toHex(ub) + (vals.length ? '\n→ ' + vals.join(',  ') : '');
         }
         fields.forEach((f, i) => {
             const s = document.querySelector('[data-fval="' + i + '"]');
-            if (s) s.textContent = p ? '지금 값: ' + fmtNum(B.readField(p.bytes, f)) + (f.unit ? ' ' + f.unit : '') : '';
+            if (s) s.textContent = ub ? '지금 값: ' + fmtNum(B.readField(ub, f)) + (f.unit ? ' ' + f.unit : '') : '';
         });
     }
 
@@ -651,14 +770,15 @@
     function renderChart() {
         const u = curChar();
         const fields = u ? curFields() : [];
-        const recs = u ? S.records.filter(r => r.char === u).slice(-500) : [];
+        const pre = getPre(u);
+        const recs = u ? S.records.filter(r => r.char === u).slice(-500).map(r => ({ t: r.t, bytes: unpackBytes(r.bytes, u) })).filter(x => x.bytes) : [];
         const tbl = $('decTable');
         tbl.innerHTML = fields.length ? '<thead><tr><th>시각(s)</th>' + fields.map(f => '<th>' + esc(f.name) + (f.unit ? ' (' + esc(f.unit) + ')' : '') + '</th>').join('') + '</tr></thead><tbody>' +
             recs.slice(-30).reverse().map(r => '<tr><td>' + r.t.toFixed(2) + '</td>' + fields.map(f => '<td>' + fmtNum(B.readField(r.bytes, f)) + '</td>').join('') + '</tr>').join('') + '</tbody>'
             : '<tbody><tr><td class="note">필드를 만들면 값이 여기에 나와요.</td></tr></tbody>';
         if (!window.Chart) { $('chartNote').hidden = false; return; }
         const colors = ['#1565c0', '#c62828', '#1e7e34', '#7b1fa2', '#ef6c00', '#0e7490', '#5f6b7a', '#ad1457'];
-        const key = u + '|' + JSON.stringify(fields);
+        const key = u + '|' + JSON.stringify(fields) + '|' + JSON.stringify(pre);
         const data = fields.map(f => recs.map(r => ({ x: r.t, y: B.readField(r.bytes, f) })).filter(pt => Number.isFinite(pt.y)));
         if (!chart || S.chartKey !== key) {
             if (chart) chart.destroy();
@@ -690,7 +810,9 @@
         if ($('truthVal').value === '' || !Number.isFinite(v)) { msg.textContent = '참값을 숫자로 넣어 주세요.'; return; }
         const p = lastPacket(u);
         if (!p) { msg.textContent = '이 특성의 기록이 아직 없어요. 🔔 알림을 켜거나 📖 읽어 주세요.'; return; }
-        (S.truths[u] = S.truths[u] || []).push({ truth: v, bytes: p.bytes, t: p.t });
+        const ub = unpackBytes(p.bytes, u);
+        if (!ub) { msg.textContent = '최근 패킷이 포장 풀기 형식과 맞지 않아요. ② 기록에서 포장 풀기를 확인하세요.'; return; }
+        (S.truths[u] = S.truths[u] || []).push({ truth: v, bytes: ub, t: p.t });
         const n = S.truths[u].length;
         msg.textContent = '📌 ' + n + '번째 참값 ' + v + ' 을(를) 찍었어요.' + (n < 3 ? ' (' + (3 - n) + '번 더)' : ' 🔎 를 눌러 보세요.');
         $('truthVal').value = '';
@@ -714,7 +836,10 @@
         const characteristics = Object.keys(S.rules).filter(u => (S.rules[u] || []).length).map(u => {
             const c = S.chars.get(u);
             const notify = c ? (c.props.notify || c.props.indicate) : S.records.filter(r => r.char === u).length > 1;
-            return { service: S.charService[u] || '', characteristic: u, mode: notify ? 'notify' : 'read', fields: S.rules[u] };
+            const entry = { service: S.charService[u] || '', characteristic: u, mode: notify ? 'notify' : 'read', fields: S.rules[u] };
+            const pre = getPre(u);
+            if (pre.type !== 'none') entry.preprocess = pre;
+            return entry;
         });
         const dec = {
             schema: B.SCHEMA, version: 1, name: $('sensorName').value.trim() || S.meta.deviceName || '이름 없는 센서',
@@ -725,11 +850,16 @@
         return dec;
     }
     function saveDraft() {
-        store(KEY_DRAFT, { rules: S.rules, charService: S.charService, initCommands: S.initCommands, meta: S.meta, name: $('sensorName').value, notes: $('ruleNotes').value });
+        store(KEY_DRAFT, { rules: S.rules, preprocess: S.preprocess, charService: S.charService, initCommands: S.initCommands, meta: S.meta, name: $('sensorName').value, notes: $('ruleNotes').value });
     }
     function applyDecoder(dec) {
         S.rules = {};
-        dec.characteristics.forEach(c => { S.rules[c.characteristic] = c.fields.map(f => Object.assign({}, f)); if (c.service) S.charService[c.characteristic] = c.service; });
+        S.preprocess = {};
+        dec.characteristics.forEach(c => {
+            S.rules[c.characteristic] = c.fields.map(f => Object.assign({}, f));
+            if (c.service) S.charService[c.characteristic] = c.service;
+            if (c.preprocess && c.preprocess.type !== 'none') S.preprocess[c.characteristic] = B.normalizePreprocess(c.preprocess);
+        });
         S.initCommands = Array.isArray(dec.initCommands) ? dec.initCommands.map(cmd => Object.assign({}, cmd)) : [];
         $('sensorName').value = dec.name;
         $('ruleNotes').value = dec.notes || '';
@@ -788,6 +918,7 @@
         const draft = load(KEY_DRAFT, null);
         if (draft) {
             S.rules = draft.rules || {};
+            S.preprocess = draft.preprocess && typeof draft.preprocess === 'object' ? draft.preprocess : {};
             S.charService = draft.charService || {};
             S.initCommands = Array.isArray(draft.initCommands) ? draft.initCommands : [];
             S.meta = Object.assign(S.meta, draft.meta || {});
@@ -818,6 +949,21 @@
                 }
             });
         }
+        if ($('framingSuggest')) {
+            $('framingSuggest').addEventListener('click', e => {
+                if (e.target.closest('#btnApplyFraming') && S.detectedFraming) {
+                    const { char, det } = S.detectedFraming;
+                    setPreForChar(char, { type: det.type, prefix: det.prefix, suffix: det.suffix, checksum: det.checksum });
+                    if ($('prepBox')) $('prepBox').open = true;
+                } else if (e.target.closest('#btnDismissFraming') && S.detectedFraming) {
+                    S.framingDismissed[S.detectedFraming.char] = true;
+                    S.detectedFraming = null;
+                    $('framingSuggest').hidden = true;
+                }
+            });
+        }
+        ['prepType', 'prepChecksum'].forEach(id => { if ($(id)) $(id).addEventListener('change', onPrepChange); });
+        ['prepPrefix', 'prepSuffix'].forEach(id => { if ($(id)) $(id).addEventListener('input', onPrepChange); });
         if ($('btnCopyBtInternals')) {
             $('btnCopyBtInternals').addEventListener('click', () => {
                 const url = 'chrome://bluetooth-internals/#devices';
@@ -939,7 +1085,7 @@
         });
         $('btnCsv').addEventListener('click', () => {
             if (!S.records.length) { $('logMsg').textContent = '기록이 없어요.'; return; }
-            download('ble-log-' + stamp() + '.csv', '﻿' + B.recordsToCsv(S.records, S.rules), 'text/csv;charset=utf-8');
+            download('ble-log-' + stamp() + '.csv', '﻿' + B.recordsToCsv(S.records, S.rules, S.preprocess), 'text/csv;charset=utf-8');
         });
         $('btnLogJson').addEventListener('click', () => {
             if (!S.records.length) { $('logMsg').textContent = '기록이 없어요.'; return; }

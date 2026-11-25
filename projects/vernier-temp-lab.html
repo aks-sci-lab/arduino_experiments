@@ -1340,20 +1340,31 @@
       } catch (e) {}
 
       const valid = [];
+      const seenNames = new Set();
       for (const item of raw) {
         const res = B.validateDecoder(item);
         if (res.ok && res.decoder.characteristics.length && res.decoder.characteristics[0].fields.length) {
+          valid.push(res.decoder);
+          seenNames.add(res.decoder.name);
+        }
+      }
+      // 기본 내장 규칙(ScienceCube SC:TEMP 등) 추가 (사용자가 같은 이름으로 저장했으면 사용자 규칙 우선)
+      for (const item of (B.BUILTIN_PROFILES || [])) {
+        if (seenNames.has(item.name)) continue;
+        const res = B.validateDecoder(item);
+        if (res.ok && res.decoder.characteristics.length && res.decoder.characteristics[0].fields.length) {
+          res.decoder.builtin = true;
           valid.push(res.decoder);
         }
       }
       state.profiles = valid;
 
       const prev = selectName !== undefined ? selectName : els.profileSelect.value;
-      els.profileSelect.innerHTML = '<option value="">자동 (Vernier · 표준 BLE)</option>';
+      els.profileSelect.innerHTML = '<option value="">자동 (Vernier · ScienceCube · 규칙 · 표준 BLE)</option>';
       valid.forEach((p, i) => {
         const opt = document.createElement('option');
         opt.value = String(i);
-        opt.textContent = `규칙: ${p.name}`;
+        opt.textContent = p.builtin ? `내장: ${p.name}` : `규칙: ${p.name}`;
         els.profileSelect.appendChild(opt);
       });
 
@@ -1397,6 +1408,13 @@
       }
     }
 
+    function profileValueToC(val, unit) {
+      const u = String(unit || '').trim().toUpperCase();
+      if (u === '°F' || u === 'F') return (val - 32) * 5 / 9;
+      if (u === 'K') return val - 273.15;
+      return val;
+    }
+
     async function attachProfileToServer(profile, bleDevice, server) {
       const B = window.BleDecode;
       if (!B) throw new Error('해석 도구(ble-decode.js)를 불러오지 못했습니다.');
@@ -1430,11 +1448,17 @@
       };
       bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
 
+      const framer = typeof B.createFramer === 'function' ? B.createFramer(chRule.preprocess) : null;
       const handleDv = (dv) => {
         if (!dv) return;
         const bytes = new Uint8Array(dv.buffer, dv.byteOffset || 0, dv.byteLength);
-        const val = B.readField(bytes, field);
-        if (typeof val === 'number' && Number.isFinite(val)) handleTemperatureSample(val);
+        const frames = framer ? framer.push(bytes) : [bytes];
+        for (const frame of frames) {
+          const val = B.readField(frame, field);
+          if (typeof val === 'number' && Number.isFinite(val)) {
+            handleTemperatureSample(profileValueToC(val, field.unit));
+          }
+        }
       };
       const onCharValue = (ev) => handleDv(ev.target.value);
 
@@ -1460,6 +1484,7 @@
       state.genericCleanup = () => {
         clearInterval(pollTimer);
         pollTimer = null;
+        if (framer) framer.reset();
         try { dataChar.removeEventListener('characteristicvaluechanged', onCharValue); } catch (e) {}
         try { if (chRule.mode !== 'read' && (props.notify || props.indicate)) Promise.resolve(dataChar.stopNotifications()).catch(() => {}); } catch (e) {}
         try { bleDevice.removeEventListener('gattserverdisconnected', onDisconnected); } catch (e) {}
@@ -1484,13 +1509,15 @@
     async function tryAutoMatchProfile(bleDevice, server) {
       if (!state.profiles.length) return false;
       const devName = String(bleDevice.name || '');
-      // 1) 이름 접두사가 맞는 프로필 우선, 2) 나머지 프로필 순서로 특성 존재 여부 확인
-      const ordered = state.profiles.slice().sort((a, b) => {
-        const aHit = a.device && a.device.namePrefix && devName.startsWith(a.device.namePrefix) ? 1 : 0;
-        const bHit = b.device && b.device.namePrefix && devName.startsWith(b.device.namePrefix) ? 1 : 0;
-        return bHit - aHit;
-      });
-      for (const prof of ordered) {
+      const nameHit = (p) => Boolean(p.device && p.device.namePrefix && devName.startsWith(p.device.namePrefix));
+      // 1) 이름 접두사가 맞는 사용자 규칙 → 2) 이름 접두사가 맞는 내장 규칙 → 3) 나머지 사용자 규칙
+      // (내장 규칙은 이름 접두사가 맞을 때만 자동 매칭해 다른 UART 기기 오탐 방지)
+      const candidates = [
+        ...state.profiles.filter((p) => !p.builtin && nameHit(p)),
+        ...state.profiles.filter((p) => p.builtin && nameHit(p)),
+        ...state.profiles.filter((p) => !p.builtin && !nameHit(p))
+      ];
+      for (const prof of candidates) {
         const ch = prof.characteristics[0];
         if (!ch) continue;
         const found = await findCharacteristic(server, ch.service, ch.characteristic);
