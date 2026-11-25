@@ -7,11 +7,26 @@ let chromium = null, devices = null; try { ({ chromium, devices } = require('pla
 const REPO = path.join(__dirname, '..');
 const QR = 'window.qrcode=function(){return{addData(){},make(){},createSvgTag(){return "<svg data-fake=1 viewBox=\\"0 0 10 10\\"><rect width=10 height=10 /></svg>"}}};';
 
-test('가족 체험형 로켓: Chart.js 및 그래프 안내 문구 제거 확인', () => {
+test('가족 체험형 로켓: Chart.js 및 그래프 안내 문구 제거 + 들어가기 3개념 정리 장 확인', () => {
     const html = fs.readFileSync(path.join(REPO, 'projects/film-rocket.html'), 'utf8');
     const rocketSlides = fs.readFileSync(path.join(REPO, 'js/lesson-content/rocket.js'), 'utf8');
+    const CC = require('../js/class-cloud.js');
+    const vm = require('node:vm');
+    const { LessonContent } = require('../js/lesson-slides.js');
+    const box = { LessonContent }; box.window = box;
+    vm.runInNewContext(rocketSlides, box);
+    const think = LessonContent.get('rocket').stages.think;
     assert.doesNotMatch(html, /chart\.umd\.min\.js/, 'Chart.js CDN 제거');
     assert.doesNotMatch(rocketSlides, /그래프/, '발표 슬라이드에서 그래프 안내 제거');
+    assert.equal(CC.EXPS.rocket.steps.think, '들어가기', '1단계 이름은 들어가기');
+    assert.equal(think[1].title, '폰에서 이렇게 해요', '안내 장이 처음 생각 물음 앞에 위치');
+    assert.equal(think[2].key, 'force');
+    assert.equal(think[3].key, 'accel');
+    assert.equal(think[4].key, 'pressure');
+    const sum = think[5];
+    assert.equal(sum.kind, 'concept');
+    assert.match(sum.title, /힘 · 가속도 · 압력/);
+    assert.match(sum.body, /쉬운 말[\s\S]*운동 상태[\s\S]*속도가[\s\S]*일정한/);
 });
 
 test('가족 체험형 로켓: 풀이 시 폰에 힘·가속도·압력 정의 표시 + 정리 처음→지금 비교 + 결과 비교 표(그래프 없음)', { skip: !chromium && 'playwright 없음', timeout: 240000 }, async () => {

@@ -38,6 +38,9 @@
 .ls-body table, .ls-reveal table { border-collapse: collapse; margin: 0.3em 0 0.5em; font-size: 0.9em; }
 .ls-body th, .ls-body td, .ls-reveal th, .ls-reveal td { border: 1px solid var(--c-line); padding: 0.25em 0.7em; text-align: center; vertical-align: middle; }
 .ls-body thead th, .ls-reveal thead th { background: var(--c-primary-soft); color: var(--c-text); }
+.ls-body table.ls-defs { width: 100%; font-size: 0.8em; }
+.ls-body table.ls-defs td { text-align: left; }
+.ls-body table.ls-defs tbody th { white-space: nowrap; }
 .ls-slide .formula { display: block; margin: 0.35em 0 0.5em; padding: 0.25em 0.7em; font-size: 1.35em; font-weight: 700; text-align: center;
     color: var(--c-primary-dark); background: var(--c-fill); border-radius: 0.3em; font-variant-numeric: tabular-nums; }
 .ls-slide .formula.inline { display: inline-block; margin: 0 0.15em; padding: 0 0.3em; font-size: 1.1em; }

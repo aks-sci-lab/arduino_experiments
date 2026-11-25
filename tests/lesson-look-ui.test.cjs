@@ -57,7 +57,8 @@ test('설명 화면 ↔ 학생 폰: 👀 띠·답 가리기·풀이 열기, 설�
         await go(A, 'wait');
         assert.match(await A.textContent('.ev-screen'), /앞 화면을 봐요[\s\S]*별빛가족/);
         assert.equal(await A.isVisible('#ev-stages'), false, '단계 탭도 숨김');
-        // 교사: 힘 장(응답 장, mode 'phone') → 폰은 저절로 그 답 칸, 띠 '✍️ 내 화면에서 해요', 다음 단추 흐름 없음
+        // 교사: 안내 장 → 힘 장(응답 장, mode 'phone') → 폰은 저절로 그 답 칸, 띠 '✍️ 내 화면에서 해요', 다음 단추 흐름 없음
+        await T.keyboard.press('ArrowRight');
         await T.keyboard.press('ArrowRight');
         assert.match((await slide(T)).title, /힘/);
         await go(A, 'think-force');

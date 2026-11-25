@@ -58,6 +58,9 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         assert.equal(await T.isVisible('.ls-note div'), false, '선생님 말은 바로 안 보임');
         await T.keyboard.press('ArrowRight');
         s = await slide(T);
+        assert.match(s.title, /폰에서 이렇게 해요/);
+        await T.keyboard.press('ArrowRight');
+        s = await slide(T);
         assert.match(s.title, /힘/);
         assert.equal(s.rev, false, '물음 먼저, 풀이는 숨김');
         assert.doesNotMatch(await T.textContent('.ls-slide'), /운동 상태를 바꾸는 원인/, '답이 먼저 보이지 않음');
@@ -68,17 +71,19 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         await T.keyboard.press('ArrowLeft');
         assert.equal((await slide(T)).rev, false, '← 는 풀이 접기');
         await T.keyboard.press('ArrowLeft');
-        assert.match((await slide(T)).title, /필름통 로켓/, '← 앞 장');
+        assert.match((await slide(T)).title, /폰에서 이렇게 해요/, '← 앞 장');
+        await T.keyboard.press('ArrowLeft');
+        assert.match((await slide(T)).title, /필름통 로켓/, '← 첫 장');
         await T.keyboard.press('ArrowLeft');
         assert.match((await slide(T)).title, /필름통 로켓/, '첫 장에서 ← 는 그대로 머묾 (말없이 학생 화면으로 가지 않음)');
-        // 끝까지 → 학생 화면 (생각 열기 첫 화면)
+        // 끝까지 → 학생 화면 (들어가기 첫 화면)
         for (let i = 0; i < 20 && await slide(T); i++) await T.keyboard.press('ArrowRight');
         assert.equal(await slide(T), null, '마지막 장 다음은 학생 화면');
         await T.waitForFunction(() => { const d = document.getElementById('presentFrame').contentDocument; return d && d.getElementById('ev-app') && d.getElementById('ev-app').getAttribute('data-screen') === 'think-intro'; }, null, { timeout: 15000 });
         assert.match(await T.textContent('#btnPMode'), /설명/);
-        // 폰 틀 학생 화면에서 ← → 생각 열기 설명의 마지막 장, → 로 다시 학생 화면
+        // 폰 틀 학생 화면에서 ← → 들어가기 설명의 마지막 장(3개념 한눈에 정리), → 로 다시 학생 화면
         await T.keyboard.press('ArrowLeft');
-        assert.ok(await slide(T), '행사형 학생 화면에서 ← 는 설명 마지막 장');
+        assert.match((await slide(T)).title, /힘 · 가속도 · 압력/, '행사형 학생 화면에서 ← 는 들어가기 핵심 개념 정리 장');
         await T.keyboard.press('ArrowRight');
         assert.equal(await slide(T), null);
         // 다음 → '열까요?' — 빨리 한 번 더 → 를 눌러도 열리지 않음 (열기는 Enter·단추로만)

@@ -152,9 +152,9 @@
     }
 
     // ---------- 맨 위 띠: 단계·팀·점수·보냄 ----------
-    var STAGES = [['think', '생각 열기'], ['t1', '1차시'], ['t2', '2차시'], ['end', '정리']];
+    var STAGES = [['think', '들어가기'], ['t1', '1차시'], ['t2', '2차시'], ['end', '정리']];
     var STAGE_KEYS = STAGES.map(function (x) { return x[0]; }), lastOpenN = null;
-    // 교사 화면에 보내는 지금 단계: 잠긴 단계(앞 단계를 끝내고 기다림)면 '앞단계-done' (예 think-done → '생각 열기 ✓ 기다림')
+    // 교사 화면에 보내는 지금 단계: 잠긴 단계(앞 단계를 끝내고 기다림)면 '앞단계-done' (예 think-done → '들어가기 ✓ 기다림')
     function stepNow() {
         var i = STAGE_KEYS.indexOf(st.stage);
         if (i > 0 && stageLocked(st.stage)) return STAGE_KEYS[i - 1] + '-done';
@@ -701,9 +701,9 @@
         location.href = location.pathname + '?past=' + encodeURIComponent(b.dataset.past);
     });
 
-    // ===== 1 생각 열기 =====
+    // ===== 1 들어가기 =====
     SCREENS['think-intro'] = function () {
-        return { html: '<h2>💭 생각 열기</h2>' + card('<p>먼저 <b>내 생각</b>을 골라요. 정답이 아니어도 괜찮아요!</p><p>고르면 <b>과학에서는 어떻게 말하는지</b> 짧게 알려 줘요.</p><p class="ev-small">처음 고른 생각은 저장해 두었다가, 마지막에 다시 풀고 나란히 비교해요.</p>') + nav('think-force', '시작 →') };
+        return { html: '<h2>💭 들어가기</h2>' + card('<p>먼저 <b>내 생각</b>을 골라요. 정답이 아니어도 괜찮아요!</p><p>고르면 <b>과학에서는 어떻게 말하는지(힘·가속도·압력)</b> 짧게 알려 줘요.</p><p class="ev-small">처음 고른 생각은 저장해 두었다가, 마지막에 다시 풀고 나란히 비교해요.</p>') + nav('think-force', '시작 →') };
     };
     function conceptScreen(c, next, final) {
         return function () {
