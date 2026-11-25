@@ -184,3 +184,85 @@ test('기록 CSV·JSON', () => {
     assert.equal(B.csvCell('=1+1'), "'=1+1");
     assert.equal(B.csvCell('-3.5'), '-3.5');
 });
+
+test('포장 풀기·자동 감지·스트림 프레이머 (SC:TEMP-304 실측 패킷 + ASCII HEX + 텍스트 숫자)', () => {
+    const enc = s => Uint8Array.from(s, c => c.charCodeAt(0));
+    const scPackets = [
+        enc('{{dAkAVABQBUIAAABo}}'), // 33.328125 °C
+        enc('{{dAkAVAB4BEIAAACP}}'), // 33.1171875 °C
+        enc('{{dAkAVADgAEIAAADz}}')  // 32.21875 °C
+    ];
+    const det = B.detectFraming(scPackets);
+    assert.ok(det);
+    assert.equal(det.type, 'base64');
+    assert.equal(det.prefix, '{{');
+    assert.equal(det.suffix, '}}');
+    assert.equal(det.checksum, 'sum8');
+    assert.equal(det.decodedLength, 12);
+
+    const pre = { type: det.type, prefix: det.prefix, suffix: det.suffix, checksum: det.checksum };
+    const unpackedSc = scPackets.map(p => B.preprocessPacket(p, pre));
+    const temps = unpackedSc.map(b => B.readField(b, { offset: 4, format: 'float32le' }));
+    assert.equal(Number(temps[0].toFixed(2)), 33.33);
+    assert.equal(Number(temps[1].toFixed(2)), 33.12);
+    assert.equal(Number(temps[2].toFixed(2)), 32.22);
+
+    // 참값 맞추기: IEEE-754 float32le @ offset 4 (배율 1, 오프셋 0) 가 1위여야 함
+    const scFit = B.findCandidates([
+        { bytes: unpackedSc[0], truth: 33.33 },
+        { bytes: unpackedSc[1], truth: 33.12 },
+        { bytes: unpackedSc[2], truth: 32.22 }
+    ]);
+    assert.ok(scFit.ok);
+    assert.equal(scFit.candidates[0].offset, 4);
+    assert.equal(scFit.candidates[0].format, 'float32le');
+    assert.equal(scFit.candidates[0].niceScale, 1);
+
+    // 체크섬 깨진 패킷 거부
+    assert.equal(B.preprocessPacket(enc('{{dAkAVADgAEIAAAD0}}'), pre), null);
+
+    // 스트림 프레이머: 조각난 패킷과 연속 2패킷 모두 복원
+    const framer = B.createFramer(pre);
+    assert.deepEqual(framer.push(enc('{{dAkAVADg')), []);
+    const got1 = framer.push(enc('AEIAAADz}}{{dAkAVABQBUIAAABo}}'));
+    assert.equal(got1.length, 2);
+    assert.equal(Number(B.readField(got1[0], { offset: 4, format: 'float32le' }).toFixed(2)), 32.22);
+    assert.equal(Number(B.readField(got1[1], { offset: 4, format: 'float32le' }).toFixed(2)), 33.33);
+
+    // ASCII 16진수 자동 감지·풀기
+    const hexPkts = [enc('A5 01 2E 09 28 00 00 00\r\n'), enc('A5 02 38 09 28 00 00 00\r\n')];
+    const detHex = B.detectFraming(hexPkts);
+    assert.equal(detHex.type, 'ascii-hex');
+    const unHex = B.preprocessPacket(hexPkts[0], detHex);
+    assert.equal(unHex[0], 0xA5);
+    assert.equal(B.readField(unHex, { offset: 2, format: 'int16le', scale: 0.01 }), 23.5);
+
+    // 텍스트·CSV 숫자 자동 감지·풀기 (float32le 배열)
+    const txtPkts = [enc('T:23.45, H:48.2\r\n'), enc('T:24.10, H:47.5\r\n'), enc('T:25.00, H:46.0\r\n')];
+    const detTxt = B.detectFraming(txtPkts);
+    assert.equal(detTxt.type, 'ascii-number');
+    assert.equal(detTxt.count, 2);
+    const uTxt = B.preprocessPacket(txtPkts[0], detTxt);
+    assert.equal(Number(B.readField(uTxt, { offset: 0, format: 'float32le' }).toFixed(2)), 23.45);
+    assert.equal(Number(B.readField(uTxt, { offset: 4, format: 'float32le' }).toFixed(1)), 48.2);
+
+    // 내장 규칙(BUILTIN_PROFILES) 및 preprocess 규칙 검사 + CSV 내보내기
+    assert.ok(B.BUILTIN_PROFILES.length >= 1);
+    const scRule = B.BUILTIN_PROFILES[0];
+    const v = B.validateDecoder(scRule);
+    assert.ok(v.ok, JSON.stringify(v.errors));
+    assert.equal(v.decoder.characteristics[0].preprocess.type, 'base64');
+    const dec = B.decodeCharPacket(scPackets[2], v.decoder.characteristics[0]);
+    assert.equal(Number(dec['온도'].toFixed(2)), 32.22);
+
+    const charUuid = scRule.characteristics[0].characteristic;
+    const csv = B.recordsToCsv([{ t: 1.0, at: '', char: charUuid, bytes: scPackets[2] }], { [charUuid]: scRule.characteristics[0].fields }, { [charUuid]: pre });
+    assert.match(csv, /,32\.21875\n$/);
+
+    const badPre = B.validateDecoder({
+        schema: B.SCHEMA,
+        characteristics: [{ characteristic: '2a6e', preprocess: { type: 'bogus' }, fields: [] }]
+    });
+    assert.equal(badPre.ok, false);
+});
+
