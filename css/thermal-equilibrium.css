@@ -1,0 +1,62 @@
+/* 열평형 실험 (projects/thermal-equilibrium.html) — 중3 기본 + 고2 심화 탐구 */
+.th-fig { margin: var(--sp-2) 0; text-align: center; }
+.th-fig svg { max-width: 440px; width: 100%; height: auto; display: block; margin: 0 auto; }
+.th-ask { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); background: var(--c-primary-soft); border-left: 4px solid var(--c-primary); border-radius: var(--r-ctl); }
+.th-level { display: inline-block; font-size: .78rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
+.th-level.mid { background: #e8f5e9; color: #2e7d32; }
+.th-level.high { background: #f3e5f5; color: #6a1b9a; }
+
+.th-form-grid { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin: var(--sp-2) 0; }
+.th-form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); font-weight: 600; }
+.th-form-grid input, .th-form-grid select { min-height: var(--tap); padding: 6px 10px; border: 1px solid var(--c-line); border-radius: var(--r-ctl); font: inherit; background: var(--c-card); color: var(--c-text); }
+
+/* 무선 센서 2대 카드 */
+.th-sensors { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); margin: var(--sp-2) 0; }
+.th-sensor-card { border: 2px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-3); background: var(--c-card); display: flex; flex-direction: column; gap: var(--sp-2); }
+.th-sensor-card.slot-a { border-top: 5px solid #e53935; }
+.th-sensor-card.slot-b { border-top: 5px solid #1e88e5; }
+.th-sensor-card.connected { background: #f8fff9; border-color: #66bb6a; }
+.th-sensor-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); flex-wrap: wrap; }
+.th-sensor-head h3 { margin: 0; font-size: 1.05rem; }
+.th-temp-big { font-size: 2.3rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; letter-spacing: -.02em; }
+.slot-a .th-temp-big { color: #c62828; }
+.slot-b .th-temp-big { color: #1565c0; }
+.th-sensor-sel { width: 100%; min-height: var(--tap); padding: 6px 10px; border: 1px solid var(--c-line); border-radius: var(--r-ctl); font: inherit; background: var(--c-card); color: var(--c-text); }
+.th-sensor-meta { font-size: var(--fs-sm); color: var(--c-muted); min-height: 1.4em; }
+
+/* 제어 띠 & 실시간 요약 */
+.th-bar { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin: var(--sp-2) 0; }
+.th-bar select, .th-bar input { min-height: var(--tap); padding: 6px 10px; border: 1px solid var(--c-line); border-radius: var(--r-ctl); font: inherit; }
+.th-sim-bar { padding: var(--sp-2) var(--sp-3); border: 1px dashed #7e57c2; border-radius: var(--r-ctl); background: #f5f0ff; }
+.th-stats { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin: var(--sp-2) 0; }
+.th-stat { padding: var(--sp-2); border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-fill); text-align: center; }
+.th-stat span { display: block; font-size: .78rem; color: var(--c-muted); }
+.th-stat b { display: block; font-size: 1.15rem; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.th-stat.eq-ok { background: #e8f5e9; border-color: #66bb6a; color: #1b5e20; }
+
+.th-chart-box { position: relative; height: 340px; width: 100%; margin: var(--sp-2) 0; }
+@media (max-width: 639px) { .th-chart-box { height: 260px; } }
+
+.th-runs-list { display: grid; gap: var(--sp-2); margin-top: var(--sp-2); }
+.th-run-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-card); }
+.th-run-item .meta { font-size: var(--fs-sm); color: var(--c-muted); }
+
+.th-compare-picks { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-2) 0; }
+.th-compare-picks label { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--c-line); border-radius: 999px; background: var(--c-card); cursor: pointer; font-size: var(--fs-sm); min-height: var(--tap); }
+
+.th-adv { border: 2px solid #ce93d8; background: #fcf8ff; border-radius: var(--r-card); padding: var(--sp-3); margin-top: var(--sp-3); }
+.th-adv > summary { cursor: pointer; font-weight: 700; color: #6a1b9a; min-height: var(--tap); display: flex; align-items: center; gap: 6px; }
+.th-adv-grid { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: var(--sp-2) 0; }
+
+.th-tbl-wrap { overflow-x: auto; max-width: 100%; margin: var(--sp-2) 0; }
+.th-tbl-wrap table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.th-tbl-wrap th, .th-tbl-wrap td { border: 1px solid var(--c-line); padding: 6px 8px; text-align: center; white-space: nowrap; }
+.th-tbl-wrap thead th { background: var(--c-fill); font-weight: 700; }
+
+.th-manual-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin-top: var(--sp-2); }
+.th-manual-row input { width: 92px; min-height: var(--tap); padding: 4px 8px; border: 1px solid var(--c-line); border-radius: var(--r-ctl); }
+
+@media print {
+    .back, nav.steps, .step-next, #class-bar-mount, .th-bar, .th-sim-bar, .th-sensors button, .th-sensors select { display: none !important; }
+    .step-panel { display: block !important; }
+}

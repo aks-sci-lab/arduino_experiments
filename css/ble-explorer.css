@@ -111,3 +111,7 @@ a.btn { text-decoration: none; }
 #uuidHelpBox ol { margin: var(--sp-1) 0 var(--sp-2); padding-left: 1.3em; font-size: var(--fs-sm); }
 #uuidHelpBox code { background: rgba(255,255,255,.65); padding: 1px 4px; border-radius: 4px; word-break: break-all; }
 .cmd-list li code { word-break: break-all; }
+.exp-pick { border: 1px solid var(--c-line); border-radius: var(--r-ctl); padding: var(--sp-2) var(--sp-3); margin: var(--sp-2) 0; background: var(--c-card); }
+.exp-pick legend { padding: 0 var(--sp-1); font-size: var(--fs-sm); }
+.exp-badges { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.exp-badge { display: inline-block; font-size: .78rem; padding: 2px 8px; border-radius: 999px; background: var(--c-primary-soft); color: var(--c-primary); font-weight: 600; }
