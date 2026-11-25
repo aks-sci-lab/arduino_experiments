@@ -380,10 +380,24 @@
             },
             characteristics: chars, notes: String(obj.notes || '').slice(0, 2000)
         };
+        if (Array.isArray(obj.experiments)) {
+            const exps = [];
+            obj.experiments.forEach(e => {
+                const s = String(e || '').trim().toLowerCase();
+                if (/^[a-z0-9_-]{1,30}$/.test(s) && !exps.includes(s)) exps.push(s);
+            });
+            clean.experiments = exps.slice(0, 20);
+        }
         if (initCommands.length) clean.initCommands = initCommands;
         if (obj.savedAt) clean.savedAt = String(obj.savedAt).slice(0, 40);
         return { ok: true, decoder: clean };
     }
+
+    // 해석 완료된 무선 센서 도구를 연결할 수 있는 실험 목록 (ble-explorer.html 체크박스 · 각 실험 페이지 호출 기준)
+    const SENSOR_EXPERIMENTS = [
+        { id: 'thermal', name: '열평형 실험', page: 'thermal-equilibrium.html', icon: '🌡️', note: '큰 비커·작은 비커 온도 변화 (무선 센서 2대)' },
+        { id: 'tempdash', name: '온도 센서 대시보드', page: 'vernier-temp-lab.html', icon: '📊', note: '실시간 온도 계측·마커·CSV' }
+    ];
 
     // ---------- 기록 내보내기 ----------
     function csvCell(v) {
@@ -458,7 +472,7 @@
     }
 
     const api = {
-        knownVendor, KNOWN_VENDORS, VERNIER, vernierCommand,
+        knownVendor, KNOWN_VENDORS, VERNIER, vernierCommand, SENSOR_EXPERIMENTS,
         FORMATS, FORMAT_BY_ID, STANDARD_SERVICES, DEVICE_INFO_CHARS, SCHEMA,
         toBytes, readRaw, parseMask, readField, decodePacket, toHex, parseHex, encodeCommand, normUuid, shortUuid, parseUuidList, knownName,
         changingBytes, fitLine, niceNumber, findCandidates, candidateToField, validateDecoder,

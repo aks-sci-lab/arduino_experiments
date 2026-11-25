@@ -1343,7 +1343,10 @@
       for (const item of raw) {
         const res = B.validateDecoder(item);
         if (res.ok && res.decoder.characteristics.length && res.decoder.characteristics[0].fields.length) {
-          valid.push(res.decoder);
+          const exps = res.decoder.experiments;
+          if (!Array.isArray(exps) || exps.length === 0 || exps.includes('tempdash')) {
+            valid.push(res.decoder);
+          }
         }
       }
       state.profiles = valid;

@@ -44,7 +44,7 @@
     var CELL_MAX = 45000;
     var SUMMARY_KEYS = 20, PLANCK_POINTS = 500;
     var JOIN_DAYS = 2;               // 수업 코드만으로 찾을 수 있는 기간 (규칙도 이 기간 뒤 읽기를 막음 — 코드는 99만 개라 훑기 쉬움). QR·링크는 수업이 지워질 때까지
-    var GENERIC_EXPS = { idealgas: 1, accel: 1, env: 1, light: 1, uv: 1, phoneaccel: 1, malus: 1, eminduction: 1, freefall: 1, nano: 1, heartrate: 1, qdot: 1, rocket: 1 };   // qdot: 퀀텀닷 용액(PR #120), rocket: 필름통 로켓(가족 행사, 팀 이름으로 입장)
+    var GENERIC_EXPS = { idealgas: 1, accel: 1, env: 1, light: 1, uv: 1, phoneaccel: 1, malus: 1, eminduction: 1, freefall: 1, nano: 1, heartrate: 1, qdot: 1, rocket: 1, thermal: 1 };   // qdot: 퀀텀닷 용액(PR #120), rocket: 필름통 로켓(가족 행사), thermal: 열평형 실험(큰 비커·작은 비커)
     var CLASS_EXPS = { planck: 1, pendulum: 1 };
     Object.keys(GENERIC_EXPS).forEach(function (k) { CLASS_EXPS[k] = 1; });
     var CUSTOM_EXP_RE = /^custom:[A-Za-z0-9_-]{1,40}$/;
@@ -976,6 +976,55 @@
             return { ok: true };
         }
 
+        // ---------- 교사 등록 공용 무선 센서 도구 (Firestore bleSensors/{id}, 읽기 전체·쓰기 교사만) ----------
+        var BLE_SENSOR_ID_RE = /^[a-z0-9_-]{2,40}$/;
+        var BLE_EXP_RE = /^[a-z0-9_-]{1,30}$/;
+        async function bleSensorList() {
+            var rows = await db.query('bleSensors', []);
+            var sensors = rows.map(function (r) {
+                return {
+                    id: r.id,
+                    name: String(r.data.name || ''),
+                    json: String(r.data.json || ''),
+                    experiments: Array.isArray(r.data.experiments) ? r.data.experiments.slice(0, 20) : [],
+                    updatedAt: iso(r.data.updatedAt || '')
+                };
+            }).sort(function (a, b) { return String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')); });
+            return { ok: true, sensors: sensors };
+        }
+        async function bleSensorSave(b, auth) {
+            needGoogle(auth);
+            if (auth.teacher === false) fail('사이트 관리 교사 계정으로 로그인해야 공용 센서 도구를 등록할 수 있습니다.');
+            var id = String(b.id || '').trim().toLowerCase();
+            if (!BLE_SENSOR_ID_RE.test(id)) fail('센서 도구 ID 형식이 올바르지 않습니다.');
+            var name = String(b.name || '').trim().slice(0, 60);
+            if (!name) fail('센서 이름을 넣어 주세요.');
+            var json = typeof b.json === 'string' ? b.json : JSON.stringify(b.json || {});
+            if (json.length < 2 || json.length > 40000) fail('센서 규칙 크기가 한도(40KB)를 넘었습니다.');
+            try { JSON.parse(json); } catch (e) { fail('센서 규칙 JSON 형식이 올바르지 않습니다.'); }
+            var exps = [];
+            (Array.isArray(b.experiments) ? b.experiments : []).forEach(function (x) {
+                var s = String(x || '').trim().toLowerCase();
+                if (BLE_EXP_RE.test(s) && exps.indexOf(s) < 0) exps.push(s);
+            });
+            await db.set('bleSensors/' + id, {
+                name: name,
+                json: json,
+                experiments: exps.slice(0, 20),
+                updatedAt: db.stamp(),
+                updatedBy: auth.uid
+            });
+            return { ok: true, id: id, name: name, experiments: exps.slice(0, 20) };
+        }
+        async function bleSensorDelete(b, auth) {
+            needGoogle(auth);
+            if (auth.teacher === false) fail('사이트 관리 교사 계정으로 로그인해야 삭제할 수 있습니다.');
+            var id = String(b.id || '').trim().toLowerCase();
+            if (!BLE_SENSOR_ID_RE.test(id)) fail('센서 도구 ID 형식이 올바르지 않습니다.');
+            await db.del('bleSensors/' + id);
+            return { ok: true, id: id };
+        }
+
         async function handle(body, auth) {
             body = body || {};
             try {
@@ -1038,6 +1087,9 @@
                 if (a === 'reportList') return await reportList(body, auth);
                 if (a === 'reportReopen') return await reportReopen(body, auth);
                 if (a === 'devExport') return await devExport(body, auth);
+                if (a === 'bleSensorList') return await bleSensorList();
+                if (a === 'bleSensorSave') return await bleSensorSave(body, auth);
+                if (a === 'bleSensorDelete') return await bleSensorDelete(body, auth);
                 fail('알 수 없는 요청입니다.');
             } catch (err) {
                 if (err && err.userError) return { ok: false, error: err.message };

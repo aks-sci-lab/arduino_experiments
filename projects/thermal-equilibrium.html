@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/lab-base.css">
+    <script src="../js/lab-ui.js"></script>
+    <title>열평형 실험 — 큰 비커 · 작은 비커 (무선 센서 2대)</title>
+    <link rel="stylesheet" href="../css/class-share.css">
+    <link rel="stylesheet" href="../css/report-ai.css">
+    <link rel="stylesheet" href="../css/thermal-equilibrium.css">
+</head>
+<body>
+<div class="wrap">
+    <a class="back" href="../index.html">← 메인 페이지</a>
+    <h1>🌡️ 열평형 실험 <span class="th-level mid">중3 기본</span><span class="th-level high">고2 심화</span></h1>
+    <div id="class-bar-mount"></div>
+    <p class="note">큰 비커 안에 작은 비커를 넣고 온도가 다른 두 액체의 온도 변화를 <b>무선 온도 센서 2대</b>로 실시간 관찰합니다. <b>중3 열평형·비열·열량 보존</b>을 기본으로 하고, 원하면 <b>고2 심화(열용량 보정·열전달 속도·지수 감쇠)</b>까지 탐구할 수 있습니다. (노트북 크롬·엣지, https)</p>
+
+    <nav class="steps" role="tablist" aria-label="실험 단계">
+        <button role="tab" data-step="purpose"><b>1</b><span>목적</span></button>
+        <button role="tab" data-step="theory"><b>2</b><span>이론</span></button>
+        <button role="tab" data-step="materials"><b>3</b><span>준비물</span></button>
+        <button role="tab" data-step="procedure"><b>4</b><span>과정</span></button>
+        <button role="tab" data-step="data"><b>5</b><span>데이터</span></button>
+        <button role="tab" data-step="result"><b>6</b><span>결과</span></button>
+        <button role="tab" data-step="conclusion"><b>7</b><span>결론</span></button>
+    </nav>
+
+    <!-- ===================== 1. 목적 ===================== -->
+    <section class="step-panel" data-step="purpose" hidden>
+        <div class="card">
+            <h2>👀 먼저 보기: 두 물이 만나면 온도는 어떻게 변할까?</h2>
+            <figure class="th-fig">
+                <svg viewBox="0 0 380 190" role="img" aria-label="찬물이 담긴 큰 비커 안에 뜨거운 물이 담긴 작은 비커가 들어 있고, 무선 온도 센서 A와 B가 각각의 물 온도를 재는 그림">
+                    <!-- 큰 비커 -->
+                    <rect x="70" y="42" width="240" height="128" rx="10" fill="#e3f2fd" stroke="#1565c0" stroke-width="4"/>
+                    <rect x="74" y="88" width="232" height="78" rx="6" fill="#bbdefb"/>
+                    <!-- 작은 비커 -->
+                    <rect x="135" y="64" width="110" height="96" rx="8" fill="#ffebee" stroke="#c62828" stroke-width="3.5"/>
+                    <rect x="139" y="96" width="102" height="60" rx="5" fill="#ffcdd2"/>
+                    <!-- 열 이동 화살표 -->
+                    <path d="M135 126 L104 126 M112 119 L104 126 L112 133" stroke="#ef6c00" stroke-width="3.5" fill="none"/>
+                    <path d="M245 126 L276 126 M268 119 L276 126 L268 133" stroke="#ef6c00" stroke-width="3.5" fill="none"/>
+                    <text x="190" y="132" text-anchor="middle" font-size="13" font-weight="700" fill="#b71c1c">뜨거운 물 (T₁)</text>
+                    <text x="190" y="184" text-anchor="middle" font-size="12" fill="#455a64">큰 비커 안 찬물 (T₂) · 열 이동 (고온 → 저온)</text>
+                    <!-- 센서 A (빨강) -->
+                    <line x1="178" y1="22" x2="178" y2="112" stroke="#c62828" stroke-width="4"/>
+                    <rect x="152" y="6" width="52" height="20" rx="5" fill="#c62828"/>
+                    <text x="178" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">센서 A</text>
+                    <!-- 센서 B (파랑) -->
+                    <line x1="286" y1="22" x2="286" y2="112" stroke="#1565c0" stroke-width="4"/>
+                    <rect x="260" y="6" width="52" height="20" rx="5" fill="#1565c0"/>
+                    <text x="286" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">센서 B</text>
+                </svg>
+                <figcaption class="note">큰 비커(바깥쪽 · 센서 B) 안에 작은 비커(안쪽 · 센서 A)를 넣고, 온도가 다른 두 액체의 온도 변화를 실시간으로 잽니다.</figcaption>
+            </figure>
+            <p class="th-ask">🤔 <b>두 물의 온도는 시간이 지나면서 어떤 모양으로 변할까요? 만나는 온도는 무엇에 따라 달라질까요?</b><br><span class="note">정답이 아니어도 괜찮아요. 조에서 떠오른 생각을 먼저 한두 줄로 써 보세요.</span></p>
+            <div data-rai-slot="problem"></div>
+        </div>
+        <details open>
+            <summary>🎯 실험 목적 보기</summary>
+            <div class="card">
+                <h2>1. 실험 목적</h2>
+                <ol class="text-list">
+                    <li><b>[중3 기본]</b> 온도가 다른 두 물체가 접촉할 때 <b>열의 이동 방향</b>과 두 온도가 같아지는 <b>열평형 상태</b>를 무선 센서 그래프로 확인한다.</li>
+                    <li><b>[중3 기본]</b> 물의 <b>질량비</b>·<b>처음 온도 차이</b> 등을 바꾸며 열평형 온도를 측정하고, <b>잃은 열량 = 얻은 열량</b>($Q = cm\Delta T$)으로 구한 이론값과 비교한다.</li>
+                    <li><b>[중3~고2]</b> 실측 열평형 온도와 이론값의 차이(<b>열손실</b>)를 데이터로 설명한다.</li>
+                    <li><b>[고2 심화]</b> <b>열용량 보정</b>, 초기 <b>열전달 속도($\Delta T/\Delta t$)</b>, 온도 차의 <b>지수 감쇠(시상수 $\tau$ · 반감기)</b>를 정량 분석한다.</li>
+                </ol>
+            </div>
+        </details>
+        <div class="step-next"><button data-go="theory">다음: 2. 이론 →</button></div>
+    </section>
+
+    <!-- ===================== 2. 이론 ===================== -->
+    <section class="step-panel" data-step="theory" hidden data-subtabs="이론 나눠 보기">
+        <div class="card" data-subtab="열평형 (중3)">
+            <h2>2-1. 온도와 열평형 <span class="th-level mid">중3 기본</span></h2>
+            <p>온도가 높은 물체일수록 물체를 이루는 <b>입자의 운동이 활발</b>합니다. 온도가 다른 두 물체가 접촉하면, 에너지는 늘 <b>온도가 높은 물체에서 낮은 물체로</b> 이동합니다. 이렇게 이동하는 에너지를 <b>열</b>이라고 합니다.</p>
+            <div data-lesson-answer="th-eq" data-lesson-stage="theory">
+                <p>시간이 지나 두 물체의 <b>온도가 같아져 더 이상 알짜 열 이동이 없는 상태</b>를 <b>열평형</b>, 이때의 온도를 <b>열평형 온도</b>라고 합니다.</p>
+                <p>그래프에서 뜨거운 물의 온도 곡선은 내려오고, 찬물의 온도 곡선은 올라가 <b>한 온도에서 만나 수평</b>에 가까워집니다.</p>
+            </div>
+        </div>
+
+        <div class="card" data-subtab="열량과 비열 (중3)">
+            <h2>2-2. 열량 보존과 이론 열평형 온도 <span class="th-level mid">중3 기본</span></h2>
+            <p>질량 $m$ (g), 비열 $c$ (J/(g·°C))인 물질의 온도가 $\Delta T$ (°C)만큼 변할 때 주고받은 열량 $Q$는 다음과 같습니다.</p>
+            <p class="formula">Q = c · m · ΔT</p>
+            <p class="note">물의 비열 $c_{\text{물}} \approx 4.186\text{ J/(g}\cdot^\circ\text{C)}$ (중3 교과서 약 $4.2\text{ J/(g}\cdot^\circ\text{C)}$ 또는 $1\text{ kcal/(kg}\cdot^\circ\text{C)}$), 식용유 약 $2.0\text{ J/(g}\cdot^\circ\text{C)}$.</p>
+            <div data-lesson-answer="th-q" data-lesson-stage="theory">
+                <p>외부로 열이 빠져나가지 않는 이상적인 경우, <b>뜨거운 물이 잃은 열량 = 찬물이 얻은 열량</b>이 됩니다.</p>
+                <p class="formula">c₁ m₁ (T₁,₀ − T_이론) = c₂ m₂ (T_이론 − T₂,₀)</p>
+                <p class="formula">T_이론 = (c₁ m₁ T₁,₀ + c₂ m₂ T₂,₀) / (c₁ m₁ + c₂ m₂)</p>
+                <p>같은 액체(물)라면 비열 $c$가 약분되어, <b>질량이 큰 쪽의 처음 온도에 더 가까운 값</b>에서 열평형이 이루어집니다.</p>
+            </div>
+        </div>
+
+        <div class="card" data-subtab="열손실과 오차">
+            <h2>2-3. 왜 실제 열평형 온도는 이론값과 다를까?</h2>
+            <p>교실에서는 비커가 완전히 단열되어 있지 않기 때문에 두 물 사이뿐 아니라 <b>주변 공기</b>와 <b>비커 자체</b>와도 열을 주고받습니다.</p>
+            <ul class="text-list" data-lesson-answer="th-loss" data-lesson-stage="theory">
+                <li><b>공기로의 열 방출</b>: 뜨거운 물(특히 바깥쪽 큰 비커가 뜨거울 때)에서 공기 중으로 열이 빠져나가면 <b>실측 열평형 온도가 이론값보다 낮아집니다</b> ($Q_{\text{잃}} &gt; Q_{\text{얻}}$).</li>
+                <li><b>비커의 열 흡수</b>: 실온에 있던 유리 비커가 데워지는 데 열이 일부 쓰입니다.</li>
+                <li><b>증발 열손실</b>: 뚜껑이 열려 있으면 뜨거운 물 표면에서 증발하며 열을 빼앗깁니다.</li>
+            </ul>
+        </div>
+
+        <div class="card" data-subtab="고2 심화">
+            <h2>2-4. [고2 심화] 열용량 · 열전달 속도 · 지수 감쇠 <span class="th-level high">고2 심화</span></h2>
+            <p class="note">중3 기본 수업에서는 이 탭을 건너뛰어도 됩니다. 고2 심화 탐구에서는 6. 결과의 '🔬 고2 심화 분석'과 함께 다룹니다.</p>
+            <div data-lesson-answer="th-adv" data-lesson-stage="theory">
+                <p><b>① 열용량 $C = cm$과 비커 보정</b>: 비커(유리 $c \approx 0.84$, 스테인리스 $0.50\text{ J/(g}\cdot^\circ\text{C)}$)의 열용량 $C_{\text{비커}}$를 포함하면 이론 온도가 실측값에 더 가까워집니다.</p>
+                <p class="formula">T_보정 = (C₁ T₁,₀ + C₂ T₂,₀ + C_비커 T_실온) / (C₁ + C₂ + C_비커)</p>
+                <p><b>② 열전달 속도와 뉴턴의 냉각(접근) 법칙</b>: 두 물 사이의 열전달률 $P = \frac{dQ}{dt} \approx k(T_1 - T_2)$는 <b>온도 차에 비례</b>합니다. 따라서 처음에는 온도가 빠르게 변하고, 열평형에 가까워질수록 기울기 $|\Delta T/\Delta t|$가 완만해집니다.</p>
+                <p class="formula">|T₁(t) − T₂(t)| ≈ ΔT₀ · e^(−t / τ),   반감기 t₁/₂ = τ ln 2</p>
+                <p>시상수 $\tau$가 작을수록(열전도도가 큰 금속 비커, 작은 열용량 등) 열평형에 빠르게 도달합니다.</p>
+            </div>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="purpose">← 이전: 1. 목적</button><button data-go="materials">다음: 3. 준비물 →</button></div>
+    </section>
+
+    <!-- ===================== 3. 준비물 ===================== -->
+    <section class="step-panel" data-step="materials" hidden>
+        <div class="card warn-card">
+            <h2>⚠️ 안전 먼저</h2>
+            <ul class="text-list">
+                <li>뜨거운 물은 <b>60~75 °C</b> 정도를 권장합니다. 펄펄 끓는 물은 화상 위험이 크고 유리 비커가 깨질 수 있어요.</li>
+                <li>뜨거운 비커는 반드시 <b>내열 장갑·비커 집게</b>로 옮기고, 쟁반 위에서 실험하세요.</li>
+                <li><b>무선 온도 센서 본체(배터리·기판)를 물에 빠뜨리지 마세요!</b> 방수 온도 탐침(프로브) 끝부분만 액체에 담급니다. (피코 환경 센서 보드는 방수가 아니므로 비닐 보호 또는 비접촉/방수 프로브 안내를 따르세요.)</li>
+                <li>식용유·에탄올(심화)을 쓸 때는 불꽃에서 멀리하고, 실험 뒤 엎질러지지 않게 정리합니다.</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h2>3. 준비물</h2>
+            <ul class="text-list">
+                <li><b>큰 비커</b> (400~500 mL) 1개, <b>작은 비커</b> (100~200 mL) 1개</li>
+                <li><b>무선 온도 센서 2대</b> — 블루투스 센서 해석 도구에서 등록한 무선 센서 또는 <b>라즈베리파이 피코 환경 센서</b> (센서 A: 작은 비커, 센서 B: 큰 비커)</li>
+                <li><b>노트북</b> (크롬 또는 엣지 브라우저, 블루투스 켜짐)</li>
+                <li>뜨거운 물(60~75 °C), 찬물(10~20 °C), 눈금실린더 또는 전자저울(질량 측정)</li>
+                <li>선택(변인·심화): 스티로폼 컵·뚜껑(단열), 스테인리스/알루미늄 컵(재질), 식용유(비열 비교), 유리 막대</li>
+            </ul>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="theory">← 이전: 2. 이론</button><button data-go="procedure">다음: 4. 과정 →</button></div>
+    </section>
+
+    <!-- ===================== 4. 과정 ===================== -->
+    <section class="step-panel" data-step="procedure" hidden>
+        <div data-rai-slot="design"></div>
+        <div class="card">
+            <h2>4. 실험 순서</h2>
+            <ol class="text-list">
+                <li>위 <b>변인 카드</b>에서 우리 조가 바꿀 조건 하나와 <b>① 처음 값 → ② 바꿀 값</b>, 예상을 먼저 정합니다.</li>
+                <li><b>5. 데이터</b>에서 <b>센서 A(작은 비커)</b>와 <b>센서 B(큰 비커)</b>의 무선 센서를 각각 선택해 블루투스로 연결합니다.</li>
+                <li>회차 조건(작은 비커·큰 비커의 액체 종류와 질량 g)을 입력합니다.</li>
+                <li>큰 비커에 찬물(또는 뜨거운 물)을 붓고, 작은 비커에 온도가 다른 물을 부어 큰 비커 안에 넣습니다.</li>
+                <li>두 센서 탐침을 각각 작은 비커·큰 비커 가운데에 담그고(바닥·벽에 닿지 않게), <b>▶ 측정 시작</b>을 누릅니다.</li>
+                <li>실시간 그래프에서 두 온도 곡선이 만나 <b>⚖️ 열평형 도달</b>이 뜰 때까지 관찰한 뒤, <b>💾 이 회차 저장</b>을 누릅니다.</li>
+                <li>정해 둔 <b>② 바꿀 조건</b>으로 한 번 더 측정해 저장하고, <b>6. 결과</b>에서 두 회차를 비교합니다.</li>
+            </ol>
+        </div>
+        <div class="step-next"><button class="secondary" data-go="materials">← 이전: 3. 준비물</button><button data-go="data">다음: 5. 데이터 →</button></div>
+    </section>
+
+    <!-- ===================== 5. 데이터 ===================== -->
+    <section class="step-panel" data-step="data" hidden>
+        <div class="card">
+            <h2>5-1. 회차 조건 입력</h2>
+            <div class="th-form-grid">
+                <label>회차 이름
+                    <input type="text" id="inRunTitle" maxlength="36" placeholder="예: ① 100g : 100g (유리)">
+                </label>
+                <label>🔴 작은 비커 액체
+                    <select id="inLiq1">
+                        <option value="water">물 (c = 4.19)</option>
+                        <option value="oil">식용유 (c = 2.00)</option>
+                        <option value="saltwater">소금물 10% (c = 3.72)</option>
+                        <option value="ethanol">에탄올 (c = 2.44)</option>
+                    </select>
+                </label>
+                <label>🔴 작은 비커 질량 m₁ (g)
+                    <input type="number" id="inM1" min="5" max="2000" step="5" value="100">
+                </label>
+                <label>🔵 큰 비커 액체
+                    <select id="inLiq2">
+                        <option value="water">물 (c = 4.19)</option>
+                        <option value="oil">식용유 (c = 2.00)</option>
+                        <option value="saltwater">소금물 10% (c = 3.72)</option>
+                        <option value="ethanol">에탄올 (c = 2.44)</option>
+                    </select>
+                </label>
+                <label>🔵 큰 비커 질량 m₂ (g)
+                    <input type="number" id="inM2" min="5" max="2000" step="5" value="100">
+                </label>
+                <label>비커·단열 조건 메모
+                    <input type="text" id="inVessel" maxlength="40" value="유리 비커 (열림)" placeholder="예: 유리 비커 / 스티로폼+뚜껑">
+                </label>
+            </div>
+            <details>
+                <summary>🔬 [고2 심화] 실내 온도 · 비커 열용량 보정 값 넣기 (선택)</summary>
+                <div class="th-form-grid">
+                    <label>실내 온도 T_실온 (°C)
+                        <input type="number" id="inRoomT" min="-10" max="50" step="0.5" value="22">
+                    </label>
+                    <label>비커 재질
+                        <select id="inBeakerMat">
+                            <option value="none">보정 안 함 (중3 기본)</option>
+                            <option value="glass">유리 비커 (c = 0.84)</option>
+                            <option value="steel">스테인리스 (c = 0.50)</option>
+                            <option value="aluminum">알루미늄 (c = 0.90)</option>
+                            <option value="styrofoam">스티로폼 (c = 1.30)</option>
+                        </select>
+                    </label>
+                    <label>작은 비커 빈 질량 (g)
+                        <input type="number" id="inCup1Mass" min="0" max="1000" step="1" value="0">
+                    </label>
+                    <label>큰 비커 빈 질량 (g)
+                        <input type="number" id="inCup2Mass" min="0" max="1000" step="1" value="0">
+                    </label>
+                </div>
+            </details>
+        </div>
+
+        <div class="card">
+            <h2>5-2. 무선 온도 센서 2대 연결</h2>
+            <p class="note" id="sensorListNote">블루투스 센서 해석 도구에서 '열평형 실험'에 체크해 등록한 센서와 라즈베리파이 피코 환경 센서가 표시됩니다.</p>
+            <div class="th-sensors">
+                <div class="th-sensor-card slot-a" id="cardSensorA">
+                    <div class="th-sensor-head">
+                        <h3>🔴 센서 A · 작은 비커 (안쪽)</h3>
+                        <span class="th-temp-big" id="tempA">--.- °C</span>
+                    </div>
+                    <select class="th-sensor-sel" id="selSensorA" aria-label="센서 A 무선 센서 선택"></select>
+                    <div class="th-bar">
+                        <button type="button" class="primary" id="btnConnA" data-ble-connect>🔗 센서 A 연결</button>
+                        <button type="button" class="secondary" id="btnDiscA" disabled>연결 끊기</button>
+                    </div>
+                    <div class="th-sensor-meta" id="statusA">대기 중 (센서를 고른 뒤 연결을 누르세요)</div>
+                </div>
+
+                <div class="th-sensor-card slot-b" id="cardSensorB">
+                    <div class="th-sensor-head">
+                        <h3>🔵 센서 B · 큰 비커 (바깥쪽)</h3>
+                        <span class="th-temp-big" id="tempB">--.- °C</span>
+                    </div>
+                    <select class="th-sensor-sel" id="selSensorB" aria-label="센서 B 무선 센서 선택"></select>
+                    <div class="th-bar">
+                        <button type="button" class="primary" id="btnConnB" data-ble-connect>🔗 센서 B 연결</button>
+                        <button type="button" class="secondary" id="btnDiscB" disabled>연결 끊기</button>
+                    </div>
+                    <div class="th-sensor-meta" id="statusB">대기 중 (센서를 고른 뒤 연결을 누르세요)</div>
+                </div>
+            </div>
+
+            <div class="th-bar">
+                <button type="button" class="secondary" id="btnRefreshSensors">🔄 센서 목록 새로고침</button>
+                <label class="btn secondary" style="display:inline-flex;align-items:center;cursor:pointer;min-height:var(--tap);padding:6px 12px;border:1px solid var(--c-line);border-radius:var(--r-ctl);">📂 규칙 JSON 추가<input type="file" id="inProfileJson" accept=".json,application/json" hidden></label>
+            </div>
+
+            <div class="th-bar th-sim-bar">
+                <strong>🧪 시뮬레이션 (센서 없이 연습·시연):</strong>
+                <select id="simPreset" aria-label="시뮬레이션 프리셋"></select>
+                <select id="simSpeed" aria-label="시뮬레이션 배속">
+                    <option value="1">1배속 (실시간)</option>
+                    <option value="5" selected>5배속</option>
+                    <option value="15">15배속 (빠른 확인)</option>
+                </select>
+                <button type="button" id="btnSimToggle" class="secondary">▶ 시뮬레이션 켜기</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>5-3. 실시간 온도 변화 측정</h2>
+            <div class="th-bar">
+                <label>기록 간격
+                    <select id="inInterval">
+                        <option value="500">0.5초</option>
+                        <option value="1000" selected>1초</option>
+                        <option value="2000">2초</option>
+                        <option value="5000">5초</option>
+                    </select>
+                </label>
+                <button type="button" id="btnRec" class="good" disabled>▶ 측정 시작</button>
+                <button type="button" id="btnSaveRun" class="primary" disabled>💾 이 회차 저장</button>
+                <button type="button" id="btnClearLive" class="secondary">🗑 기록 지우기</button>
+            </div>
+            <div class="th-bar">
+                <input type="text" id="inMarker" maxlength="30" placeholder="사건 표시 메모 (예: 뚜껑 덮음, 저어 줌)">
+                <button type="button" id="btnAddMarker" class="secondary" disabled>🏷️ 사건 표시</button>
+            </div>
+
+            <div class="th-stats">
+                <div class="th-stat"><span>경과 시간</span><b id="stTime">0.0 s</b></div>
+                <div class="th-stat"><span>기록 점 수</span><b id="stCount">0</b></div>
+                <div class="th-stat"><span>온도 차 |T₁−T₂|</span><b id="stDiff">–</b></div>
+                <div class="th-stat"><span>이론 열평형 T_이론</span><b id="stTheory">–</b></div>
+                <div class="th-stat" id="stEqBox"><span>열평형 상태</span><b id="stEq">측정 전</b></div>
+            </div>
+
+            <div class="th-chart-box"><canvas id="liveChart"></canvas></div>
+            <p class="note" id="liveMsg" role="status"></p>
+
+            <details>
+                <summary>✏️ 수동으로 한 점 넣기 (센서 1대가 끊겼을 때 보조)</summary>
+                <div class="th-manual-row">
+                    <label>시간(s) <input type="number" id="inManT" step="1" value="0"></label>
+                    <label>T₁(°C) <input type="number" id="inManT1" step="0.1" placeholder="60.0"></label>
+                    <label>T₂(°C) <input type="number" id="inManT2" step="0.1" placeholder="22.0"></label>
+                    <button type="button" id="btnManAdd" class="secondary">➕ 점 추가</button>
+                </div>
+            </details>
+        </div>
+
+        <div class="card">
+            <h2>5-4. 저장한 회차 <span id="runsCnt" class="note"></span></h2>
+            <div id="runsList" class="th-runs-list"></div>
+            <div class="th-bar" style="margin-top:var(--sp-2);">
+                <button type="button" id="btnImportCsv" class="secondary">📂 CSV 회차 불러오기</button>
+                <input type="file" id="inCsvFile" accept=".csv,text/csv" hidden>
+            </div>
+            <div id="share-mount"></div>
+        </div>
+
+        <div class="step-next"><button class="secondary" data-go="procedure">← 이전: 4. 과정</button><button data-go="result">다음: 6. 결과 →</button></div>
+    </section>
+
+    <!-- ===================== 6. 결과 ===================== -->
+    <section class="step-panel" data-step="result" hidden>
+        <div class="card">
+            <h2>6-1. 회차별 열평형 분석 표 <span class="th-level mid">중3 기본</span></h2>
+            <p class="note">열량 보존(Q = c·m·ΔT)으로 계산한 <b>이론 열평형 온도</b>와 실제 센서가 잰 <b>실측 열평형 온도</b>, 그리고 <b>잃은 열량 vs 얻은 열량</b>을 비교합니다.</p>
+            <div class="th-tbl-wrap">
+                <table id="resTable">
+                    <thead>
+                        <tr>
+                            <th>회차</th>
+                            <th>조건 (작은 : 큰)</th>
+                            <th>처음 T₁ / T₂ (°C)</th>
+                            <th>실측 열평형 (°C)</th>
+                            <th>이론 열평형 (°C)</th>
+                            <th>도달 시간 (s)</th>
+                            <th>잃은 열량 Q_잃 (J)</th>
+                            <th>얻은 열량 Q_얻 (J)</th>
+                            <th>열손실률 (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resTbody"></tbody>
+                </table>
+            </div>
+            <p class="note" id="resSummary"></p>
+        </div>
+
+        <div class="card">
+            <h2>6-2. 회차별 온도 변화 곡선 비교</h2>
+            <div class="th-bar">
+                <label>보기 모드
+                    <select id="selCompareMode">
+                        <option value="temps">작은 비커(T₁) · 큰 비커(T₂) 온도 곡선</option>
+                        <option value="diff">온도 차 |T₁ − T₂| 감소 곡선</option>
+                    </select>
+                </label>
+            </div>
+            <div id="comparePicks" class="th-compare-picks"></div>
+            <div class="th-chart-box"><canvas id="compareChart"></canvas></div>
+        </div>
+
+        <div data-rai-compare="design"></div>
+
+        <details class="th-adv" id="advPanel">
+            <summary>🔬 [고2 심화 분석] 열용량 보정 · 열전달 속도(ΔT/Δt) · 지수 감쇠(τ · 반감기) 펼치기</summary>
+            <p class="note">고2 물리학·심화 탐구용 정량 분석입니다. 5-1에서 비커 재질과 빈 질량을 입력하면 비커 열용량 보정 이론 온도도 함께 계산됩니다.</p>
+            <div class="th-tbl-wrap">
+                <table id="advTable">
+                    <thead>
+                        <tr>
+                            <th>회차</th>
+                            <th>열용량 C₁ / C₂ (J/°C)</th>
+                            <th>비커 보정 T_보정 (°C)</th>
+                            <th>초기 기울기 dT₁/dt (°C/min)</th>
+                            <th>초기 기울기 dT₂/dt (°C/min)</th>
+                            <th>시상수 τ (s)</th>
+                            <th>반감기 t₁/₂ (s)</th>
+                            <th>지수 맞춤 R²</th>
+                            <th>주변 열교환 Q_주변 (J)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="advTbody"></tbody>
+                </table>
+            </div>
+            <p class="note" id="advExplain">시상수 τ(타우)가 작을수록 두 물체 사이 열전달이 빨라 열평형에 빨리 도달합니다. R²가 1에 가까울수록 뉴턴의 냉각(지수 감쇠) 모델과 잘 맞습니다.</p>
+        </details>
+
+        <div class="step-next"><button class="secondary" data-go="data">← 이전: 5. 데이터</button><button data-go="conclusion">다음: 7. 결론 →</button></div>
+    </section>
+
+    <!-- ===================== 7. 결론 ===================== -->
+    <section class="step-panel" data-step="conclusion" hidden>
+        <div data-rai-compare="design"></div>
+        <div class="card">
+            <h2>📮 내는 곳은 하나예요</h2>
+            <ul class="text-list cs-hide-solo">
+                <li>📊 <b>측정값(회차)</b> — 5. 데이터에서 보낸 회차가 선생님께 전달됩니다.</li>
+                <li>📝 <b>보고서</b> — 아래 보고서 칸에 쓰면 선생님께 자동 저장되고, <b>📤 최종 제출</b>로 마무리합니다.</li>
+            </ul>
+            <p class="cs-show-solo">수업 QR 없이 혼자 연습하는 화면입니다. 아래 보고서는 이 기기에 저장되며 <b>🖨️ 인쇄(PDF)</b>로 저장할 수 있습니다.</p>
+            <div class="th-bar">
+                <button type="button" class="secondary cs-hide-solo" data-go="data">📤 측정값 보내러 5. 데이터로</button>
+                <button type="button" class="secondary" id="btnPrint">🖨️ 이 페이지 인쇄 (표·그래프)</button>
+            </div>
+        </div>
+        <div id="report-ai"></div>
+        <div class="step-next"><button class="secondary" data-go="result">← 이전: 6. 결과</button></div>
+    </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
+<script src="../js/pendulum-config.js"></script>
+<script src="../js/pendulum-cloud.js"></script>
+<script src="../js/lab-store.js"></script>
+<script src="../js/class-cloud.js"></script>
+<script src="../js/class-share.js"></script>
+<script src="../js/report-ai.js"></script>
+<script src="../js/ble-help.js"></script>
+<script src="../js/ble-decode.js"></script>
+<script src="../js/pico-ble.js"></script>
+<script src="../js/environment-protocol.js"></script>
+<script src="../js/ble-sensor-registry.js"></script>
+<script src="../js/thermal-equilibrium-math.js"></script>
+<script src="../js/thermal-equilibrium.js"></script>
+</body>
+</html>

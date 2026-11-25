@@ -709,7 +709,25 @@
             '</td><td><button type="button" class="btn small primary" data-usecand="' + i + '">필드로</button></td></tr>').join('');
     }
 
-    // ---------- ④ 저장 ----------
+    // ---------- ④ 저장 (센서 도구 등록 · 사용할 실험 체크) ----------
+    let cloudCache = [];
+    function expInfoById(id) {
+        return (B.SENSOR_EXPERIMENTS || []).find(x => x.id === id) || null;
+    }
+    function renderExpChoices(checkedIds) {
+        const box = $('ruleExps');
+        if (!box) return;
+        const set = new Set(Array.isArray(checkedIds) ? checkedIds : (S.experiments || []));
+        box.innerHTML = (B.SENSOR_EXPERIMENTS || []).map(x =>
+            '<label><input type="checkbox" data-exp="' + esc(x.id) + '"' + (set.has(x.id) ? ' checked' : '') + '> ' +
+            esc(x.icon + ' ' + x.name) + ' <span class="note">' + esc(x.note) + '</span></label>'
+        ).join('');
+    }
+    function selectedExperiments() {
+        const box = $('ruleExps');
+        if (!box) return Array.isArray(S.experiments) ? S.experiments.slice() : [];
+        return Array.from(box.querySelectorAll('input[data-exp]:checked')).map(c => c.dataset.exp);
+    }
     function buildDecoder() {
         const characteristics = Object.keys(S.rules).filter(u => (S.rules[u] || []).length).map(u => {
             const c = S.chars.get(u);
@@ -719,34 +737,74 @@
         const dec = {
             schema: B.SCHEMA, version: 1, name: $('sensorName').value.trim() || S.meta.deviceName || '이름 없는 센서',
             device: { namePrefix: S.meta.deviceName || '', maker: S.meta.maker || '', model: S.meta.model || '', firmware: S.meta.firmware || '' },
-            characteristics, notes: $('ruleNotes').value, savedAt: new Date().toISOString()
+            characteristics, experiments: selectedExperiments(), notes: $('ruleNotes').value, savedAt: new Date().toISOString()
         };
         if (S.initCommands.length) dec.initCommands = S.initCommands.map(cmd => Object.assign({}, cmd));
         return dec;
     }
     function saveDraft() {
-        store(KEY_DRAFT, { rules: S.rules, charService: S.charService, initCommands: S.initCommands, meta: S.meta, name: $('sensorName').value, notes: $('ruleNotes').value });
+        S.experiments = selectedExperiments();
+        store(KEY_DRAFT, { rules: S.rules, charService: S.charService, initCommands: S.initCommands, meta: S.meta, name: $('sensorName').value, notes: $('ruleNotes').value, experiments: S.experiments });
     }
     function applyDecoder(dec) {
         S.rules = {};
         dec.characteristics.forEach(c => { S.rules[c.characteristic] = c.fields.map(f => Object.assign({}, f)); if (c.service) S.charService[c.characteristic] = c.service; });
         S.initCommands = Array.isArray(dec.initCommands) ? dec.initCommands.map(cmd => Object.assign({}, cmd)) : [];
+        S.experiments = Array.isArray(dec.experiments) ? dec.experiments.slice() : [];
         $('sensorName').value = dec.name;
         $('ruleNotes').value = dec.notes || '';
+        renderExpChoices(S.experiments);
         if (!S.device) S.meta = { deviceName: dec.device.namePrefix, maker: dec.device.maker, model: dec.device.model, firmware: dec.device.firmware };
         saveDraft();
         refreshCharSelects();
         renderInitCommands();
         renderFields();
     }
+    function expLinksHtml(d) {
+        const exps = Array.isArray(d.experiments) ? d.experiments : [];
+        if (!exps.length) {
+            return '<a class="btn small primary" href="vernier-temp-lab.html?profile=' + encodeURIComponent(d.name) + '">📊 대시보드</a>';
+        }
+        return exps.map(id => {
+            const info = expInfoById(id);
+            if (!info) return '<span class="exp-badge">' + esc(id) + '</span>';
+            return '<a class="btn small primary" href="' + esc(info.page) + '?profile=' + encodeURIComponent(d.name) + '">' + esc(info.icon + ' ' + info.name) + '</a>';
+        }).join('');
+    }
+    function expBadgesHtml(d) {
+        const exps = Array.isArray(d.experiments) ? d.experiments : [];
+        if (!exps.length) return '<span class="note">실험 미지정</span>';
+        return exps.map(id => {
+            const info = expInfoById(id);
+            return '<span class="exp-badge">' + esc(info ? info.icon + ' ' + info.name : id) + '</span>';
+        }).join(' ');
+    }
     function renderSaved() {
         const list = load(KEY_SAVED, []);
-        $('savedRules').innerHTML = list.length ? list.map((d, i) => '<li><b>' + esc(d.name) + '</b><span class="note">특성 ' + d.characteristics.length + '개' +
+        $('savedRules').innerHTML = list.length ? list.map((d, i) => '<li><b>' + esc(d.name) + '</b>' +
+            '<span class="note">특성 ' + d.characteristics.length + '개' +
             (d.initCommands && d.initCommands.length ? ' · 명령 ' + d.initCommands.length + '개' : '') + ' · ' + esc((d.savedAt || '').slice(0, 10)) + '</span>' +
-            '<a class="btn small primary" href="vernier-temp-lab.html?profile=' + encodeURIComponent(d.name) + '">📊 대시보드</a>' +
+            '<span class="exp-badges">' + expBadgesHtml(d) + '</span>' +
+            expLinksHtml(d) +
             '<button type="button" class="btn small" data-loadrule="' + i + '">불러오기</button><button type="button" class="btn small" data-delrule="' + i + '" aria-label="' + esc(d.name) + ' 지우기">🗑</button></li>').join('')
-            : '<li class="note">아직 저장한 규칙이 없어요.</li>';
+            : '<li class="note">아직 저장한 센서 도구가 없어요.</li>';
         $('rulePreview').textContent = JSON.stringify(buildDecoder(), null, 2);
+        renderCloudList();
+    }
+    function renderCloudList() {
+        const ul = $('cloudRules');
+        if (!ul) return;
+        ul.innerHTML = cloudCache.length ? cloudCache.map((item, i) => '<li><b>' + esc(item.decoder.name) + '</b>' +
+            '<span class="exp-badges">' + expBadgesHtml(item.decoder) + '</span>' +
+            expLinksHtml(item.decoder) +
+            '<button type="button" class="btn small" data-loadcloud="' + i + '">불러오기</button>' +
+            '<button type="button" class="btn small" data-delcloud="' + esc(item.id) + '" aria-label="' + esc(item.decoder.name) + ' 공용 삭제">🗑</button></li>').join('')
+            : '<li class="note">등록된 수업 공용 센서 도구가 없어요. 교사 구글 로그인 뒤 ☁️ 등록을 누르면 모든 학생 노트북에 자동 표시됩니다.</li>';
+    }
+    async function refreshCloudRules() {
+        if (!window.BleSensorRegistry || !window.LabStore) return;
+        cloudCache = await window.BleSensorRegistry.readCloud(window.LabStore);
+        renderCloudList();
     }
     function saveRule() {
         const check = B.validateDecoder(buildDecoder());
@@ -754,8 +812,50 @@
         if (!check.decoder.characteristics.length) { $('ruleMsg').textContent = '⚠️ 필드가 있는 특성이 없어요. ③ 해석에서 필드를 만드세요.'; return; }
         const list = load(KEY_SAVED, []).filter(d => d.name !== check.decoder.name);
         list.unshift(check.decoder);
-        $('ruleMsg').textContent = store(KEY_SAVED, list.slice(0, 30)) ? '✓ "' + check.decoder.name + '" 을(를) 이 브라우저에 저장했어요.' : '⚠️ 이 브라우저에 저장할 수 없어요 (사생활 보호 모드?). JSON 파일로 받으세요.';
+        const expNote = check.decoder.experiments && check.decoder.experiments.length
+            ? ' (체크한 실험: ' + check.decoder.experiments.map(id => (expInfoById(id) || { name: id }).name).join(', ') + ')'
+            : '';
+        $('ruleMsg').textContent = store(KEY_SAVED, list.slice(0, 30))
+            ? '✓ "' + check.decoder.name + '" 도구를 이 브라우저에 저장했어요' + expNote + '.'
+            : '⚠️ 이 브라우저에 저장할 수 없어요 (사생활 보호 모드?). JSON 파일로 받으세요.';
         renderSaved();
+    }
+    async function publishRule() {
+        const check = B.validateDecoder(buildDecoder());
+        if (!check.ok) { $('ruleMsg').textContent = '⚠️ ' + check.errors.join(' '); return; }
+        if (!check.decoder.characteristics.length) { $('ruleMsg').textContent = '⚠️ 필드가 있는 특성이 없어요. ③ 해석에서 필드를 만드세요.'; return; }
+        if (!check.decoder.experiments || !check.decoder.experiments.length) {
+            $('ruleMsg').textContent = '⚠️ 사용할 실험을 하나 이상 체크해 주세요.'; return;
+        }
+        if (!window.LabStore || !window.BleSensorRegistry) { $('ruleMsg').textContent = '⚠️ 공용 저장소를 불러오지 못했어요.'; return; }
+        const msg = $('ruleMsg');
+        msg.textContent = '⏳ 공용 센서 도구로 등록하는 중…';
+        let u = window.LabStore.currentUser ? await window.LabStore.currentUser() : null;
+        if (!(u && u.google)) {
+            try {
+                u = await window.LabStore.signInGoogle();
+            } catch (err) {
+                msg.textContent = '⚠️ 교사 구글 로그인이 필요해요: ' + ((err && err.message) || '취소됨');
+                return;
+            }
+            if (!(u && u.google)) { msg.textContent = '⚠️ 교사 구글 로그인이 필요해요.'; return; }
+        }
+        const id = window.BleSensorRegistry.slugify(check.decoder.name);
+        const res = await window.LabStore.call('', {
+            action: 'bleSensorSave',
+            id,
+            name: check.decoder.name,
+            json: JSON.stringify(check.decoder),
+            experiments: check.decoder.experiments
+        });
+        if (!res || !res.ok) { msg.textContent = '⚠️ 공용 등록 실패: ' + ((res && res.error) || '알 수 없는 오류'); return; }
+        // 로컬 브라우저에도 같이 저장해 두어 오프라인에도 바로 표시
+        const list = load(KEY_SAVED, []).filter(d => d.name !== check.decoder.name);
+        list.unshift(check.decoder);
+        store(KEY_SAVED, list.slice(0, 30));
+        await refreshCloudRules();
+        renderSaved();
+        msg.textContent = '☁️ "' + check.decoder.name + '" 을(를) 수업 공용 도구로 등록했어요! 이제 체크한 실험에서 모든 학생 노트북이 바로 호출할 수 있어요.';
     }
     function readFile(input, fn) {
         const file = input.files && input.files[0];
@@ -790,11 +890,13 @@
             S.rules = draft.rules || {};
             S.charService = draft.charService || {};
             S.initCommands = Array.isArray(draft.initCommands) ? draft.initCommands : [];
+            S.experiments = Array.isArray(draft.experiments) ? draft.experiments : [];
             S.meta = Object.assign(S.meta, draft.meta || {});
             $('sensorName').value = draft.name || '';
             $('ruleNotes').value = draft.notes || '';
         }
-        mainTabs = LabUI.initTabs('#bxTabs', { key: 'ble-explorer', onShow: tab => { S.dirty = true; if (tab === 'save') renderSaved(); if (tab === 'rules') refreshCharSelects(); render(); } });
+        renderExpChoices(S.experiments);
+        mainTabs = LabUI.initTabs('#bxTabs', { key: 'ble-explorer', onShow: tab => { S.dirty = true; if (tab === 'save') { renderSaved(); refreshCloudRules(); } if (tab === 'rules') refreshCharSelects(); render(); } });
         ruleTabs = LabUI.initTabs('#ruleTabs', { key: 'ble-explorer-rule', onShow: () => { S.chartKey = null; S.dirty = true; render(); } });
         LabUI.initTabs('#saveTabs', { key: 'ble-explorer-save' });
         refreshCharSelects();
@@ -907,9 +1009,11 @@
             $('findMsg').textContent = '✓ 필드로 만들었어요. 이름·단위를 넣고 \'값·그래프\'에서 확인하세요.';
         });
 
-        $('sensorName').addEventListener('input', saveDraft);
-        $('ruleNotes').addEventListener('input', saveDraft);
+        $('sensorName').addEventListener('input', () => { saveDraft(); $('rulePreview').textContent = JSON.stringify(buildDecoder(), null, 2); });
+        $('ruleNotes').addEventListener('input', () => { saveDraft(); $('rulePreview').textContent = JSON.stringify(buildDecoder(), null, 2); });
+        if ($('ruleExps')) $('ruleExps').addEventListener('change', () => { saveDraft(); $('rulePreview').textContent = JSON.stringify(buildDecoder(), null, 2); });
         $('btnSaveRule').addEventListener('click', saveRule);
+        if ($('btnPublishRule')) $('btnPublishRule').addEventListener('click', publishRule);
         $('btnRuleFile').addEventListener('click', () => {
             const dec = buildDecoder();
             download('ble-decoder-' + (dec.name.replace(/[^\w가-힣-]+/g, '_') || 'sensor') + '.json', JSON.stringify(dec, null, 2), 'application/json');
@@ -937,6 +1041,21 @@
             }
             renderSaved();
         });
+        if ($('cloudRules')) {
+            $('cloudRules').addEventListener('click', async e => {
+                const l = e.target.closest('[data-loadcloud]'), d = e.target.closest('[data-delcloud]');
+                if (l) {
+                    const item = cloudCache[Number(l.dataset.loadcloud)];
+                    if (item && item.decoder) { applyDecoder(item.decoder); $('ruleMsg').textContent = '✓ 공용 도구 "' + item.decoder.name + '" 을(를) 불러왔어요.'; renderSaved(); }
+                } else if (d && window.LabStore) {
+                    const id = d.dataset.delcloud;
+                    if (!confirm('수업 공용 센서 도구에서 삭제할까요? (모든 학생 노트북 목록에서도 사라집니다)')) return;
+                    const res = await window.LabStore.call('', { action: 'bleSensorDelete', id });
+                    $('ruleMsg').textContent = res && res.ok ? '✓ 공용 센서 도구에서 삭제했어요.' : '⚠️ 삭제 실패: ' + ((res && res.error) || '권한을 확인하세요.');
+                    await refreshCloudRules();
+                }
+            });
+        }
         $('btnCsv').addEventListener('click', () => {
             if (!S.records.length) { $('logMsg').textContent = '기록이 없어요.'; return; }
             download('ble-log-' + stamp() + '.csv', '﻿' + B.recordsToCsv(S.records, S.rules), 'text/csv;charset=utf-8');

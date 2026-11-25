@@ -172,18 +172,25 @@
             <button data-tab="logfile">기록</button>
         </nav>
         <div class="tab-panel" data-tab="rulefile">
-            <label for="sensorName"><b>센서 이름</b></label>
+            <label for="sensorName"><b>센서 도구 이름</b></label>
             <input type="text" id="sensorName" maxlength="60" placeholder="예: 무선 온도 센서 (TH-100)">
+            <fieldset class="exp-pick" id="ruleExpsBox">
+                <legend><b>사용할 실험에 체크하세요</b> <span class="note">(체크한 실험의 무선 센서 목록에 이 도구가 바로 뜹니다)</span></legend>
+                <div id="ruleExps" class="svc-list"></div>
+            </fieldset>
             <label for="ruleNotes">메모</label>
             <textarea id="ruleNotes" rows="2" maxlength="2000" placeholder="확인한 날짜, 펌웨어 판, 이상한 점 등"></textarea>
             <div class="row">
-                <button type="button" id="btnSaveRule" class="btn primary">💾 이 브라우저에 저장</button>
-                <button type="button" id="btnRuleFile" class="btn info">⬇ JSON 파일</button>
+                <button type="button" id="btnSaveRule" class="btn primary">💾 도구로 저장 (이 브라우저)</button>
+                <button type="button" id="btnPublishRule" class="btn info">☁️ 수업 공용 도구로 등록 (학생 노트북 공유)</button>
+                <button type="button" id="btnRuleFile" class="btn">⬇ JSON 파일</button>
                 <label class="btn file-btn">📂 JSON 불러오기<input type="file" id="ruleFileIn" accept=".json,application/json" hidden></label>
             </div>
             <p id="ruleMsg" class="note" role="status"></p>
-            <h3>저장해 둔 규칙</h3>
+            <h3>💾 이 브라우저에 저장한 센서 도구</h3>
             <ul id="savedRules" class="saved"></ul>
+            <h3>☁️ 수업 공용 센서 도구 <span class="note">(교사 등록 · 모든 학생 노트북에서 체크된 실험에 자동 표시)</span></h3>
+            <ul id="cloudRules" class="saved"></ul>
             <details><summary>지금 규칙 JSON 보기</summary><pre id="rulePreview" class="mono pre"></pre></details>
         </div>
         <div class="tab-panel" data-tab="logfile">
@@ -204,7 +211,7 @@
             <li>① 연결: 센서를 켜고 🔍. 목록에 서비스가 안 보이면 nRF Connect 앱(휴대폰)으로 서비스 UUID 를 찾아 '직접 넣을 서비스'에 넣고 다시 연결</li>
             <li>🔔 알림을 켜면 ② 기록에 바이트가 쌓여요. 센서 값을 바꿔 보며(손으로 쥐기, 누르기) 어느 바이트가 움직이는지 봅니다</li>
             <li>③ 해석 → 참값 맞추기: 믿을 수 있는 기기 값을 3번 이상 찍고 🔎 → 1위 후보를 필드로 → 값·그래프로 확인</li>
-            <li>④ 저장: 규칙을 JSON 으로 저장. 나중에 실험 페이지가 이 파일로 센서를 읽을 수 있게 할 예정이에요</li>
+            <li>④ 저장: 센서 도구 이름을 정하고 사용할 실험에 체크한 뒤 저장(또는 ☁️ 공용 등록)하면, 체크된 실험의 무선 센서 목록에서 바로 호출할 수 있어요</li>
         </ol>
         <h2>되는 기기</h2>
         <ul>
@@ -222,7 +229,10 @@
         </ul>
     </section>
 </main>
+<script src="../js/pendulum-config.js"></script>
+<script src="../js/lab-store.js"></script>
 <script src="../js/ble-decode.js"></script>
+<script src="../js/ble-sensor-registry.js"></script>
 <script src="../js/ble-explorer.js"></script>
 </body>
 </html>

@@ -43,6 +43,8 @@
         heartrate: { name: '스마트폰 카메라 심박수 (숨 참기 탐구)', icon: '❤️', page: 'projects/heart-rate.html', steps: { live: '심박수 재기', breath: '숨 참기 탐구' }, ready: true },
         // 탄소 양자점 형광 (시료 하나 = 한 줄, 저장은 Firestore)
         qdot: { name: '탄소 양자점 형광 실험', icon: '🌈', page: 'projects/quantum-dot.html', steps: STEPS7, ready: true, flows: true },
+        // 열평형 실험 (큰 비커·작은 비커, 무선 온도 센서 2대, 중3 기본 + 고2 심화, 7단계·가설연역)
+        thermal: { name: '열평형 실험 (큰 비커 · 작은 비커)', icon: '🌡️', page: 'projects/thermal-equilibrium.html', steps: STEPS7, ready: true, flows: true },
         // 가족 행사 (행사형 화면): 조를 미리 나누지 않고 가족이 팀 이름을 정해 들어옴 (team: true → 수업 만들 때 '팀 수'·예비 실험 값)
         rocket: { name: '발포비타민 필름통 로켓 (가족 행사)', icon: '🚀', page: 'projects/film-rocket.html', steps: { enter: '입장', think: '들어가기', t1: '1차시 열리는 시간', t2: '2차시 로켓 높이', end: '정리' }, gate: ['think', 't1', 't2', 'end'], ready: true, team: true }
     };
