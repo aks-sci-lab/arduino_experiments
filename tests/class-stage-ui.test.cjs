@@ -129,7 +129,7 @@ test('선생님이 여는 단계: 교사 진행 화면 → 학생 폰 둘 저절
         const rlink = (await T.getAttribute('#outLink', 'href')).replace(/^https?:\/\/[^/]+\//, ROOT);
         await T.click('#btnToRun'); await T.waitForSelector('#presentPane:not([hidden])');
         await T.click('#btnPExit'); await T.waitForSelector('#runPop:not([hidden]) #stageCard:not([hidden])');
-        assert.match(await T.textContent('#stageNow'), /생각 열기.*\(1 \/ 4\)/);
+        assert.match(await T.textContent('#stageNow'), /들어가기.*\(1 \/ 4\)/);
         const F = await ctx(devices['iPhone 13'], 'F');
         await F.goto(rlink);
         await F.waitForSelector('[data-screen="enter"]');

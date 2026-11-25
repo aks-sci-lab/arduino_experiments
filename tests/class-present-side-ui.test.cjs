@@ -82,7 +82,8 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         assert.equal(await T.isVisible('#cornerQr'), false, '오른쪽 위 QR 없음');
         assert.match(await T.evaluate(() => document.getElementById('presentFrame').contentDocument.querySelector('.ev-screen').textContent), /앞 화면을 봐요/, '학생 화면 = 폰이 보는 👀 대기');
         await A.waitForSelector('#ev-app[data-screen="wait"]');
-        // → 응답 장 '힘' → 학생 화면도 답 칸 (폰과 같음)
+        // → 안내 장 → 응답 장 '힘' → 학생 화면도 답 칸 (폰과 같음)
+        await T.keyboard.press('ArrowRight');
         await T.keyboard.press('ArrowRight');
         await waitFrame(T, 'think-force');
         await A.waitForSelector('#ev-app[data-screen="think-force"]');
@@ -153,7 +154,7 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         if (SHOTS) await T.screenshot({ path: path.join(SHOTS, 'rocket-side-measure-1920.png') });
         // ↩ 되돌리기 (띠, 확인 창) → 단계 하나 잠김
         await T.click('#btnPBack');
-        await T.waitForFunction(() => /생각 열기/.test(document.getElementById('pStage').textContent), null, { timeout: 15000 });
+        await T.waitForFunction(() => /들어가기/.test(document.getElementById('pStage').textContent), null, { timeout: 15000 });
         assert.equal(app.db.docs.get('labClasses/' + c.space).stage, 1, '↩ 로 되돌림');
         // 📱 학생 크게 → 설명 닫고 학생 화면만 (폰도 혼자 흐름으로)
         await toStudent(T);

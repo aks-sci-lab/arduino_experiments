@@ -58,7 +58,8 @@ test('로켓 폰은 응답만: 대기 → 응답 장 → 보냄 → 대기, 새�
         assert.equal(await A.locator('.ev-screen [data-lesson-answer], .ev-screen .ev-def').count(), 0, '설명·정의 없음');
         assert.equal(await A.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '375px');
         if (SHOTS) await A.screenshot({ path: path.join(SHOTS, 'phone-1-wait.png') });
-        // 응답 장 '힘' → 답 칸만 (다음 단추 없음)
+        // 안내 장 → 응답 장 '힘' → 답 칸만 (다음 단추 없음)
+        await T.keyboard.press('ArrowRight');
         await T.keyboard.press('ArrowRight');
         for (const P of [A, B]) await go(P, 'think-force');
         assert.equal(await navShown(A), 0, '응답 장에서는 다음 단추 흐름 없음');

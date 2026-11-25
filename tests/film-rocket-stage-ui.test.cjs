@@ -69,15 +69,15 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         await thinkAll(A); await go(A, 'locked');
         assert.match(await A.textContent('.ev-screen'), /‘1차시’ 은 아직 잠겨 있어요/);
         await next(B); await go(B, 'think-force');
-        // ⑤ 교사: 기다리는 팀 1 / 2, 결과판 '생각 열기 ✓ 기다림'
+        // ⑤ 교사: 기다리는 팀 1 / 2, 결과판 '들어가기 ✓ 기다림'
         await T.waitForFunction(() => /기다리는 팀\s*1\s*\/\s*들어온 팀\s*2/.test(document.getElementById('stageWait').textContent), null, { timeout: 20000 });
-        assert.match(await T.textContent('#board'), /별빛가족[\s\S]*생각 열기 ✓ 기다림/);
+        assert.match(await T.textContent('#board'), /별빛가족[\s\S]*들어가기 ✓ 기다림/);
         assert.doesNotMatch(await T.textContent('#board'), /달님 탐험대[\s\S]*✓ 기다림/);
         // ② 끝낸 팀이 잠김 화면을 떠나 앞 화면을 다시 봐도 '끝냄'으로 셈 ('✓ 끝냄 · 더 재는 중')
         await A.locator('.ev-screen [data-go]').last().click(); await go(A, 'think-pressure');
         await T.waitForFunction(() => /더 재는 중/.test(document.getElementById('board').textContent), null, { timeout: 20000 });
         assert.match(await T.textContent('#stageWait'), /기다리는 팀\s*1\s*\/\s*들어온 팀\s*2/, '결과를 다시 보는 팀도 기다림으로');
-        assert.match(await T.textContent('#board'), /별빛가족[\s\S]*생각 열기 ✓ 끝냄 · 더 재는 중/);
+        assert.match(await T.textContent('#board'), /별빛가족[\s\S]*들어가기 ✓ 끝냄 · 더 재는 중/);
         await next(A); await go(A, 'locked');
         // B 도 끝내면 '모든 팀이 기다려요'
         await B.click('.ev-choice[data-k="have"]'); await next(B); await go(B, 'think-accel'); await B.click('.ev-choice[data-k="fast"]');

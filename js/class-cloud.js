@@ -44,7 +44,7 @@
         // 탄소 양자점 형광 (시료 하나 = 한 줄, 저장은 Firestore)
         qdot: { name: '탄소 양자점 형광 실험', icon: '🌈', page: 'projects/quantum-dot.html', steps: STEPS7, ready: true, flows: true },
         // 가족 행사 (행사형 화면): 조를 미리 나누지 않고 가족이 팀 이름을 정해 들어옴 (team: true → 수업 만들 때 '팀 수'·예비 실험 값)
-        rocket: { name: '발포비타민 필름통 로켓 (가족 행사)', icon: '🚀', page: 'projects/film-rocket.html', steps: { enter: '입장', think: '생각 열기', t1: '1차시 열리는 시간', t2: '2차시 로켓 높이', end: '정리' }, gate: ['think', 't1', 't2', 'end'], ready: true, team: true }
+        rocket: { name: '발포비타민 필름통 로켓 (가족 행사)', icon: '🚀', page: 'projects/film-rocket.html', steps: { enter: '입장', think: '들어가기', t1: '1차시 열리는 시간', t2: '2차시 로켓 높이', end: '정리' }, gate: ['think', 't1', 't2', 'end'], ready: true, team: true }
     };
     var CUSTOM_RE = /^custom:([A-Za-z0-9_-]{1,40})$/;
     var CUSTOM_STEPS = Object.assign({ live: '한 화면' }, STEPS7);
@@ -58,7 +58,7 @@
     }
     function isExp(exp) { return !!expInfo(exp); }
     /* 교사가 하나씩 여는 단계 (교사 화면 '▶ 다음 단계 열기', 학생 화면 잠금은 js/class-share.js)
-       7단계 보고서 실험 = 목적…결론, 필름통 로켓 = 생각 열기·1차시·2차시·정리 (입장은 늘 열림), 한 화면 실험·선생님이 만든 실험 = 없음(null) */
+       7단계 보고서 실험 = 목적…결론, 필름통 로켓 = 들어가기·1차시·2차시·정리 (입장은 늘 열림), 한 화면 실험·선생님이 만든 실험 = 없음(null) */
     var STAGE_ALL = 99;
     // flow: 수업의 진행 방법 ('hd' = 가설연역 6단계, 그 밖 = 7단계). 가설연역은 그 페이지가 붙였을 때(flows: true)만
     function canFlow(exp) { var e = EXPS[exp]; return !!(e && e.flows && e.steps === STEPS7); }
