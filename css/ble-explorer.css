@@ -41,11 +41,11 @@ body { padding: var(--sp-3) var(--sp-4); }
 
 label { display: block; margin-top: var(--sp-2); font-size: var(--fs-sm); }
 label.inline, label.btn { margin-top: 0; }
-input[type="text"], input[type="number"], textarea, select {
+input[type="text"], input[type="number"], input[type="password"], textarea, select {
     width: 100%; min-height: var(--tap); padding: var(--sp-2); font-size: var(--fs-base);
     border: 1px solid var(--c-line); border-radius: var(--r-ctl); background: var(--c-card); color: var(--c-text);
 }
-.row select, .row input[type="number"], .row input[type="text"] { width: auto; flex: 1 1 120px; min-width: 0; }
+.row select, .row input[type="number"], .row input[type="text"], .row input[type="password"] { width: auto; flex: 1 1 120px; min-width: 0; }
 textarea { font-family: var(--font-mono); font-size: var(--fs-sm); }
 
 .card, .box { background: var(--c-card); border: 1px solid var(--c-line); border-radius: var(--r-card); padding: var(--sp-3); margin: var(--sp-2) 0; }

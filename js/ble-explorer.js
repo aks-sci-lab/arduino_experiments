@@ -142,11 +142,13 @@
         if (got > 0) {
             box.className = 'box ok';
             box.innerHTML = '<span>✓ 알림 ' + startedCount + '개를 자동으로 켰고 데이터 <b>' + got + '개</b>를 받고 있어요!</span> ' +
-                '<div class="row"><button type="button" class="btn small primary" id="btnGoLog">📊 ② 기록 탭에서 바이트 보기</button></div>';
+                '<div class="row"><button type="button" class="btn small primary" id="btnGoAuto">🤖 자동 역추적 하기</button>' +
+                '<button type="button" class="btn small" id="btnGoLog">📊 ② 기록 보기</button></div>';
         } else if (waitedSilent) {
             box.className = 'box warn';
             box.innerHTML = '<span>⏳ 알림 ' + startedCount + '개를 자동으로 켰지만 3초 동안 들어온 값이 없어요. <b>시작 명령</b>을 보내야 값을 내보내는 센서일 수 있어요.</span> ' +
-                '<div class="row"><button type="button" class="btn small primary" id="btnGoWrite">✏️ ② 기록 탭에서 시작 명령 보내기</button></div>';
+                '<div class="row"><button type="button" class="btn small primary" id="btnGoWrite">✏️ ② 시작 명령 보내기</button>' +
+                '<button type="button" class="btn small" id="btnGoAuto">🤖 AI 에게 물어보기</button></div>';
         } else {
             box.className = 'box';
             box.innerHTML = '<span>⚡ 알림 ' + startedCount + '개를 자동으로 켰어요. 센서에서 오는 데이터를 기다리는 중…</span>';
@@ -910,11 +912,236 @@
         }
     }
 
+    // ---------- 🤖 자동 역추적 (로컬 + 외부 AI API) ----------
+    const AI_PREF_PREFIX = 'report-ai-teacher:';
+    function aiStoreGet(storeObj, key) { try { return storeObj ? storeObj.getItem(AI_PREF_PREFIX + key) : null; } catch (e) { return null; } }
+    function aiStorePut(storeObj, key, val) { try { if (!storeObj) return; if (val == null || val === '') storeObj.removeItem(AI_PREF_PREFIX + key); else storeObj.setItem(AI_PREF_PREFIX + key, val); } catch (e) { /* 무시 */ } }
+
+    function initAiConfig() {
+        const RA = window.ReportAI;
+        const sel = $('aiProvider');
+        if (!RA || !sel) return;
+        let ss = null, ls = null;
+        try { ss = window.sessionStorage; } catch (e) { ss = null; }
+        try { ls = window.localStorage; } catch (e) { ls = null; }
+
+        sel.innerHTML = Object.keys(RA.PROVIDERS).map(k => '<option value="' + esc(k) + '">' + esc(RA.PROVIDERS[k].name) + '</option>').join('');
+        sel.value = aiStoreGet(ls, 'provider') || 'gemini';
+        $('aiRemember').checked = aiStoreGet(ls, 'remember') === '1';
+
+        const updateBadge = () => {
+            const p = sel.value, info = RA.PROVIDERS[p], k = $('aiKey').value.trim(), m = $('aiModel').value.trim();
+            if ($('aiCfgBadge')) $('aiCfgBadge').textContent = k ? (info.name.split(' ')[0] + ' · ' + (m || info.models[0]) + ' · 준비됨') : '키 없음';
+        };
+        const loadProvider = () => {
+            const p = sel.value, info = RA.PROVIDERS[p];
+            $('aiModel').value = aiStoreGet(ls, 'model:' + p) || info.models[0];
+            $('aiModelList').innerHTML = info.models.map(m => '<option value="' + esc(m) + '">').join('');
+            $('aiKey').value = aiStoreGet(ss, 'key:' + p) || aiStoreGet(ls, 'key:' + p) || '';
+            $('aiKey').placeholder = info.keyHint;
+            $('aiKeyLink').href = info.keyUrl;
+            $('aiKeyLink').textContent = info.keySite + '에서 키 만들기 ↗';
+            $('aiTestMsg').textContent = '';
+            updateBadge();
+        };
+        const saveKey = () => {
+            const p = sel.value, k = $('aiKey').value.trim(), rem = $('aiRemember').checked;
+            aiStorePut(ls, 'remember', rem ? '1' : '');
+            aiStorePut(ss, 'key:' + p, k);
+            aiStorePut(ls, 'key:' + p, rem ? k : '');
+            updateBadge();
+        };
+        sel.addEventListener('change', () => { aiStorePut(ls, 'provider', sel.value); loadProvider(); });
+        $('aiModel').addEventListener('change', () => { aiStorePut(ls, 'model:' + sel.value, $('aiModel').value.trim()); updateBadge(); });
+        $('aiKey').addEventListener('input', saveKey);
+        $('aiRemember').addEventListener('change', () => {
+            if ($('aiRemember').checked && !confirm('이 브라우저에 API 키를 기억할까요? 공용 PC 에서는 끄세요.')) {
+                $('aiRemember').checked = false; return;
+            }
+            saveKey();
+        });
+        $('aiKeyShow').addEventListener('click', () => {
+            const inp = $('aiKey');
+            inp.type = inp.type === 'password' ? 'text' : 'password';
+            $('aiKeyShow').textContent = inp.type === 'password' ? '👁 보기' : '🙈 숨기기';
+        });
+        $('btnAiTest').addEventListener('click', async () => {
+            const msg = $('aiTestMsg'), p = sel.value, key = $('aiKey').value.trim();
+            msg.textContent = '⏳ 키를 시험하는 중…';
+            const r = await RA.listModels({ provider: p, key });
+            if (!r.ok) { msg.textContent = '⚠️ ' + r.error; return; }
+            if (r.models.length) $('aiModelList').innerHTML = r.models.map(x => '<option value="' + esc(x) + '">').join('');
+            const model = $('aiModel').value.trim();
+            const c = await RA.callAI({ provider: p, model, key, system: '한 단어로만 답한다.', user: '준비됐으면 "준비"라고만 답해.', timeoutMs: 30000 });
+            if (!c.ok) { msg.textContent = '⚠️ ' + c.error; return; }
+            msg.textContent = '✅ 키가 맞아요 — ' + model + ' 응답 확인 (' + r.models.length + '개 모델 불러옴).';
+            updateBadge();
+        });
+        loadProvider();
+    }
+
+    function autoTargetChar() {
+        return curChar() || activeLogChar() || Array.from(S.chars.keys())[0] || '';
+    }
+    function buildServiceSummary() {
+        const bySvc = new Map();
+        for (const c of S.chars.values()) {
+            const list = bySvc.get(c.service) || [];
+            const props = ['notify', 'indicate', 'read', 'write', 'writeWithoutResponse'].filter(k => c.props[k]);
+            list.push({ uuid: c.uuid, props });
+            bySvc.set(c.service, list);
+        }
+        return Array.from(bySvc.entries()).map(([uuid, chars]) => ({ uuid, chars }));
+    }
+
+    function renderAutoResult() {
+        const box = $('aiResultBox');
+        if (!box) return;
+        const item = S.lastProposal;
+        if (!item) { box.hidden = true; return; }
+        const { proposal, verify, source } = item;
+        box.hidden = false;
+        const confMap = { high: '높음 🟢', medium: '보통 🟡', low: '낮음 🟠' };
+        const pre = B.normalizePreprocess(proposal.preprocess);
+        const rows = (verify.fieldStats || []).map(fs => '<tr><td><b>' + esc(fs.name) + '</b>' + (fs.unit ? ' (' + esc(fs.unit) + ')' : '') + '</td>' +
+            '<td>' + fs.offset + ' · ' + esc(fs.format) + '</td>' +
+            '<td>' + (fs.count ? (fmtNum(fs.min) + ' ~ ' + fmtNum(fs.max)) : '읽기 실패') + '</td>' +
+            '<td><b>' + (fs.count ? fmtNum(fs.last) : '—') + '</b>' + (fs.unit && fs.count ? ' ' + esc(fs.unit) : '') + '</td></tr>').join('');
+        const warnHtml = (verify.errors && verify.errors.length ? verify.errors : []).concat(verify.warnings || []).map(w => '<p class="box warn">⚠️ ' + esc(w) + '</p>').join('');
+        const cmdHtml = (proposal.initCommands && proposal.initCommands.length)
+            ? '<p class="note"><b>제안된 시작 명령:</b> ' + proposal.initCommands.map(c => esc(B.shortUuid(c.characteristic) + ' ← ' + (c.mode === 'ascii' ? 'ASCII ' : '') + c.payload)).join(', ') + '</p>'
+            : '';
+        const canSave = Boolean(verify.decoder && verify.decoder.characteristics[0] && verify.decoder.characteristics[0].fields.length);
+        box.innerHTML =
+            '<p><b>' + (source === 'ai' ? '🤖 AI 분석 결과' : '⚡ 로컬 분석 결과') + '</b> · 신뢰도 <b>' + esc(confMap[proposal.confidence] || '보통') + '</b>' +
+            (pre.type !== 'none' ? ' · 포장 풀기: <code>' + esc(preSummary(pre)) + '</code>' : '') + '</p>' +
+            '<p>' + esc(proposal.summary) + '</p>' +
+            cmdHtml +
+            '<p class="note"><b>로컬 전수 검증:</b> 통과 패킷 ' + verify.okFrames + ' / ' + verify.totalFrames + '개' +
+            (verify.truthRmse !== null && verify.truthRmse !== undefined ? ' · 참값 오차(RMSE) ' + verify.truthRmse.toFixed(4) : '') + '</p>' +
+            (rows ? '<div class="tbl-wrap"><table class="log"><thead><tr><th>필드</th><th>자리·형식</th><th>범위</th><th>최근값</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '') +
+            warnHtml +
+            (proposal.nextStep ? '<p class="note">💡 다음 확인: ' + esc(proposal.nextStep) + '</p>' : '') +
+            '<div class="row">' +
+            (canSave ? '<button type="button" class="btn primary" id="btnAiApplySave">✅ 규칙 적용 · 저장</button>' +
+                '<button type="button" class="btn info" id="btnAiApplyDash">📊 적용·저장 후 대시보드 열기</button>'
+                : (pre.type !== 'none' ? '<button type="button" class="btn primary" id="btnAiApplyPrep">📦 포장 풀기만 먼저 적용</button>' : '')) +
+            (source === 'ai' ? '<button type="button" class="btn" id="btnAiRetry">🔁 검증 결과 보내서 AI 다시 분석</button>' : '') +
+            '</div>';
+    }
+
+    function applyAutoProposal(openDashboard) {
+        const item = S.lastProposal;
+        if (!item || !item.verify || !item.verify.decoder) return;
+        applyDecoder(item.verify.decoder);
+        saveRule();
+        if (openDashboard) {
+            const name = $('sensorName').value.trim() || item.verify.decoder.name;
+            window.location.href = 'vernier-temp-lab.html?profile=' + encodeURIComponent(name);
+            return;
+        }
+        $('aiStatus').textContent = '✅ "' + item.verify.decoder.name + '" 규칙을 적용하고 이 브라우저에 저장했어요! 값·그래프 탭에서 실시간 변화를 확인하세요.';
+        ruleTabs.show('chart', true);
+    }
+
+    function runAutoLocal() {
+        const A = window.BleAiAuto;
+        const st = $('aiStatus');
+        if (!A) { st.textContent = '⚠️ 자동 분석 도구(ble-ai-auto.js)를 불러오지 못했어요.'; return; }
+        const u = autoTargetChar();
+        const rawList = (u ? S.records.filter(r => r.char === u) : S.records).slice(-100).map(r => r.bytes);
+        const approx = $('aiApprox') ? $('aiApprox').value : '';
+        const unit = $('aiUnit') ? $('aiUnit').value.trim() : '';
+        const hint = $('aiHint') ? $('aiHint').value.trim() : '';
+        const res = A.guessFieldsLocally(rawList, {
+            approxValue: approx,
+            unit,
+            name: unit === '°C' || /온도/.test(hint) ? '온도' : (unit === 'pH' || /pH/i.test(hint) ? 'pH' : '측정값'),
+            truths: (u && S.truths[u]) || [],
+            sensorName: $('sensorName').value.trim() || S.meta.deviceName || ''
+        });
+        if (!res.ok) {
+            st.textContent = '⚠️ ' + res.error;
+            S.lastProposal = null;
+            renderAutoResult();
+            return;
+        }
+        const verify = A.verifyProposal(res.proposal, rawList, {
+            serviceUuid: S.charService[u] || '',
+            charUuid: u,
+            deviceMeta: S.meta,
+            truths: (u && S.truths[u]) || []
+        });
+        S.lastProposal = { char: u, proposal: res.proposal, verify, source: 'local' };
+        st.textContent = verify.valid ? '✓ 로컬 자동 분석과 전체 패킷 검증이 끝났어요.' : '⚠️ 로컬 분석 결과에 주의 사항이 있어요. 아래 내용을 확인하거나 🤖 AI 자동 역추적을 써 보세요.';
+        renderAutoResult();
+    }
+
+    async function runAutoAi(previousFeedback) {
+        const A = window.BleAiAuto, RA = window.ReportAI;
+        const st = $('aiStatus');
+        if (!A || !RA) { st.textContent = '⚠️ AI 도구를 불러오지 못했어요.'; return; }
+        const provider = $('aiProvider') ? $('aiProvider').value : 'gemini';
+        const model = $('aiModel') ? $('aiModel').value.trim() : '';
+        const key = $('aiKey') ? $('aiKey').value.trim() : '';
+        if (!key) {
+            st.textContent = '🔑 먼저 아래 ‘외부 AI API 설정’에 API 키를 넣어 주세요 (또는 API 키 없이 ⚡ 로컬 자동 분석을 쓰세요).';
+            if ($('aiCfgBox')) $('aiCfgBox').open = true;
+            if ($('aiKey')) $('aiKey').focus();
+            return;
+        }
+        const u = autoTargetChar();
+        const rawRecs = (u ? S.records.filter(r => r.char === u) : S.records).slice(-30);
+        const prompt = A.buildAiPrompt({
+            deviceName: S.meta.deviceName,
+            maker: S.meta.maker,
+            model: S.meta.model,
+            firmware: S.meta.firmware,
+            serviceUuid: S.charService[u] || '',
+            charUuid: u,
+            services: buildServiceSummary(),
+            rawPackets: rawRecs,
+            truths: (u && S.truths[u]) || [],
+            hint: $('aiHint') ? $('aiHint').value.trim() : '',
+            approxValue: $('aiApprox') ? $('aiApprox').value : '',
+            unit: $('aiUnit') ? $('aiUnit').value.trim() : '',
+            previousFeedback: previousFeedback || ''
+        });
+        $('btnAutoAi').disabled = true;
+        st.textContent = '⏳ ' + (RA.PROVIDERS[provider] ? RA.PROVIDERS[provider].name : provider) + ' (' + model + ') 가 패킷을 분석하는 중…';
+        try {
+            const ans = await RA.callAI({ provider, model, key, system: prompt.system, user: prompt.user, timeoutMs: 60000 });
+            if (!ans.ok) {
+                st.textContent = '⚠️ ' + ans.error;
+                return;
+            }
+            const parsed = A.parseAiProposal(ans.text);
+            if (!parsed.ok) {
+                st.textContent = '⚠️ ' + parsed.error;
+                return;
+            }
+            const verify = A.verifyProposal(parsed.proposal, rawRecs.map(r => r.bytes), {
+                serviceUuid: S.charService[u] || '',
+                charUuid: u,
+                deviceMeta: S.meta,
+                truths: (u && S.truths[u]) || []
+            });
+            S.lastProposal = { char: u, proposal: parsed.proposal, verify, source: 'ai' };
+            st.textContent = verify.valid
+                ? '✅ AI 분석 및 로컬 코드 전수 검증을 마쳤어요! 아래 결과를 확인하고 한 번에 저장하세요.'
+                : '⚠️ AI 가 제안을 만들었지만 로컬 검증에서 문제가 발견됐어요. ‘🔁 검증 결과 보내서 AI 다시 분석’을 눌러 보세요.';
+            renderAutoResult();
+        } finally {
+            $('btnAutoAi').disabled = false;
+        }
+    }
+
     // ---------- 시작 ----------
     function init() {
         renderServiceChoices();
         checkCustom();
         checkSupport();
+        initAiConfig();
         const draft = load(KEY_DRAFT, null);
         if (draft) {
             S.rules = draft.rules || {};
@@ -941,11 +1168,29 @@
         }
         if ($('autoFeedNote')) {
             $('autoFeedNote').addEventListener('click', e => {
+                if (e.target.closest('#btnGoAuto')) {
+                    mainTabs.show('rules', true);
+                    ruleTabs.show('auto', true);
+                }
                 if (e.target.closest('#btnGoLog')) mainTabs.show('log', true);
                 if (e.target.closest('#btnGoWrite')) {
                     mainTabs.show('log', true);
                     if ($('writeBox')) $('writeBox').open = true;
                     if ($('writeHex')) $('writeHex').focus();
+                }
+            });
+        }
+        if ($('btnAutoLocal')) $('btnAutoLocal').addEventListener('click', runAutoLocal);
+        if ($('btnAutoAi')) $('btnAutoAi').addEventListener('click', () => runAutoAi(''));
+        if ($('aiResultBox')) {
+            $('aiResultBox').addEventListener('click', e => {
+                if (e.target.closest('#btnAiApplySave')) applyAutoProposal(false);
+                else if (e.target.closest('#btnAiApplyDash')) applyAutoProposal(true);
+                else if (e.target.closest('#btnAiApplyPrep') && S.lastProposal) {
+                    setPreForChar(S.lastProposal.char, S.lastProposal.proposal.preprocess);
+                    $('aiStatus').textContent = '✓ 포장 풀기를 적용했어요. ② 기록 또는 ③ 참값 맞추기에서 확인하세요.';
+                } else if (e.target.closest('#btnAiRetry') && S.lastProposal) {
+                    runAutoAi(S.lastProposal.verify && S.lastProposal.verify.feedbackForRetry || '');
                 }
             });
         }
