@@ -1,22 +1,13 @@
-// 회귀 시험: ① 교사 진행 상황 팝업에서 진행 화면으로 빠지지 않고 목록·마치기·설정 바로 조작 ② 7단계 변인 카드 ① → ② 입력·저장·검사 ③ 모아 보기 [바꿀 값] 표시
+// 회귀 시험: ② 7단계 변인 카드 ① → ② 읽기·쓰기·검사(예전 저장 포함) ③ 모아 보기 [바꿀 값] 표시·esc — 계산·그리기 함수 단위 시험
+// 화면으로 하는 확인은 다른 시험이 맡음(2026-11-27 글자 확인을 옮김):
+//  ① 진행 상황 팝업: '진행 화면으로 가기' 없음·✅ 수업 마치기·⚙ 설정·수업 목록을 실제로 눌러 봄 → tests/class-runpop-layout-ui.test.cjs, tests/class-present-first-ui.test.cjs
+//  ② 변인 카드 화면: ①=② 이면 경고·다음 단계 막힘, 다르면 열림, 저장 → 새로고침해도 그대로 → tests/vars-gate-ui.test.cjs
+//  ①→② 로켓: 같은 값이면 [다음] 꺼짐·② 로 재러 가기 → tests/film-rocket-scaffold2-ui.test.cjs
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const RA = require('../js/report-ai.js');
 const G = require('../js/class-teacher-gather.js');
 
-const REPO = path.join(__dirname, '..');
-
-test('교사 진행 상황 팝업: 진행 화면으로 가기 단추 제거 · 목록/마치기/설정 단추 포함', () => {
-    const html = fs.readFileSync(path.join(REPO, 'projects/class-teacher.html'), 'utf8');
-    const js = fs.readFileSync(path.join(REPO, 'js/class-teacher.js'), 'utf8');
-    assert.doesNotMatch(html, /id="btnRunPopGo"/, 'HTML 에 btnRunPopGo 없음');
-    assert.doesNotMatch(js, /btnRunPopGo/, 'JS 에 btnRunPopGo 없음');
-    for (const id of ['btnRunPopList', 'btnRunPopDone', 'btnRunPopSet', 'btnRunPopClose', 'runPopMsg']) {
-        assert.match(html, new RegExp('id="' + id + '"'), 'HTML 에 ' + id);
-    }
-});
 
 test('7단계 변인 카드: ① → ② 파싱·직렬화·varsReady 검사 (예전 저장 하위 호환)', () => {
     const cfg = {

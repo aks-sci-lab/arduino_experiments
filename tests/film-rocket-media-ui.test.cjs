@@ -111,6 +111,10 @@ test('로켓 도전 장면: 얼굴을 캐릭터로 가려 보냄·못 가리면 
         await A.waitForSelector('#ev-chk-img', { timeout: 40000 });
         await A.waitForSelector('#ev-chk-send:not([disabled])');
         assert.equal(await A.locator('#ev-chk-vid').count(), 1, '영상도 확인');
+        // 영상을 끝까지 보면 캡션이 '✅ 끝까지 확인했어요' 로 (재생 끝 = 'ended' 사건)
+        assert.match(await A.textContent('#ev-chk-vcap'), /꼭 재생해 끝까지 봐요/);
+        await A.evaluate(() => document.getElementById('ev-chk-vid').dispatchEvent(new Event('ended')));
+        assert.match(await A.textContent('#ev-chk-vcap'), /✅ 영상 끝까지 확인했어요/);
         assert.equal(mediaDocs().length, 0, '확인 전에는 서버에 없음');
         assert.match(await A.textContent('.ev-screen'), /얼굴이 다 가려졌나요/);
         const ib = await A.evaluate(() => { const r = document.getElementById('ev-chk-img').getBoundingClientRect(); return r.width / innerWidth; });
