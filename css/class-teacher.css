@@ -477,3 +477,8 @@ button.ct-rp-cell { cursor: pointer; }
 .ct-media-body { display: flex; justify-content: center; min-width: min(80vw, 320px); }
 .ct-media-body img, .ct-media-body video { height: 72vh; width: auto; max-width: 90vw; object-fit: contain; border-radius: 8px; background: #000; }
 #ctMediaClose { min-height: 44px; padding: 0 var(--sp-3); font-size: 1rem; }
+
+/* 발표 보기 짧은 알림 (2026-11-27: '마지막 장이에요'·'첫 장이에요' — 학생 화면을 단독으로 띄우지 않으므로 끝에서는 알림만) */
+.ct-pframe { position: relative; }
+.ct-pframe > .ct-ptoast { position: absolute; left: 50%; bottom: 1.2em; transform: translateX(-50%); z-index: 5; padding: .5em 1.1em; border-radius: 999px; background: rgba(0, 0, 0, .78); color: #fff; font-weight: 700; font-size: 1.1rem; pointer-events: none; white-space: nowrap; }
+.ct-pframe > .ct-ptoast[hidden] { display: none; }

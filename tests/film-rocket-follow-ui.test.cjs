@@ -4,9 +4,9 @@
 //  ② 응답 장(mode 'phone' + key) → 그 답 칸만 → 답하면 '✅ 보냈어요' → 다음 장이면 다시 대기, 프로젝터에 팀 답이 모임
 //  ③ 새로고침해도 지금 응답 장으로, 퀴즈는 풀이를 열면 ⭕·점수
 //  ④ 측정 장(do-t1) → 측정 화면, 측정 중(⏱ 도는 중)에는 장이 바뀌어도 그대로 → 끝나면 대기
-//  ⑤ 선생님이 설명을 닫으면(📱 학생) 하던 곳으로, 수업 없이 연 화면은 지금처럼 폰 혼자 끝까지
+//  ⑤ 차시 마지막 장(🎯 도전) 다음은 학생 화면 단독 없이 열기 확인(2026-11-27), 폰은 도전 화면에서 멈추지 않음
+//  ⑥ 선생님이 발표 보기를 떠나면(설명이 닫힘) 하던 곳으로, 수업 없이 연 화면은 지금처럼 폰 혼자 끝까지
 const test = require('node:test');
-const toStudent = async P => { for (let i = 0; i < 80 && await P.evaluate(() => !!document.querySelector('#presentPane.ls-on .ls-slide')); i++) { await P.keyboard.press('ArrowRight'); await P.waitForTimeout(40); } };   // 설명 장을 끝까지 넘겨 학생 화면으로 ('📱 학생 크게' 단추는 2026-11-23 뺌)
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const { loadLabStore, labServer, configJs } = require('./fake-lab-store.cjs');
@@ -111,8 +111,15 @@ test('로켓 폰은 응답만: 대기 → 응답 장 → 보냄 → 대기, 새�
         await go(A, 'wait');
         assert.equal(await A.evaluate(() => window.__filmRocket.state().t1.trials.length), 1, '잰 값은 저장');
 
-        // 선생님이 설명을 닫음(📱 학생) → 하던 곳으로, 다시 혼자 흐름 (단계 탭 보임)
-        await toStudent(T);
+        // 1차시 마지막 장(🎯 도전)까지 → 다음은 '2차시를 열까요?' (학생 화면 단독 없음, 2026-11-27) — 폰은 도전 화면에서 멈추지 않음
+        for (let k = 0; k < 12 && !(await T.isVisible('#pAsk')); k++) await T.keyboard.press('ArrowRight');
+        assert.equal(await T.isVisible('#pAsk'), true);
+        assert.match(await T.textContent('#pSlides .ls-title'), /도전/);
+        // 한 가지 값만 잰 팀은 도전 대신 '하나만 바꿔 한 번 더'(t1-more), 아직 안 잰 팀도 같음 — 어느 쪽도 👀 대기에 멈추지 않음
+        await go(A, 't1-more'); await go(B, 't1-more');
+        await T.keyboard.press('Escape');
+        // 선생님이 발표 보기를 떠남(📋 → 수업 목록) → 설명이 닫혀 폰은 하던 곳으로, 다시 혼자 흐름 (단계 탭 보임)
+        await T.click('#btnPExit'); await T.click('#btnRunPopList');
         await A.waitForFunction(() => !document.documentElement.classList.contains('ev-following'), null, { timeout: 15000 });
         assert.notEqual(await scr(A), 'wait');
         assert.equal(await A.isVisible('#ev-stages'), true);
