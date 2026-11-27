@@ -73,3 +73,11 @@ details.th-purpose > summary { min-height: 44px; display: flex; align-items: cen
 .th-sent.err { color: var(--c-danger); }
 /* 시뮬레이션 고르기: 긴 이름이 폰 폭(375px)을 넘지 않게 */
 #simPreset { max-width: 100%; min-width: 0; }
+
+/* 같은 조건 반복 · 차이가 흔들림보다 큰가요? (6-1, 6-3) */
+[data-step="result"] .card > h3 { font-size: var(--fs-base); margin: var(--sp-3, 16px) 0 4px; }
+.th-rep-line { margin: 6px 0; padding: 8px 10px; border-radius: var(--r-ctl, 8px); background: var(--c-fill); line-height: 1.5; overflow-wrap: anywhere; }
+.th-rep-line.clear { border-left: 4px solid var(--c-success); }
+.th-rep-line.unclear, .th-rep-line.norep { border-left: 4px solid var(--c-secondary); }
+.th-rep-line.mix { border-left: 4px solid var(--c-danger); }
+.th-rep-hint { font-weight: 700; }

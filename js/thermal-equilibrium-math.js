@@ -259,6 +259,91 @@
         };
     }
 
+    // ---------- 같은 조건 반복 묶기 · '차이가 흔들림보다 큰가요?' (2026-11-27 가상 수업 2차) ----------
+    // 조건 = 회차에 이미 있는 칸: 두 비커 액체·질량, 뜨거운 물 위치(작은/큰 비커), 비커·단열 메모, 비커 재질,
+    //        처음 온도(측정값이라 같은 조건 반복이어도 조금씩 달라 tempTol °C 안이면 같다고 봄)
+    var COND_NAMES = { liquid: '액체 종류', mass: '물의 질량', pos: '뜨거운 물 위치', temp: '처음 온도', vessel: '비커·단열 메모', mat: '비커 재질' };
+    function normMemo(v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().toLowerCase(); }
+    function runCond(run) {
+        var m = (run && run.meta) || {};
+        var a = analyzeRun(run && run.samples, m);
+        if (!a.ok) return null;
+        var hot = a.hotSide === 1 ? a.t1_0 : a.t2_0, cold = a.hotSide === 1 ? a.t2_0 : a.t1_0;
+        return {
+            a: a,
+            parts: {
+                liquid: (m.liquid1 || 'water') + ':' + (m.liquid2 || 'water'),
+                mass: (Number(m.m1) || 100) + ':' + (Number(m.m2) || 100),
+                pos: a.hotSide === 1 ? 'in' : 'out',
+                vessel: normMemo(m.vessel),
+                mat: m.beakerMat || 'none'
+            },
+            hot: hot, cold: cold
+        };
+    }
+    function condDiff(g1, g2, tempTol) {
+        var out = [];
+        Object.keys(g1.parts).forEach(function (k) { if (g1.parts[k] !== g2.parts[k]) out.push(k); });
+        if (Math.abs(g1.hot - g2.hot) > tempTol || Math.abs(g1.cold - g2.cold) > tempTol) out.push('temp');
+        return out;
+    }
+    function statOf(ys) {
+        ys = ys.filter(function (v) { return Number.isFinite(v); });
+        if (!ys.length) return null;
+        var lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys);
+        var mean = ys.reduce(function (s, v) { return s + v; }, 0) / ys.length;
+        return { n: ys.length, mean: round(mean, 2), lo: round(lo, 2), hi: round(hi, 2), range: round(hi - lo, 2) };
+    }
+    // runs: [{ title, meta, samples }] → { groups, pairs, rep }
+    //  groups[i] = { no(1부터), runs:[title], parts, hot, cold, memo, tEq:{n,mean,lo,hi,range}, tau:{…}|null }
+    //  pairs[i] = { a, b(그룹 번호), changed:[이름], mix(두 가지 넘게 바뀜), tEq:{diff, jitter, verdict}, tau:{…} }
+    //  verdict: 'clear' 차이 > 흔들림 / 'unclear' 차이 ≤ 흔들림 / 'norep' 두 조건 중 하나라도 반복이 없음
+    function repeatGroups(runs, opts) {
+        var tempTol = opts && Number(opts.tempTol) > 0 ? Number(opts.tempTol) : 3;
+        var groups = [];
+        (runs || []).forEach(function (run) {
+            var c = runCond(run);
+            if (!c) return;
+            var g = null;
+            for (var i = 0; i < groups.length; i++) {
+                if (!condDiff(groups[i], c, tempTol).length) { g = groups[i]; break; }
+            }
+            if (!g) {
+                g = { no: groups.length + 1, runs: [], parts: c.parts, hot: c.hot, cold: c.cold,
+                    memo: String((run.meta && run.meta.vessel) || '').trim(), _eq: [], _tau: [] };
+                groups.push(g);
+            }
+            g.runs.push(run.title || ('회차 ' + (run.no || '')));
+            g._eq.push(c.a.tEq);
+            g._tau.push(c.a.expFit ? c.a.expFit.tau : NaN);
+        });
+        groups.forEach(function (g) {
+            g.tEq = statOf(g._eq);
+            g.tau = statOf(g._tau);
+            delete g._eq; delete g._tau;
+        });
+        function judge(x, y) {
+            if (!x || !y) return null;
+            var diff = round(Math.abs(x.mean - y.mean), 2);
+            var jitter = round(Math.max(x.range, y.range), 2);
+            var verdict = x.n < 2 || y.n < 2 ? 'norep' : (diff > jitter + 1e-9 ? 'clear' : 'unclear');
+            return { diff: diff, jitter: jitter, verdict: verdict };
+        }
+        var pairs = [];
+        for (var j = 1; j < groups.length; j++) {
+            var g1 = groups[j - 1], g2 = groups[j];
+            var ch = condDiff(g1, g2, tempTol);
+            pairs.push({
+                a: g1.no, b: g2.no,
+                changed: ch.map(function (k) { return COND_NAMES[k]; }),
+                mix: ch.length >= 2,
+                tEq: judge(g1.tEq, g2.tEq),
+                tau: judge(g1.tau, g2.tau)
+            });
+        }
+        return { groups: groups, pairs: pairs, rep: groups.some(function (g) { return g.tEq && g.tEq.n >= 2; }) };
+    }
+
     // 결합 2물체 + 실내 열교환 시뮬레이터 (1초 간격 등으로 호출 가능)
     function createSimulator(presetKey, overrides) {
         var base = Object.assign({}, SIM_PRESETS[presetKey] || SIM_PRESETS.equal, overrides || {});
@@ -400,6 +485,8 @@
         linFit: linFit,
         fitExpDecay: fitExpDecay,
         analyzeRun: analyzeRun,
+        repeatGroups: repeatGroups,
+        COND_NAMES: COND_NAMES,
         createSimulator: createSimulator,
         runToCsv: runToCsv,
         parseRunCsv: parseRunCsv,
