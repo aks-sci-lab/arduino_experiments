@@ -26,8 +26,7 @@
         '<path d="M40 150 L40 205 M28 192 L40 205 L52 192" stroke="#1565c0" stroke-width="6" fill="none"/><text x="40" y="140" text-anchor="middle" font-size="15" fill="#1565c0">물·기체 ↓</text></svg>';
 
     /* '이렇게 재요'·'이렇게 찍고 재요' (2026-11-27 선생님 '직관적이지 않음' → 초3 가족이 프로젝터로 한눈에: 글 목록 대신 큰 그림, 낱말 최소,
-       녹화/초시계는 작은 보조 줄, 예측은 '우리 팀 실험 계획' 장에서 이미 물어서 뺌). 두 안을 견주어 고름 → HOW 하나만 남김 */
-    var HOW_V = (typeof window !== 'undefined' && window.ROCKET_HOW) || 'a';
+       녹화/초시계는 작은 보조 줄, 예측은 '우리 팀 실험 계획' 장에서 이미 물어서 뺌). 선생님이 고른 것: 1차시 = 그림 카드 3칸, 2차시 = 장면 그림 하나 */
     var CAN = function (x, lbl, fill) {   // 작은 필름통 (x: 왼쪽, lbl: ①/②)
         return '<g transform="translate(' + x + ' 0)"><rect x="0" y="28" width="34" height="52" rx="5" fill="#eceff1" stroke="#455a64" stroke-width="3"/>' +
             '<rect x="-3" y="20" width="40" height="10" rx="3" fill="#ffb74d"/><rect x="3" y="52" width="28" height="26" fill="' + fill + '"/>' +
@@ -42,35 +41,13 @@
         '<rect x="30" y="34" width="34" height="62" rx="3" fill="#90caf9"/><rect x="86" y="54" width="34" height="42" rx="3" fill="#ef9a9a"/>' +
         '<text x="47" y="26" text-anchor="middle" font-size="16" font-weight="700" fill="#1565c0">①</text><text x="103" y="46" text-anchor="middle" font-size="16" font-weight="700" fill="#c62828">②</text></svg>';
     var AVG = '<p class="ls-aside">⏱ 초시계 또는 🎥 녹화(‘펑’ 장면 고르기) · 🧒 평균 = 여러 번 잰 값을 모두 더해 잰 횟수로 나눈 값</p>';
-    var HOW_T1 = {
-        // 안 A: 그림 카드 3칸 흐름
-        a: { flow: [{ n: '①', img: SVG_SAME3, t: '그대로<br>3번 재요' }, { n: '②', img: SVG_CHG3, t: '하나만 바꿔<br>3번 재요' }, { n: '📊', img: SVG_BARS, t: '평균을<br>견줘요' }], body: AVG },
-        // 안 B: 채워 갈 결과 표 하나 (폰의 결과 비교 표와 같은 모양)
-        b: { body: '<table class="ls-fill"><thead><tr><th></th><th>1번</th><th>2번</th><th>3번</th><th>평균</th></tr></thead><tbody>' +
-           '<tr><th>① 그대로</th><td>⏱</td><td>⏱</td><td>⏱</td><td class="ls-avg">?초</td></tr>' +
-           '<tr><th>② 하나만 바꿔서</th><td>⏱</td><td>⏱</td><td>⏱</td><td class="ls-avg">?초</td></tr></tbody></table>' +
-           '<p class="ls-bigq">①과 ②의 <b>평균</b>은 어떻게 다를까요?</p>' + AVG }
-    };
+    // 1차시: 그림 카드 3칸 흐름 (① 그대로 3번 → ② 하나만 바꿔 3번 → 평균 견주기)
+    var HOW_T1 = { flow: [{ n: '①', img: SVG_SAME3, t: '그대로<br>3번 재요' }, { n: '②', img: SVG_CHG3, t: '하나만 바꿔<br>3번 재요' }, { n: '📊', img: SVG_BARS, t: '평균을<br>견줘요' }], body: AVG };
     var KID = function (x, h) {   // 아이 (발끝 y=150, 키 h)
         var top = 150 - h;
         return '<circle cx="' + x + '" cy="' + (top + 10) + '" r="10" fill="#ffcc80"/><rect x="' + (x - 9) + '" y="' + (top + 20) + '" width="18" height="' + (h * 0.42) + '" rx="6" fill="#42a5f5"/>' +
             '<rect x="' + (x - 7) + '" y="' + (top + 20 + h * 0.42) + '" width="6" height="' + (h - 20 - h * 0.42) + '" fill="#1e88e5"/><rect x="' + (x + 1) + '" y="' + (top + 20 + h * 0.42) + '" width="6" height="' + (h - 20 - h * 0.42) + '" fill="#1e88e5"/>';
     };
-    var SVG_STAND = '<svg viewBox="0 0 120 160" role="img" aria-label="아이가 발사대 바로 옆에 선 그림"><rect x="0" y="150" width="120" height="4" fill="#90a4ae"/>' +
-        '<rect x="22" y="138" width="22" height="12" fill="#607d8b"/><rect x="28" y="100" width="10" height="38" rx="3" fill="#ef6c00"/><path d="M28 100 L33 88 L38 100 Z" fill="#c62828"/>' + KID(76, 80) + '</svg>';
-    var SVG_FILM2 = '<svg viewBox="0 0 120 160" role="img" aria-label="부모님이 2~3 m 떨어져 폰을 세로로 들고 찍는 그림"><rect x="0" y="150" width="120" height="4" fill="#90a4ae"/>' +
-        '<circle cx="84" cy="62" r="11" fill="#ffcc80"/><rect x="74" y="73" width="20" height="46" rx="6" fill="#7e57c2"/><rect x="76" y="119" width="7" height="31" fill="#5e35b1"/><rect x="85" y="119" width="7" height="31" fill="#5e35b1"/>' +
-        '<rect x="54" y="66" width="13" height="22" rx="2" fill="#263238"/><rect x="56" y="69" width="9" height="15" fill="#80deea"/>' +
-        '<path d="M8 140 L48 140" stroke="#455a64" stroke-width="2.5"/><path d="M8 134 L8 146 M48 134 L48 146" stroke="#455a64" stroke-width="2.5"/><text x="28" y="130" text-anchor="middle" font-size="14" font-weight="700" fill="#455a64">2~3 m</text></svg>';
-    var SVG_TOP = '<svg viewBox="0 0 120 160" role="img" aria-label="로켓이 가장 높이 오른 장면"><rect x="0" y="150" width="120" height="4" fill="#90a4ae"/>' +
-        '<path d="M40 140 Q46 70 52 30" stroke="#ffb74d" stroke-width="3" stroke-dasharray="5 4" fill="none"/>' +
-        '<rect x="47" y="18" width="10" height="34" rx="3" fill="#ef6c00"/><path d="M47 18 L52 6 L57 18 Z" fill="#c62828"/>' + KID(88, 80) +
-        '<text x="22" y="28" font-size="20" aria-hidden="true">⭐</text></svg>';
-    var SVG_TAP = '<svg viewBox="0 0 120 160" role="img" aria-label="발끝, 정수리, 로켓 꼭대기 세 곳을 누르는 그림"><rect x="0" y="150" width="120" height="4" fill="#90a4ae"/>' +
-        '<rect x="42" y="22" width="10" height="34" rx="3" fill="#ef6c00"/><path d="M42 22 L47 10 L52 22 Z" fill="#c62828"/>' + KID(86, 80) +
-        '<g font-size="13" font-weight="700"><circle cx="86" cy="150" r="9" fill="#43a047"/><text x="86" y="155" text-anchor="middle" fill="#fff">1</text>' +
-        '<circle cx="86" cy="70" r="9" fill="#1e88e5"/><text x="86" y="75" text-anchor="middle" fill="#fff">2</text>' +
-        '<circle cx="47" cy="10" r="9" fill="#e53935"/><text x="47" y="15" text-anchor="middle" fill="#fff">3</text></g></svg>';
     var SVG_SCENE2 = '<svg viewBox="0 0 420 222" role="img" aria-label="아이가 발사대 옆에 서고, 부모님이 2~3 m 떨어져 세로로 찍고, 가장 높은 장면에서 발끝·정수리·로켓 꼭대기를 누르는 그림">' +
         '<rect x="0" y="180" width="420" height="5" fill="#90a4ae"/>' +
         '<rect x="70" y="168" width="26" height="12" fill="#607d8b"/><path d="M83 165 Q90 100 96 50" stroke="#ffb74d" stroke-width="3" stroke-dasharray="6 5" fill="none"/>' +
@@ -86,12 +63,9 @@
         '<text x="240" y="205" text-anchor="middle" font-size="16" font-weight="700" fill="#455a64">2~3 m · 폰은 세로로</text></svg>';
     var PCT = '<p class="ls-aside">📏 자 대신 <b>같은 장면 속 아이 키</b>와 견줘요 · 녹화가 안 되면 눈으로 높다·비슷·낮다</p>' +
         '<p class="ls-easy">🧒 쉬운 말 · % = 아이 키를 100 으로 볼 때 얼마만큼인지 · 정수리 = 머리 꼭대기</p>';
-    var HOW_T2 = {
-        a: { flow: [{ n: '1', img: SVG_STAND, t: '발사대<br>옆에 서요' }, { n: '2', img: SVG_FILM2, t: '세로로<br>찍어요' }, { n: '3', img: SVG_TOP, t: '가장 높은<br>장면' }, { n: '4', img: SVG_TAP, t: '세 곳<br>눌러요' }],
-             body: '<p class="ls-aside">👆 ① 발끝 ② 정수리 ③ 로켓 꼭대기 → ‘아이 키의 ○%’</p>' + PCT },
-        b: { flow: [{ img: SVG_SCENE2 }],
-             body: '<p class="ls-bigq"><span class="ls-dot g">1</span> 발끝 <span class="ls-dot b">2</span> 정수리 <span class="ls-dot r">3</span> 로켓 꼭대기 → <b>아이 키의 ○%</b></p>' + PCT }
-    };
+    // 2차시: 장면 그림 하나 (아이·로켓·찍는 부모님·2~3 m·세 점)
+    var HOW_T2 = { flow: [{ img: SVG_SCENE2 }],
+        body: '<p class="ls-bigq"><span class="ls-dot g">1</span> 발끝 <span class="ls-dot b">2</span> 정수리 <span class="ls-dot r">3</span> 로켓 꼭대기 → <b>아이 키의 ○%</b></p>' + PCT };
 
     // 🛠 로켓 만들기 (2026-11-27 '학생이 로켓을 만드는 과정도 있어야해'): 네 단계 그림 카드 — 폰은 차례 체크 + '다 만들었어요'
     var BODY = function (extra) {   // 뒤집어 세운 로켓 몸통 (뚜껑이 아래)
@@ -187,7 +161,7 @@
                   note: '폰은 ‘변인 통제’ 퀴즈(팀 점수) → ‘무엇을 바꿔 볼까요?’(바꿀 것 하나 · ① → ② · 🔮 예측 · 까닭)예요. 예측은 정답이 없어요 — 프로젝터에 모인 길어질·짧아질·비슷과 까닭을 두세 팀 말하게 한 뒤 풀이(변인 통제)를 여세요. 측정할 때는 예측을 다시 묻지 않아요.' },
                 // 📱 측정 장 (2026-11-23 '폰은 응답만'): 이 장을 띄운 동안 팀 폰이 측정 화면 — '이렇게 재요'를 그림 흐름으로 이 장 안에 (2026-11-27)
                 { kind: 'how', title: '📱 이제 폰으로 재요', key: 'do-t1', mode: 'phone',
-                  flow: (HOW_T1[HOW_V] || HOW_T1.a).flow, body: (HOW_T1[HOW_V] || HOW_T1.a).body,
+                  flow: HOW_T1.flow, body: HOW_T1.body,
                   note: '이 장을 띄워 둔 동안 팀 폰이 1차시 측정 화면이 돼요(안전 → 조건 → 재기 → 결과 비교). 다음 장으로 넘기면 측정 중이 아닌 팀은 👀 대기, 재는 중인 팀은 그 측정을 마친 뒤 바뀌어요. 손으로 누르는 초시계는 늦기 쉬워 녹화가 더 정확하다는 점도 견주어 볼 수 있어요.' },
                 { kind: 'ask', title: '같은 조건인데 시간이 달라요!',
                   body: '<p>같은 물, 같은 발포비타민인데 1번은 12초, 2번은 15초.</p>',
@@ -209,7 +183,7 @@
                 { kind: 'ask', title: '날개와 앞코는 왜 달까요?', mode: 'look',
                   body: '<p>날아갈 때 <b>공기</b>가 앞을 막아요(<b>공기 저항</b>).</p>',
                   ask: '뾰족한 앞코와 꼬리 날개는 어떤 일을 할까요?',
-                  reveal: '<p><b>앞코</b> — 공기를 갈라 <b>공기 저항</b>을 줄여요 · <b>날개</b> — <b>똑바로</b> 날게 해요</p><p class="ls-easy">🧒 쉬운 말 · 공기 저항 = 공기가 움직임을 막는 힘</p>',
+                  reveal: '<p><b>앞코</b> — 공기를 갈라 <b>공기 저항</b>을 줄여요 · <b>꼬리 날개</b> — <b>똑바로</b> 날게 해요</p><p class="ls-easy">🧒 쉬운 말 · 공기 저항 = 공기가 움직임을 막는 힘</p>',
                   note: '날개가 너무 무겁거나 크면 오히려 덜 올라갈 수 있어요. 2차시에서 날개 수를 바꿀 것으로 고른 팀이 까닭을 말할 때 연결해 주세요.' },
                 // 쏘는 힘(작용 반작용) + 무게(질량) 물음을 하나로 (2026-11-27): 폰은 두 퀴즈를 차례로, 풀이를 열면 둘 다 열림
                 { kind: 'why', title: '로켓은 왜 솟고, 무거우면 어떻게 될까요?', key: 'action', mode: 'phone', opens: ['mass'],
@@ -227,7 +201,7 @@
                   note: '폰은 ‘무엇을 바꿔 볼까요?’(바꿀 것 하나 · ① → ② · 🔮 예측 · 까닭)예요. 정답이 없는 예측이에요 — 프로젝터에 모인 높아질·낮아질·비슷과 까닭을 두세 팀 말하게 해 보세요. 쏠 때는 예측을 다시 묻지 않아요.' },
                 // 📱 측정 장: 2차시 발사·촬영·세 곳 누르기 — '이렇게 찍고 재요'와 '%로 재는 까닭'을 그림 흐름으로 이 장 안에
                 { kind: 'how', title: '📱 이제 폰으로 쏘아요', key: 'do-t2', mode: 'phone',
-                  flow: (HOW_T2[HOW_V] || HOW_T2.a).flow, body: (HOW_T2[HOW_V] || HOW_T2.a).body,
+                  flow: HOW_T2.flow, body: HOW_T2.body,
                   note: '이 장을 띄워 둔 동안 팀 폰이 2차시 측정 화면이 돼요. 자를 들고 하늘까지 잴 수 없으니, 같은 장면·같은 거리에 있는 아이 키를 기준으로 견줘요. 아이 키(cm)는 폰에만 남고 선생님께는 %만 와요. 찍는 중인 팀은 장을 넘겨도 그 측정을 마친 뒤 바뀌어요.' },
                 { kind: 'how', title: '🎯 도전: 딱 아이 키만큼!', key: 'ch-t2', mode: 'phone',
                   body: '<p>우리 <b>결과 표</b>를 보고 조건을 골라 <b>아이 키만큼</b> 쏘아 올려요.</p>',

@@ -63,14 +63,20 @@
         if (pm) {
             var part = pm[1], G = M.GUESS[part], defs = part === 't1' ? M.vars1() : M.vars2();
             var gOpts = ['down', 'up', 'same'].map(function (k) { return { k: 'g-' + k, t: G[k] }; });
-            var gg = choiceGroup('', gOpts, function (p) { var x = p[part]; return x && x.changed && p.guess && p.guess[part] && p.guess[part].dir ? 'g-' + p.guess[part].dir : ''; }, list);
+            // 바꿀 것별로 묶음 (2026-11-27 선생님이 고른 '팀이 고른 것으로'): 고른 팀이 있는 변인만, 변인 목록 순서
+            var pickOf = function (p) { var x = p[part]; return x && x.changed && p.guess && p.guess[part] && p.guess[part].dir ? 'g-' + p.guess[part].dir : ''; };
+            var gs = Object.keys(defs).map(function (vk) {
+                var mine = list.filter(function (p) { return p[part] && p[part].changed === vk && pickOf(p); });
+                return mine.length ? choiceGroup((defs[vk].short || defs[vk].name) + ' · ' + mine.length + '팀', gOpts, pickOf, mine) : null;
+            }).filter(Boolean);
+            var answered = gs.reduce(function (n, g) { return n + g.answered; }, 0);
             var items = [];
             withP.forEach(function (x) {
                 var p = x.p, z = p && p[part], g = p && p.guess && p.guess[part]; if (!z || !z.changed || !g || !g.dir) return;
                 var d = defs[z.changed], pl = z.plan;
                 items.push({ name: x.name, text: (d ? (d.short || d.name) : z.changed) + (d && pl && pl.length === 2 ? ' ' + d.label(pl[0]) + ' → ' + d.label(pl[1]) : '') + ' · ' + (G[g.dir] || '') + (g.why ? ' · 왜냐하면 ' + g.why : '') });
             });
-            return { kind: 'choice', groups: [gg], list: items, answered: gg.answered, total: total };
+            return { kind: 'choice', groups: gs, list: items, answered: answered, total: total };
         }
         // 🛠 만들기: 다 만든 팀 수
         if (key === 'build') {

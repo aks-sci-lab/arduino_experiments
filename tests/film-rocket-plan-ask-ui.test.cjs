@@ -101,8 +101,9 @@ test('로켓 계획 🔮·🛠 만들기·쏘는 힘+무게 응답 장: 폰(iPho
         const ans = await answers(T);
         assert.match(ans, /별빛가족 물의 온도 [^·]+→[^·]+ · 짧아질 것 같아요 · 왜냐하면 따뜻하면 빨리 녹아서/);
         assert.match(ans, /달님가족 물의 양 [^·]+→[^·]+ · 길어질 것 같아요/);
-        const bars = await T.$$eval('#pSlides .ls-bar', els => els.map(e => [e.querySelector('.ls-bar-t').textContent, e.querySelector('.ls-bar-n').textContent]));
-        assert.deepEqual(bars, [['짧아질 것 같아요', '1'], ['길어질 것 같아요', '1'], ['비슷할 것 같아요', '0']]);
+        // 바꿀 것별 묶음: 고른 변인마다 예측 칸 수·막대
+        const grp = await T.$$eval('#pSlides .ls-ans-g', els => els.map(g => [g.querySelector('.ls-ans-title').textContent, [...g.querySelectorAll('.ls-bar')].map(b => b.querySelector('.ls-bar-n').textContent).join(',')]));
+        assert.deepEqual(grp, [['물의 양 · 1팀', '0,1,0'], ['물의 온도 · 1팀', '1,0,0']]);
         if (SHOTS) await T.screenshot({ path: path.join(SHOTS, 'projector-plan-t1.png') });
         // 풀이 열기 → 변인 통제 퀴즈 ⭕ 도 열림 (opens), 프로젝터에 정답 ✅ 없음 (예측에는 정답이 없음)
         await T.keyboard.press('ArrowRight');
