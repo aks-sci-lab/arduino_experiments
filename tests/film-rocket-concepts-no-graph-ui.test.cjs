@@ -7,8 +7,8 @@ let chromium = null, devices = null; try { ({ chromium, devices } = require('pla
 const REPO = path.join(__dirname, '..');
 const QR = 'window.qrcode=function(){return{addData(){},make(){},createSvgTag(){return "<svg data-fake=1 viewBox=\\"0 0 10 10\\"><rect width=10 height=10 /></svg>"}}};';
 
-test('가족 체험형 로켓: Chart.js 및 그래프 안내 문구 제거 + 들어가기 3개념 정리 장 확인', () => {
-    const html = fs.readFileSync(path.join(REPO, 'projects/film-rocket.html'), 'utf8');
+test('가족 체험형 로켓: 설명 장에 그래프 안내 없음 + 들어가기 3개념 정리 장 확인', () => {
+    // Chart.js 를 불러오지 않는지는 아래 화면 시험이 실제 요청으로 확인 (2026-11-27 글자 확인을 옮김)
     const rocketSlides = fs.readFileSync(path.join(REPO, 'js/lesson-content/rocket.js'), 'utf8');
     const CC = require('../js/class-cloud.js');
     const vm = require('node:vm');
@@ -16,8 +16,11 @@ test('가족 체험형 로켓: Chart.js 및 그래프 안내 문구 제거 + 들
     const box = { LessonContent }; box.window = box;
     vm.runInNewContext(rocketSlides, box);
     const think = LessonContent.get('rocket').stages.think;
-    assert.doesNotMatch(html, /chart\.umd\.min\.js/, 'Chart.js CDN 제거');
-    assert.doesNotMatch(rocketSlides, /그래프/, '발표 슬라이드에서 그래프 안내 제거');
+    // 불러온 설명 장 전부(제목·본문·물음·풀이·선생님용)에 그래프 안내가 없음
+    const allSlides = Object.values(LessonContent.get('rocket').stages).flat();
+    assert.ok(allSlides.length > 20);
+    const withGraph = allSlides.filter(sl => /그래프/.test([sl.title, sl.body, sl.ask, sl.reveal, sl.note].join(' '))).map(sl => sl.title);
+    assert.deepEqual(withGraph, [], '발표 설명 장에서 그래프 안내 제거');
     assert.equal(CC.EXPS.rocket.steps.think, '들어가기', '1단계 이름은 들어가기');
     assert.equal(think[1].title, '폰에서 이렇게 해요', '안내 장이 처음 생각 물음 앞에 위치');
     assert.equal(think[2].key, 'force');
@@ -29,7 +32,7 @@ test('가족 체험형 로켓: Chart.js 및 그래프 안내 문구 제거 + 들
     assert.match(sum.body, /쉬운 말[\s\S]*운동 상태[\s\S]*속도가[\s\S]*일정한/);
 });
 
-test('가족 체험형 로켓: 풀이 시 폰에 힘·가속도·압력 정의 표시 + 정리 처음→지금 비교 + 결과 비교 표(그래프 없음)', { skip: !chromium && 'playwright 없음', timeout: 240000 }, async () => {
+test('가족 체험형 로켓: 풀이 시 폰에 힘·가속도·압력 정의 표시 + 정리 처음→지금 비교 + 결과 비교 표(그래프·Chart.js 없음)', { skip: !chromium && 'playwright 없음', timeout: 240000 }, async () => {
     const app = loadLabStore(), api = labServer(app);
     const stat = http.createServer((req, res) => {
         const p = path.join(REPO, decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -38,11 +41,11 @@ test('가족 체험형 로켓: 풀이 시 폰에 힘·가속도·압력 정의 �
     });
     await new Promise(r => api.listen(0, r)); await new Promise(r => stat.listen(0, r));
     const API = 'http://127.0.0.1:' + api.address().port + '/exec', ROOT = 'http://127.0.0.1:' + stat.address().port + '/';
-    const browser = await chromium.launch(), errors = [];
+    const browser = await chromium.launch(), errors = [], chartReqs = [];
     const ctx = async (opt, name, teacher) => {
         const c = await browser.newContext(opt);
         await c.route('**/js/pendulum-config.js', r => r.fulfill({ contentType: 'text/javascript', body: configJs(API, { pollSeconds: 2 }) }));
-        await c.route(/cdn\.jsdelivr|cdnjs/, r => r.fulfill({ contentType: 'text/javascript', body: /qrcode/.test(r.request().url()) ? QR : '' }));
+        await c.route(/cdn\.jsdelivr|cdnjs/, r => { if (/chart/i.test(r.request().url())) chartReqs.push(r.request().url()); r.fulfill({ contentType: 'text/javascript', body: /qrcode/.test(r.request().url()) ? QR : '' }); });
         await c.route(/gstatic/, r => r.abort());
         await c.addInitScript(t => { if (t) localStorage.setItem('lab-store:fake-user', JSON.stringify({ uid: 'teacher-1', google: true, teacher: true })); }, !!teacher);
         const pg = await c.newPage();
@@ -117,6 +120,9 @@ test('가족 체험형 로켓: 풀이 시 폰에 힘·가속도·압력 정의 �
         await go(A, 't2-graph');
         assert.equal(await A.locator('#ev-chart').count(), 0, '2차시 그래프 캔버스 없음');
         assert.match(await A.textContent('.ev-screen'), /0개[\s\S]*2개[\s\S]*오늘의 핵심 개념 · 힘과 가속도/);
+        // 그래프 도구(Chart.js)를 아예 받지 않음
+        assert.deepEqual(chartReqs, [], 'Chart.js 요청 없음');
+        assert.equal(await A.evaluate(() => typeof window.Chart), 'undefined');
         assert.deepEqual(errors, []);
     } finally { await browser.close(); api.close(); stat.close(); }
 });
