@@ -146,8 +146,11 @@ async function start(opts) {
         // 🎥 2차시 한 발: (촬영 안내면 영상으로) 녹화 → 끝 → '가장 높은 장면' → 발끝·정수리·로켓 꼭대기 → 아이 키의 pct %
         async launch(pg, pct) {
             if ((await S.screen(pg)) === 't2-film') { await pg.locator('.ev-choice[data-go="t2-measure"]').click(); await pg.waitForTimeout(800); }
-            await pg.waitForSelector('#ev-r1:visible', { timeout: 15000 });
-            await pg.waitForTimeout(800); await pg.click('#ev-r1'); await pg.waitForTimeout(2200); await pg.click('#ev-r3');
+            if (!(await pg.isVisible('#ev-r3'))) {   // 이미 녹화 중(● 녹화 시작을 눌러 둔 채)이면 이어서 끝냄
+                await pg.waitForSelector('#ev-r1:visible', { timeout: 15000 });
+                await pg.waitForTimeout(800); await pg.click('#ev-r1'); await pg.waitForTimeout(2200);
+            }
+            await pg.click('#ev-r3');
             await pg.waitForSelector('#ev-pick:visible', { timeout: 20000 }); await pg.waitForTimeout(800); await pg.click('#ev-pick');
             const c = pg.locator('#ev-mark'); await c.waitFor({ timeout: 10000 }); await pg.waitForTimeout(400);
             const bb = await c.boundingBox(), foot = bb.height * 0.92, head = bb.height * 0.52, top = foot - (foot - head) * pct / 100;
