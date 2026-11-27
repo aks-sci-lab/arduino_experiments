@@ -146,10 +146,11 @@ test('로켓 4차 고침: 2차시 반복·대기 화면·끊김 안내·도전 �
         await A.context().setOffline(false);
         await A.waitForSelector('#ev-offline', { state: 'hidden', timeout: 10000 });
         // ⑨ 발표 화면 🏆 결과판: 관리 표시(🔌·✓ 기다림) 없음, 값이 없는 ⏱·🎯 칸 없음, 💬 생각은 있음
-        await T.click('#btnPBoard'); await T.waitForSelector('#pPanel:not([hidden]) .ct-board');
-        const bh = await T.textContent('#pPanel .ct-board thead');
-        assert.doesNotMatch(bh, /⏱|🎯|🚀/, '값이 없는 도전 칸 숨김: ' + bh);
-        assert.match(bh, /⭐ 점수[\s\S]*💬 생각/);
+        // (가상 수업 5차 상 2: 발표 화면 결과판은 순위·점수 없이 팀마다 '바꾼 것 → 우리 숫자' 한 줄)
+        await T.click('#btnPBoard'); await T.waitForSelector('#pPanel:not([hidden]) .ct-pboard');
+        const bh = await T.textContent('#pPanel .ct-pboard thead');
+        assert.doesNotMatch(bh, /⏱|🎯|🚀|⭐|점수/, '값이 없는 도전 칸·점수 숨김: ' + bh);
+        assert.match(bh, /바꾼 것 → 우리 숫자/);
         assert.doesNotMatch(await T.textContent('#pPanel'), /🔌|✓ 기다림/);
         await T.click('#btnPBoard');
         // 1차시 열기 → 측정 장(do-t1)까지

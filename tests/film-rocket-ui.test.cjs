@@ -331,12 +331,12 @@ test('필름통 로켓 2차시·정리 (수업 없이 이 폰만): 촬영 → �
         assert.match(await P.textContent('#ev-cm'), /로켓 높이 약 1\d\d cm/);
         // 눈으로 한 번 (무게 3개)
         await P.click('#ev-change'); await go('t2-cond'); await P.click('.ev-stepper:not(.locked) [data-pm="1"]');
-        await next(); await go('t2-safe'); await next(); await go('t2-film'); await P.click('[data-go="t2-hand"]'); await go('t2-hand');
+        await next(); await go('t2-film'); /* 안전 체크는 한 번 (가상 수업 5차 중 5) */ await P.click('[data-go="t2-hand"]'); await go('t2-hand');
         await P.click('.ev-choice[data-k="low"]'); await go('t2-result');
         await P.click('[data-go="t2-graph"]'); await go('t2-graph');
         assert.match(await P.textContent('#ev-mini'), /2개[\s\S]*11[67]%[\s\S]*3개[\s\S]*70%/);
         await next(); await go('t2-challenge');
-        await P.click('#ev-ch2'); await go('t2-ch-cond'); await next(); await go('t2-safe'); await next(); await go('t2-film');
+        await P.click('#ev-ch2'); await go('t2-ch-cond'); await next(); await go('t2-film');   // 안전 체크는 한 번 (가상 수업 5차 중 5)
         await P.click('[data-go="t2-hand"]'); await P.click('.ev-choice[data-k="same"]'); await go('t2-ch-result');
         assert.match(await P.textContent('.ev-screen h2'), /성공/);
         await P.click('#ev-end'); await go('end-intro'); await next();

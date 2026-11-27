@@ -119,7 +119,7 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         await A.evaluate(() => window.__filmRocket.sendNow());
         await A.waitForFunction(() => /선생님께 보냄/.test(document.getElementById('ev-sync').textContent), null, { timeout: 15000 });
         const sm = app.items('rocket')[0].summary;
-        assert.equal(sm['1차시 예측'], '짧아짐(따뜻하면 거품이 빨리 나서)', '예측과 까닭 한 칸'); assert.equal(sm['1차시 값 가짓수'], 1);
+        assert.equal(sm['1차시 예측'], '짧아짐(따뜻하면 거품이 빨리 나서)', '예측과 까닭 한 칸'); assert.match(String(sm['값 가짓수']), /^1·/);
         assert.equal(sm['1차시 결과'], '아직 말할 수 없음', '한 가지 값만 잰 차시');
         assert.ok(Object.keys(sm).length <= 20, '요약 20개까지');
         const T = await ctx({ viewport: { width: 1920, height: 1080 } }, 'T', true);

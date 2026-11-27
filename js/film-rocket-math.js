@@ -86,7 +86,8 @@
     }
     function round(v, d) { var p = Math.pow(10, d == null ? 1 : d); return Math.round(v * p) / p; }
     /* 같은 조건 반복 → 조건 값마다 평균: trials [{ value, y }] → [{ value, n, mean, sd, ys }] (값 순서대로) */
-    function byValue(trials, def) {
+    /* 값마다 묶어 평균. plan = 팀이 정한 [①, ②] 이면 ① → ② 차례를 먼저 (가상 수업 5차 중 1: 줄인 팀도 계획한 차례대로), 나머지 값은 그 뒤 크기 차례 */
+    function byValue(trials, def, plan) {
         var map = {}, order = [];
         (trials || []).forEach(function (t) {
             if (!isFinite(t.y)) return;
@@ -96,6 +97,10 @@
         });
         var out = order.map(function (k) { var g = map[k]; return { value: g.value, n: g.ys.length, mean: mean(g.ys), sd: sd(g.ys), ys: g.ys }; });
         if (def) out.sort(function (a, b) { return axisValue(def, a.value) - axisValue(def, b.value); });
+        if (Array.isArray(plan) && plan.length === 2 && String(plan[0]) !== String(plan[1])) {
+            var at = function (v) { var i = plan.map(String).indexOf(String(v)); return i < 0 ? 2 : i; };
+            out = out.map(function (r, i) { return { r: r, i: i }; }).sort(function (a, b) { return at(a.r.value) - at(b.r.value) || a.i - b.i; }).map(function (x) { return x.r; });
+        }
         return out;
     }
     /* 목표와 차이: diff = 실제 − 목표, ok = |diff| ≤ 허용 오차 */
@@ -242,27 +247,44 @@
     function evidence(part, p, setup) {
         var defs = part === 't2' ? vars2(setup) : vars1(setup), d = p && defs[p.changed];
         if (!d) return null;
-        var rows = byValue(((p && p.trials) || []).filter(function (t) { return d.values.indexOf(t.value) >= 0; }).map(function (t) { return { value: t.value, y: part === 't2' ? t.pct : t.y }; }), d);
+        var plan = planOf(p);
+        var rows = byValue(((p && p.trials) || []).filter(function (t) { return d.values.indexOf(t.value) >= 0; }).map(function (t) { return { value: t.value, y: part === 't2' ? t.pct : t.y }; }), d, plan);
         if (!rows.length) return null;
         var unit = function (m) { return part === 't2' ? Math.round(m) + '%' : round(m, 1) + '초'; };
         var labels = rows.map(function (r) { return d.label(r.value); }), means = rows.map(function (r) { return unit(r.mean); });
-        var name = d.short || d.name, first = rows[0], last = rows[rows.length - 1];
+        // 결과판용 두 값: 계획한 ① · ② 를 둘 다 쟀으면 그 둘, 아니면 처음·끝 (5차 중 2)
+        var pair = pairRows(rows, plan), name = d.short || d.name, first = pair[0], last = pair[1];
         var one = rows.length < 2;
         var text = one ? name + '을(를) ' + labels[0] + ' 로 했더니 평균 ' + means[0]
-            : name + '을(를) ' + labels.join(' → ') + ' 로 바꿨더니 평균 ' + means.join(' → ');
-        // 선생님 결과판용 (40자 안): 처음·끝 값만
+            : name + '을(를) ' + labels.join(' → ') + ' 로 ' + planVerb(d, plan) + ' 평균 ' + means.join(' → ');
+        // 선생님 결과판용 (40자 안): 계획한 ① → ② (또는 처음·끝) 값만
         var short = one ? name + ' ' + labels[0] + ': ' + means[0] : name + ' ' + d.label(first.value) + '→' + d.label(last.value) + ': ' + unit(first.mean) + '→' + unit(last.mean);
         // 값은 두 가지 넘는데 같은 조건 반복이 하나도 없으면 흔들림을 몰라 아직 말할 수 없음 (2026-11-23 가상 수업 4차: 2차시를 값마다 1발씩만 쏴도 결론이 열림)
         var norep = !one && !rows.some(function (r) { return r.n >= 2; });
         return { one: one, norep: norep, labels: labels, means: means, text: text, short: cleanShort(short), rows: rows };
     }
-    /* 반복 흔들림: 같은 조건 반복의 가장 작은 값~가장 큰 값. 처음·끝 값의 범위가 겹치면 '흔들림 안' */
-    function spread(rows) {
+    function planOf(p) { var pl = p && p.plan; return Array.isArray(pl) && pl.length === 2 && String(pl[0]) !== String(pl[1]) ? pl : null; }
+    // 견줄 두 줄: 계획한 ① · ② 가 둘 다 있으면 그 둘, 아니면 처음·끝
+    function pairRows(rows, plan) {
+        if (plan) {
+            var a = rows.filter(function (r) { return String(r.value) === String(plan[0]); })[0], b = rows.filter(function (r) { return String(r.value) === String(plan[1]); })[0];
+            if (a && b) return [a, b];
+        }
+        return [rows[0], rows[rows.length - 1]];
+    }
+    // 정리 문장의 말: ① → ② 가 늘림이면 '늘렸더니', 줄임이면 '줄였더니', 모양처럼 크기가 없거나 계획이 없으면 '바꿨더니' (5차 중 1)
+    function planVerb(def, plan) {
+        if (!def || def.cat || !plan) return '바꿨더니';
+        var a = axisValue(def, plan[0]), b = axisValue(def, plan[1]);
+        return b > a ? '늘렸더니' : b < a ? '줄였더니' : '바꿨더니';
+    }
+    /* 반복 흔들림: 같은 조건 반복의 가장 작은 값~가장 큰 값. 계획한 ① · ② (없으면 처음·끝) 값의 범위가 겹치면 '흔들림 안' */
+    function spread(rows, plan) {
         rows = (rows || []).map(function (r) { var ys = r.ys || []; return { value: r.value, n: ys.length, lo: Math.min.apply(null, ys), hi: Math.max.apply(null, ys) }; });
         var rep = rows.some(function (r) { return r.n >= 2; });
         if (rows.length < 2 || !rep) return { rows: rows, rep: rep, verdict: '' };
-        var a = rows[0], b = rows[rows.length - 1];
-        return { rows: rows, rep: rep, verdict: a.lo <= b.hi && b.lo <= a.hi ? 'overlap' : 'clear' };
+        var ab = pairRows(rows, plan), a = ab[0], b = ab[1];
+        return { rows: rows, rep: rep, pair: [a.value, b.value], verdict: a.lo <= b.hi && b.lo <= a.hi ? 'overlap' : 'clear' };
     }
     function cleanShort(t) { return String(t == null ? '' : t).replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40); }
 
@@ -289,7 +311,10 @@
         if (b1) { out['시간 도전 차이(초)'] = round(b1.diff, 1); out['시간 도전 성공'] = Math.abs(b1.diff) <= s.tolTime + 1e-9 ? 1 : 0; }
         out['로켓 발사 수'] = t2.length + ch2.length;
         // 바꾼 조건의 값 가짓수 (1 이하 = 아직 한 가지 값으로만 잼 → 교사 발표 화면 '값 안 바꾼 팀')
-        out['1차시 값 가짓수'] = valueKinds(t1); out['2차시 값 가짓수'] = valueKinds(t2);
+        // 2026-11-27: 두 칸을 한 칸으로 ('1차시·2차시', 예 '2·1') — 요약 칸 20개 안에 '만들기' 자리를 내려고. 교사 화면은 예전 두 칸도 읽음
+        out['값 가짓수'] = valueKinds(t1) + '·' + valueKinds(t2);
+        // 🛠 만들기 (2026-11-27 가상 수업 5차 상 1): 2차시 만들기 화면을 연 팀만 — 1 다 만듦 · 0 아직 (교사 📋 진행 상황 '챙길 팀')
+        if (st.build) out['만들기'] = st.build.done ? 1 : 0;
         // 예측·정리 문장 (교사 결과판 '💬 생각'): 짧은 글만, 40자까지
         ['t1', 't2'].forEach(function (k, i) {
             var p = st[k] || {}, G = GUESS[k], n = (i + 1) + '차시';
@@ -331,7 +356,7 @@
 
     return {
         DEFAULT_SETUP: DEFAULT_SETUP, mergeSetup: mergeSetup, valueKinds: valueKinds, EASY: EASY, KEY_WORDS: KEY_WORDS, easyLine: easyLine, GUESS: GUESS, BECAUSE: BECAUSE, becauseFor: becauseFor, whyExample: whyExample, teamQuestion: teamQuestion, evidence: evidence, spread: spread, cleanShort: cleanShort, PIECES: PIECES, NOSES: NOSES, tabletLabel: tabletLabel, vars1: vars1, vars2: vars2,
-        range: range, stepIn: stepIn, axisValue: axisValue, mean: mean, sd: sd, round: round, byValue: byValue, targetDiff: targetDiff,
+        range: range, stepIn: stepIn, axisValue: axisValue, mean: mean, sd: sd, round: round, byValue: byValue, planVerb: planVerb, planOf: planOf, targetDiff: targetDiff,
         heightPct: heightPct, cmFrom: cmFrom, HAND: HAND, handPct: handPct,
         DEF: DEF, CONCEPTS: CONCEPTS, QUIZ: QUIZ, quizPoints: quizPoints, score: score, conceptChanges: conceptChanges, optText: optText, WHY: WHY,
         summary: summary, payload: payload

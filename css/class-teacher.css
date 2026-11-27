@@ -482,3 +482,19 @@ button.ct-rp-cell { cursor: pointer; }
 .ct-pframe { position: relative; }
 .ct-pframe > .ct-ptoast { position: absolute; left: 50%; bottom: 1.2em; transform: translateX(-50%); z-index: 5; padding: .5em 1.1em; border-radius: 999px; background: rgba(0, 0, 0, .78); color: #fff; font-weight: 700; font-size: 1.1rem; pointer-events: none; white-space: nowrap; }
 .ct-pframe > .ct-ptoast[hidden] { display: none; }
+/* 🎬 발표 화면 🏆 결과판 (가상 수업 5차 상 2): 순위·점수 없이 팀마다 한 줄, 6팀이 4K 한 화면 */
+.ct-pboard { table-layout: fixed; }
+.ct-pboard th:first-child, .ct-pboard td:first-child { width: 18%; }
+.ct-pboard tbody th { text-align: left; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-pboard td { text-align: left; line-height: 1.3; overflow-wrap: anywhere; }
+.ct-pb-ch { white-space: nowrap; font-weight: 700; }
+.ct-pb-ch.ok { color: var(--c-success); }
+.ct-pb-ch.no { color: var(--c-danger); }
+/* 4K 답 모음 글자는 화면 높이의 2 % 아래로 내려가지 않게, 보기 글은 줄임표 대신 줄바꿈 (가상 수업 5차 상 3) */
+.ls-answers .ls-ans-head { font-size: max(2.4vh, .8em); }
+.ls-answers .ls-ans-title { font-size: max(2.2vh, .75em); }
+.ls-answers .ls-bar, .ls-answers .ls-ans-cols .ls-bar { font-size: max(2.1vh, .7em); }
+.ls-answers .ls-ans-list { font-size: max(2.1vh, .7em); }
+.ls-answers .ls-ans-list.two { columns: 2; column-gap: 1.2em; }
+.ls-answers .ls-ans-list li { break-inside: avoid; }
+.ls-answers .ls-bar-t { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; }

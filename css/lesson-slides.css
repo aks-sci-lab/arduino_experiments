@@ -81,3 +81,6 @@
 .ls-scene svg { width: 100%; height: auto; max-height: calc(42vh * var(--ls-scale)); display: block; }
 .ls-dot { display: inline-flex; align-items: center; justify-content: center; width: 1.3em; height: 1.3em; border-radius: 50%; color: #fff; font-size: 0.85em; vertical-align: 0.1em; }
 .ls-dot.g { background: #43a047; } .ls-dot.b { background: #1e88e5; } .ls-dot.r { background: #e53935; }
+/* 작은 줄(쉬운 말·보조 줄·풀이 안내)도 프로젝터에서 화면 높이 2 % 아래로 내려가지 않게 (가상 수업 5차 상 3) */
+.ls-slide .ls-easy, .ls-slide .ls-aside, .ls-slide .ls-wait { font-size: max(2.05vh, .72em); }
+.ls-slide .ls-kicker { font-size: max(2.05vh, .8em); }

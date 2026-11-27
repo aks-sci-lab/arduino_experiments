@@ -132,7 +132,7 @@ test('로켓 비계 4: 아직 말할 수 없어요·변인별 보기·우리 숫
 
         // ① 변인별 왜냐하면 보기 + ② 우리 숫자
         await show(A, 'end-sentence');
-        assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을\(를\) 10 mL → 15 mL 로 바꿨더니 평균 12초 → 15초/);
+        assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을\(를\) 10 mL → 15 mL 로 늘렸더니 평균 12초 → 15초/);
         assert.match(await box1.locator('.ev-teamq').textContent(), /물을 많이 넣으면/);
         const why = await box1.locator('[data-why]').allTextContents();
         assert.ok(why.some(t => /빈 공간/.test(t)), '물의 양 팀용 보기: ' + why.join(' / '));

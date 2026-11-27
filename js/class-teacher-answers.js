@@ -129,9 +129,9 @@
             }).join('');
             if (t.groups.length > 1) body = '<div class="ls-ans-cols">' + body + '</div>';
             // 계획 장: 막대 아래 팀마다 바꾼 것 · 예측 · 까닭
-            if (t.list && t.list.length) body += '<ul class="ls-ans-list">' + t.list.map(function (x) { return '<li><b>' + esc(x.name) + '</b> ' + esc(x.text) + '</li>'; }).join('') + '</ul>';
+            if (t.list && t.list.length) body += '<ul class="ls-ans-list' + (t.list.length > 3 ? ' two' : '') + '">' + t.list.map(function (x) { return '<li><b>' + esc(x.name) + '</b> ' + esc(x.text) + '</li>'; }).join('') + '</ul>';
         } else {
-            body = t.list.length ? '<ul class="ls-ans-list">' + t.list.map(function (x) { return '<li><b>' + esc(x.name) + '</b> ' + esc(x.text) + '</li>'; }).join('') + '</ul>' : '';
+            body = t.list.length ? '<ul class="ls-ans-list' + (t.list.length > 3 ? ' two' : '') + '">' + t.list.map(function (x) { return '<li><b>' + esc(x.name) + '</b> ' + esc(x.text) + '</li>'; }).join('') + '</ul>' : '';
         }
         return head + body;
     }

@@ -78,6 +78,8 @@ test('로켓 계획 🔮·🛠 만들기·쏘는 힘+무게 응답 장: 폰(iPho
         await toSlide(T, /우리 팀 실험 계획/);
         assert.match(await T.textContent('#pSlides .ls-slide'), /① → ② 로 바꾸면 시간이 길어질까요, 짧아질까요\? 왜\?/);
         // 폰: 먼저 변인 통제 퀴즈 (팀 점수), 그다음 바꿀 것·① → ②·🔮 예측
+        // (가상 수업 5차 중 3: 풀이가 열린 채 넘어간 gas 퀴즈를 먼저 한 번)
+        for (const P of [A, B]) { await go(P, 'q-gas'); await P.click('.ev-choice[data-k="ok"]'); }
         for (const P of [A, B]) await go(P, 'q-control');
         assert.equal(await A.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, '375px');
         await A.click('.ev-choice[data-k="ok"]'); await go(A, 't1-var');
