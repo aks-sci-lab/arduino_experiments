@@ -149,6 +149,9 @@ test('수업 자료 편집 → 발표 보기에 반영 → 기본 자료로 되�
         assert.equal(app.db.docs.has('lessonEdits/teacher-1/exps/rocket'), false);
         await P.reload();
         await P.waitForFunction(() => document.querySelector('#presentPane.ls-on .ls-title'), null, { timeout: 15000 });
+        // 단계 끝에서 설명이 닫히지 않으므로(2026-11-27) 다시 열면 보던 장에서 이어짐 → ← 로 첫 장까지 가면 기본 자료
+        assert.ok(base.includes(await P.textContent('#pSlides .ls-title')), '되돌린 뒤 발표 보기는 기본 자료 (이어 보는 장)');
+        for (let i = 0; i < 20 && await P.textContent('#pSlides .ls-title') !== base[0]; i++) await P.keyboard.press('ArrowLeft');
         assert.equal(await P.textContent('#pSlides .ls-title'), base[0], '되돌린 뒤 발표 보기는 기본 자료');
         await P.close();
 
