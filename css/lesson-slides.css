@@ -61,3 +61,23 @@
 .ls-texts { margin: 0; padding-left: 1.2em; columns: 2; font-size: 0.85em; }
 .ls-rnote { margin: 0.35em 0 0; font-size: 0.7em; color: var(--c-muted); }
 .ls-who { font-size: 0.55em; }
+/* 그림 카드 흐름 (로켓 '이렇게 재요' 2026-11-27, 초3 가족이 프로젝터로 한눈에): 카드마다 번호·큰 그림·두세 낱말, 사이에 ➜ */
+.ls-flow { display: flex; align-items: stretch; gap: 0.35em; margin: 0.15em 0 0.5em; }
+.ls-step { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 0.15em; padding: 0.35em 0.3em 0.45em;
+    border: 3px solid var(--c-line); border-radius: 0.5em; background: var(--c-bg); text-align: center; }
+.ls-step-n { font-size: 0.95em; font-weight: 800; color: var(--c-primary); line-height: 1; }
+.ls-step-ic { display: flex; justify-content: center; width: 100%; }
+.ls-step-ic svg { width: 100%; height: auto; max-height: calc(36vh * var(--ls-scale)); }
+.ls-step-t { font-size: 1.05em; line-height: 1.2; color: var(--c-text); }
+.ls-arr { align-self: center; flex: 0 0 auto; font-size: 1.4em; color: var(--c-primary); }
+.ls-aside { margin: 0.2em 0 0; font-size: 0.72em; color: var(--c-muted); }
+/* 채워 갈 결과 표 (안 B) */
+.ls-body table.ls-fill { width: 100%; font-size: 1.05em; margin: 0.2em 0 0.4em; }
+.ls-fill td, .ls-fill th { padding: 0.35em 0.4em; }
+.ls-fill tbody th { text-align: left; white-space: nowrap; color: var(--c-primary-dark); }
+.ls-fill td { font-size: 1.15em; }
+.ls-fill td.ls-avg { font-weight: 800; color: var(--c-primary); background: var(--c-primary-soft); }
+.ls-bigq { margin: 0.25em 0; font-size: 1.1em; font-weight: 700; }
+.ls-scene svg { width: 100%; height: auto; max-height: calc(42vh * var(--ls-scale)); display: block; }
+.ls-dot { display: inline-flex; align-items: center; justify-content: center; width: 1.3em; height: 1.3em; border-radius: 50%; color: #fff; font-size: 0.85em; vertical-align: 0.1em; }
+.ls-dot.g { background: #43a047; } .ls-dot.b { background: #1e88e5; } .ls-dot.r { background: #e53935; }
