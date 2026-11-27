@@ -2,11 +2,11 @@
 //  최대한 한곳에 집중되도록 하고 학생 화면은 수업화면 옆에 같이 보이도록") — Playwright, 가짜 저장소
 //  ① 설명 장(왼쪽 약 65 %) | 학생 화면(오른쪽 약 35 %) — 장을 넘기면 학생 화면도 따라감
 //     · 로켓: 폰이 보는 화면 그대로(👀 대기 → 답 칸 → 퀴즈 → 측정), 7단계: 그 단계 탭 + 👀 띠 + 답 가리기(풀이를 열면 열림)
-//  ② 아래 띠 하나로: 단계 열기·↩ 되돌리기·🔓 풀이·⬜ 설명만/⇔ 나란히·📱 학생 크게·🧩 모아 보기·🏆 결과판·📱 QR·⛶·📋
+//  ② 아래 띠 하나로: 단계 열기·↩ 되돌리기·🔓 풀이·⬜ 설명만/⇔ 나란히·🧩 모아 보기·🏆 결과판·📱 QR·⛶·📋
 //     띠는 한 줄 (4K 3840×2160 배율 100·150·200 %·1280×720), 단추 44px 이상, 오른쪽 위 QR 없음
-//  ③ 설명 장이 없는 실험은 학생 화면만 크게
+//  ③ 설명 장 마지막 장 다음은 학생 화면 단독 없이 다음 단계 열기 확인 (2026-11-27)
+//  ④ 설명 장이 없는 실험은 학생 화면만 크게
 const test = require('node:test');
-const toStudent = async P => { for (let i = 0; i < 80 && await P.evaluate(() => !!document.querySelector('#presentPane.ls-on .ls-slide')); i++) { await P.keyboard.press('ArrowRight'); await P.waitForTimeout(40); } };   // 설명 장을 끝까지 넘겨 학생 화면으로 ('📱 학생 크게' 단추는 2026-11-23 뺌)
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const { loadLabStore, labServer, configJs } = require('./fake-lab-store.cjs');
@@ -152,17 +152,20 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         assert.match(await slideTitle(T), /이제 폰으로 재요/);
         await waitFrame(T, 't1-safe');
         if (SHOTS) await T.screenshot({ path: path.join(SHOTS, 'rocket-side-measure-1920.png') });
+        // 1차시 마지막 장(🎯 도전) 다음 → 학생 화면을 단독으로 띄우지 않고 '2차시를 열까요?' (2026-11-27 사용자 결정)
+        for (let k = 0; k < 14 && !(await T.isVisible('#pAsk')); k++) await T.keyboard.press('ArrowRight');
+        assert.equal(await T.isVisible('#pAsk'), true, '마지막 장 다음은 열기 확인');
+        assert.match(await T.textContent('#pAskText'), /2차시/);
+        assert.match(await slideTitle(T), /도전/, '설명 장(도전) 그대로');
+        d = await box(T, '#pSlides'); f = await box(T, '#presentFrame');
+        assert.ok(d && f && d.x + d.width <= f.x + 1, '학생 화면은 옆 칸에만');
+        assert.ok(f.height < 1080 && f.width < 700, '학생 화면 단독(크게) 아님');
+        assert.notEqual(await A.getAttribute('#ev-app', 'data-screen'), 'wait', '도전 장에서 폰은 멈추지 않음 (도전 화면)');
+        await T.keyboard.press('Escape');
         // ↩ 되돌리기 (띠, 확인 창) → 단계 하나 잠김
         await T.click('#btnPBack');
         await T.waitForFunction(() => /들어가기/.test(document.getElementById('pStage').textContent), null, { timeout: 15000 });
         assert.equal(app.db.docs.get('labClasses/' + c.space).stage, 1, '↩ 로 되돌림');
-        // 📱 학생 크게 → 설명 닫고 학생 화면만 (폰도 혼자 흐름으로)
-        await toStudent(T);
-        assert.equal(await slideTitle(T), '', '설명 닫힘');
-        f = await box(T, '#presentFrame');
-        assert.ok(f && f.height > 900, '학생 화면 크게');
-        await A.waitForFunction(() => !document.documentElement.classList.contains('ev-following'), null, { timeout: 15000 });
-        assert.match(await T.textContent('#btnPMode'), /설명/);
         // 📋 진행 상황 (띠) → 팝업에서 바로 단계·목록·마치기·설정 (진행 화면으로 빠지지 않음)
         await T.click('#btnPExit');
         await T.waitForSelector('#runPop:not([hidden]) #stageCard:not([hidden])');
