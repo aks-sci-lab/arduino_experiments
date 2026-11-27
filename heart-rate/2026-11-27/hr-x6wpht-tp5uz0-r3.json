@@ -1,0 +1,152 @@
+{
+  "id": "hr-x6wpht-tp5uz0-r3",
+  "exp": "heartrate",
+  "measuredAt": "2026-11-27T12:35:24.109Z",
+  "savedAt": "2026-11-27T12:35:24.545Z",
+  "device": "dve2x6wpht",
+  "summary": {
+    "심박수": 96.8,
+    "신뢰도": 0.56,
+    "노출": "steady",
+    "손목": "",
+    "FFT": 94,
+    "자기상관": 47,
+    "봉우리": 97
+  },
+  "data": {
+    "result": {
+      "ok": true,
+      "bpm": 96.8,
+      "level": "bad",
+      "conf": 0.56,
+      "method": "자기상관 → 두 배 후보 검사로 바꿈",
+      "channel": "r",
+      "bpmFFT": 94.3,
+      "bpmAC": 47.2,
+      "bpmPeaks": 96.8,
+      "ibi": [
+        629,
+        668,
+        639,
+        651,
+        638,
+        611,
+        596,
+        604,
+        596,
+        600,
+        603,
+        640,
+        635,
+        683,
+        641,
+        622,
+        594,
+        628,
+        639,
+        611,
+        625,
+        608,
+        618,
+        617,
+        617,
+        588,
+        609,
+        585,
+        599,
+        605
+      ],
+      "cv": 0.037,
+      "dur": 24.62,
+      "fpsMean": 71.4,
+      "reasons": [
+        "24.6초쯤 손가락이 떨어진 것 같아 그 뒤는 빼고 계산했어요",
+        "처음 찾은 47회/분보다 두 배인 97회/분이 더 그럴듯해 바꿨어요",
+        "아주 어두워서 신뢰도 낮음",
+        "처음 3초(손가락·노출이 자리 잡는 동안)는 빼고 계산"
+      ],
+      "mode": "steady",
+      "modeText": "노출 값이 측정 동안 바뀌지 않음 → 보정 없이 그대로 계산",
+      "doubled": true,
+      "acdc": 0.02583,
+      "alt": null,
+      "cutAt": 24.6,
+      "doubleCheck": {
+        "switch": true,
+        "from": 47.19173066685902,
+        "f2": 1.571044921875,
+        "ratio": 3.038,
+        "snr": 57.8,
+        "cvBroad": 0.037,
+        "altHeight": 0.91,
+        "why": "broad"
+      },
+      "expLag": null,
+      "expBeta": null,
+      "quality": {
+        "covered": true,
+        "R": 38.2,
+        "G": 4.9,
+        "B": null,
+        "rg": 7.83,
+        "level": "good"
+      },
+      "light": {
+        "level": "dark",
+        "text": "🌙 아주 어두워요 — 더 밝은 곳(창가)에서 하거나 플래시를 켜세요. 손가락 밝기가 낮아요 (빨강 38) · 손가락을 대기 전 방이 어두웠어요",
+        "R": 38.2,
+        "acdc": 0.02583,
+        "exposureTime": 416.219,
+        "iso": 27
+      },
+      "exposure": {
+        "warn": false,
+        "wobble": false,
+        "available": true,
+        "text": "노출이 바뀌지 않았어요 (좋음)",
+        "varPct": 0
+      }
+    },
+    "lock": "unlocked",
+    "why": "어두워서 자동 노출이 이미 한계라 잠그지 않음(값이 그대로인지만 봄)",
+    "lockLog": {
+      "steps": [
+        {
+          "what": "잠그기 전",
+          "ms": 0,
+          "y": 17.6,
+          "r": 45.9,
+          "mode": "continuous",
+          "et": 416.2186,
+          "iso": 27
+        }
+      ],
+      "before": {
+        "what": "잠그기 전",
+        "ms": 0,
+        "y": 17.6,
+        "r": 45.9,
+        "mode": "continuous",
+        "et": 416.2186,
+        "iso": 27
+      },
+      "target": 60,
+      "skipped": true
+    },
+    "scene": {
+      "y": 13.4,
+      "exposureTime": 333.33333,
+      "iso": 27
+    },
+    "torch": false,
+    "facing": "environment",
+    "palp": null,
+    "palpBpm": null,
+    "device": "Android 10 · Chrome 158",
+    "screen": [
+      360,
+      880,
+      3
+    ]
+  }
+}
