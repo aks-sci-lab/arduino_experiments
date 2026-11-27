@@ -60,3 +60,16 @@
     .back, nav.steps, .step-next, #class-bar-mount, .th-bar, .th-sim-bar, .th-sensors button, .th-sensors select { display: none !important; }
     .step-panel { display: block !important; }
 }
+
+/* 설명 화면 답 가리기: 가린 자리에 '언제 열리는지' (공통 문구는 css/class-share.css, 가설연역이면 그 이름) */
+[data-lesson-answer][data-lesson-stage="purpose"].cs-ans-hide::after { content: '🔒 1. 목적 설명 뒤에 열려요'; }
+[data-lesson-answer][data-lesson-stage="theory"].cs-ans-hide::after { content: '🔒 2. 이론 설명 뒤에 열려요'; }
+html.flow-hd [data-lesson-answer][data-lesson-stage="purpose"].cs-ans-hide::after { content: '🔒 ① 문제 인식 설명 뒤에 열려요'; }
+html.flow-hd [data-lesson-answer][data-lesson-stage="theory"].cs-ans-hide::after { content: '🔒 ② 가설 설정 설명 뒤에 열려요'; }
+details.th-purpose > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+/* 회차 목록: 선생님께 보낸 상태 */
+.th-sent { font-size: .85em; margin-top: 2px; }
+.th-sent.ok { color: var(--c-success); }
+.th-sent.err { color: var(--c-danger); }
+/* 시뮬레이션 고르기: 긴 이름이 폰 폭(375px)을 넘지 않게 */
+#simPreset { max-width: 100%; min-width: 0; }

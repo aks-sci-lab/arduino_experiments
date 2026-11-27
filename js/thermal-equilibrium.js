@@ -15,6 +15,7 @@
         tab: 'purpose',
         runs: [],           // 저장된 회차 [{ no, title, meta, samples:[{t,t1,t2}], markers:[{t,text}], at }]
         ext: {},            // 조 공유로 받은 회차
+        sent: {},           // 수업에서 선생님께 보낸 회차 { r1: { at, sig } }
         share: null,
         sensorOptions: [],  // BleSensorRegistry.loadOptionsFor('thermal') 결과
         importedProfiles: [],
@@ -43,13 +44,14 @@
                 state.runs = Array.isArray(d.runs) ? d.runs : [];
                 state.ext = d.ext && typeof d.ext === 'object' ? d.ext : {};
                 state.share = d.share || null;
+                state.sent = d.sent && typeof d.sent === 'object' ? d.sent : {};
             }
         } catch (e) { /* 저장 무시 */ }
     }
     function saveState() {
         try {
             localStorage.setItem(STORE_KEY, JSON.stringify({
-                runs: state.runs, ext: state.ext, share: state.share
+                runs: state.runs, ext: state.ext, share: state.share, sent: state.sent
             }));
         } catch (e) { /* 저장 한도 무시 */ }
     }
@@ -414,7 +416,7 @@
         $('liveMsg').textContent = '✅ "' + title + '" 회차를 저장했어요! 조건을 ②로 바꿔 한 번 더 재거나 6. 결과에서 분석하세요.';
         renderRuns();
         renderResults();
-        if (share) share.saved();
+        sendToTeacher();
     }
 
     // ---------- 저장 회차 & 결과 표·그래프 ----------
@@ -426,6 +428,45 @@
         return list;
     }
 
+    // ---------- 수업(?c=)이면 회차를 저장·불러오기·지울 때 선생님께 저절로 보내기 ----------
+    // (ClassShare autoSendOnSave: 수업일 때만 켬. 보낸 상태는 회차 목록에 '✅ 선생님께 보냄')
+    const IN_CLASS = !!new URLSearchParams(location.search).get('c');
+    const sendRun = { busy: false, err: '' };
+    const runSig = r => String(r.title || '') + '|' + ((r.samples || []).length);
+    function sendToTeacher(again) {
+        if (!share) return Promise.resolve(null);
+        if (!IN_CLASS) return share.saved();
+        sendRun.busy = true; sendRun.err = ''; renderRuns();
+        return (again ? share.sendPicked() : share.saved()).then(r => {
+            sendRun.busy = false;
+            if (r && r.busy) { setTimeout(() => sendToTeacher(true), 1500); sendRun.busy = true; return r; }
+            if (r && r.ok && !r.skipped) {
+                const at = new Date().toISOString(), pre = String(share.device() || '') + '-';
+                const itemId = id => (String(id).indexOf(pre) === 0 ? String(id).slice(pre.length) : String(id));   // 줄 id = 기기-회차 id
+                (r.ids || []).map(itemId).forEach(id => {
+                    const run = state.runs.find(x => 'r' + x.no === id);
+                    if (run) state.sent[id] = { at, sig: runSig(run) };
+                });
+                (r.cleared || []).map(itemId).forEach(id => { delete state.sent[id]; });
+                saveState();
+            } else if (r && !r.ok) {
+                sendRun.err = r.error ? String(r.error) : '수업 참여(조·번호)를 먼저 고르세요.';
+            }
+            renderRuns();
+            return r;
+        }, () => { sendRun.busy = false; sendRun.err = '인터넷 연결을 확인하세요.'; renderRuns(); });
+    }
+    function sentLine(r) {
+        if (!IN_CLASS) return '';
+        const s = state.sent && state.sent['r' + r.no];
+        if (s && s.sig === runSig(r)) {
+            const d = new Date(s.at);
+            return '<div class="th-sent ok" data-sent="ok">✅ 선생님께 보냄 (' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ')</div>';
+        }
+        if (sendRun.busy) return '<div class="th-sent" data-sent="busy">📤 선생님께 보내는 중…</div>';
+        return '<div class="th-sent err" data-sent="no">⚠ 아직 선생님께 못 보냈어요' + (sendRun.err ? ' — ' + esc(sendRun.err) : '') + '</div>';
+    }
+
     function renderRuns() {
         const cnt = state.runs.length;
         $('runsCnt').textContent = cnt ? '(' + cnt + '회차)' : '';
@@ -433,15 +474,16 @@
             $('runsList').innerHTML = '<p class="note">아직 저장한 회차가 없습니다. 위에서 측정한 뒤 💾 이 회차 저장을 누르세요.</p>';
             return;
         }
+        const unsent = IN_CLASS && !sendRun.busy && state.runs.some(r => { const s = state.sent['r' + r.no]; return !s || s.sig !== runSig(r); });
         $('runsList').innerHTML = state.runs.slice().reverse().map(r => {
             const a = M.analyzeRun(r.samples, r.meta);
             return '<div class="th-run-item"><div><b>' + esc(r.title) + '</b><div class="meta">' +
                 esc(M.liquidOf(r.meta.liquid1).name) + ' ' + r.meta.m1 + 'g : ' + esc(M.liquidOf(r.meta.liquid2).name) + ' ' + r.meta.m2 + 'g · ' +
-                '열평형 <b>' + fmt(a.tEq, 1) + ' °C</b> (이론 ' + fmt(a.tTheory, 1) + ' °C) · 점 ' + a.n + '개</div></div>' +
+                '열평형 <b>' + fmt(a.tEq, 1) + ' °C</b> (이론 ' + fmt(a.tTheory, 1) + ' °C) · 점 ' + a.n + '개</div>' + sentLine(r) + '</div>' +
                 '<div class="th-bar" style="margin:0;">' +
                 '<button type="button" class="secondary" data-csv="' + r.no + '">⬇ CSV</button>' +
                 '<button type="button" class="danger" data-del="' + r.no + '">🗑</button></div></div>';
-        }).join('');
+        }).join('') + (unsent ? '<div class="th-bar"><button type="button" id="btnResend">📤 선생님께 다시 보내기</button></div>' : '');
     }
 
     function renderResults() {
@@ -617,6 +659,11 @@
                 if (!confirm('회차 ' + no + '을(를) 지울까요?')) return;
                 state.runs = state.runs.filter(r => r.no !== no);
                 saveState(); renderRuns(); renderResults();
+                sendToTeacher();
+                return;
+            }
+            if (e.target.closest('#btnResend')) {
+                sendToTeacher(true);
                 return;
             }
             const csv = e.target.closest('[data-csv]');
@@ -644,7 +691,8 @@
                 state.runs.push({ no, title: parsed.title, meta: readMeta(), samples: parsed.samples, markers: [], at: new Date().toISOString() });
                 state.comparePicked['m:' + no] = true;
                 saveState(); renderRuns(); renderResults();
-                $('liveMsg').textContent = '✅ CSV "' + parsed.title + '" (' + parsed.samples.length + '점)을 회차로 불러왔어요.';
+                $('liveMsg').textContent = '✅ CSV "' + parsed.title + '" (' + parsed.samples.length + '점)을 회차로 불러왔어요.' + (IN_CLASS ? ' 선생님께도 보내요.' : '');
+                sendToTeacher();
                 e.target.value = '';
             };
             r.readAsText(f);
@@ -688,6 +736,7 @@
             barMount: '#class-bar-mount',
             shareMount: '#share-mount',
             csvHint: '5-4 저장한 회차 → ⬇ CSV',
+            autoSendOnSave: IN_CLASS,   // 수업이면 회차를 저장·불러오기·지울 때 저절로 보냄
             store: { load: () => state.share, save: o => { state.share = o; saveState(); } },
             getItems: () => M.buildItems(state.runs),
             onIncoming: items => {
@@ -712,7 +761,7 @@
             mount: '#report-ai',
             contextFrom: '#resTable, #resSummary, #advTable',
             sections: [
-                { key: 'problem', name: '우리 생각', step: 'purpose', inline: true, hint: '큰 비커와 작은 비커의 물 온도는 어떻게 변하고 어디서 만날까? 떠오른 생각을 한두 줄로.' },
+                { key: 'problem', name: '우리 생각', step: 'purpose', inline: true, hint: '두 물의 온도는 어떻게 변하고, 만나는 온도는 무엇에 따라 달라질까? 예: "○○이 많으면(높으면) 만나는 온도는 …" 처럼 한두 줄로.' },
                 { key: 'theory', hint: '열의 이동 방향, 열평형 온도, Q = c·m·ΔT (심화: 열용량·열전달 속도)를 내 말로 정리하세요.' },
                 { key: 'design', name: '변인·예상', step: 'procedure', inline: true, vars: VARS, hint: '바꿀 것은 하나만, ① → ② 값과 예상을 먼저 정해요.' },
                 { key: 'method', hint: '큰 비커·작은 비커 배치, 무선 센서 2대 측정 순서와 통제 변인을 적으세요.' },
