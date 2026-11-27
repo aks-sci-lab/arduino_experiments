@@ -69,7 +69,7 @@ test('로켓 4차 고침: 2차시 반복·대기 화면·끊김 안내·도전 �
         await P.evaluate(() => window.__filmRocket.show('t1-predict')); await go(P, 't1-measure');
         // ④ 2차시: 발사 전 퀴즈 → mass 퀴즈 (설계 기록 없음), 예전 주소 t2-base 도 넘어감
         await P.evaluate(() => { const s = window.__filmRocket.state(); s.gate = { open: null }; window.__filmRocket.show('t2-intro'); });
-        await go(P, 't2-intro'); await next(P); await go(P, 'q-action'); await P.click('.ev-choice[data-k="ok"]'); await P.waitForSelector('.ev-ok'); await next(P);
+        await go(P, 't2-intro'); await next(P); await go(P, 't2-build');   /* 2026-11-27 🛠 만들기 */ await P.click('#ev-build-done'); await go(P, 'q-action'); await P.click('.ev-choice[data-k="ok"]'); await P.waitForSelector('.ev-ok'); await next(P);
         await go(P, 'q-mass');
         await P.evaluate(() => window.__filmRocket.show('t2-base')); await go(P, 'q-mass');
         // ① 2차시 결과 → 🔁 같은 조건으로 한 번 더 (눈으로 고르기로 빠르게)
@@ -110,7 +110,7 @@ test('로켓 4차 고침: 2차시 반복·대기 화면·끊김 안내·도전 �
         await T.waitForSelector('#pSlides .ls-slide');
         await go(A, 'wait');
         // ⑧ 응답 장('힘')을 보는 중에 교사 화면 새로고침 · 두 번째 창(다른 배율) → 같은 장에서 이어 보임, 폰 답 칸 그대로 (문서를 되돌려 쓰지 않음)
-        await T.keyboard.press('ArrowRight'); await T.keyboard.press('ArrowRight'); await go(A, 'think-force');   // 첫 장 → '폰에서 이렇게 해요'(#198) → '힘'
+        await T.keyboard.press('ArrowRight'); await go(A, 'think-force');   // 첫 장 → '힘' (2026-11-27 '폰에서 이렇게 해요'는 첫 장에 합침)
         await T.waitForFunction(() => /힘/.test((document.querySelector('#pSlides .ls-title') || {}).textContent || ''));
         await T.waitForTimeout(800);
         const L0 = JSON.stringify(app.db.docs.get('labClasses/' + c.space).lesson);

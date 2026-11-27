@@ -34,8 +34,6 @@
             '</g>';
     };
     var SW = function (x, y) { return '<g transform="translate(' + x + ' ' + y + ')"><circle cx="0" cy="0" r="11" fill="#fff" stroke="#455a64" stroke-width="3"/><path d="M0 0 L0 -7 M0 0 L5 3" stroke="#e53935" stroke-width="2.5"/><rect x="-3" y="-17" width="6" height="5" fill="#455a64"/></g>'; };
-    var STEP = function (n, ic, t) { return '<div class="ls-step"><span class="ls-step-n">' + n + '</span><span class="ls-step-ic" aria-hidden="true">' + ic + '</span><b class="ls-step-t">' + t + '</b></div>'; };
-    var ARR = '<span class="ls-arr" aria-hidden="true">➜</span>';
     var SVG_SAME3 = '<svg viewBox="0 10 150 85" role="img" aria-label="같은 필름통을 3번 재는 그림">' + CAN(10, '①', '#90caf9') + SW(80, 40) + SW(108, 40) + SW(136, 40) +
         '<text x="108" y="80" text-anchor="middle" font-size="16" fill="#455a64">3번</text></svg>';
     var SVG_CHG3 = '<svg viewBox="0 10 150 85" role="img" aria-label="하나만 바꾼 필름통을 3번 재는 그림">' + CAN(10, '②', '#ef9a9a') + SW(80, 40) + SW(108, 40) + SW(136, 40) +
@@ -43,16 +41,15 @@
     var SVG_BARS = '<svg viewBox="0 0 150 110" role="img" aria-label="①과 ②의 평균 막대를 견주는 그림"><rect x="10" y="96" width="130" height="3" fill="#90a4ae"/>' +
         '<rect x="30" y="34" width="34" height="62" rx="3" fill="#90caf9"/><rect x="86" y="54" width="34" height="42" rx="3" fill="#ef9a9a"/>' +
         '<text x="47" y="26" text-anchor="middle" font-size="16" font-weight="700" fill="#1565c0">①</text><text x="103" y="46" text-anchor="middle" font-size="16" font-weight="700" fill="#c62828">②</text></svg>';
+    var AVG = '<p class="ls-aside">⏱ 초시계 또는 🎥 녹화(‘펑’ 장면 고르기) · 🧒 평균 = 여러 번 잰 값을 모두 더해 잰 횟수로 나눈 값</p>';
     var HOW_T1 = {
         // 안 A: 그림 카드 3칸 흐름
-        a: '<div class="ls-flow">' + STEP('①', SVG_SAME3, '그대로<br>3번 재요') + ARR + STEP('②', SVG_CHG3, '하나만 바꿔<br>3번 재요') + ARR + STEP('📊', SVG_BARS, '평균을<br>견줘요') + '</div>' +
-           '<p class="ls-aside">⏱ 초시계 또는 🎥 녹화(‘펑’ 장면 고르기) · 🧒 평균 = 여러 번 잰 값을 모두 더해 잰 횟수로 나눈 값</p>',
+        a: { flow: [{ n: '①', img: SVG_SAME3, t: '그대로<br>3번 재요' }, { n: '②', img: SVG_CHG3, t: '하나만 바꿔<br>3번 재요' }, { n: '📊', img: SVG_BARS, t: '평균을<br>견줘요' }], body: AVG },
         // 안 B: 채워 갈 결과 표 하나 (폰의 결과 비교 표와 같은 모양)
-        b: '<table class="ls-fill"><thead><tr><th></th><th>1번</th><th>2번</th><th>3번</th><th>평균</th></tr></thead><tbody>' +
+        b: { body: '<table class="ls-fill"><thead><tr><th></th><th>1번</th><th>2번</th><th>3번</th><th>평균</th></tr></thead><tbody>' +
            '<tr><th>① 그대로</th><td>⏱</td><td>⏱</td><td>⏱</td><td class="ls-avg">?초</td></tr>' +
            '<tr><th>② 하나만 바꿔서</th><td>⏱</td><td>⏱</td><td>⏱</td><td class="ls-avg">?초</td></tr></tbody></table>' +
-           '<p class="ls-bigq">①과 ②의 <b>평균</b>은 어떻게 다를까요?</p>' +
-           '<p class="ls-aside">⏱ 초시계 또는 🎥 녹화(‘펑’ 장면 고르기) · 🧒 평균 = 여러 번 잰 값을 모두 더해 잰 횟수로 나눈 값</p>'
+           '<p class="ls-bigq">①과 ②의 <b>평균</b>은 어떻게 다를까요?</p>' + AVG }
     };
     var KID = function (x, h) {   // 아이 (발끝 y=150, 키 h)
         var top = 150 - h;
@@ -87,15 +84,13 @@
         '<path d="M312 104 L150 40 M312 104 L150 182" stroke="#b0bec5" stroke-width="2" stroke-dasharray="4 4"/>' +
         '<path d="M150 214 L330 214" stroke="#455a64" stroke-width="2.5"/><path d="M150 208 L150 220 M330 208 L330 220" stroke="#455a64" stroke-width="2.5"/>' +
         '<text x="240" y="205" text-anchor="middle" font-size="16" font-weight="700" fill="#455a64">2~3 m · 폰은 세로로</text></svg>';
+    var PCT = '<p class="ls-aside">📏 자 대신 <b>같은 장면 속 아이 키</b>와 견줘요 · 녹화가 안 되면 눈으로 높다·비슷·낮다</p>' +
+        '<p class="ls-easy">🧒 쉬운 말 · % = 아이 키를 100 으로 볼 때 얼마만큼인지 · 정수리 = 머리 꼭대기</p>';
     var HOW_T2 = {
-        a: '<div class="ls-flow">' + STEP('1', SVG_STAND, '발사대<br>옆에 서요') + ARR + STEP('2', SVG_FILM2, '세로로<br>찍어요') + ARR + STEP('3', SVG_TOP, '가장 높은<br>장면') + ARR + STEP('4', SVG_TAP, '세 곳<br>눌러요') + '</div>' +
-           '<p class="ls-aside">👆 ① 발끝 ② 정수리 ③ 로켓 꼭대기 → ‘아이 키의 ○%’</p>' +
-           '<p class="ls-aside">📏 자 대신 <b>같은 장면 속 아이 키</b>와 견줘요 · 녹화가 안 되면 눈으로 높다·비슷·낮다</p>' +
-           '<p class="ls-easy">🧒 쉬운 말 · % = 아이 키를 100 으로 볼 때 얼마만큼인지 · 정수리 = 머리 꼭대기</p>',
-        b: '<div class="ls-scene">' + SVG_SCENE2 + '</div>' +
-           '<p class="ls-bigq"><span class="ls-dot g">1</span> 발끝 <span class="ls-dot b">2</span> 정수리 <span class="ls-dot r">3</span> 로켓 꼭대기 → <b>아이 키의 ○%</b></p>' +
-           '<p class="ls-aside">📏 자 대신 <b>같은 장면 속 아이 키</b>와 견줘요 · 녹화가 안 되면 눈으로 높다·비슷·낮다</p>' +
-           '<p class="ls-easy">🧒 쉬운 말 · % = 아이 키를 100 으로 볼 때 얼마만큼인지 · 정수리 = 머리 꼭대기</p>'
+        a: { flow: [{ n: '1', img: SVG_STAND, t: '발사대<br>옆에 서요' }, { n: '2', img: SVG_FILM2, t: '세로로<br>찍어요' }, { n: '3', img: SVG_TOP, t: '가장 높은<br>장면' }, { n: '4', img: SVG_TAP, t: '세 곳<br>눌러요' }],
+             body: '<p class="ls-aside">👆 ① 발끝 ② 정수리 ③ 로켓 꼭대기 → ‘아이 키의 ○%’</p>' + PCT },
+        b: { flow: [{ img: SVG_SCENE2 }],
+             body: '<p class="ls-bigq"><span class="ls-dot g">1</span> 발끝 <span class="ls-dot b">2</span> 정수리 <span class="ls-dot r">3</span> 로켓 꼭대기 → <b>아이 키의 ○%</b></p>' + PCT }
     };
 
     // 🛠 로켓 만들기 (2026-11-27 '학생이 로켓을 만드는 과정도 있어야해'): 네 단계 그림 카드 — 폰은 차례 체크 + '다 만들었어요'
@@ -112,8 +107,8 @@
     var SVG_B2 = BODY({ label: '몸통 아래에 날개 세 장을 붙인 그림', top: 38, fill: '#fff3e0', more: FINS });
     var SVG_B3 = BODY({ label: '몸통 위에 원뿔 앞코를 씌운 그림', top: 38, fill: '#fff3e0', more: FINS + NOSE });
     var SVG_B4 = BODY({ label: '점토를 붙여 무게를 맞추는 그림', top: 38, fill: '#fff3e0', more: FINS + NOSE + CLAY });
-    var BUILD_FLOW = '<div class="ls-flow">' + STEP('1', SVG_B1, '색지로<br>몸통') + ARR + STEP('2', SVG_B2, '날개<br>3장') + ARR + STEP('3', SVG_B3, '뾰족한<br>앞코') + ARR + STEP('4', SVG_B4, '점토로<br>무게') + '</div>' +
-        '<p class="ls-aside">🧰 필름통(뚜껑이 아래로) · 색지 · 가위 · 투명테이프 · 점토·클립 (처음엔 0개)</p>';
+    var BUILD = { flow: [{ n: '1', img: SVG_B1, t: '색지로<br>몸통' }, { n: '2', img: SVG_B2, t: '날개<br>3장' }, { n: '3', img: SVG_B3, t: '뾰족한<br>앞코' }, { n: '4', img: SVG_B4, t: '점토로<br>무게' }],
+        body: '<p class="ls-aside">🧰 필름통(뚜껑이 아래로) · 색지 · 가위 · 투명테이프 · 점토·클립 (처음엔 0개)</p>' };
 
     // '펑' 장면 (2026-11-21 비계 4): 물음 그림은 기체가 조금 있는 닫힌 통만, 풀이 그림은 세 칸 (조금 → 많이 + 미는 화살표 → 펑)
     var SVG_POP_ASK = '<svg viewBox="0 0 200 200" role="img" aria-label="뚜껑이 닫힌 필름통 안에 기체 알갱이가 조금 있는 그림">' +
@@ -192,7 +187,7 @@
                   note: '폰은 ‘변인 통제’ 퀴즈(팀 점수) → ‘무엇을 바꿔 볼까요?’(바꿀 것 하나 · ① → ② · 🔮 예측 · 까닭)예요. 예측은 정답이 없어요 — 프로젝터에 모인 길어질·짧아질·비슷과 까닭을 두세 팀 말하게 한 뒤 풀이(변인 통제)를 여세요. 측정할 때는 예측을 다시 묻지 않아요.' },
                 // 📱 측정 장 (2026-11-23 '폰은 응답만'): 이 장을 띄운 동안 팀 폰이 측정 화면 — '이렇게 재요'를 그림 흐름으로 이 장 안에 (2026-11-27)
                 { kind: 'how', title: '📱 이제 폰으로 재요', key: 'do-t1', mode: 'phone',
-                  body: HOW_T1[HOW_V] || HOW_T1.a,
+                  flow: (HOW_T1[HOW_V] || HOW_T1.a).flow, body: (HOW_T1[HOW_V] || HOW_T1.a).body,
                   note: '이 장을 띄워 둔 동안 팀 폰이 1차시 측정 화면이 돼요(안전 → 조건 → 재기 → 결과 비교). 다음 장으로 넘기면 측정 중이 아닌 팀은 👀 대기, 재는 중인 팀은 그 측정을 마친 뒤 바뀌어요. 손으로 누르는 초시계는 늦기 쉬워 녹화가 더 정확하다는 점도 견주어 볼 수 있어요.' },
                 { kind: 'ask', title: '같은 조건인데 시간이 달라요!',
                   body: '<p>같은 물, 같은 발포비타민인데 1번은 12초, 2번은 15초.</p>',
@@ -209,7 +204,7 @@
             t2: [
                 // 🛠 로켓 만들기 (2026-11-27 새로): 폰은 네 단계 체크 + '다 만들었어요', 프로젝터에 '다 만든 팀 N / M'
                 { kind: 'how', title: '🛠 로켓을 만들어요', key: 'build', mode: 'phone',
-                  body: BUILD_FLOW,
+                  flow: BUILD.flow, body: BUILD.body,
                   note: '폰에서 네 단계를 하나씩 체크하고 ‘✅ 다 만들었어요’를 눌러요. 프로젝터에 다 만든 팀 수가 모여요. 몸통 종이는 필름통 뚜껑 쪽이 아래로 오게, 날개는 같은 간격으로 붙이게 도와주세요.' },
                 { kind: 'ask', title: '날개와 앞코는 왜 달까요?', mode: 'look',
                   body: '<p>날아갈 때 <b>공기</b>가 앞을 막아요(<b>공기 저항</b>).</p>',
@@ -232,7 +227,7 @@
                   note: '폰은 ‘무엇을 바꿔 볼까요?’(바꿀 것 하나 · ① → ② · 🔮 예측 · 까닭)예요. 정답이 없는 예측이에요 — 프로젝터에 모인 높아질·낮아질·비슷과 까닭을 두세 팀 말하게 해 보세요. 쏠 때는 예측을 다시 묻지 않아요.' },
                 // 📱 측정 장: 2차시 발사·촬영·세 곳 누르기 — '이렇게 찍고 재요'와 '%로 재는 까닭'을 그림 흐름으로 이 장 안에
                 { kind: 'how', title: '📱 이제 폰으로 쏘아요', key: 'do-t2', mode: 'phone',
-                  body: HOW_T2[HOW_V] || HOW_T2.a,
+                  flow: (HOW_T2[HOW_V] || HOW_T2.a).flow, body: (HOW_T2[HOW_V] || HOW_T2.a).body,
                   note: '이 장을 띄워 둔 동안 팀 폰이 2차시 측정 화면이 돼요. 자를 들고 하늘까지 잴 수 없으니, 같은 장면·같은 거리에 있는 아이 키를 기준으로 견줘요. 아이 키(cm)는 폰에만 남고 선생님께는 %만 와요. 찍는 중인 팀은 장을 넘겨도 그 측정을 마친 뒤 바뀌어요.' },
                 { kind: 'how', title: '🎯 도전: 딱 아이 키만큼!', key: 'ch-t2', mode: 'phone',
                   body: '<p>우리 <b>결과 표</b>를 보고 조건을 골라 <b>아이 키만큼</b> 쏘아 올려요.</p>',

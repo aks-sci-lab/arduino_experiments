@@ -22,11 +22,12 @@ test('가족 체험형 로켓: 설명 장에 그래프 안내 없음 + 들어가
     const withGraph = allSlides.filter(sl => /그래프/.test([sl.title, sl.body, sl.ask, sl.reveal, sl.note].join(' '))).map(sl => sl.title);
     assert.deepEqual(withGraph, [], '발표 설명 장에서 그래프 안내 제거');
     assert.equal(CC.EXPS.rocket.steps.think, '들어가기', '1단계 이름은 들어가기');
-    assert.equal(think[1].title, '폰에서 이렇게 해요', '안내 장이 처음 생각 물음 앞에 위치');
-    assert.equal(think[2].key, 'force');
-    assert.equal(think[3].key, 'accel');
-    assert.equal(think[4].key, 'pressure');
-    const sum = think[5];
+    // 2026-11-27 분량 조절: '폰에서 이렇게 해요'는 첫 장(오늘 할 일)에 합침 → 들어가기 5장
+    assert.match(think[0].body, /처음 생각/, '첫 장에 폰 안내(처음 생각 고르기)');
+    assert.equal(think[1].key, 'force');
+    assert.equal(think[2].key, 'accel');
+    assert.equal(think[3].key, 'pressure');
+    const sum = think[4];
     assert.equal(sum.kind, 'concept');
     assert.match(sum.title, /힘 · 가속도 · 압력/);
     assert.match(sum.body, /쉬운 말[\s\S]*운동 상태[\s\S]*속도가[\s\S]*일정한/);

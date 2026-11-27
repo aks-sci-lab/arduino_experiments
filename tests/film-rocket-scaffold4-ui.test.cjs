@@ -57,11 +57,13 @@ test('로켓 설명 장: 압력을 ‘펑’ 장면에 잇는 장 (풀이 그림
     const vm = require('node:vm'), box = { LessonContent }; box.window = box;
     vm.runInNewContext(fs.readFileSync(path.join(REPO, 'js', 'lesson-content', 'rocket.js'), 'utf8'), box);
     const t1 = LessonContent.get('rocket').stages.t1;
-    const i = t1.findIndex(s => /펑!’ 하는 그 순간/.test(s.title));
-    assert.equal(i, 1, '1차시 gas 풀이 바로 다음 장');
+    // 2026-11-27 분량 조절: '펑' 물음 두 장(기체 발생 + 그 순간)을 1차시 첫 장 하나로 (gas 퀴즈 key 그대로)
+    const i = t1.findIndex(s => s.key === 'gas');
+    assert.equal(i, 0, '1차시 첫 장');
+    assert.equal(t1.filter(s => /펑/.test(s.title)).length, 1, "'펑' 장은 하나");
     const s = t1[i];
     assert.ok(s.ask && s.reveal && s.revealImg && s.img);
-    assert.ok(s.reveal.includes(M.DEF.pressure.replace('압력 = ', '').replace('일정한 넓이에', '일정한 <b>넓이</b>에')), '압력 정의 말이 생각 열기와 같음');
+    assert.match(s.reveal, /이산화 탄소[\s\S]*압력[\s\S]*붙잡는 힘/, '기체 → 압력 → 붙잡는 힘보다 커지면 펑');
     assert.doesNotMatch(LessonSlides.render(s, false), /③ 펑/, '풀이 전에는 답 그림 없음');
     assert.match(LessonSlides.render(s, true), /③ 펑/);
 });

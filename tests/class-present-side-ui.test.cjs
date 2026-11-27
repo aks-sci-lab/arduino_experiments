@@ -83,8 +83,7 @@ test('발표 보기 나란히: 설명 장 옆 학생 화면이 따라감, 조작
         assert.match(await T.evaluate(() => document.getElementById('presentFrame').contentDocument.querySelector('.ev-screen').textContent), /앞 화면을 봐요/, '학생 화면 = 폰이 보는 👀 대기');
         await A.waitForSelector('#ev-app[data-screen="wait"]');
         // → 안내 장 → 응답 장 '힘' → 학생 화면도 답 칸 (폰과 같음)
-        await T.keyboard.press('ArrowRight');
-        await T.keyboard.press('ArrowRight');
+        await T.keyboard.press('ArrowRight');   // 2026-11-27: 들어가기 첫 장 다음이 바로 '힘'
         await waitFrame(T, 'think-force');
         await A.waitForSelector('#ev-app[data-screen="think-force"]');
         assert.equal(await T.isVisible('#btnPReveal'), true, '풀이가 있는 장이면 🔓 풀이');
