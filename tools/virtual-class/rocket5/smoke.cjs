@@ -79,13 +79,13 @@ const VC = require('./lib.cjs');
         await A.click('#ev-plan-send'); await S.waitScreen(A, 'sent');
         await S.toSlide(T, /이제 폰으로 쏘아요/); await A.waitForTimeout(4000);
         res.A_do2 = await S.scr(A, 300);
-        res.run2 = await R.run2(S, A, [{ v: 0, pct: 80 }, { v: 1, hand: 'low' }]);
+        res.run2 = await R.run2(S, A, [{ v: 0, pct: 80 }, { v: 'same', pct: 84 }, { v: 1, hand: 'low' }]);
         res.trials2 = await A.evaluate(() => window.__filmRocket.state().t2.trials.map(t => [t.value, t.pct, t.method]));
         res.over = await S.overflow(T);
         res.out = S.out('smoke');
         res.log = S.log.filter(l => l.kind === 'pageerror');
         assert.deepEqual(res.trials.map(t => t[1]), [1.5, 1.8, 2.2]);
-        assert.equal(res.trials2.length, 2); assert.ok(Math.abs(res.trials2[0][1] - 80) <= 2, '80 % 근처'); assert.equal(res.trials2[1][1], 70);
+        assert.deepEqual(res.trials2.map(t => t[0]), [0, 0, 2], '같은 조건 반복 뒤 ②'); assert.equal(res.trials2[2][1], 70);
         res.ok = true;
     } catch (e) { res.error = String(e && e.stack || e).slice(0, 1500); }
     finally { console.log(JSON.stringify(res, null, 1)); await S.close(); }

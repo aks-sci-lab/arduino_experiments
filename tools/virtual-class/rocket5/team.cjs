@@ -35,7 +35,7 @@ async function goMeasure(S, pg, part, want, log, opt) {
         if (/^t[12]-result$/.test(id)) {   // 결과 화면: 같은 값이면 '같은 조건으로 한 번 더', 다른 값이면 '정해 둔 ②'·'바꿔서'
             const last = await pg.evaluate(p => { const s = window.__filmRocket.state()[p]; const r = s.trials[s.trials.length - 1]; return { v: r && r.value, plan: s.plan }; }, part);
             const wantVal = typeof want === 'number' && last.plan ? last.plan[want] : null;
-            if ((want === 'same' || (wantVal != null && wantVal === last.v)) && await pg.isVisible('#ev-again')) { await pg.click('#ev-again'); await pg.waitForTimeout(600); continue; }
+            if ((want === 'same' || (wantVal != null && wantVal === last.v)) && await pg.isVisible(part === 't2' ? '#ev-again2' : '#ev-again')) { await pg.click(part === 't2' ? '#ev-again2' : '#ev-again'); await pg.waitForTimeout(600); continue; }
             if (await pg.isVisible('#ev-change')) { await pg.click('#ev-change'); await pg.waitForTimeout(600); continue; }
             return { stuck: await S.scr(pg, 600), seen };
         }
