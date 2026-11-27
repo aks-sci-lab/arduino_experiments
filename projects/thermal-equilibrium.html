@@ -55,10 +55,10 @@
                 </svg>
                 <figcaption class="note">큰 비커(바깥쪽 · 센서 B) 안에 작은 비커(안쪽 · 센서 A)를 넣고, 온도가 다른 두 액체의 온도 변화를 실시간으로 잽니다.</figcaption>
             </figure>
-            <p class="th-ask">🤔 <b>두 물의 온도는 시간이 지나면서 어떤 모양으로 변할까요? 만나는 온도는 무엇에 따라 달라질까요?</b><br><span class="note">정답이 아니어도 괜찮아요. 조에서 떠오른 생각을 먼저 한두 줄로 써 보세요.</span></p>
+            <p class="th-ask">🤔 <b>두 물의 온도는 시간이 지나면서 어떤 모양으로 변할까요? 만나는 온도는 무엇에 따라 달라질까요?</b><br><span class="note">정답이 아니어도 괜찮아요. <b>"○○이 많으면(높으면) 만나는 온도는 …"</b>처럼, 무엇을 바꾸면 무엇이 달라질지 넣어 한두 줄로 써 보세요.</span></p>
             <div data-rai-slot="problem"></div>
         </div>
-        <details open>
+        <details class="th-purpose" data-lesson-answer="th-purpose" data-lesson-stage="purpose">
             <summary>🎯 실험 목적 보기</summary>
             <div class="card">
                 <h2>1. 실험 목적</h2>
@@ -77,8 +77,10 @@
     <section class="step-panel" data-step="theory" hidden data-subtabs="이론 나눠 보기">
         <div class="card" data-subtab="열평형 (중3)">
             <h2>2-1. 온도와 열평형 <span class="th-level mid">중3 기본</span></h2>
-            <p>온도가 높은 물체일수록 물체를 이루는 <b>입자의 운동이 활발</b>합니다. 온도가 다른 두 물체가 접촉하면, 에너지는 늘 <b>온도가 높은 물체에서 낮은 물체로</b> 이동합니다. 이렇게 이동하는 에너지를 <b>열</b>이라고 합니다.</p>
+            <p>온도가 높은 물체일수록 물체를 이루는 <b>입자의 운동이 활발</b>합니다.</p>
+            <p class="th-ask">🤔 <b>온도가 다른 두 물체가 맞닿으면 에너지는 어느 쪽으로 이동할까요? 그 이동은 언제 멈출까요?</b></p>
             <div data-lesson-answer="th-eq" data-lesson-stage="theory">
+                <p>에너지는 늘 <b>온도가 높은 물체에서 낮은 물체로</b> 이동합니다. 이렇게 이동하는 에너지를 <b>열</b>이라고 합니다.</p>
                 <p>시간이 지나 두 물체의 <b>온도가 같아져 더 이상 알짜 열 이동이 없는 상태</b>를 <b>열평형</b>, 이때의 온도를 <b>열평형 온도</b>라고 합니다.</p>
                 <p>그래프에서 뜨거운 물의 온도 곡선은 내려오고, 찬물의 온도 곡선은 올라가 <b>한 온도에서 만나 수평</b>에 가까워집니다.</p>
             </div>
@@ -99,12 +101,16 @@
 
         <div class="card" data-subtab="열손실과 오차">
             <h2>2-3. 왜 실제 열평형 온도는 이론값과 다를까?</h2>
-            <p>교실에서는 비커가 완전히 단열되어 있지 않기 때문에 두 물 사이뿐 아니라 <b>주변 공기</b>와 <b>비커 자체</b>와도 열을 주고받습니다.</p>
-            <ul class="text-list" data-lesson-answer="th-loss" data-lesson-stage="theory">
+            <p>교실의 비커는 완전히 단열되어 있지 않아요.</p>
+            <p class="th-ask">🤔 <b>뜨거운 물이 잃은 열량이 찬물이 얻은 열량보다 크게 나왔다면, 나머지 열은 어디로 갔을까요?</b></p>
+            <div data-lesson-answer="th-loss" data-lesson-stage="theory">
+            <p>두 물 사이뿐 아니라 <b>주변 공기</b>와 <b>비커 자체</b>와도 열을 주고받습니다.</p>
+            <ul class="text-list">
                 <li><b>공기로의 열 방출</b>: 뜨거운 물(특히 바깥쪽 큰 비커가 뜨거울 때)에서 공기 중으로 열이 빠져나가면 <b>실측 열평형 온도가 이론값보다 낮아집니다</b> ($Q_{\text{잃}} &gt; Q_{\text{얻}}$).</li>
                 <li><b>비커의 열 흡수</b>: 실온에 있던 유리 비커가 데워지는 데 열이 일부 쓰입니다.</li>
                 <li><b>증발 열손실</b>: 뚜껑이 열려 있으면 뜨거운 물 표면에서 증발하며 열을 빼앗깁니다.</li>
             </ul>
+            </div>
         </div>
 
         <div class="card" data-subtab="고2 심화">
@@ -400,7 +406,7 @@
         <div class="card">
             <h2>📮 내는 곳은 하나예요</h2>
             <ul class="text-list cs-hide-solo">
-                <li>📊 <b>측정값(회차)</b> — 5. 데이터에서 보낸 회차가 선생님께 전달됩니다.</li>
+                <li>📊 <b>측정값(회차)</b> — 수업 중에는 5. 데이터에서 저장하거나 불러온 회차가 저절로 선생님께 전달됩니다(회차 목록에 ✅ 선생님께 보냄).</li>
                 <li>📝 <b>보고서</b> — 아래 보고서 칸에 쓰면 선생님께 자동 저장되고, <b>📤 최종 제출</b>로 마무리합니다.</li>
             </ul>
             <p class="cs-show-solo">수업 QR 없이 혼자 연습하는 화면입니다. 아래 보고서는 이 기기에 저장되며 <b>🖨️ 인쇄(PDF)</b>로 저장할 수 있습니다.</p>
