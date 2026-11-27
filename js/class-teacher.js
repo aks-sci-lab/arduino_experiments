@@ -909,10 +909,11 @@
     function openNext() {
         var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow), nx = si && !si.all ? si.gate[si.n] : '';
         askOpen(false); $('btnStageNext').click();
-        if (nx) lessonStart(nx, 0);   // 새로 연 단계는 설명 화면부터
+        // 새로 연 단계는 설명 화면부터 (2026-11-27). 그 단계에 설명 장이 없으면 하던 설명을 닫고 그 단계 학생 화면으로
+        if (nx && !lessonStart(nx, 0) && lesson.on) { lessonOff(); setTimeout(function () { frameToGate(nx); }, 600); }
     }
     // ---------- 📖 수업 설명 화면 (2026-11-21 선생님 "교사가 프로젝트에 띄우게 될 화면에 내용이 있어야", 내용은 js/lesson-content/<exp>.js, 부품은 js/lesson-slides.js) ----------
-    // 단계를 열면 그 단계 설명부터 → 한 장씩(물음 ❓ 다음 키에 풀이) → 마지막 장 다음은 학생 화면(iframe) → 작은 탭 → 단계 끝이면 '열까요?'
+    // 단계를 열면 그 단계 설명부터 → 한 장씩(물음 ❓ 다음 키에 풀이) → 마지막 장 다음은 다음 단계 첫 장 또는 '열까요?' (학생 화면은 나란히 옆 칸, 2026-11-27)
     var LSx = window.LessonSlides;
     var lesson = { def: null, on: false, gate: '', list: [], i: 0, rev: false };
     function lessonLoad(c) {
@@ -1115,11 +1116,40 @@
         if (sb.length) sb[dir < 0 ? sb.length - 1 : 0].click();
         try { d.defaultView.scrollTo(0, 0); } catch (e) { /* 무시 */ }
     }
+    /* 설명 장의 처음·끝을 넘어갈 때 (2026-11-27 선생님 결정 "교사가 수업하는 화면에 학생의 화면이 단독으로 표시되는 기능은 필요 없어"):
+       설명 장이 있는 실험은 학생 화면을 단독으로 띄우지 않음 — 학생 화면은 '⇔ 나란히' 옆 칸에만
+       → 마지막 장 다음: 다음 단계가 열려 있으면 그 단계 첫 장 · 잠겨 있으면 '열까요?' · 마지막 단계면 머묾
+         (다음 단계에 설명 장이 없으면 예전처럼 그 단계 학생 화면)
+       ← 첫 장 앞: 앞 단계 설명의 마지막 장 (없으면 머묾) */
+    var toastT = 0;
+    function presentToast(msg) {
+        var t = $('pToast'); if (!t) return;
+        t.textContent = msg; t.hidden = false;
+        clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2500);
+    }
+    function lessonEdge(dir) {
+        var c = watched(), si = c && CC.stageInfo(c.exp, c.stage, c.flow);
+        var k = si ? si.gate.indexOf(lesson.gate) : -1;
+        if (k < 0) { if (dir > 0) lessonToFrame(1); return; }   // 단계 열기가 없는 실험: 예전처럼
+        if (dir < 0) {
+            for (var j = k - 1; j >= 0; j--) if (lessonStart(si.gate[j], -1, true)) return;
+            presentToast('첫 장이에요');
+            return;
+        }
+        var nx = si.gate[k + 1];
+        if (!nx) { presentToast('마지막 장이에요'); return; }
+        if (k + 1 < si.n) {   // 열려 있는 다음 단계
+            if (lessonStart(nx, 0)) return;
+            lessonOff(); frameToGate(nx);   // 설명 장이 없는 단계: 그 단계 학생 화면
+            return;
+        }
+        askOpen(true);
+    }
     window.addEventListener('resize', function () { if (lesson.on && LSx) LSx.fit($('pSlides')); });
     $('btnPMode').addEventListener('click', function () {
         var c = watched(); if (!c) return;
         if (pres.panel || lesson.on) return;   // 설명·🧩·🏆 가 떠 있을 때는 단추가 숨어 있음
-        if (!lessonStart(frameGate(c), 0)) $('pHint').textContent = '이 단계에는 설명 화면이 없어요.';
+        if (!lessonStart(frameGate(c), 0)) presentToast('이 단계에는 설명 화면이 없어요');
     });
     $('btnPLayout').addEventListener('click', function () {
         pres.layout = pres.layout === 'side' ? 'deck' : 'side';
@@ -1138,8 +1168,8 @@
         // '다음 단계를 열까요?' 가 떠 있는 동안 → 는 무시 (빨리 두 번 눌러 잘못 열리지 않게): 열기는 Enter·단추로만, ← 는 닫기
         if (pres.ask) { if (dir < 0) askOpen(false); return; }
         if (pres.panel) { setPanel(''); return; }   // 🏆·🧩 를 띄운 동안 → ← 는 하던 설명·학생 화면으로 돌아감
-        // 설명 장: ← 는 앞 장, 첫 장이면 그대로 머묾 · → 는 다음 장, 마지막 장 다음은 학생 화면
-        if (lesson.on) { if (!lessonMove(dir) && dir > 0) lessonToFrame(1); return; }
+        // 설명 장: ← 는 앞 장(첫 장이면 앞 단계 마지막 장) · → 는 다음 장(마지막 장 다음은 다음 단계 첫 장·열기 확인, lessonEdge)
+        if (lesson.on) { if (!lessonMove(dir)) lessonEdge(dir); return; }
         var d = frameDoc(), c = watched();
         if (!d || !c) return;
         // 글자를 크게 키우면 한 화면에 다 안 들어옴 → 먼저 남은 내용을 한 화면씩 내리고(←는 올리고), 끝에 닿은 뒤에 다음(이전) 탭
