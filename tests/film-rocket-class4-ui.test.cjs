@@ -110,7 +110,7 @@ test('로켓 4차 고침: 2차시 반복·대기 화면·끊김 안내·도전 �
         await T.waitForSelector('#pSlides .ls-slide');
         await go(A, 'wait');
         // ⑧ 응답 장('힘')을 보는 중에 교사 화면 새로고침 · 두 번째 창(다른 배율) → 같은 장에서 이어 보임, 폰 답 칸 그대로 (문서를 되돌려 쓰지 않음)
-        await T.keyboard.press('ArrowRight'); await go(A, 'think-force');
+        await T.keyboard.press('ArrowRight'); await T.keyboard.press('ArrowRight'); await go(A, 'think-force');   // 첫 장 → '폰에서 이렇게 해요'(#198) → '힘'
         await T.waitForFunction(() => /힘/.test((document.querySelector('#pSlides .ls-title') || {}).textContent || ''));
         await T.waitForTimeout(800);
         const L0 = JSON.stringify(app.db.docs.get('labClasses/' + c.space).lesson);
