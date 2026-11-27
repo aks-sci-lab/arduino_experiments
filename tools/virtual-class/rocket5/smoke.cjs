@@ -45,7 +45,8 @@ const VC = require('./lib.cjs');
         res.plan = await S.toSlide(T, /우리 팀 실험 계획/);
         await A.waitForTimeout(4000);
         res.A_plan0 = await S.scr(A, 300);
-        if ((await S.screen(A)) === 'q-control') await S.pick(A, '무엇 때문에');
+        // 놓친 퀴즈가 먼저 나올 수 있음 (고친 판: 다음 응답 장 앞에 한 번)
+        for (let g = 0; g < 4; g++) { const id = await S.screen(A); if (id === 'q-gas') await S.pick(A, '이산화'); else if (id === 'q-control') await S.pick(A, '무엇 때문에'); else break; await A.waitForTimeout(800); }
         await S.waitScreen(A, 't1-var');
         await S.pick(A, '물의 양');
         res.planVals = [await S.planStep(A, 0, 0), await S.planStep(A, 1, 1)];
@@ -72,8 +73,7 @@ const VC = require('./lib.cjs');
         res.ans_build = (await S.answers(T)).slice(0, 200);
         // 2차시 계획 → do-t2 → 🎥 한 발 80 %
         await S.toSlide(T, /로켓은 왜 솟고/); await A.waitForTimeout(4000);
-        if ((await S.screen(A)) === 'q-action') await S.pick(A, '물과 기체');
-        if ((await S.screen(A)) === 'q-mass') await S.pick(A, '가속도가 작아');
+        for (let g = 0; g < 4; g++) { const id = await S.screen(A); if (id === 'q-action') await S.pick(A, '물과 기체'); else if (id === 'q-mass') await S.pick(A, '가속도가 작아'); else break; await A.waitForTimeout(800); }
         await S.toSlide(T, /우리 팀 실험 계획/); await A.waitForTimeout(4000);
         await S.waitScreen(A, 't2-var'); await S.pick(A, '몸체 무게'); await S.planStep(A, 1, 1); await S.pick(A, '낮아질');
         await A.click('#ev-plan-send'); await S.waitScreen(A, 'sent');
