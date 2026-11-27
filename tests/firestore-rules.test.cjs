@@ -116,8 +116,9 @@ test('규칙: 수업·조 공유·진행·개발 자료 (에뮬레이터)', { sk
         assert.equal((await S2({ action: 'joinInfo', class: c.classCode })).ok, false);
         // 익명 사용자는 예전 구글 전용 컬렉션(appConfig·walkRunData·roles)에 접근 불가
         await env.withSecurityRulesDisabled(async c2 => {
-            await c2.firestore().doc('appConfig/walkRunAI').set({ allowStudents: true, apiKey: 'secret' });
-            await c2.firestore().doc('walkRunData/d1').set({ userId: 't1', label: 'walk', m: new Array(200).fill(1), evalSet: false });
+            const f2 = c2.firestore();   // 같은 곳에서 firestore() 를 두 번 부르면 설정 오류가 남
+            await f2.doc('appConfig/walkRunAI').set({ allowStudents: true, apiKey: 'secret' });
+            await f2.doc('walkRunData/d1').set({ userId: 't1', label: 'walk', m: new Array(200).fill(1), evalSet: false });
         });
         await RUT.assertFails(ctx('s1', 'anonymous').firestore().doc('appConfig/walkRunAI').get());
         await RUT.assertFails(ctx('s1', 'anonymous').firestore().doc('walkRunData/d1').get());
