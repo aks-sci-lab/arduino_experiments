@@ -966,7 +966,7 @@
             mode: s && s.mode === 'phone' && !(lesson.rev && s.reveal) ? 'phone' : 'look' };
         // 📱 선생님이 만든 응답 물음 (③): 물음 글·고를 답을 함께 (정답은 빼고) → 학생 화면(js/class-share.js)이 답 칸을 띄움
         var q = LSx.respQ ? LSx.respQ(s) : null; if (q) L.q = q;
-        var open = s && s.key && lesson.rev ? [s.key] : [];
+        var open = s && s.key && lesson.rev ? revealKeys(s) : [];
         var sig = JSON.stringify([c.space, L, open]);
         // 이어 보기로 연 장은 문서에 이미 있는 그대로 → 쓰지 않음 (다음에 장을 넘길 때부터 씀)
         if (lsync.hold) { lsync.hold = false; lsync.last = sig; c.lesson = L; return; }
@@ -982,13 +982,15 @@
     /* 옆의 학생 화면이 지금 띄운 장을 따라가게 (2026-11-23 나란히 보기): 같은 사이트 iframe 에 바로 알림 (저장소를 거치지 않아 바로 바뀜)
        · js/class-share.js (발표용) 가 학생과 같게 '👀 앞 화면을 봐요' 띠·답 가리기, 행사형(로켓)은 폰이 보는 화면(대기·답 칸·측정)
        · 단계형은 그 단계 탭으로 (작은 탭은 첫 탭) */
+    // 풀이를 열 때 함께 여는 key: 그 장 key + opens (두 장을 합친 장의 다른 퀴즈, 예: 계획 장 → 'control', 2026-11-27 분량 조절)
+    function revealKeys(s) { return [s.key].concat(Array.isArray(s.opens) ? s.opens.filter(function (k) { return /^[a-z0-9][a-z0-9-]{0,39}$/.test(String(k)); }) : []); }
     function framePush() {
         if (!pres.space) return;
         var s = lesson.on ? lesson.list[lesson.i] : null;
         var L = { on: !!lesson.on, stage: lesson.on ? lesson.gate : '', i: lesson.on ? lesson.i : 0, key: s && s.key ? s.key : '', reveal: !!(lesson.on && lesson.rev),
             mode: s && s.mode === 'phone' && !(lesson.rev && s.reveal) ? 'phone' : 'look' };
         var open = (pres.open || []).slice();
-        if (s && s.key && lesson.rev && open.indexOf(s.key) < 0) open.push(s.key);
+        if (s && s.key && lesson.rev) revealKeys(s).forEach(function (k) { if (open.indexOf(k) < 0) open.push(k); });
         try {
             var w = $('presentFrame').contentWindow;
             if (w && w.document && w.document.body) w.dispatchEvent(new w.CustomEvent('lab-present-lesson', { detail: JSON.parse(JSON.stringify({ lesson: L, lessonOpen: open })) }));
@@ -1082,7 +1084,7 @@
     $('btnLessonOpenAll').addEventListener('click', async function () {
         var c = watched(); if (!c || !LSx) return;
         var def = await LSx.load(c.exp), keys = [];
-        if (def) Object.keys(def.stages).forEach(function (k) { def.stages[k].forEach(function (sl) { if (sl.key && keys.indexOf(sl.key) < 0) keys.push(sl.key); }); });
+        if (def) Object.keys(def.stages).forEach(function (k) { def.stages[k].forEach(function (sl) { if (sl.key) revealKeys(sl).forEach(function (x) { if (keys.indexOf(x) < 0) keys.push(x); }); }); });
         var r = await CC.classLesson(c.space, { on: false }, keys);
         $('lessonMsg').textContent = r && r.ok ? '✅ 풀이 ' + keys.length + '개를 열었어요' : '⚠ ' + ((r && r.error) || '열지 못했어요');
     });

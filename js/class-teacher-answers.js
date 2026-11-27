@@ -50,6 +50,33 @@
             var g = choiceGroup('', c.opts, function (p) { return p.think && p.think.first && p.think.first[key]; }, list);
             return { kind: 'choice', groups: [g], answered: g.answered, total: total };
         }
+        // 합친 장 (2026-11-27 분량 조절): 2차시 '로켓은 왜 솟고, 무거우면?' = 작용 반작용 + 질량 퀴즈 두 칸
+        if (key === 'action' && M.QUIZ && M.QUIZ.mass) {
+            var qs = ['action', 'mass'].map(function (k) {
+                return choiceGroup(M.QUIZ[k].word || '', M.QUIZ[k].opts, function (p) { var z = p.quiz && p.quiz[k]; return z && z.picks && z.picks[0]; }, list);
+            });
+            var both = list.filter(function (p) { return ['action', 'mass'].every(function (k) { var z = p.quiz && p.quiz[k]; return z && z.picks && z.picks.length; }); }).length;
+            return { kind: 'choice', groups: qs, answered: both, total: total };
+        }
+        // 🔮 우리 팀 실험 계획 (plan-t1·plan-t2): 예측 칸마다 팀 수·막대(정답 없음) + 팀마다 바꾼 것 ① → ② · 까닭
+        var pm = /^plan-(t[12])$/.exec(key);
+        if (pm) {
+            var part = pm[1], G = M.GUESS[part], defs = part === 't1' ? M.vars1() : M.vars2();
+            var gOpts = ['down', 'up', 'same'].map(function (k) { return { k: 'g-' + k, t: G[k] }; });
+            var gg = choiceGroup('', gOpts, function (p) { var x = p[part]; return x && x.changed && p.guess && p.guess[part] && p.guess[part].dir ? 'g-' + p.guess[part].dir : ''; }, list);
+            var items = [];
+            withP.forEach(function (x) {
+                var p = x.p, z = p && p[part], g = p && p.guess && p.guess[part]; if (!z || !z.changed || !g || !g.dir) return;
+                var d = defs[z.changed], pl = z.plan;
+                items.push({ name: x.name, text: (d ? (d.short || d.name) : z.changed) + (d && pl && pl.length === 2 ? ' ' + d.label(pl[0]) + ' → ' + d.label(pl[1]) : '') + ' · ' + (G[g.dir] || '') + (g.why ? ' · 왜냐하면 ' + g.why : '') });
+            });
+            return { kind: 'choice', groups: [gg], list: items, answered: gg.answered, total: total };
+        }
+        // 🛠 만들기: 다 만든 팀 수
+        if (key === 'build') {
+            var dn = list.filter(function (p) { return p.build && p.build.done; }).length;
+            return { kind: 'done', groups: [], list: [], answered: dn, total: total };
+        }
         var q = M.QUIZ && M.QUIZ[key];
         if (q) {   // 정의 퀴즈: 처음 고른 답
             var g2 = choiceGroup('', q.opts, function (p) { var z = p.quiz && p.quiz[key]; return z && z.picks && z.picks[0]; }, list);
@@ -80,6 +107,7 @@
     /* 그리기: revealed = 풀이를 열었으면 정답 칸 ✅ */
     function render(t, revealed) {
         if (!t) return '';
+        if (t.kind === 'done') return '<p class="ls-ans-head ls-ans-done">🛠 다 만든 팀 <b>' + t.answered + '</b> / ' + t.total + (t.total > t.answered ? ' <span class="ls-ans-left">(아직 ' + (t.total - t.answered) + '팀)</span>' : t.total ? ' 🎉' : '') + '</p>';
         var head = '<p class="ls-ans-head">📱 <b>지금 폰으로 답해요</b> · 답한 팀 <b>' + t.answered + '</b> / ' + t.total +
             (t.total > t.answered ? ' <span class="ls-ans-left">(아직 ' + (t.total - t.answered) + '팀)</span>' : '') + '</p>';
         var body = '';
@@ -94,6 +122,8 @@
                     }).join('') + '</div>';
             }).join('');
             if (t.groups.length > 1) body = '<div class="ls-ans-cols">' + body + '</div>';
+            // 계획 장: 막대 아래 팀마다 바꾼 것 · 예측 · 까닭
+            if (t.list && t.list.length) body += '<ul class="ls-ans-list">' + t.list.map(function (x) { return '<li><b>' + esc(x.name) + '</b> ' + esc(x.text) + '</li>'; }).join('') + '</ul>';
         } else {
             body = t.list.length ? '<ul class="ls-ans-list">' + t.list.map(function (x) { return '<li><b>' + esc(x.name) + '</b> ' + esc(x.text) + '</li>'; }).join('') + '</ul>' : '';
         }

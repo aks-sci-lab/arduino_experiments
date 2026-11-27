@@ -149,6 +149,9 @@
                     else if (seenKey[s.key]) bad.push(at + ': key ' + s.key + ' 가 ' + seenKey[s.key] + ' 와 겹쳐요');
                     else seenKey[s.key] = at;
                 }
+                // opens: 풀이를 열 때 함께 여는 다른 key (두 장을 합친 장 — 폰의 그 퀴즈 ⭕·점수도 같이 열림)
+                if (s && s.opens != null && !(Array.isArray(s.opens) && s.opens.every(function (k) { return typeof k === 'string' && /^[a-z0-9][a-z0-9-]{0,39}$/.test(k); }) && s.key)) bad.push(at + ': opens 는 key 목록 (그 장에 key 가 있어야 해요)');
+                if (s && s.opens && s.opens.indexOf && s.opens.forEach) s.opens.forEach(function (k) { if (seenKey[k]) bad.push(at + ': opens ' + k + ' 가 다른 장 key 와 겹쳐요'); else seenKey[k] = at; });
                 if (s && s.kind === 'vars' && !(s.vars && s.vars.change && s.vars.measure && Array.isArray(s.vars.keep) && s.vars.keep.length)) bad.push(at + ': vars 는 change·keep[]·measure');
                                 if (s && s.revealImg && !s.reveal) bad.push(at + ': revealImg 는 reveal 과 함께');
                 // mode: 이 장을 띄울 때 학생 폰 띠 ('look' 👀 앞 화면을 봐요 · 'phone' ✍️ 내 화면에서 해요)

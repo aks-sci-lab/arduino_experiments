@@ -321,9 +321,11 @@
             v: 1, stage: st.stage || '',
             think: { first: (st.think && st.think.first) || {}, last: (st.think && st.think.last) || {} },
             quiz: st.quiz || {},
-            t1: { changed: t1.changed || '', base: t1.base || {}, trials: pick(t1.trials, ['value', 'predict', 'y', 'method', 'at']), why: t1.why || '', challenge: pick(t1.challenge, ['value', 'predict', 'y', 'diff', 'ok', 'method', 'at']) },
-            t2: { changed: t2.changed || '', base: t2.base || {}, trials: pick(t2.trials, ['value', 'pct', 'method', 'hand', 'at']), challenge: pick(t2.challenge, ['value', 'pct', 'diff', 'ok', 'method', 'hand', 'at']) },
-            guess: { t1: t1.guess || null, t2: t2.guess || null }, concl: st.concl || {}
+            t1: { changed: t1.changed || '', plan: Array.isArray(t1.plan) ? t1.plan.slice(0, 2) : null, base: t1.base || {}, trials: pick(t1.trials, ['value', 'predict', 'y', 'method', 'at']), why: t1.why || '', challenge: pick(t1.challenge, ['value', 'predict', 'y', 'diff', 'ok', 'method', 'at']) },
+            t2: { changed: t2.changed || '', plan: Array.isArray(t2.plan) ? t2.plan.slice(0, 2) : null, base: t2.base || {}, trials: pick(t2.trials, ['value', 'pct', 'method', 'hand', 'at']), challenge: pick(t2.challenge, ['value', 'pct', 'diff', 'ok', 'method', 'hand', 'at']) },
+            guess: { t1: t1.guess || null, t2: t2.guess || null }, concl: st.concl || {},
+            // 🛠 만들기 (2026-11-27): 네 단계 체크·다 만들었어요 (교사 발표 보기 '다 만든 팀 N / M')
+            build: { done: !!(st.build && st.build.done), n: st.build && st.build.steps ? Object.keys(st.build.steps).filter(function (k) { return st.build.steps[k]; }).length : 0 }
         };
     }
 

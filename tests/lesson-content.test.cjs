@@ -28,7 +28,8 @@ test('로켓 설명 장: 폰 답(data-lesson-answer)과 key 짝, 초3 쉬운 말
     const box = { LessonContent }; box.window = box;
     vm.runInNewContext(fs.readFileSync(path.join(DIR, 'rocket.js'), 'utf8'), box);
     const def = LessonContent.get('rocket'), M = require('../js/film-rocket-math.js');
-    const keys = new Set([].concat(...Object.values(def.stages)).map(s => s.key).filter(Boolean));
+    // 장 key + opens(두 장을 합친 장이 풀이와 함께 여는 다른 퀴즈 key, 2026-11-27 분량 조절)
+    const keys = new Set([].concat(...Object.values(def.stages)).flatMap(s => [s.key].concat(s.opens || [])).filter(Boolean));
     const page = fs.readFileSync(path.join(__dirname, '..', 'js', 'film-rocket.js'), 'utf8');
     for (const k of Object.keys(M.KEY_WORDS)) assert.ok(keys.has(k), '폰 📘 정의 ' + k + ' 의 풀이 장이 있어야 해요');
     for (const c of M.CONCEPTS) assert.ok(keys.has(c.key));

@@ -306,6 +306,8 @@
         if (GONE[id]) id = GONE[id];
         // 측정 장(선생님이 띄운 📱 측정 장) 안에서는 정의 퀴즈를 되풀이하지 않음 — 퀴즈는 그 퀴즈 장에서만 (점수도)
         if (SKIP_IN_DO[id] && following() && followTarget().free) id = SKIP_IN_DO[id];
+        // 계획 장(plan-t1·plan-t2)에서 이미 계획·🔮 예측을 정했으면 측정 장에서 다시 묻지 않음 (2026-11-27 '같은 것을 두 번 묻지 않기')
+        if ((id === 't1-var' || id === 't2-var') && following() && followTarget().free === id.slice(0, 2) && hasGuess(id.slice(0, 2))) id = id.slice(0, 2) + '-cond';
         markDone(id);
         if (id !== 'wait' && id !== 'sent' && stageLocked(stageOf(id))) {   // 잠긴 단계: 화면 자리는 기억하고 잠금 안내만
             if (!(opt && opt.follow)) st.lastReal = id;   // 팀이 가려던 곳 (열리면·설명을 닫으면 그리로)
@@ -354,6 +356,9 @@
     // 🎯 도전 장 (2026-11-23 가상 수업 4차): 이 장을 띄우면 폰이 그 차시 도전 화면
     var CH_PART = { 'ch-t1': 't1', 'ch-t2': 't2' };
     var GONE = { 't1-predict': 't1-measure', 't1-ch-predict': 't1-ch-measure', 't2-base': 'q-mass' };
+    // 응답 장 하나가 맡는 폰 화면 차례 (퀴즈 key 또는 화면 id) — 2026-11-27 분량 조절로 두 장을 합친 장
+    var SEQ = { 'plan-t1': ['control', 't1-var'], 'plan-t2': ['t2-var'], action: ['action', 'mass'], build: ['t2-build'] };
+    function sentKey(k) { return !!(st.sentKeys && st.sentKeys[k]); }
     var SKIP_IN_DO = { 'q-pressure': 't1-var', 'q-control': 't1-cond', 'q-mass': 't2-var', 'q-action': 't2-var' };
     function lessonNow() { return share && share.lessonNow ? share.lessonNow() : { on: false }; }
     // 발표용(교사 🎬 발표 보기의 옆 학생 화면, 2026-11-23 나란히 보기)도 같은 규칙으로 '폰이 지금 보는 화면'을 보임 (팀 없이, 저장·보내기 없음)
@@ -365,13 +370,25 @@
         if (DO_PART[k]) return { free: DO_PART[k] };
         if (CH_PART[k]) return { free: CH_PART[k], ch: true };
         if (conceptOf(k)) return st.think.first[k] ? 'sent' : 'think-' + k;
+        if (SEQ[k]) return seqTarget(k);
         if (M.QUIZ[k] && SCREENS['q-' + k]) return st.quiz[k] && st.quiz[k].tries ? 'sent' : 'q-' + k;   // 고르면 바로 ✅ 보냈어요 (점수 계산은 그대로)
         if (k === 'end-think') {
             for (var i = 0; i < M.CONCEPTS.length; i++) { var z = st.quiz['end_' + M.CONCEPTS[i].key]; if (!(z && z.tries)) return 'end-' + M.CONCEPTS[i].key; }
             return lessonNow().reveal || !held('end-think') ? 'end-compare' : 'sent';
         }
         if (k === 'end-cause') return st.sentKeys && st.sentKeys['end-cause'] ? 'sent' : 'end-sentence';
+        // 합친 장 (2026-11-27 분량 조절): 그 장 하나에서 퀴즈 → 계획·예측, 퀴즈 둘을 차례로 → ✅ 보냈어요
         return 'wait';
+    }
+    function seqTarget(k) {
+        var seq = SEQ[k];
+        for (var j = 0; j < seq.length; j++) {
+            var x = seq[j];
+            if (M.QUIZ[x]) { if (!(st.quiz[x] && st.quiz[x].tries)) return 'q-' + x; }
+            else if (x === 't1-var' || x === 't2-var') { if (!sentKey(k)) return x; }
+            else if (x === 't2-build') { if (!(st.build && st.build.done)) return x; }
+        }
+        return 'sent';
     }
     // 측정 장: 그 차시에서 하던 화면, 처음이면 안전 확인부터 (소개·설명 글은 앞 화면에서)
     function doEntry(part) {
@@ -414,7 +431,7 @@
         document.documentElement.classList.toggle('ev-answering', !!(f && t && !t.free));
     }
     /* 🔎 우리 팀 물음 (2026-11-21 비계 4): 바꿀 것을 고른 뒤 측정·결과 화면 위에 이어서 (정리 문장은 카드 안에) */
-    var NO_TEAMQ = { 't1-intro': 1, 't1-again': 1, 't1-safe': 1, 't1-var': 1, 't2-intro': 1, 't2-again': 1, 't2-base': 1, 't2-var': 1 };
+    var NO_TEAMQ = { 't2-build': 1, 't1-intro': 1, 't1-again': 1, 't1-safe': 1, 't1-var': 1, 't2-intro': 1, 't2-again': 1, 't2-base': 1, 't2-var': 1 };
     function teamQ(id) {
         var part = /^t1-/.test(id) ? 't1' : /^t2-/.test(id) ? 't2' : '';
         if (!part || NO_TEAMQ[id] || !st[part] || !st[part].changed) return '';
@@ -915,12 +932,15 @@
                 }).join('') : '') +
                 (p.trials.length && p.changed ? '<p class="ev-small">바꿀 조건을 바꾸면 지금까지 잰 값은 그대로 두고, 결과 비교 표는 새 조건으로 보여 줘요.</p>' : '') +
                 (p.changed && !okG ? '<p class="ev-small ev-need-guess">' + (okP ? '🔮 예측을 골라야 다음으로 가요' : '✋ ①과 ②를 서로 다른 값으로 정해야 다음으로 가요') + '</p>' : '') +
+                // 계획 장(plan-t1·plan-t2)을 띄운 동안: 다 정하면 '보내기' → ✅ 보냈어요 (다음 단추 흐름은 숨김, 2026-11-27)
+                (following() && lessonNow().key === 'plan-' + part ? '<div class="ev-follow-only ev-nav col"><button type="button" class="ev-next good" id="ev-plan-send"' + (okG ? '' : ' disabled') + '>✅ 다 정했어요 · 보내기</button></div>' : '') +
                 nav(next, '다음 →', okG ? '' : ' disabled');
             return { html: html, mount: function (el) {
                 var syncNext = function () {
                     var ok1 = planOk(part), ok2 = hasGuess(part);
                     var same = el.querySelector('#ev-plan-same'); if (same) same.hidden = ok1;
                     var nx = el.querySelector('.ev-next[data-go]'); if (nx) nx.disabled = !ok2;
+                    var ps = el.querySelector('#ev-plan-send'); if (ps) ps.disabled = !ok2;
                     var need = el.querySelector('.ev-need-guess');
                     if (ok2 && need) need.remove();
                     else if (!ok2 && need) need.textContent = ok1 ? '🔮 예측을 골라야 다음으로 가요' : '✋ ①과 ②를 서로 다른 값으로 정해야 다음으로 가요';
@@ -942,6 +962,14 @@
                     changed(); syncNext();
                 });
                 mountGuess(el, part, syncNext);
+                var ps = el.querySelector('#ev-plan-send');
+                if (ps) ps.addEventListener('click', function () {
+                    if (!hasGuess(part)) return;
+                    var dd = ensureBase(part)[p.changed], pl = ensurePlan(part), G = M.GUESS[part];
+                    st.sentKeys = st.sentKeys || {}; st.sentKeys['plan-' + part] = true;
+                    logAnswer('계획', (dd.short || dd.name) + (pl && dd.values.length > 1 ? ' ' + dd.label(pl[0]) + ' → ' + dd.label(pl[1]) : '') + ' · 🔮 ' + (G[p.guess.dir] || ''));
+                    changed(); show('sent', { follow: true });
+                });
             } };
         };
     }
@@ -1345,11 +1373,35 @@
     };
 
     // ===== 3 2차시: 아이 키만큼 오르는 로켓 =====
+    /* 🛠 로켓 만들기 (2026-11-27 선생님 '학생이 로켓을 만드는 과정도 있어야해'): 네 단계를 하나씩 체크 → '다 만들었어요'.
+       설명 장 'build' 를 띄운 동안 이 화면(응답 장), 다 만들면 ✅ 보냈어요 → 프로젝터 '다 만든 팀 N / M'. 수업 없이는 2차시 첫 화면 다음 */
+    var BUILD_STEPS = [['body', '📜 색지를 말아 필름통에 붙여 <b>몸통</b> (뚜껑이 아래로)'], ['fins', '🪽 <b>날개 3장</b>을 아래쪽에 붙여요'], ['nose', '🔺 <b>뾰족한 앞코</b>를 씌워요'], ['clay', '⚖️ <b>점토</b>는 처음엔 0개 (무게는 나중에 바꿔요)']];
+    SCREENS['t2-build'] = function () {
+        var b = st.build = st.build || { steps: {} }, all = BUILD_STEPS.every(function (x) { return b.steps[x[0]]; });
+        var html = '<p class="ev-kicker">2차시 · 🛠 만들기</p><h2>로켓을 만들어요</h2>' +
+            '<div class="ev-choices ev-build">' + BUILD_STEPS.map(function (x, i) {
+                return '<button type="button" class="ev-choice' + (b.steps[x[0]] ? ' on' : '') + '" data-build="' + x[0] + '" aria-pressed="' + !!b.steps[x[0]] + '">' + (b.steps[x[0]] ? '✅ ' : (i + 1) + '. ') + x[1] + '</button>';
+            }).join('') + '</div>' +
+            '<p class="ev-small">🧰 필름통 · 색지 · 가위 · 투명테이프 · 점토·클립</p>' +
+            // 응답 장을 띄운 동안은 네 단계를 다 체크해야 보냄, 혼자 하는 화면은 언제든 다음으로
+            '<div class="ev-follow-only ev-nav col"><button type="button" class="ev-next good" id="ev-build-done"' + (all || !following() ? '' : ' disabled') + '>✅ 다 만들었어요</button></div>';
+        return { html: html, mount: function (el) {
+            el.querySelector('.ev-build').addEventListener('click', function (e) {
+                var t = e.target.closest('[data-build]'); if (!t) return;
+                b.steps[t.dataset.build] = !b.steps[t.dataset.build]; changed();
+                show(st.screen, { back: true });
+            });
+            $('#ev-build-done').addEventListener('click', function () {
+                b.done = true; logAnswer('만들기', '다 만들었어요'); changed();
+                show(following() ? 'sent' : 'q-action', following() ? { follow: true } : undefined);
+            });
+        } };
+    };
     SCREENS['t2-intro'] = function () {
         return { html: '<p class="ev-kicker">2차시</p><h2>🚀 아이 키만큼 오르는 로켓</h2>' +
             card('<p>필름통을 <b>뒤집어 세우면</b> 로켓이 돼요. 목표는 <b>아이 키만큼</b> 올리기!</p><p>천장까지 날아가지 않게, 몸체 무게·물·발포비타민 양을 조절해서 딱 맞춰 봐요.</p>') +
             '<details class="ev-more"><summary>🧰 준비물</summary><p>필름통 · 발포비타민 · 물 · 계량스푼 · 스포이트 · 보안경 · 색지 · 가위 · 투명테이프 · 줄자 · 점토·클립 · 쟁반 · 걸레</p></details>' +
-            nav('q-action', '다음 →') };
+            nav('t2-build', '다음 →') };
     };
     // 2026-11-23 가상 수업 4차: '✏️ 로켓 설계 기록' 은 바꿀 것 고르기와 겹쳐 흐름에서 뺌 (예전 주소 t2-base 는 show() 가 다음 화면 q-mass 로)
     SCREENS['q-action'] = quizScreen('action', 'q-mass', '발사 전');
