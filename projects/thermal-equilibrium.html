@@ -342,6 +342,7 @@
                         <tr>
                             <th>회차</th>
                             <th>조건 (작은 : 큰)</th>
+                            <th>비커·단열 메모</th>
                             <th>처음 T₁ / T₂ (°C)</th>
                             <th>실측 열평형 (°C)</th>
                             <th>이론 열평형 (°C)</th>
@@ -355,6 +356,9 @@
                 </table>
             </div>
             <p class="note" id="resSummary"></p>
+            <h3>↕ 같은 조건 반복 · 차이가 흔들림보다 큰가요?</h3>
+            <p class="note">같은 조건(액체·질량·처음 온도·뜨거운 물 위치·비커 메모)으로 잰 회차를 묶어 평균과 범위(가장 낮은 값 ~ 가장 높은 값)를 보여요.</p>
+            <div id="repBox" class="th-rep" data-rep="tEq"></div>
         </div>
 
         <div class="card">
@@ -394,6 +398,8 @@
                     <tbody id="advTbody"></tbody>
                 </table>
             </div>
+            <h3>↕ 시상수 τ 도 반복 흔들림과 견주기</h3>
+            <div id="repTauBox" class="th-rep" data-rep="tau"></div>
             <p class="note" id="advExplain">시상수 τ(타우)가 작을수록 두 물체 사이 열전달이 빨라 열평형에 빨리 도달합니다. R²가 1에 가까울수록 뉴턴의 냉각(지수 감쇠) 모델과 잘 맞습니다.</p>
         </details>
 

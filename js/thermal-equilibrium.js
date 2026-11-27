@@ -486,12 +486,55 @@
         }).join('') + (unsent ? '<div class="th-bar"><button type="button" id="btnResend">📤 선생님께 다시 보내기</button></div>' : '');
     }
 
+    // ---------- 같은 조건 반복 · '차이가 흔들림보다 큰가요?' (6-1 열평형 온도, 6-3 심화 τ) ----------
+    const MAT_NAME = { glass: '유리', steel: '스테인리스', aluminum: '알루미늄', styrofoam: '스티로폼' };
+    function memoOf(m) {
+        m = m || {};
+        const mat = MAT_NAME[m.beakerMat];
+        return String(m.vessel || '').trim() + (mat ? ' · 재질 ' + mat : '') || '–';
+    }
+    const CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+    const gName = no => '조건 ' + (CIRCLED[no - 1] || ('(' + no + ')'));
+    function repHtml(rep, field, unit, d) {
+        const groups = rep.groups.filter(g => g[field]);
+        if (!groups.length) return '<p class="note">' + (field === 'tau' ? 'τ 를 구한 회차가 아직 없어요.' : '') + '</p>';
+        const rows = groups.map(g => {
+            const st = g[field];
+            const L1 = g.parts.liquid.split(':'), m = g.parts.mass.split(':');
+            const cond = M.liquidOf(L1[0]).name + ' ' + m[0] + 'g : ' + M.liquidOf(L1[1]).name + ' ' + m[1] + 'g · 처음 ' + fmt(g.hot, 0) + ' / ' + fmt(g.cold, 0) + ' °C · 뜨거운 물 ' + (g.parts.pos === 'in' ? '안(작은 비커)' : '밖(큰 비커)');
+            return '<tr data-group="' + g.no + '"><td><b>' + gName(g.no) + '</b></td><td>' + esc(cond) + '</td><td>' + esc(g.memo || '–') + '</td>' +
+                '<td>' + st.n + '번</td><td><b>' + fmt(st.mean, d) + '</b></td>' +
+                '<td>' + (st.n >= 2 ? '↕ ' + fmt(st.lo, d) + ' ~ ' + fmt(st.hi, d) + ' (' + fmt(st.range, d) + ')' : '한 번만 잼') + '</td></tr>';
+        }).join('');
+        const valName = field === 'tau' ? '시상수 τ' : '열평형 온도';
+        const table = '<div class="th-tbl-wrap"><table class="th-rep-table"><thead><tr><th>묶음</th><th>조건</th><th>비커·단열 메모</th><th>회차 수</th><th>' + valName + ' 평균 (' + unit + ')</th><th>↕ 반복 범위 (' + unit + ')</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+        const lines = rep.pairs.filter(p => p[field]).map(p => {
+            const j = p[field];
+            const head = gName(p.a) + ' ↔ ' + gName(p.b) + (p.changed.length ? ' (바뀐 것: ' + p.changed.join(', ') + ')' : '') + ': ';
+            let out = '';
+            if (j.verdict === 'clear') out = '<div class="th-rep-line clear" data-verdict="clear">' + esc(head) + '<b>✅ 차이가 흔들림보다 커요</b> — 평균 차이 ' + fmt(j.diff, d) + ' ' + unit + ' &gt; 반복 흔들림 ' + fmt(j.jitter, d) + ' ' + unit + '</div>';
+            else if (j.verdict === 'unclear') out = '<div class="th-rep-line unclear" data-verdict="unclear">' + esc(head) + '<b>🤔 아직 말하기 어려워요</b> — 평균 차이 ' + fmt(j.diff, d) + ' ' + unit + ' ≤ 반복 흔들림 ' + fmt(j.jitter, d) + ' ' + unit + '</div>';
+            else out = '<div class="th-rep-line norep" data-verdict="norep">' + esc(head) + '<b>🤔 아직 말하기 어려워요</b> — 반복이 없어 흔들림을 몰라요. <span class="th-rep-hint">같은 조건으로 한 번 더 재 보세요.</span></div>';
+            if (p.mix) out += '<div class="th-rep-line mix" data-mix="1">⚠ ' + esc(gName(p.a) + ' ↔ ' + gName(p.b)) + ': 두 가지 조건이 함께 바뀌었어요 (' + esc(p.changed.join(', ')) + '). 어느 것 때문인지 가르기 어려워요.</div>';
+            return out;
+        }).join('');
+        const hint = !rep.rep ? '<p class="th-rep-hint" data-rep-hint="1">🔁 아직 같은 조건 반복이 없어요. 같은 조건으로 한 번 더 재 보세요.</p>' : '';
+        return table + lines + hint;
+    }
+    function renderRepeats(list) {
+        const rep = M.repeatGroups(list);
+        $('repBox').innerHTML = repHtml(rep, 'tEq', '°C', 2);
+        $('repTauBox').innerHTML = repHtml(rep, 'tau', 's', 1);
+    }
+
     function renderResults() {
         const list = allRuns();
         if (!list.length) {
-            $('resTbody').innerHTML = '<tr><td colspan="9">저장된 회차가 없습니다. 5. 데이터에서 측정하거나 시뮬레이션 회차를 저장해 주세요.</td></tr>';
+            $('resTbody').innerHTML = '<tr><td colspan="10">저장된 회차가 없습니다. 5. 데이터에서 측정하거나 시뮬레이션 회차를 저장해 주세요.</td></tr>';
             $('advTbody').innerHTML = '<tr><td colspan="9">저장된 회차가 없습니다.</td></tr>';
             $('resSummary').textContent = '';
+            $('repBox').innerHTML = '';
+            $('repTauBox').innerHTML = '';
             $('comparePicks').innerHTML = '';
             if (compareChart) { compareChart.data.datasets = []; compareChart.update('none'); }
             return;
@@ -505,6 +548,7 @@
             return '<tr>' +
                 '<td><b>' + esc(r.title) + '</b>' + (r._mine ? '' : ' <small>(' + esc(r.from || '조원') + ')</small>') + '</td>' +
                 '<td>' + esc(cond) + '</td>' +
+                '<td data-col="memo">' + esc(memoOf(r.meta)) + '</td>' +
                 '<td>' + fmt(a.t1_0, 1) + ' / ' + fmt(a.t2_0, 1) + '</td>' +
                 '<td><b>' + fmt(a.tEq, 2) + '</b>' + (a.reached ? '' : ' <small>(미도달)</small>') + '</td>' +
                 '<td>' + fmt(a.tTheory, 2) + '</td>' +
@@ -515,6 +559,7 @@
                 '</tr>';
         }).join('');
         $('resSummary').textContent = '요약: ' + summaries.join(' | ');
+        renderRepeats(list);
 
         // 고2 심화 표
         $('advTbody').innerHTML = list.map(r => {
