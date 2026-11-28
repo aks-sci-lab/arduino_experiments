@@ -69,7 +69,14 @@ async function start(opts) {
         // 교사 화면: 배율(zoom) 1·1.5·2 는 deviceScaleFactor 가 아니라 CSS 픽셀 폭을 나눠 흉내 냄 (3840×2160 을 150 % 로 = 2560×1440)
         teacher: (vp, zoom, name) => { vp = vp || { width: 3840, height: 2160 }; const z = zoom || 1;
             return open(name || 'T', { viewport: { width: Math.round(vp.width / z), height: Math.round(vp.height / z) }, deviceScaleFactor: 1 }, true); },
-        phone: (name, dev) => open(name, devices[dev || 'iPhone 13']),
+        // 팀 폰. VC_DSF1=1 이면 화면 크기·터치는 그대로 두고 deviceScaleFactor 1 (6차: 스크린샷을 작게)
+        phone: (name, dev) => open(name, Object.assign({}, devices[dev || 'iPhone 13'], process.env.VC_DSF1 ? { deviceScaleFactor: 1 } : {})),
+        // 기록용 스크린샷 (6차): JPEG 품질 70, 보이는 화면만, 폴더가 없으면 만듦 → 파일 경로와 크기(KB)
+        async snap(pg, file, quality) {
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            await pg.screenshot({ path: file, type: 'jpeg', quality: quality || 70 });
+            return { file, kb: Math.round(fs.statSync(file).size / 1024) };
+        },
         async shot(pg, label, full) {
             const f = path.join(dir, 'shots', String(++n).padStart(3, '0') + '-' + (pg.vcName || 'x') + '-' + String(label).replace(/[^\w가-힣.-]+/g, '_') + '.png');
             await pg.screenshot({ path: f, fullPage: !!full }); return f;

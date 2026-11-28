@@ -90,4 +90,28 @@ async function glance(S, pages, n) {
     for (const k of Object.keys(pages)) { try { const r = await S.scr(pages[k], n || 260); o[k] = r.화면 + ' | ' + r.글 + ' | 단추: ' + r.단추.join(' · '); } catch (e) { o[k] = '못 봄: ' + e.message; } }
     return o;
 }
-module.exports = { run1, run2, challenge, glance, goMeasure };
+// 초3 아이가 글을 안 읽고 보이는 단추를 n 번 아무거나 누름 (seed 로 늘 같은 차례). '지우기'·'처음부터'·'저장'·외부 링크는 누르지 않음
+async function mash(S, pg, n, seed) {
+    let x = seed || 7; const rnd = () => { x = (x * 1103515245 + 12345) % 2147483648; return x / 2147483648; };
+    const out = [];
+    for (let i = 0; i < (n || 3); i++) {
+        const bs = pg.locator('button:visible:not([disabled]), .ev-choice:visible:not([disabled])');
+        const texts = await bs.allTextContents(), ok = texts.map((t, k) => [t.replace(/\s+/g, ' ').trim(), k]).filter(([t]) => t && !/지우기|처음부터|저장|공유|메인|선생님 연결/.test(t));
+        if (!ok.length) { out.push('누를 것 없음'); break; }
+        const [t, k] = ok[Math.floor(rnd() * ok.length)];
+        try { await bs.nth(k).click({ timeout: 3000 }); out.push(t.slice(0, 30)); } catch (e) { out.push('못 누름: ' + t.slice(0, 20)); }
+        await pg.waitForTimeout(500);
+    }
+    return { 누른것: out, 지금: await S.scr(pg, 300) };
+}
+// 폰이 서툰 어른: 뒤로 가기 / 새로고침 → 그 뒤 화면
+async function back(S, pg) { await pg.goBack().catch(() => null); await pg.waitForTimeout(2000); return S.scr(pg, 400); }
+async function forward(S, pg) { await pg.goForward().catch(() => null); await pg.waitForTimeout(2500); return S.scr(pg, 400); }
+async function reload(S, pg) { await pg.reload(); await pg.waitForTimeout(3000); return S.scr(pg, 400); }
+// 6차: 여섯 폰 스크린샷을 한 번에 (dir 은 기록 worktree 의 student 폴더, nn = 차례 번호, label = 설명)
+async function snapAll(S, pages, dir, nn, label) {
+    const o = {};
+    for (const k of Object.keys(pages)) { try { o[k] = await S.snap(pages[k], require('node:path').join(dir, String(nn).padStart(2, '0') + '-' + k + '-' + label + '.jpg')); } catch (e) { o[k] = '못 찍음: ' + e.message; } }
+    return o;
+}
+module.exports = { run1, run2, challenge, glance, goMeasure, mash, back, forward, reload, snapAll };
