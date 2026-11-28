@@ -86,7 +86,7 @@ async function start(opts) {
         hscroll: pg => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
         // 화면에 보이는 가장 작은 글자 크기 (4K 판정: 화면 높이 2 % 아래면 '안 읽힘'으로 셈)
         minFont: pg => pg.evaluate(() => { let min = 999, at = ''; const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let t;
-            while ((t = w.nextNode())) { const s = t.nodeValue.trim(); const p = t.parentElement; if (!s || !p || !p.offsetParent) continue; const r = p.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight || r.width === 0) continue;
+            while ((t = w.nextNode())) { const s = t.nodeValue.trim(); const p = t.parentElement; if (!s || !p || !p.offsetParent || p.closest('summary') || p.closest('details:not([open])')) continue;   // '🔧 선생님용' 접힌 표지는 뺌 const r = p.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight || r.width === 0) continue;
                 const f = parseFloat(getComputedStyle(p).fontSize); if (f < min) { min = f; at = s.slice(0, 30); } }
             return { min, at, h: innerHeight, ratio: +(min / innerHeight * 100).toFixed(2) }; }),
         // ── 로켓 팀 폰 ──
