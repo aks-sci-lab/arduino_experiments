@@ -88,6 +88,8 @@ test('가족 체험형 로켓: 풀이 시 폰에 힘·가속도·압력 정의 �
 
         // 정리: 처음 생각, 지금 생각(end-think) → 3문제 다시 풀기 → 풀이 전엔 sent, 풀이 열면 end-compare(힘·가속도·압력 정의 3종 모두 보임)
         Object.assign(doc(), { lesson: { on: true, stage: 'end', i: 0, key: 'end-think', reveal: false, mode: 'phone' } });
+        // (5b 중 1: 1·2차시를 건너뛴 팀은 지나간 점수 퀴즈 하나를 먼저 — 한 장에 하나)
+        await go(A, 'q-gas'); await A.click('.ev-choice[data-k="ok"]');
         await go(A, 'end-force'); await A.click('.ev-choice[data-k="ok"]');
         await go(A, 'end-accel'); await A.click('.ev-choice[data-k="ok"]');
         await go(A, 'end-pressure'); await A.click('.ev-choice[data-k="ok"]');

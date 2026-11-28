@@ -304,6 +304,10 @@ details.ct-phint:not([open]) > summary { min-height: 0; padding: 2px 0; }
 .ls-ans-title { margin: 0 0 .15em; font-weight: 700; font-size: .75em; }
 .ls-bar { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; align-items: center; gap: .4em; font-size: .7em; margin: .12em 0; }
 .ls-ans-cols .ls-bar { grid-template-columns: minmax(0, 1fr) 3em auto; font-size: .55em; }
+/* 칸이 둘이면 반씩, 보기 글은 막대 위 한 줄 전체 폭 (5b 하 3: 좁은 칸에서 세로로 길게 줄바꿈되던 것) */
+.ls-ans-cols.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ls-ans-cols .ls-bar { grid-template-columns: minmax(0, 1fr) auto; row-gap: .1em; }
+.ls-ans-cols .ls-bar .ls-bar-t { grid-column: 1 / -1; }
 .ls-bar-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ls-bar-track { height: .9em; border-radius: .45em; background: var(--c-fill); overflow: hidden; }
 .ls-bar-fill { display: block; height: 100%; background: var(--c-primary); }

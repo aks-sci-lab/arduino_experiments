@@ -102,7 +102,11 @@
                 var parts = ['t1', 't2'].map(function (k) {
                     var r = co[k]; if (!r || !(r.dir || r.why)) return '';
                     var G = M.GUESS[k], d = x.p[k] && x.p[k].changed, defs = k === 't1' ? M.vars1() : M.vars2(), v = defs[d];
-                    return (k === 't1' ? '1차시 ' : '2차시 ') + (v ? (v.short || v.name) + ' → ' : '') + (r.dir && G.word[r.dir] ? G.word[r.dir] : '') + (r.why ? ' · 왜냐하면 ' + r.why : '');
+                    // 📏 그 팀 숫자를 같이 (숫자와 반대인 결과는 ⚠, 5b 중 3)
+                    var ev = null; try { ev = M.evidence && x.p[k] && x.p[k].trials && x.p[k].trials.length ? M.evidence(k, x.p[k], x.p.setup) : null; } catch (e) { ev = null; }
+                    var clash = ev && ((r.dir === 'up' && ev.dir === 'down') || (r.dir === 'down' && ev.dir === 'up'));
+                    return (k === 't1' ? '1차시 ' : '2차시 ') + (v ? (v.short || v.name) + ' → ' : '') + (r.dir && G.word[r.dir] ? (clash ? '⚠ ' : '') + G.word[r.dir] : '') +
+                        (ev && !ev.one ? ' (📏 ' + String(ev.short).split(': ').pop() + ')' : '') + (r.why ? ' · 왜냐하면 ' + r.why : '');
                 }).filter(Boolean);
                 if (parts.length) out.push({ name: x.name, text: parts.join(' / ') });
             });
@@ -127,7 +131,7 @@
                             '<span class="ls-bar-track"><span class="ls-bar-fill" style="width:' + Math.round(o.n / max * 100) + '%"></span></span><b class="ls-bar-n">' + o.n + '</b></div>';
                     }).join('') + '</div>';
             }).join('');
-            if (t.groups.length > 1) body = '<div class="ls-ans-cols">' + body + '</div>';
+            if (t.groups.length > 1) body = '<div class="ls-ans-cols n' + t.groups.length + '">' + body + '</div>';
             // 계획 장: 막대 아래 팀마다 바꾼 것 · 예측 · 까닭
             if (t.list && t.list.length) body += '<ul class="ls-ans-list' + (t.list.length > 3 ? ' two' : '') + '">' + t.list.map(function (x) { return '<li><b>' + esc(x.name) + '</b> ' + esc(x.text) + '</li>'; }).join('') + '</ul>';
         } else {

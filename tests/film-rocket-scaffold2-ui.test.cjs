@@ -63,7 +63,7 @@ test('로켓: 하나만 바꿔 구멍·퀴즈 정답 표시 풀이 뒤로·내 �
         await A.evaluate(() => window.__filmRocket.show('t1-var')); await go(A, 't1-var');
         await A.click('.ev-choice[data-k="temp"]');
         await A.waitForSelector('[data-guess="t1"]');
-        assert.match(await A.textContent('[data-guess="t1"] h3'), /물의 온도을\(를\) 20 °C → 30 °C 로 바꾸면 열리는 시간이/);
+        assert.match(await A.textContent('[data-guess="t1"] h3'), /물의 온도를 20 °C → 30 °C 로 바꾸면 열리는 시간이/);
         // ①과 ②가 같으면 경고 + 다음 꺼짐 → 다시 다르게 바꾸면 풀림
         await A.click('[data-plan-slot="1"] [data-pm="-1"]');
         assert.equal(await A.isVisible('#ev-plan-same'), true, '①=② 면 경고');

@@ -255,13 +255,21 @@
         // 결과판용 두 값: 계획한 ① · ② 를 둘 다 쟀으면 그 둘, 아니면 처음·끝 (5차 중 2)
         var pair = pairRows(rows, plan), name = d.short || d.name, first = pair[0], last = pair[1];
         var one = rows.length < 2;
-        var text = one ? name + '을(를) ' + labels[0] + ' 로 했더니 평균 ' + means[0]
-            : name + '을(를) ' + labels.join(' → ') + ' 로 ' + planVerb(d, plan) + ' 평균 ' + means.join(' → ');
+        var text = one ? josa(name, '을를') + ' ' + labels[0] + ' 로 했더니 평균 ' + means[0]
+            : josa(name, '을를') + ' ' + labels.join(' → ') + ' 로 ' + planVerb(d, plan) + ' 평균 ' + means.join(' → ');
+        // 계획한 ① → ② 의 결과 방향 (정리 문장과 견줌, 5b 중 3)
+        var dir = one ? '' : last.mean > first.mean ? 'up' : last.mean < first.mean ? 'down' : 'same';
         // 선생님 결과판용 (40자 안): 계획한 ① → ② (또는 처음·끝) 값만
         var short = one ? name + ' ' + labels[0] + ': ' + means[0] : name + ' ' + d.label(first.value) + '→' + d.label(last.value) + ': ' + unit(first.mean) + '→' + unit(last.mean);
         // 값은 두 가지 넘는데 같은 조건 반복이 하나도 없으면 흔들림을 몰라 아직 말할 수 없음 (2026-11-23 가상 수업 4차: 2차시를 값마다 1발씩만 쏴도 결론이 열림)
         var norep = !one && !rows.some(function (r) { return r.n >= 2; });
-        return { one: one, norep: norep, labels: labels, means: means, text: text, short: cleanShort(short), rows: rows };
+        return { one: one, norep: norep, labels: labels, means: means, text: text, short: cleanShort(short), rows: rows, dir: dir };
+    }
+    // 조사 (5b 하 5 '온도을(를)'): 끝 글자가 한글이면 받침에 맞춰 하나로, 숫자·기호로 끝나면 '을(를)' 그대로
+    function josa(word, pair) {
+        var w = String(word == null ? '' : word), c = w.charCodeAt(w.length - 1), a = pair.charAt(0), b = pair.charAt(1);
+        if (!(c >= 0xac00 && c <= 0xd7a3)) return w + a + '(' + b + ')';
+        return w + ((c - 0xac00) % 28 ? a : b);
     }
     function planOf(p) { var pl = p && p.plan; return Array.isArray(pl) && pl.length === 2 && String(pl[0]) !== String(pl[1]) ? pl : null; }
     // 견줄 두 줄: 계획한 ① · ② 가 둘 다 있으면 그 둘, 아니면 처음·끝
@@ -356,7 +364,7 @@
 
     return {
         DEFAULT_SETUP: DEFAULT_SETUP, mergeSetup: mergeSetup, valueKinds: valueKinds, EASY: EASY, KEY_WORDS: KEY_WORDS, easyLine: easyLine, GUESS: GUESS, BECAUSE: BECAUSE, becauseFor: becauseFor, whyExample: whyExample, teamQuestion: teamQuestion, evidence: evidence, spread: spread, cleanShort: cleanShort, PIECES: PIECES, NOSES: NOSES, tabletLabel: tabletLabel, vars1: vars1, vars2: vars2,
-        range: range, stepIn: stepIn, axisValue: axisValue, mean: mean, sd: sd, round: round, byValue: byValue, planVerb: planVerb, planOf: planOf, targetDiff: targetDiff,
+        range: range, stepIn: stepIn, axisValue: axisValue, mean: mean, sd: sd, round: round, byValue: byValue, planVerb: planVerb, josa: josa, planOf: planOf, targetDiff: targetDiff,
         heightPct: heightPct, cmFrom: cmFrom, HAND: HAND, handPct: handPct,
         DEF: DEF, CONCEPTS: CONCEPTS, QUIZ: QUIZ, quizPoints: quizPoints, score: score, conceptChanges: conceptChanges, optText: optText, WHY: WHY,
         summary: summary, payload: payload

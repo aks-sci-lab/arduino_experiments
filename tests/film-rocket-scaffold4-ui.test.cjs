@@ -26,7 +26,7 @@ test('로켓 계산: 변인별 까닭 보기·우리 숫자·흔들림·요약 2
     // 우리 숫자
     const p = { changed: 'temp', trials: [{ value: 20, y: 14 }, { value: 20, y: 14.4 }, { value: 40, y: 9.8 }] };
     const ev = M.evidence('t1', p);
-    assert.equal(ev.text, '물의 온도을(를) 20 °C → 40 °C 로 바꿨더니 평균 14.2초 → 9.8초');
+    assert.equal(ev.text, '물의 온도를 20 °C → 40 °C 로 바꿨더니 평균 14.2초 → 9.8초');
     assert.equal(ev.short, '물의 온도 20 °C→40 °C: 14.2초→9.8초');
     assert.equal(M.evidence('t1', { changed: 'temp', trials: [{ value: 20, y: 14 }] }).one, true);
     // 흔들림: 겹침 / 안 겹침 / 반복 없음
@@ -112,7 +112,7 @@ test('로켓 비계 4: 아직 말할 수 없어요·변인별 보기·우리 숫
         assert.match(await box1.locator('.ev-notyet').textContent(), /아직 말할 수 없어요 — 값을 하나 바꿔 재야 알 수 있어요/);
         assert.equal(await box1.locator('[data-dir]').count(), 0, '결과 고르기 없음');
         assert.equal(await box1.locator('[data-why]').count(), 0, '까닭 고르기도 없음');
-        assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을\(를\) 10 mL 로 했더니 평균 12초/);
+        assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을 10 mL 로 했더니 평균 12초/);
         assert.equal(await box1.locator('[data-go="t1-again"]').count(), 1, '바꿔서 재러 가기');
 
         // ③ 값을 바꿔 재기(15 mL 3번, 겹침 없음) → 가족 체험형은 그래프 없이 결과 비교 표·'흔들림보다 큰가요?'·핵심 개념 연결
@@ -132,7 +132,7 @@ test('로켓 비계 4: 아직 말할 수 없어요·변인별 보기·우리 숫
 
         // ① 변인별 왜냐하면 보기 + ② 우리 숫자
         await show(A, 'end-sentence');
-        assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을\(를\) 10 mL → 15 mL 로 늘렸더니 평균 12초 → 15초/);
+        assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을 10 mL → 15 mL 로 늘렸더니 평균 12초 → 15초/);
         assert.match(await box1.locator('.ev-teamq').textContent(), /물을 많이 넣으면/);
         const why = await box1.locator('[data-why]').allTextContents();
         assert.ok(why.some(t => /빈 공간/.test(t)), '물의 양 팀용 보기: ' + why.join(' / '));

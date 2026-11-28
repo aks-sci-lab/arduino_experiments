@@ -105,6 +105,9 @@
                 }
                 net.classErr = info ? '' : ((share.classFailed() || {}).error || '');
                 save(); renderTop();
+                // 마친 수업: 장에 맞춰 띄웠던 화면(👀·✅·답 칸)이면 하던 곳(결과 카드)으로 (5b 하 6)
+                if (info && info.done && st.team && (st.screen === 'wait' || st.screen === 'sent' || st.forced)) followApply();
+                else if (info && info.done && st.screen === 'end-card' && !$('.ev-done-band')) show('end-card', { back: true });
                 if (st.screen === 'enter') {   // 입장 화면을 새로 그리되, 쓰던 팀 이름은 남김
                     var typed = $('#ev-name') ? $('#ev-name').value : '';
                     show('enter', { back: true });
@@ -165,7 +168,8 @@
     function beatIfChanged() { var s = stepNow(); if (share && st.team && s !== lastStep) { lastStep = s; share.stepChanged(); } }
     // 측정 중(🎥 녹화·⏱ 초시계·장면 고르기·세 곳 누르기, 👀 눈으로 고르기 전)이면 화면을 바꾸지 않음
     // (촬영 안내 t2-film 은 아직 발사 전이라 막지 않음. 눈으로 고르기 화면은 고르면 바로 결과로 넘어가고 ← 뒤로도 있음)
-    function busy() { return (/measure$|^t2-hand$|-ch-check$/.test(st.screen) || (st.screen === 't2-build' && st.build && !st.build.done && Object.keys(st.build.steps || {}).some(function (x) { return st.build.steps[x]; }) && following() && lessonNow().key !== 'build')) && app.getAttribute('data-screen') === st.screen; }
+    var BUSY_RE = /measure$|^t2-hand$|-ch-check$/;
+    function busy() { return (BUSY_RE.test(st.screen) || (st.screen === 't2-build' && st.build && !st.build.done && Object.keys(st.build.steps || {}).some(function (x) { return st.build.steps[x]; }) && following() && lessonNow().key !== 'build')) && app.getAttribute('data-screen') === st.screen; }
     // 측정 화면은 처음부터 다시 (조건 화면으로), 나머지는 그 화면 그대로
     function resumeId(id) { return /measure$/.test(id) ? id.replace(/measure$/, 'cond') : id; }
     // 선생님이 내 단계보다 뒤 단계를 열었을 때 위에 늘 보이는 띠
@@ -302,6 +306,7 @@
     }
     function show(id, opt) {
         cleanup.forEach(function (f) { try { f(); } catch (e) { /* 무시 */ } }); cleanup = [];
+        var wasBusy = BUSY_RE.test(String(st.screen || ''));
         if (/challenge|-ch-|^t2-(film|safe|measure)$/.test(String(id)) && mediaOn()) FACE.load();   // 도전 전에 얼굴 찾기를 미리 받아 둠
         if (!SCREENS[id]) id = 'enter';
         // 흐름에서 뺀 화면 (2026-11-23 가상 수업 4차): 예전에 저장된 화면 주소로 와도 그다음 화면으로
@@ -346,6 +351,11 @@
         app.setAttribute('data-screen', id);
         if (view.mount) view.mount(app.firstChild);
         renderTop();
+        // 측정(녹화·초시계·눈으로 고르기)을 마쳤는데 그동안 선생님이 🎯 도전 장을 띄웠으면 그리로 (5b 하 1, 도전 화면에 우리 결과 표가 있음)
+        if (wasBusy && !BUSY_RE.test(id) && following()) {
+            var ct = followTarget();
+            if (ct && ct.ch && !/-ch-|-challenge$/.test(id)) { setTimeout(function () { if (st.screen === id && following()) followApply(); }, 0); }
+        }
         window.scrollTo(0, 0);
         var h = app.querySelector('h2'); if (h) { h.setAttribute('tabindex', '-1'); try { h.focus({ preventScroll: true }); } catch (e) { /* 무시 */ } }
         if (stageMoved && share) { lastStep = stepNow(); share.stepChanged(); } else beatIfChanged();
@@ -368,23 +378,31 @@
     var SKIP_IN_DO = { 'q-pressure': 't1-var', 'q-control': 't1-cond', 'q-mass': 't2-var', 'q-action': 't2-var' };
     function lessonNow() { return share && share.lessonNow ? share.lessonNow() : { on: false }; }
     // 발표용(교사 🎬 발표 보기의 옆 학생 화면, 2026-11-23 나란히 보기)도 같은 규칙으로 '폰이 지금 보는 화면'을 보임 (팀 없이, 저장·보내기 없음)
-    function following() { return !!(CLASS && !PAST && share && lessonNow().on && (PRESENT || (st.team && !st.team.pending))); }
+    // ✅ 선생님이 수업을 마쳤으면(수업 문서 done) 장을 따라가지 않음 — 결과 카드 그대로 (5b 하 6)
+    function classDone() { var ci = share && share.classInfo && share.classInfo(); return !!(ci && ci.done); }
+    function following() { return !!(CLASS && !PAST && share && lessonNow().on && !classDone() && (PRESENT || (st.team && !st.team.pending))); }
     function conceptOf(k) { return M.CONCEPTS.filter(function (c) { return c.key === k; })[0] || null; }
     // 띄운 장 → 폰 화면 (측정 장이면 { free: 't1' })
-    // 놓친 점수 퀴즈 (가상 수업 5차 중 3): 그 장 풀이가 이미 열렸는데 아직 안 고른 퀴즈는 다음 응답 장 앞에 한 번 (늦게 골라 5점)
+    // 놓친 점수 퀴즈 (가상 수업 5차 중 3, 5b 중 1): 아직 안 고른 점수 퀴즈 가운데 이미 지나간 것(풀이가 열렸거나 그 차시가 지남)을
+    // 다음 응답 장 앞에 하나씩 — 차시를 넘어도 사라지지 않음. 한 장에서는 하나만 (고를 때까지 그대로), 남은 것은 다음 응답 장에서
     var MISSABLE = ['gas', 'control', 'action', 'mass'];
+    var QUIZ_STAGE = { gas: 't1', control: 't1', action: 't2', mass: 't2' }, STAGE_ORD = { think: 0, t1: 1, t2: 2, end: 3 };
+    function quizTried(k) { return !!(st.quiz[k] && st.quiz[k].tries); }
+    function quizPassed(k) {
+        var L = lessonNow();
+        return !held(k) || (STAGE_ORD[L.stage] || 0) > STAGE_ORD[QUIZ_STAGE[k]];
+    }
     function missedQuiz() {
-        if (!(share && share.lessonUsed && share.lessonUsed())) return '';
-        var at = lessonNow().key || '', tried = function (k) { return st.quiz[k] && st.quiz[k].tries; };
-        st.missOffered = st.missOffered || {};
-        // 이미 이 장에서 꺼낸 퀴즈는 고를 때까지 그대로, 장이 바뀌면 다시 꺼내지 않음 (한 번만)
-        if (st.miss && st.miss.at === at && !tried(st.miss.k)) return 'q-' + st.miss.k;
+        if (PRESENT || !(share && share.lessonUsed && share.lessonUsed())) return '';   // 발표용 옆 화면은 팀이 아님
+        var at = lessonNow().key || '', inSeq = SEQ[at] || [];
+        if (st.miss && st.miss.at === at) return quizTried(st.miss.k) ? '' : 'q-' + st.miss.k;
         for (var i = 0; i < MISSABLE.length; i++) {
             var k = MISSABLE[i];
-            if (SCREENS['q-' + k] && !held(k) && !tried(k) && !st.missOffered[k] && k !== at) { st.missOffered[k] = 1; st.miss = { k: k, at: at }; save(); return 'q-' + k; }
+            if (SCREENS['q-' + k] && !quizTried(k) && k !== at && inSeq.indexOf(k) < 0 && quizPassed(k)) { st.miss = { k: k, at: at }; save(); return 'q-' + k; }
         }
         return '';
     }
+    function missingNow(k) { return !!(st.miss && st.miss.k === k && st.miss.at === (lessonNow().key || '')); }
     function followTarget() {
         var t = followTarget0();
         if (typeof t === 'string' && t !== 'wait' && t !== 'sent' && t !== 'end-card') { var miss = missedQuiz(); if (miss) return miss; }
@@ -419,7 +437,8 @@
     // 측정 장: 그 차시에서 하던 화면, 처음이면 안전 확인부터 (소개·설명 글은 앞 화면에서)
     function doEntry(part) {
         var last = st.lastReal;
-        if (last && stageOf(last) === part && !/-intro$/.test(last) && SCREENS[last]) return resumeId(last);
+        // 🛠 만들기는 측정이 아님 — 다 만든 팀이 측정 장에서 만들기 화면으로 돌아가지 않게
+        if (last && stageOf(last) === part && !/-intro$/.test(last) && !(last === 't2-build' && st.build && st.build.done) && SCREENS[last]) return resumeId(last);
         if (part === 't1') { var sf = st.t1.safe || {}; return sf.goggle && sf.face && sf.away && sf.wait ? (st.t1.changed ? (st.t1.trials.length ? 't1-again' : 't1-cond') : 't1-var') : 't1-safe'; }
         return st.t2.changed ? (st.t2.trials.length ? 't2-again' : 't2-cond') : 't2-var';   // 처음(0번)이면 '이어서' 없이 조건으로 (가상 수업 5차 중 5)
     }
@@ -434,7 +453,7 @@
         if (id === 't2-build' && !(st.build && st.build.done)) return id;   // 마저 만들기 (상 1)
         if (busy() && /measure$|^t2-hand$/.test(id) && !(opt && opt.follow)) return id;   // 측정 화면을 다시 그리는 것은 그대로 (측정을 마치고 결과로 가면 띄운 장에 맞춤)
         var t = followTarget();
-        if (t.free) return stageOf(id) === t.free && id !== t.free + '-intro' ? id : t.ch ? chEntry(t.free) : doEntry(t.free);
+        if (t.free) return stageOf(id) === t.free && id !== t.free + '-intro' && id !== 't2-build' ? id : t.ch ? chEntry(t.free) : doEntry(t.free);
         return t;
     }
     // 선생님이 장을 넘기면: 측정 중이 아니면 그 장에 맞춤, 설명을 닫으면 하던 화면으로 → 처리했으면 true
@@ -503,8 +522,14 @@
     function shownQuiz() { var o = {}; Object.keys(st.quiz || {}).forEach(function (k) { if (!(held(k) && st.quiz[k] && st.quiz[k].tries)) o[k] = st.quiz[k]; }); return o; }
     // 설명 화면을 쓴 반에서 그 장 풀이가 이미 열렸으면 → 지금 처음 고르면 '늦게 고름'(맞혀도 5점)
     function lateNow(k) { return !!(share && share.lessonUsed && share.lessonUsed() && !held(k)); }
-    var LATE_TXT = '<p class="ev-small ev-late">풀이를 본 뒤 골라서 5점이에요</p>';
-    function quizHint(k, q) { return q && q.tries ? (q.late ? LATE_TXT : '') : (lateNow(k) ? '<p class="ev-small ev-late">풀이가 이미 나왔어요 — 풀이를 본 뒤 골라서 맞히면 5점이에요</p>' : '<p class="ev-small">처음에 맞히면 10점, 두 번째에 맞히면 5점!</p>'); }
+    // 늦게 고른 퀴즈 안내는 답 칸만 보이는 화면(ev-answering)에서도 보이게 ev-keep (5b 중 2)
+    var LATE_TXT = '<p class="ev-small ev-late ev-keep">풀이를 본 뒤 골라서 5점이에요</p>';
+    function quizHint(k, q) {
+        if (q && q.tries) return q.late ? LATE_TXT : '';
+        var miss = missingNow(k) ? '⏪ 지나간 문제예요 · ' : '';
+        if (lateNow(k)) return '<p class="ev-small ev-late ev-keep">' + miss + '풀이를 본 뒤 골라서 5점이에요</p>';
+        return miss ? '<p class="ev-small ev-late ev-keep">' + miss + '지금 골라요</p>' : '<p class="ev-small">처음에 맞히면 10점, 두 번째에 맞히면 5점!</p>';
+    }
     var HOLD_TXT = '<p class="ev-hold" role="status">골랐어요 ✓ — <b>앞 화면을 봐요</b>. 선생님이 풀이를 보여 주면 맞았는지 나와요.</p>';
     function heldChoices(opts, picks) {
         return '<div class="ev-choices">' + opts.map(function (o) { return '<button type="button" class="ev-choice' + (picks.indexOf(o.k) >= 0 ? ' on' : '') + '" data-k="' + o.k + '" disabled>' + esc(o.t) + '</button>'; }).join('') + '</div>';
@@ -937,7 +962,7 @@
         var changeTxt = plan && d.values.length > 1
             ? '<b>' + esc(d.label(plan[0])) + ' → ' + esc(d.label(plan[1])) + '</b> 로 바꾸면 '
             : (d.cat ? '바꾸면 ' : '늘리면 ');
-        return '🔮 ' + esc(d.short || d.name) + '을(를) ' + changeTxt + G.what + '?';
+        return '🔮 ' + esc(M.josa(d.short || d.name, '을를')) + ' ' + changeTxt + G.what + '?';
     }
     function varScreen(part, title, next) {
         return function () {
@@ -963,8 +988,8 @@
                 }).join('') : '') +
                 (p.trials.length && p.changed ? '<p class="ev-small">바꿀 조건을 바꾸면 지금까지 잰 값은 그대로 두고, 결과 비교 표는 새 조건으로 보여 줘요.</p>' : '') +
                 (p.changed && !okG ? '<p class="ev-small ev-need-guess">' + (okP ? '🔮 예측을 골라야 다음으로 가요' : '✋ ①과 ②를 서로 다른 값으로 정해야 다음으로 가요') + '</p>' : '') +
-                // 계획 장(plan-t1·plan-t2)을 띄운 동안: 다 정하면 '보내기' → ✅ 보냈어요 (다음 단추 흐름은 숨김, 2026-11-27)
-                (following() && lessonNow().key === 'plan-' + part ? '<div class="ev-follow-only ev-nav col"><button type="button" class="ev-next good" id="ev-plan-send"' + (okG ? '' : ' disabled') + '>✅ 다 정했어요 · 보내기</button></div>' : '') +
+                // 계획 장(plan-t1·plan-t2)을 띄운 동안: 다 정하면 '다음 →' → ✅ 보냈어요 (다음 단추 흐름은 숨김, 2026-11-27)
+                (following() && lessonNow().key === 'plan-' + part ? '<div class="ev-follow-only ev-nav col"><button type="button" class="ev-next good" id="ev-plan-send"' + (okG ? '' : ' disabled') + '>✅ 다 정했어요 · 다음 →</button></div>' : '') +
                 nav(next, '다음 →', okG ? '' : ' disabled');
             return { html: html, mount: function (el) {
                 var syncNext = function () {
@@ -1044,7 +1069,7 @@
             p.quick = false;
             var countOf = function () { return p.trials.filter(function (t) { return t.value === p.value; }).length; }, count = countOf();
             var html = '<p class="ev-kicker">' + (challenge ? '🎯 도전' : (part === 't1' ? '1차시' : '2차시') + ' · 이번 조건') + '</p>' +
-                '<h2>' + esc(d.short || d.name) + '을(를) 얼마로 할까요?</h2>' +
+                '<h2>' + esc(M.josa(d.short || d.name, '을를')) + ' 얼마로 할까요?</h2>' +
                 (challenge ? '<p class="ev-target">목표: <b>' + (part === 't1' ? esc(s.targetTime) + '초' : '아이 키만큼 (' + esc(s.targetPct) + '%)') + '</b> · 우리 결과 표를 보고 정해요</p>' : planBar(part, { pickable: true })) +
                 stepper(p.changed, d.short || d.name, d.label(p.value), {}) +
                 '<h3>같게 할 조건 🔒</h3>' + Object.keys(defs).filter(function (k) { return k !== p.changed; }).map(function (k) { return stepper(k, defs[k].short || defs[k].name, defs[k].label(p.base[k]), { locked: true }); }).join('') +
@@ -1093,7 +1118,7 @@
         // 계획한 ① → ② 차례로 (줄인 팀도), 흔들림은 ① · ② 끼리 견줌 (가상 수업 5차 중 1·2)
         var plan = M.planOf(p), rows = M.byValue(p.trials.map(function (t) { return { value: t.value, y: part === 't1' ? t.y : t.pct }; }), d, plan);
         var f = function (v) { return part === 't1' ? fmtS(v) : Math.round(v) + '%'; }, sp = M.spread(rows, plan);
-        var pairTxt = sp.pair ? esc(d.label(sp.pair[0])) + '과(와) ' + esc(d.label(sp.pair[1])) : '처음 값과 끝 값';
+        var pairTxt = sp.pair ? esc(M.josa(d.label(sp.pair[0]), '과와')) + ' ' + esc(d.label(sp.pair[1])) : '처음 값과 끝 값';
         box.innerHTML = rows.length ? '<table class="ev-table"><thead><tr><th>' + esc(d.short || d.name) + '</th><th>평균</th><th>↕ 범위</th><th>횟수</th></tr></thead><tbody>' + rows.map(function (r) {
             var lo = Math.min.apply(null, r.ys), hi = Math.max.apply(null, r.ys);
             return '<tr><td>' + esc(d.label(r.value)) + '</td><td>' + f(r.mean) + '</td><td>' + (r.n > 1 ? f(lo) + '~' + f(hi) : '–') + '</td><td>' + r.n + '</td></tr>';
@@ -1271,7 +1296,7 @@
         var np = nextPlanned('t1', r.value);
         var changeBtn = np && d
             ? '▶ 정해 둔 ' + (np.idx === 0 ? '① ' : '② ') + esc(d.label(np.val)) + ' 로 재러 가기'
-            : '🔧 ' + esc(d ? d.short || d.name : '조건') + '을(를) 바꿔서 재기';
+            : '🔧 ' + esc(M.josa(d ? d.short || d.name : '조건', '을를')) + ' 바꿔서 재기';
         var html = '<p class="ev-kicker">결과 · ' + esc(d ? d.label(r.value) : '') + '</p><h2>💥 ' + fmtS(r.y) + ' 만에 ‘펑’!</h2>' +
             card('<p>이 조건: <b>' + same.length + '번째</b> · 평균 <b>' + fmtS(avg) + '</b></p>' + planBar('t1') + (guessLine('t1') ? '<p class="ev-small">' + guessLine('t1') + '</p>' : '')) +
             '<div class="ev-nav col">' + (same.length < s.repeats ? '<button type="button" class="ev-next good" id="ev-again">🔁 같은 조건으로 한 번 더 (' + same.length + '/' + s.repeats + ')</button>' : '<p class="ev-ok">✅ 같은 조건으로 ' + s.repeats + '번 쟀어요!</p>') +
@@ -1309,7 +1334,7 @@
         return function () {
             var defs = ensureBase(part), p = st[part], d = defs[p.changed];
             var html = '<h2>📊 ' + (part === 't1' ? '바꾼 조건 → 열리는 시간 비교' : '바꾼 조건 → 오른 높이 비교') + '</h2>' +
-                (d ? '<p>' + esc(d.short || d.name) + '을(를) 바꾸면 ' + (part === 't1' ? '열리는 시간이' : '높이가') + ' 어떻게 달라졌나요?</p>' : '') +
+                (d ? '<p>' + esc(M.josa(d.short || d.name, '을를')) + ' 바꾸면 ' + (part === 't1' ? '열리는 시간이' : '높이가') + ' 어떻게 달라졌나요?</p>' : '') +
                 planBar(part) +
                 (guessLine(part) ? '<p class="ev-small">' + guessLine(part).replace(/ · $/, '') + '</p>' : '') +
                 '<div id="ev-mini"></div>' +
@@ -1330,7 +1355,7 @@
                 ? '▶ 정해 둔 ' + (np.idx === 0 ? '① ' : '② ') + esc(d.label(np.val)) + ' 로 ' + (t1 ? '재러 가기 →' : '발사하러 가기 →')
                 : '🔧 ' + esc(name) + ' 바꿔서 다시 ' + (t1 ? '재기' : '발사하기') + ' →';
             var html = '<p class="ev-kicker">' + (t1 ? '1차시' : '2차시') + ' · 한 번 더</p><h2>🔧 ' + (np && d ? '정해 둔 ' + (np.idx === 0 ? '① ' : '② ') + esc(d.label(np.val)) + ' 로 재요' : '하나만 바꿔 한 번 더 재요') + '</h2>' +
-                card((n && d ? '<p>지금은 <b>' + esc(name) + '</b>을(를) <b>' + esc(d.label(one.value)) + '</b> 하나로만 ' + n + '번 쟀어요.</p>' : '<p>아직 잰 값이 없어요.</p>') +
+                card((n && d ? '<p>지금은 <b>' + esc(name) + '</b>' + M.josa(name, '을를').slice(name.length) + ' <b>' + esc(d.label(one.value)) + '</b> 하나로만 ' + n + '번 쟀어요.</p>' : '<p>아직 잰 값이 없어요.</p>') +
                     planBar(part) +
                     '<p class="ev-why">💡 값을 바꿔서 한 번 더 재야 무엇 때문에 ' + (t1 ? '열리는 시간이' : '높이가') + ' 달라지는지 결과 표로 비교할 수 있어요.</p>') +
                 '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-change">' + btnTxt + '</button>' +
@@ -1358,7 +1383,7 @@
     // 2차시 결과 안내 (2026-11-21 비계 4): 지금 바꾸는 조건 안에서만 권함 — 잠긴 조건은 권하지 않음
     function t2Hint(high) {
         var p = st.t2, d = ensureBase('t2')[p.changed], name = d ? d.short || d.name : '바꿀 조건';
-        if (p.changed === 'mass') return high ? '점토·클립을 하나 더 붙여 볼까요?' : massNow() > 0 ? '점토·클립을 하나 떼어 볼까요?' : '몸체 무게는 이미 0개예요. 이 높이도 좋은 결과예요!';
+        if (p.changed === 'mass') return high ? '점토·클립을 하나 더 붙여 볼까요?' : massNow() > 0 ? '점토·클립을 하나 떼어 볼까요?' : '점토를 다 뗀 가장 가벼운 로켓이에요. 이 높이도 좋은 결과예요!';
         return esc(name) + ' 값을 바꿔서 다시 쏘아 볼까요?';
     }
     function massNow() { var p = st.t2; return Number(p.changed === 'mass' ? p.value : p.base && p.base.mass) || 0; }
@@ -1400,7 +1425,7 @@
     SCREENS['t1-ch-result'] = function () {
         var r = st.t1.challenge[st.t1.challenge.length - 1], s = setup();
         if (!r) return { html: nav('t1-challenge', '도전하러 가기 →') };
-        var html = '<p class="ev-kicker">🎯 도전 결과</p><h2>' + (r.ok ? '🎉 성공!' : '목표와 ' + diffText('t1', r.diff)) + '</h2>' +
+        var html = '<p class="ev-kicker">🎯 도전 결과</p><h2>' + (r.ok ? '🎉 성공!' : '❌ 목표와 ' + diffText('t1', r.diff)) + '</h2>' +
             card('<p>목표 <b>' + esc(s.targetTime) + '초</b> → 실제 <b>' + fmtS(r.y) + '</b></p><p class="ev-big">목표와 ' + (Math.round(Math.abs(r.diff) * 10) / 10) + '초 차이</p>') + mediaLine('t1') +
             '<div class="ev-nav col"><button type="button" class="ev-next ' + (r.ok ? 'secondary' : 'good') + '" data-go="t1-ch-cond">🔁 다시 도전</button>' +
             '<button type="button" class="ev-next ' + (r.ok ? 'good' : 'secondary') + '" data-go="t2-intro">2차시로 →</button></div>';
@@ -1414,6 +1439,8 @@
     SCREENS['t2-build'] = function () {
         var b = st.build = st.build || { steps: {} }, all = BUILD_STEPS.every(function (x) { return b.steps[x[0]]; });
         var html = '<p class="ev-kicker">2차시 · 🛠 만들기</p><h2>로켓을 만들어요</h2>' +
+            // 선생님이 다음 장으로 넘어간 뒤에도 만드는 팀 (5b 하 4)
+            (following() && lessonNow().key !== 'build' && !b.done ? '<p class="ev-small ev-late ev-keep" role="status">🛠 다 만들면 지금 문제로 가요</p>' : '') +
             '<div class="ev-choices ev-build">' + BUILD_STEPS.map(function (x, i) {
                 return '<button type="button" class="ev-choice' + (b.steps[x[0]] ? ' on' : '') + '" data-build="' + x[0] + '" aria-pressed="' + !!b.steps[x[0]] + '">' + (b.steps[x[0]] ? '✅ ' : (i + 1) + '. ') + x[1] + '</button>';
             }).join('') + '</div>' +
@@ -1620,7 +1647,7 @@
     SCREENS['t2-ch-result'] = function () {
         var r = st.t2.challenge[st.t2.challenge.length - 1], s = setup();
         if (!r) return { html: nav('t2-challenge', '도전하러 가기 →') };
-        var html = '<p class="ev-kicker">🎯 도전 결과</p><h2>' + (r.ok ? '🎉 성공!' : '목표와 ' + diffText('t2', r.diff)) + '</h2>' +
+        var html = '<p class="ev-kicker">🎯 도전 결과</p><h2>' + (r.ok ? '🎉 성공!' : '❌ 목표와 ' + diffText('t2', r.diff)) + '</h2>' +
             card('<p>목표 <b>' + esc(s.targetPct) + '%</b> → 실제 <b>' + r.pct + '%</b>' + (r.method === 'hand' ? ' (눈으로)' : '') + '</p><p class="ev-big">목표와 ' + Math.round(Math.abs(r.diff)) + '% 차이</p>') + mediaLine('t2') +
             '<div class="ev-nav col"><button type="button" class="ev-next ' + (r.ok ? 'secondary' : 'good') + '" data-go="t2-ch-cond">🔁 다시 도전</button>' +
             '<button type="button" class="ev-next ' + (r.ok ? 'good' : 'secondary') + '" id="ev-end">정리로 →</button></div>';
@@ -1647,6 +1674,7 @@
         return { html: html };
     };
     /* 정리 문장 (2026-11-21): '○○을(를) 늘렸더니 □□가 ___. 왜냐하면 ___' — 고르기 먼저, 까닭은 고르거나 짧게 쓰기 */
+    function numClash(pick, dir) { return (pick === 'up' && dir === 'down') || (pick === 'down' && dir === 'up'); }
     SCREENS['end-sentence'] = function () {
         st.concl = st.concl || {};
         var parts = ['t1', 't2'].filter(function (k) { return st[k].changed && st[k].trials.length; });
@@ -1666,8 +1694,10 @@
                     (stageLocked(k) ? '' : '<div class="ev-nav col"><button type="button" class="ev-next secondary" data-go="' + k + '-again">🔁 같은 조건으로 한 번 더 ' + (k === 't1' ? '재러' : '쏘러') + ' 가기</button></div>') + '</div>';
                 // 계획한 ① → ② 차례·방향 그대로 ('줄였더니'·'늘렸더니'·'바꿨더니', 가상 수업 5차 중 1)
                 var pl = M.planOf(st[k]);
-                return head + '<p><b>' + esc(d.short || d.name) + '</b>을(를) ' + (pl ? '<b>' + esc(d.label(pl[0])) + ' → ' + esc(d.label(pl[1])) + '</b> 로 ' : '') + M.planVerb(d, pl) + ' ' + G.what + '</p>' +
-                    '<div class="ev-choices">' + ['down', 'up', 'same'].map(function (x) { return '<button type="button" class="ev-choice' + (c.dir === x ? ' on' : '') + '" data-dir="' + x + '">' + esc(G[x + 'Done']) + '</button>'; }).join('') + '</div>' +
+                return head + '<p><b>' + esc(d.short || d.name) + '</b>' + M.josa(d.short || d.name, '을를').slice((d.short || d.name).length) + ' ' + (pl ? '<b>' + esc(d.label(pl[0])) + ' → ' + esc(d.label(pl[1])) + '</b> 로 ' : '') + M.planVerb(d, pl) + ' ' + G.what + '</p>' +
+                    '<div class="ev-choices" data-evdir="' + (ev.dir || '') + '">' + ['down', 'up', 'same'].map(function (x) { return '<button type="button" class="ev-choice' + (c.dir === x ? ' on' : '') + '" data-dir="' + x + '">' + esc(G[x + 'Done']) + '</button>'; }).join('') + '</div>' +
+                    // 고른 결과가 📏 우리 숫자와 반대면 한 줄 (막지는 않음, 5b 중 3)
+                    '<p class="ev-numcheck ev-keep" role="status"' + (numClash(c.dir, ev.dir) ? '' : ' hidden') + '>📏 <b>숫자를 다시 봐요</b> — 우리 숫자는 <b>' + esc(G.word[ev.dir] || '') + '</b> 쪽이에요</p>' +
                     '<p>왜냐하면…</p><div class="ev-choices">' + bec.map(function (t) { return '<button type="button" class="ev-choice' + (c.why === t ? ' on' : '') + '" data-why="' + esc(t) + '">' + esc(t) + '</button>'; }).join('') + '</div>' +
                     '<label class="ev-field">직접 쓰기 <small>(짧게, 안 써도 돼요)</small><input type="text" class="ev-why-in" maxlength="40" autocomplete="off" value="' + esc(c.why && bec.indexOf(c.why) < 0 ? c.why : '') + '"></label></div>';
             }).join('') : card('<p>아직 바꿔서 잰 조건이 없어요. 결과 카드로 가요.</p>')) +
@@ -1682,7 +1712,11 @@
                 box.addEventListener('click', function (e) {
                     var b = e.target.closest('[data-dir], [data-why]'); if (!b) return;
                     var c = st.concl[k] = st.concl[k] || {};
-                    if (b.dataset.dir) c.dir = b.dataset.dir; else { c.why = b.dataset.why; box.querySelector('.ev-why-in').value = ''; }
+                    if (b.dataset.dir) {
+                        c.dir = b.dataset.dir;
+                        var nc = box.querySelector('.ev-numcheck'), evd = (box.querySelector('[data-evdir]') || {}).dataset;
+                        if (nc) nc.hidden = !numClash(c.dir, evd && evd.evdir);
+                    } else { c.why = b.dataset.why; box.querySelector('.ev-why-in').value = ''; }
                     Array.prototype.forEach.call(box.querySelectorAll(b.dataset.dir ? '[data-dir]' : '[data-why]'), function (x) { x.classList.toggle('on', x === b); });
                     changed();
                 });
@@ -1696,7 +1730,7 @@
         } };
     };
     SCREENS['end-card'] = function () {
-        var html = '<h2>🏅 우리 팀 결과 카드</h2><canvas id="ev-card" class="ev-cardimg" width="1080" height="1350" aria-label="팀 결과 카드"></canvas>' +
+        var html = (CLASS && !PAST && classDone() ? '<p class="ev-done-band ev-keep" role="status">🏁 <b>수업이 끝났어요</b> · 결과 카드를 저장해 두세요</p>' : '') + '<h2>🏅 우리 팀 결과 카드</h2><canvas id="ev-card" class="ev-cardimg" width="1080" height="1660" aria-label="팀 결과 카드"></canvas>' +
             '<div class="ev-nav col"><button type="button" class="ev-next good" id="ev-save">📥 이미지로 저장</button>' + (navigator.share ? '<button type="button" class="ev-next secondary" id="ev-share">📤 공유하기</button>' : '') + '</div>' +
             '<p id="ev-card-msg" class="ev-msg" role="status"></p><p class="ev-small">수고했어요! 이 카드는 이 폰에서 만들었어요. 선생님 화면에는 팀 점수·시간 차이·높이 %만 가요.</p>';
         return { html: html, mount: function () {
@@ -1716,6 +1750,14 @@
             });
         } };
     };
+    function foundLine(k) {
+        var p = st[k] || {}, defs = k === 't2' ? M.vars2(st.setup) : M.vars1(st.setup), d = defs[p.changed];
+        if (!d) return '바꾼 것 없음';
+        var name = d.short || d.name, ev = p.trials && p.trials.length ? M.evidence(k, p, st.setup) : null, c = (st.concl || {})[k] || {}, pl = M.planOf(p);
+        var what = name + (pl ? ' ' + d.label(pl[0]) + '→' + d.label(pl[1]) : '');
+        if (!ev || ev.one || ev.norep) return what + ' · 아직 말할 수 없음';
+        return what + ' → ' + (c.dir ? M.GUESS[k].word[c.dir] : '?') + ' (' + String(ev.short).split(': ').pop() + ')';
+    }
     function drawCard(cv) {
         var g = cv.getContext('2d'), W = cv.width, s = setup(), sc = M.score(st.quiz), sum = M.summary(st, st.setup);
         var grd = g.createLinearGradient(0, 0, 0, cv.height); grd.addColorStop(0, '#0d47a1'); grd.addColorStop(1, '#1565c0');
@@ -1731,18 +1773,23 @@
             ['⏱ 열리는 시간 도전', sum['시간 도전 차이(초)'] != null ? '목표 ' + s.targetTime + '초와 ' + Math.abs(sum['시간 도전 차이(초)']) + '초 차이' + (sum['시간 도전 성공'] ? ' 🎉' : '') : '도전 기록 없음'],
             ['🚀 가장 높이', maxPct >= 0 ? '아이 키의 ' + Math.round(maxPct) + '%' : '기록 없음'],
             ['🎯 높이 도전', sum['높이 도전 차이(%)'] != null ? '목표와 ' + Math.abs(sum['높이 도전 차이(%)']) + '% 차이' + (sum['높이 도전 성공'] ? ' 🎉' : '') : '도전 기록 없음'],
-            ['✨ 바뀐 생각', sum['생각 바뀜 ✨'] + '개']
+            ['✨ 바뀐 생각', sum['생각 바뀜 ✨'] + '개'],
+            // 우리가 알아낸 것 (5b 하 5): 바꾼 것 ① → ② → 정리 문장 결과, 한 가지만 쟀으면 '아직 말할 수 없음'
+            ['🔧 1차시 알아낸 것', foundLine('t1')],
+            ['🔧 2차시 알아낸 것', foundLine('t2')]
         ];
         var y = 400;
         rows.forEach(function (r) {
             g.fillStyle = 'rgba(255,255,255,0.12)'; roundRect(g, 80, y, W - 160, 130, 28); g.fill();
             g.textAlign = 'left'; g.fillStyle = '#bbdefb'; g.font = 'bold 40px system-ui, sans-serif'; g.fillText(r[0], 120, y + 20);
-            g.fillStyle = '#fff'; g.font = '46px system-ui, sans-serif'; g.fillText(r[1], 120, y + 70);
+            g.fillStyle = '#fff'; var fs = 46; g.font = fs + 'px system-ui, sans-serif';
+            while (fs > 26 && g.measureText(r[1]).width > W - 240) { fs -= 2; g.font = fs + 'px system-ui, sans-serif'; }
+            g.fillText(r[1], 120, y + 70);
             y += 150;
         });
         g.textAlign = 'center'; g.fillStyle = '#e3f2fd'; g.font = '34px system-ui, sans-serif';
-        g.fillText('힘 = 물체의 모양이나 운동 상태를 바꾸는 원인', W / 2, 1180);
-        g.fillText('압력 = 일정한 넓이에 작용하는 힘 · 가속도 = 속도가 변하는 정도', W / 2, 1230);
+        g.fillText('힘 = 물체의 모양이나 운동 상태를 바꾸는 원인', W / 2, y + 30);
+        g.fillText('압력 = 일정한 넓이에 작용하는 힘 · 가속도 = 속도가 변하는 정도', W / 2, y + 80);
     }
     function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
@@ -1769,5 +1816,5 @@
     if (share && !PRESENT) retryLoop();
     if (st.dirty) queueSend();
     // 시험·디버그용 (화면에서 쓰지 않음)
-    window.__filmRocket = { state: function () { return st; }, show: show, sendNow: sendNow, share: function () { return share; } };
+    window.__filmRocket = { state: function () { return st; }, show: show, sendNow: sendNow, share: function () { return share; }, foundLine: foundLine };
 })();

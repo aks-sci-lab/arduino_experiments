@@ -98,7 +98,7 @@
             var cur = si && !si.all ? si.cur : '', part = si && (si.cur === 't1' || si.cur === 't2') ? si.cur : '';
             var wait = cur ? joined.filter(function (r) { return r.doneStage === cur; }) : [];
             var behind = joined.filter(function (r) { return r.behind; }), off = joined.filter(function (r) { return r.off; });
-            var still = part ? joined.filter(function (r) { return (r.kinds && r.kinds[part] || 0) < 2; }) : [];
+            var still = stillRows(c, joined, part, cur);
             var idle = joined.filter(function (r) { return !r.off && r.state && r.state.idle; });
             sum.push('들어옴 <b>' + joined.length + ' / ' + rows.length + '</b>');
             if (cur) { sum.push('⏳ 끝내고 기다림 <b>' + wait.length + '</b>'); sum.push('하는 중 <b>' + (joined.length - wait.length) + '</b>'); }
@@ -902,6 +902,13 @@
     /* 발표 화면 띠의 팀(조) 상태 — 설명 장을 보는 동안에도 (하트비트·제출 요약만, 규칙·색인 그대로)
        팀 수업: 들어온 팀 · ⏳ 기다리는 팀 · 하는 중(펼치면 이름) · 🔧 값을 한 번도 안 바꾼 팀(1·2차시)
        조 수업: 들어온 학생 · 보낸 조 · 아직 안 보낸 조(펼치면 조 번호) */
+    // '🔧 값 안 바꿈' (5b 하 5): 한 가지 값만 잰 팀을, 측정 시간이 끝난 뒤(🎯 도전 장을 띄웠거나 그 단계를 끝내고 기다림)에만
+    // — 단계를 열자마자·① 을 반복해 재는 동안에는 띄우지 않음
+    function stillRows(c, joined, part, cur) {
+        if (!part) return [];
+        var L = c && c.lesson, past = !!(L && L.on && (L.key === 'ch-' + part || (part === 't1' && /^(build|action|plan-t2|do-t2|ch-t2|end-|card)/.test(L.key || '')) || (part === 't2' && /^(end-|card)/.test(L.key || ''))));
+        return joined.filter(function (r) { return (r.kinds && r.kinds[part] || 0) === 1 && (past || r.doneStage === cur); });
+    }
     function presentStatus(c, si) {
         var st = state.last; if (!st) return '';
         var names = function (list) { return list.map(function (x) { return '<span class="ct-pname">' + esc(x) + '</span>'; }).join(''); };
@@ -910,7 +917,7 @@
             var cur = si && !si.all ? si.cur : '', part = si && (si.cur === 't1' || si.cur === 't2') ? si.cur : '';
             var wait = cur ? joined.filter(function (r) { return r.doneStage === cur; }) : [];
             var doing = joined.filter(function (r) { return wait.indexOf(r) < 0; });
-            var still = part ? joined.filter(function (r) { return (r.kinds && r.kinds[part] || 0) < 2; }) : [];
+            var still = stillRows(c, joined, part, cur);
             // 띠에는 작은 숫자만, 팀 이름은 펼친 안에만 (2026-11-23)
             var offN = joined.filter(function (r) { return r.off; }).length;
             var h = '<span title="들어온 팀 · ⏳ 기다리는 팀 · 🔌 연결 끊김">👨‍👩‍👧 <b>' + joined.length + '</b>팀' + (rows.length > joined.length ? '/' + rows.length : '') +
@@ -947,7 +954,15 @@
         lesson.def = null; lessonOff();
         if (!LSx) return;
         var space = c.space;
-        LSx.load(c.exp).then(function (def) {
+        // 지금 장·마침 여부는 수업 문서를 새로 읽어서 (예전에 받아 둔 목록의 lesson 은 오래됐을 수 있음, 5b 하 5·6)
+        var fresh = function (def) {
+            if (!def || !CC.classInfo) return def;
+            return CC.classInfo('lab:' + space, c.classCode).then(function (r) {
+                if (r && r.ok) { if (r.lesson !== undefined) c.lesson = r.lesson; c.done = !!r.done; }
+                return def;
+            }, function () { return def; });
+        };
+        LSx.load(c.exp).then(fresh).then(function (def) {
             if (pres.space !== space || !def) return;
             lesson.def = def;
             // 새로고침·다른 창으로 열면 (2026-11-23 가상 수업 4차 버그): 수업 문서에 이미 있는 지금 장(lesson)에서 이어 보임 — 장을 넘기기 전에는 다시 쓰지 않음
@@ -959,8 +974,16 @@
                 if (at < 0 && L.i < list.length) at = L.i;
                 if (at >= 0) { lsync.hold = true; if (lessonStart(L.stage, at, L.reveal)) return; lsync.hold = false; }
             }
-            // 처음 여는 수업: 가장 뒤에 연 단계의 설명부터 (설명이 끝나면 학생 화면도 그 단계로)
+            // 발표 보기를 닫았던 수업(마지막 단계·장이 남아 있음): 다시 열면 그 장에서 이어서 (5b 하 5, 정리 첫 장으로 되돌아가지 않게)
+            //  (그 뒤 단계를 새로 열었으면 새 단계 설명부터)
             var si = CC.stageInfo(c.exp, c.stage, c.flow);
+            if (L && !L.on && L.stage && si && L.stage === si.cur) {
+                var list0 = LSx.slidesFor(def, L.stage, c.flow), at0 = -1;
+                if (L.key) list0.forEach(function (sl, j) { if (at0 < 0 && sl.key === L.key) at0 = j; });
+                if (at0 < 0 && L.i < list0.length) at0 = L.i;
+                if (at0 >= 0 && lessonStart(L.stage, at0)) return;
+            }
+            // 처음 여는 수업: 가장 뒤에 연 단계의 설명부터 (설명이 끝나면 학생 화면도 그 단계로)
             if (!lessonStart(si ? si.cur : frameGate(c), 0)) renderPresentBar();
         });
     }
@@ -989,7 +1012,9 @@
         framePush();
         var s = lesson.on ? lesson.list[lesson.i] : null;
         // 'phone' 장은 풀이를 열기 전까지 학생 띠가 '✍️ 내 화면에서 해요' (풀이를 열면 '👀 앞 화면을 봐요')
-        var L = { on: !!lesson.on, stage: lesson.on ? lesson.gate : '', i: lesson.on ? lesson.i : 0, key: s && s.key ? s.key : '', reveal: !!(lesson.on && lesson.rev),
+        // 설명을 닫을 때도 마지막 단계·장 번호는 남김 → 발표 보기를 다시 열면 그 자리에서 (5b 하 5, 정리 첫 장으로 되돌아가지 않게)
+        var last = lesson.list && lesson.list[lesson.i];
+        var L = { on: !!lesson.on, stage: lesson.gate || '', i: lesson.i || 0, key: s && s.key ? s.key : (!lesson.on && last && last.key ? last.key : ''), reveal: !!(lesson.on && lesson.rev),
             mode: s && s.mode === 'phone' && !(lesson.rev && s.reveal) ? 'phone' : 'look' };
         // 📱 선생님이 만든 응답 물음 (③): 물음 글·고를 답을 함께 (정답은 빼고) → 학생 화면(js/class-share.js)이 답 칸을 띄움
         var q = LSx.respQ ? LSx.respQ(s) : null; if (q) L.q = q;
@@ -999,6 +1024,8 @@
         if (lsync.hold) { lsync.hold = false; lsync.last = sig; c.lesson = L; return; }
         if (sig === lsync.last) return;
         c.lesson = L;   // 이 창이 쓴 지금 장 (진행 화면에 갔다 다시 열어도 이어서)
+        // ✅ 마친 수업 (5b 하 6): 발표 보기를 다시 열어 넘겨 봐도 수업 문서는 쓰지 않음 → 팀 폰은 결과 카드 그대로
+        if (c.done) { lsync.last = sig; return; }
         clearTimeout(lsync.t);
         var go = function () { lsync.last = sig; CC.classLesson(c.space, L, open).then(function (r) {
             if (!r || !r.ok) { lsync.last = ''; return; }
@@ -1014,7 +1041,9 @@
     function framePush() {
         if (!pres.space) return;
         var s = lesson.on ? lesson.list[lesson.i] : null;
-        var L = { on: !!lesson.on, stage: lesson.on ? lesson.gate : '', i: lesson.on ? lesson.i : 0, key: s && s.key ? s.key : '', reveal: !!(lesson.on && lesson.rev),
+        // 설명을 닫을 때도 마지막 단계·장 번호는 남김 → 발표 보기를 다시 열면 그 자리에서 (5b 하 5, 정리 첫 장으로 되돌아가지 않게)
+        var last = lesson.list && lesson.list[lesson.i];
+        var L = { on: !!lesson.on, stage: lesson.gate || '', i: lesson.i || 0, key: s && s.key ? s.key : (!lesson.on && last && last.key ? last.key : ''), reveal: !!(lesson.on && lesson.rev),
             mode: s && s.mode === 'phone' && !(lesson.rev && s.reveal) ? 'phone' : 'look' };
         var open = (pres.open || []).slice();
         if (s && s.key && lesson.rev) revealKeys(s).forEach(function (k) { if (open.indexOf(k) < 0) open.push(k); });
@@ -1178,7 +1207,8 @@
     $('btnPMode').addEventListener('click', function () {
         var c = watched(); if (!c) return;
         if (pres.panel || lesson.on) return;   // 설명·🧩·🏆 가 떠 있을 때는 단추가 숨어 있음
-        if (!lessonStart(frameGate(c), 0)) presentToast('이 단계에는 설명 화면이 없어요');
+        var g = frameGate(c);
+        if (!lessonStart(g, g === lesson.gate ? lesson.i : 0)) presentToast('이 단계에는 설명 화면이 없어요');
     });
     $('btnPLayout').addEventListener('click', function () {
         pres.layout = pres.layout === 'side' ? 'deck' : 'side';
