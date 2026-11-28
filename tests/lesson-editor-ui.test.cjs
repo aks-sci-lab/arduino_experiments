@@ -58,11 +58,11 @@ test('수업 자료 편집 → 발표 보기에 반영 → 기본 자료로 되�
         assert.match(T.url(), /#exp=rocket$/);
         assert.match(await T.textContent('#stageTabs'), /들어가기[\s\S]*1차시[\s\S]*2차시[\s\S]*정리/);
         const base = await titles(T);
-        assert.equal(base[2], '‘힘’은 무엇일까요?');
+        assert.equal(base[1], '‘힘’은 무엇일까요?');   // 2026-11-27 분량 조절: 들어가기 5장 (오늘 할 일 → 힘)
         assert.equal(await prevTitle(T), base[0], '미리보기 = 고른 장');
 
-        // ① 글 고치기: 셋째 장(힘) 제목·본문
-        await T.click('#slideList .le-pickslide[data-i="2"]');
+        // ① 글 고치기: 둘째 장(힘) 제목·본문
+        await T.click('#slideList .le-pickslide[data-i="1"]');
         await T.fill('#slideForm input[data-f="title"]', '힘이란 무엇일까? (고침)');
         await T.evaluate(() => { const ed = document.querySelector('#slideForm .le-rich[data-f="body"]'); ed.innerHTML = '<p>공을 <b>세게</b> 차 봐요</p><img src=x onerror="window.__xss=1"><script>window.__xss=2</script>'; ed.dispatchEvent(new Event('input', { bubbles: true })); });
         await T.waitForFunction(() => /고침/.test(document.querySelector('#prevFrame').contentDocument.querySelector('.ls-title').textContent));
@@ -78,9 +78,9 @@ test('수업 자료 편집 → 발표 보기에 반영 → 기본 자료로 되�
         assert.equal(pv.img, 0, '넣은 그림·스크립트는 거름');
         assert.equal(await T.evaluate(() => document.getElementById('prevFrame').contentWindow.__xss), undefined, '미리보기에서 스크립트가 돌지 않음');
 
-        // ② 숨기기: 넷째 장(가속도)
-        await T.click('#slideList button[data-op="hide"][data-i="3"]');
-        assert.match(await T.textContent('#slideList .le-item:nth-child(4)'), /숨김/);
+        // ② 숨기기: 셋째 장(가속도)
+        await T.click('#slideList button[data-op="hide"][data-i="2"]');
+        assert.match(await T.textContent('#slideList .le-item:nth-child(3)'), /숨김/);
         // ③ 새 장 더하기 (지금 고른 장 다음) → 맨 위로
         await T.click('#slideList .le-pickslide[data-i="0"]');
         await T.click('#btnAdd');
@@ -88,8 +88,8 @@ test('수업 자료 편집 → 발표 보기에 반영 → 기본 자료로 되�
         await T.selectOption('#slideForm select[data-f="kind"]', 'how');
         await T.evaluate(() => { const ed = document.querySelector('#slideForm .le-rich[data-f="body"]'); ed.innerHTML = '<div>1차시 → 2차시</div>'; ed.dispatchEvent(new Event('input', { bubbles: true })); });
         await T.click('#slideList button[data-op="up"][data-i="1"]');
-        assert.deepEqual((await titles(T)).slice(0, 5), ['오늘 순서 (새 장)', base[0], base[1], '힘이란 무엇일까? (고침)', base[3]]);
-        assert.match(await T.textContent('#stageTabs'), /들어가기 6장/, '숨긴 장은 세지 않음');
+        assert.deepEqual((await titles(T)).slice(0, 5), ['오늘 순서 (새 장)', base[0], '힘이란 무엇일까? (고침)', base[2], base[3]]);
+        assert.match(await T.textContent('#stageTabs'), /들어가기 5장/, '숨긴 장은 세지 않음');
         await layout(T, '고치기 1280');
 
         // 💾 저장 → 내 계정 (lessonEdits/teacher-1/exps/rocket)
@@ -101,13 +101,13 @@ test('수업 자료 편집 → 발표 보기에 반영 → 기본 자료로 되�
         assert.equal(doc.stages.think[0].kind, 'how');
         assert.match(doc.stages.think[0].add, /^my-/, '새 장은 새 key');
         assert.equal(doc.stages.think[0].body, '<p>1차시 → 2차시</p>');
-        assert.deepEqual(doc.stages.think[3], { ref: 'k:force', of: '‘힘’은 무엇일까요?', set: { title: '힘이란 무엇일까? (고침)', body: '<p>공을 <b>세게</b> 차 봐요</p>' } });
-        assert.equal(doc.stages.think[4].hide, true);
+        assert.deepEqual(doc.stages.think[2], { ref: 'k:force', of: '‘힘’은 무엇일까요?', set: { title: '힘이란 무엇일까? (고침)', body: '<p>공을 <b>세게</b> 차 봐요</p>' } });
+        assert.equal(doc.stages.think[3].hide, true);
 
         // 다시 열어도(다른 컴퓨터라고 보고) 고친 자료 그대로, 고르기 카드에 ✏️
         await T.reload();
         await T.waitForSelector('#slideList .le-item');
-        assert.deepEqual((await titles(T)).slice(0, 4), ['오늘 순서 (새 장)', base[0], base[1], '힘이란 무엇일까? (고침)']);
+        assert.deepEqual((await titles(T)).slice(0, 4), ['오늘 순서 (새 장)', base[0], '힘이란 무엇일까? (고침)', base[2]]);
         await T.click('#btnBack');
         await T.waitForFunction(() => /내가 고친 자료 있음/.test(document.querySelector('.le-pick[data-exp="rocket"]').textContent));
 

@@ -134,7 +134,7 @@ test('로켓 단계 열기: 기다리던 팀만 이동, 하는 중인 팀은 띠
         await T.waitForFunction(() => /앞 단계에 남은 팀\s*1/.test(document.getElementById('stageWait').textContent), null, { timeout: 20000 });
         assert.match(await T.textContent('#stageWait'), /달님 탐험대/);
         assert.equal(await notice(A), '', '넘어가면 띠가 사라짐');
-        await next(A); await go(A, 'q-action');
+        await next(A); await go(A, 't2-build'); await A.click('#ev-build-done'); await go(A, 'q-action');   // 2026-11-27 🛠 만들기
 
         // ④ ◀ 하나 되돌리기 → A 는 잠김 화면, B 의 띠는 사라짐
         await T.click('#btnStagePrev');

@@ -26,7 +26,7 @@ test('로켓 계산: 변인별 까닭 보기·우리 숫자·흔들림·요약 2
     // 우리 숫자
     const p = { changed: 'temp', trials: [{ value: 20, y: 14 }, { value: 20, y: 14.4 }, { value: 40, y: 9.8 }] };
     const ev = M.evidence('t1', p);
-    assert.equal(ev.text, '물의 온도을(를) 20 °C → 40 °C 로 바꿨더니 평균 14.2초 → 9.8초');
+    assert.equal(ev.text, '물의 온도를 20 °C → 40 °C 로 바꿨더니 평균 14.2초 → 9.8초');
     assert.equal(ev.short, '물의 온도 20 °C→40 °C: 14.2초→9.8초');
     assert.equal(M.evidence('t1', { changed: 'temp', trials: [{ value: 20, y: 14 }] }).one, true);
     // 흔들림: 겹침 / 안 겹침 / 반복 없음
@@ -57,11 +57,13 @@ test('로켓 설명 장: 압력을 ‘펑’ 장면에 잇는 장 (풀이 그림
     const vm = require('node:vm'), box = { LessonContent }; box.window = box;
     vm.runInNewContext(fs.readFileSync(path.join(REPO, 'js', 'lesson-content', 'rocket.js'), 'utf8'), box);
     const t1 = LessonContent.get('rocket').stages.t1;
-    const i = t1.findIndex(s => /펑!’ 하는 그 순간/.test(s.title));
-    assert.equal(i, 1, '1차시 gas 풀이 바로 다음 장');
+    // 2026-11-27 분량 조절: '펑' 물음 두 장(기체 발생 + 그 순간)을 1차시 첫 장 하나로 (gas 퀴즈 key 그대로)
+    const i = t1.findIndex(s => s.key === 'gas');
+    assert.equal(i, 0, '1차시 첫 장');
+    assert.equal(t1.filter(s => /펑/.test(s.title)).length, 1, "'펑' 장은 하나");
     const s = t1[i];
     assert.ok(s.ask && s.reveal && s.revealImg && s.img);
-    assert.ok(s.reveal.includes(M.DEF.pressure.replace('압력 = ', '').replace('일정한 넓이에', '일정한 <b>넓이</b>에')), '압력 정의 말이 생각 열기와 같음');
+    assert.match(s.reveal, /이산화 탄소[\s\S]*압력[\s\S]*붙잡는 힘/, '기체 → 압력 → 붙잡는 힘보다 커지면 펑');
     assert.doesNotMatch(LessonSlides.render(s, false), /③ 펑/, '풀이 전에는 답 그림 없음');
     assert.match(LessonSlides.render(s, true), /③ 펑/);
 });
@@ -110,7 +112,7 @@ test('로켓 비계 4: 아직 말할 수 없어요·변인별 보기·우리 숫
         assert.match(await box1.locator('.ev-notyet').textContent(), /아직 말할 수 없어요 — 값을 하나 바꿔 재야 알 수 있어요/);
         assert.equal(await box1.locator('[data-dir]').count(), 0, '결과 고르기 없음');
         assert.equal(await box1.locator('[data-why]').count(), 0, '까닭 고르기도 없음');
-        assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을\(를\) 10 mL 로 했더니 평균 12초/);
+        assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을 10 mL 로 했더니 평균 12초/);
         assert.equal(await box1.locator('[data-go="t1-again"]').count(), 1, '바꿔서 재러 가기');
 
         // ③ 값을 바꿔 재기(15 mL 3번, 겹침 없음) → 가족 체험형은 그래프 없이 결과 비교 표·'흔들림보다 큰가요?'·핵심 개념 연결
@@ -130,7 +132,7 @@ test('로켓 비계 4: 아직 말할 수 없어요·변인별 보기·우리 숫
 
         // ① 변인별 왜냐하면 보기 + ② 우리 숫자
         await show(A, 'end-sentence');
-        assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을\(를\) 10 mL → 15 mL 로 바꿨더니 평균 12초 → 15초/);
+        assert.match(await box1.locator('.ev-evidence').textContent(), /물의 양을 10 mL → 15 mL 로 늘렸더니 평균 12초 → 15초/);
         assert.match(await box1.locator('.ev-teamq').textContent(), /물을 많이 넣으면/);
         const why = await box1.locator('[data-why]').allTextContents();
         assert.ok(why.some(t => /빈 공간/.test(t)), '물의 양 팀용 보기: ' + why.join(' / '));

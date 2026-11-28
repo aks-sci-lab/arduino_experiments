@@ -87,8 +87,7 @@ test('발표 보기: 응답 장에 팀 답이 실시간으로 모임·풀이 뒤
         assert.ok(pos.h <= pos.vh * 0.09, '띠는 얇게 (화면 높이의 9% 안): ' + JSON.stringify(pos));
         assert.equal(await T.locator('#pJoined').evaluate(el => /별빛|달님/.test(el.querySelector('summary') ? el.querySelector('summary').textContent : el.textContent.replace(/<details[\s\S]*$/, ''))), false, '띠 겉에는 팀 이름 없음');
         // ① 안내 장 → '힘' 응답 장 → 답한 팀 0 / 2
-        await T.keyboard.press('ArrowRight');
-        await T.keyboard.press('ArrowRight');
+        await T.keyboard.press('ArrowRight');   // 2026-11-27 분량 조절: 들어가기 첫 장 다음이 바로 '힘'
         await T.waitForFunction(() => /‘힘’은 무엇일까요/.test(document.querySelector('#pSlides .ls-title').textContent));
         await T.waitForSelector('#pSlides .ls-answers');
         assert.match(await T.textContent('#pSlides .ls-answers'), /📱 지금 폰으로 답해요 · 답한 팀 0 \/ 2 \(아직 2팀\)/);

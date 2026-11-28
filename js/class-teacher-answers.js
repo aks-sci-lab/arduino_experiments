@@ -50,6 +50,39 @@
             var g = choiceGroup('', c.opts, function (p) { return p.think && p.think.first && p.think.first[key]; }, list);
             return { kind: 'choice', groups: [g], answered: g.answered, total: total };
         }
+        // 합친 장 (2026-11-27 분량 조절): 2차시 '로켓은 왜 솟고, 무거우면?' = 작용 반작용 + 질량 퀴즈 두 칸
+        if (key === 'action' && M.QUIZ && M.QUIZ.mass) {
+            var qs = ['action', 'mass'].map(function (k) {
+                return choiceGroup(M.QUIZ[k].word || '', M.QUIZ[k].opts, function (p) { var z = p.quiz && p.quiz[k]; return z && z.picks && z.picks[0]; }, list);
+            });
+            var both = list.filter(function (p) { return ['action', 'mass'].every(function (k) { var z = p.quiz && p.quiz[k]; return z && z.picks && z.picks.length; }); }).length;
+            return { kind: 'choice', groups: qs, answered: both, total: total };
+        }
+        // 🔮 우리 팀 실험 계획 (plan-t1·plan-t2): 예측 칸마다 팀 수·막대(정답 없음) + 팀마다 바꾼 것 ① → ② · 까닭
+        var pm = /^plan-(t[12])$/.exec(key);
+        if (pm) {
+            var part = pm[1], G = M.GUESS[part], defs = part === 't1' ? M.vars1() : M.vars2();
+            var gOpts = ['down', 'up', 'same'].map(function (k) { return { k: 'g-' + k, t: G[k] }; });
+            // 바꿀 것별로 묶음 (2026-11-27 선생님이 고른 '팀이 고른 것으로'): 고른 팀이 있는 변인만, 변인 목록 순서
+            var pickOf = function (p) { var x = p[part]; return x && x.changed && p.guess && p.guess[part] && p.guess[part].dir ? 'g-' + p.guess[part].dir : ''; };
+            var gs = Object.keys(defs).map(function (vk) {
+                var mine = list.filter(function (p) { return p[part] && p[part].changed === vk && pickOf(p); });
+                return mine.length ? choiceGroup((defs[vk].short || defs[vk].name) + ' · ' + mine.length + '팀', gOpts, pickOf, mine) : null;
+            }).filter(Boolean);
+            var answered = gs.reduce(function (n, g) { return n + g.answered; }, 0);
+            var items = [];
+            withP.forEach(function (x) {
+                var p = x.p, z = p && p[part], g = p && p.guess && p.guess[part]; if (!z || !z.changed || !g || !g.dir) return;
+                var d = defs[z.changed], pl = z.plan;
+                items.push({ name: x.name, text: (d ? (d.short || d.name) : z.changed) + (d && pl && pl.length === 2 ? ' ' + d.label(pl[0]) + ' → ' + d.label(pl[1]) : '') + ' · ' + (G[g.dir] || '') + (g.why ? ' · 왜냐하면 ' + g.why : '') });
+            });
+            return { kind: 'choice', groups: gs, list: items, answered: answered, total: total };
+        }
+        // 🛠 만들기: 다 만든 팀 수
+        if (key === 'build') {
+            var dn = list.filter(function (p) { return p.build && p.build.done; }).length;
+            return { kind: 'done', groups: [], list: [], answered: dn, total: total };
+        }
         var q = M.QUIZ && M.QUIZ[key];
         if (q) {   // 정의 퀴즈: 처음 고른 답
             var g2 = choiceGroup('', q.opts, function (p) { var z = p.quiz && p.quiz[key]; return z && z.picks && z.picks[0]; }, list);
@@ -69,7 +102,11 @@
                 var parts = ['t1', 't2'].map(function (k) {
                     var r = co[k]; if (!r || !(r.dir || r.why)) return '';
                     var G = M.GUESS[k], d = x.p[k] && x.p[k].changed, defs = k === 't1' ? M.vars1() : M.vars2(), v = defs[d];
-                    return (k === 't1' ? '1차시 ' : '2차시 ') + (v ? (v.short || v.name) + ' → ' : '') + (r.dir && G.word[r.dir] ? G.word[r.dir] : '') + (r.why ? ' · 왜냐하면 ' + r.why : '');
+                    // 📏 그 팀 숫자를 같이 (숫자와 반대인 결과는 ⚠, 5b 중 3)
+                    var ev = null; try { ev = M.evidence && x.p[k] && x.p[k].trials && x.p[k].trials.length ? M.evidence(k, x.p[k], x.p.setup) : null; } catch (e) { ev = null; }
+                    var clash = ev && ((r.dir === 'up' && ev.dir === 'down') || (r.dir === 'down' && ev.dir === 'up'));
+                    return (k === 't1' ? '1차시 ' : '2차시 ') + (v ? (v.short || v.name) + ' → ' : '') + (r.dir && G.word[r.dir] ? (clash ? '⚠ ' : '') + G.word[r.dir] : '') +
+                        (ev && !ev.one ? ' (📏 ' + String(ev.short).split(': ').pop() + ')' : '') + (r.why ? ' · 왜냐하면 ' + r.why : '');
                 }).filter(Boolean);
                 if (parts.length) out.push({ name: x.name, text: parts.join(' / ') });
             });
@@ -80,6 +117,7 @@
     /* 그리기: revealed = 풀이를 열었으면 정답 칸 ✅ */
     function render(t, revealed) {
         if (!t) return '';
+        if (t.kind === 'done') return '<p class="ls-ans-head ls-ans-done">🛠 다 만든 팀 <b>' + t.answered + '</b> / ' + t.total + (t.total > t.answered ? ' <span class="ls-ans-left">(아직 ' + (t.total - t.answered) + '팀)</span>' : t.total ? ' 🎉' : '') + '</p>';
         var head = '<p class="ls-ans-head">📱 <b>지금 폰으로 답해요</b> · 답한 팀 <b>' + t.answered + '</b> / ' + t.total +
             (t.total > t.answered ? ' <span class="ls-ans-left">(아직 ' + (t.total - t.answered) + '팀)</span>' : '') + '</p>';
         var body = '';
@@ -93,9 +131,11 @@
                             '<span class="ls-bar-track"><span class="ls-bar-fill" style="width:' + Math.round(o.n / max * 100) + '%"></span></span><b class="ls-bar-n">' + o.n + '</b></div>';
                     }).join('') + '</div>';
             }).join('');
-            if (t.groups.length > 1) body = '<div class="ls-ans-cols">' + body + '</div>';
+            if (t.groups.length > 1) body = '<div class="ls-ans-cols n' + t.groups.length + '">' + body + '</div>';
+            // 계획 장: 막대 아래 팀마다 바꾼 것 · 예측 · 까닭
+            if (t.list && t.list.length) body += '<ul class="ls-ans-list' + (t.list.length > 3 ? ' two' : '') + '">' + t.list.map(function (x) { return '<li><b>' + esc(x.name) + '</b> ' + esc(x.text) + '</li>'; }).join('') + '</ul>';
         } else {
-            body = t.list.length ? '<ul class="ls-ans-list">' + t.list.map(function (x) { return '<li><b>' + esc(x.name) + '</b> ' + esc(x.text) + '</li>'; }).join('') + '</ul>' : '';
+            body = t.list.length ? '<ul class="ls-ans-list' + (t.list.length > 3 ? ' two' : '') + '">' + t.list.map(function (x) { return '<li><b>' + esc(x.name) + '</b> ' + esc(x.text) + '</li>'; }).join('') + '</ul>' : '';
         }
         return head + body;
     }

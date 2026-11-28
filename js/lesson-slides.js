@@ -58,6 +58,15 @@
         if (/^<svg[\s>]/i.test(s)) return '<figure class="ls-fig">' + s + '</figure>';
         return '<figure class="ls-fig"><img src="' + esc(s) + '" alt=""></figure>';
     }
+    /* 그림 흐름 (2026-11-27 로켓 분량 조절 '글 목록 대신 그림'): flow = [{ n: 번호, img: '<svg…>', t: 두세 낱말(<br> 가능) }]
+       칸 사이에 ➜, 하나면 큰 그림 한 장. 내용 파일(저장소 글)만 — 고치기 화면에서는 글(body)만 고침 */
+    function flowHtml(f) {
+        if (!Array.isArray(f) || !f.length) return '';
+        if (f.length === 1) return '<div class="ls-scene">' + String(f[0].img || '') + '</div>';
+        return '<div class="ls-flow">' + f.map(function (x) {
+            return '<div class="ls-step"><span class="ls-step-n">' + esc(x.n == null ? '' : x.n) + '</span><span class="ls-step-ic" aria-hidden="true">' + String(x.img || '') + '</span><b class="ls-step-t">' + String(x.t || '') + '</b></div>';
+        }).join('<span class="ls-arr" aria-hidden="true">➜</span>') + '</div>';
+    }
     function varsHtml(v) {
         if (!v) return '';
         var row = function (ic, k, val) { return '<tr><th scope="row">' + ic + ' ' + k + '</th><td>' + val + '</td></tr>'; };
@@ -99,7 +108,7 @@
         pos = pos || {};
         var k = KINDS[slide.kind] ? slide.kind : 'concept';
         var hasReveal = !!slide.reveal;
-        var text = (slide.body ? '<div class="ls-body">' + slide.body + '</div>' : '') +
+        var text = flowHtml(slide.flow) + (slide.body ? '<div class="ls-body">' + slide.body + '</div>' : '') +
             (k === 'vars' ? varsHtml(slide.vars) : '') +
             (slide.ask ? '<p class="ls-ask">❓ ' + slide.ask + '</p>' : '') +
             (slide.resp ? respHtml(slide, pos.answers || null, revealed) : '') +
@@ -141,7 +150,8 @@
                 var at = exp + '.' + sk + '[' + i + ']';
                 if (!s || !KINDS[s.kind]) bad.push(at + ': kind 는 ' + Object.keys(KINDS).join('·'));
                 if (!s || typeof s.title !== 'string' || !s.title.trim()) bad.push(at + ': title 없음');
-                if (s && !s.body && !s.ask && !s.vars) bad.push(at + ': body·ask·vars 중 하나는 있어야 해요');
+                if (s && s.flow != null && !(Array.isArray(s.flow) && s.flow.length && s.flow.length <= 6 && s.flow.every(function (x) { return x && /^<svg[\s>]/i.test(String(x.img || '')) && !/<script|\son\w+\s*=|javascript:/i.test(String(x.img) + String(x.t || '')); }))) bad.push(at + ': flow 는 [{ n, img(svg), t }] 1~6칸');
+                if (s && !s.body && !s.ask && !s.vars && !s.flow) bad.push(at + ': body·ask·vars 중 하나는 있어야 해요');
                 if (s && s.reveal && !s.ask) bad.push(at + ': reveal 은 ask 와 함께');
                 // key: 그 장의 풀이가 학생 화면 어느 답([data-lesson-answer])과 짝인지 (영어 소문자·숫자·-, 한 실험 안에서 하나씩)
                 if (s && s.key != null) {
@@ -149,6 +159,9 @@
                     else if (seenKey[s.key]) bad.push(at + ': key ' + s.key + ' 가 ' + seenKey[s.key] + ' 와 겹쳐요');
                     else seenKey[s.key] = at;
                 }
+                // opens: 풀이를 열 때 함께 여는 다른 key (두 장을 합친 장 — 폰의 그 퀴즈 ⭕·점수도 같이 열림)
+                if (s && s.opens != null && !(Array.isArray(s.opens) && s.opens.every(function (k) { return typeof k === 'string' && /^[a-z0-9][a-z0-9-]{0,39}$/.test(k); }) && s.key)) bad.push(at + ': opens 는 key 목록 (그 장에 key 가 있어야 해요)');
+                if (s && s.opens && s.opens.indexOf && s.opens.forEach) s.opens.forEach(function (k) { if (seenKey[k]) bad.push(at + ': opens ' + k + ' 가 다른 장 key 와 겹쳐요'); else seenKey[k] = at; });
                 if (s && s.kind === 'vars' && !(s.vars && s.vars.change && s.vars.measure && Array.isArray(s.vars.keep) && s.vars.keep.length)) bad.push(at + ': vars 는 change·keep[]·measure');
                                 if (s && s.revealImg && !s.reveal) bad.push(at + ': revealImg 는 reveal 과 함께');
                 // mode: 이 장을 띄울 때 학생 폰 띠 ('look' 👀 앞 화면을 봐요 · 'phone' ✍️ 내 화면에서 해요)

@@ -35,30 +35,30 @@ test('고친 자료: 글 고치기·숨기기·새 장·순서 → 저장 모양
     const R = L.resolveEdit(def, null);
     assert.deepEqual(R.stageKeys, ['think', 't1', 't2', 'end']);
     const think = R.stages.think;
-    assert.deepEqual(think.map(e => e.ref).slice(0, 5), ['s:think:0', 's:think:1', 'k:force', 'k:accel', 'k:pressure']);
-    think[2].set.title = '힘이란 <b>무엇</b>일까?';
-    think[2].set.body = '<p>공을 <b>차요</b></p><script>alert(1)</script>';
-    think[3].hide = true;
+    assert.deepEqual(think.map(e => e.ref).slice(0, 5), ['s:think:0', 'k:force', 'k:accel', 'k:pressure', 's:think:4']);   // 2026-11-27 분량 조절: 들어가기 5장
+    think[1].set.title = '힘이란 <b>무엇</b>일까?';
+    think[1].set.body = '<p>공을 <b>차요</b></p><script>alert(1)</script>';
+    think[2].hide = true;
     think.splice(0, 0, { add: 'my-intro1', kind: 'how', title: '오늘 순서', body: '<div>하나</div><img src=x onerror=1>' });
     think.push(think.splice(1, 1)[0]);   // 원래 첫 장을 맨 뒤로
     const E = L.toEdit('rocket', R.stages);
     assert.equal(E.v, 1); assert.equal(E.exp, 'rocket');
     assert.deepEqual(E.stages.think[0], { add: 'my-intro1', kind: 'how', title: '오늘 순서', body: '<p>하나</p>' });
-    assert.deepEqual(E.stages.think[2], { ref: 'k:force', of: '‘힘’은 무엇일까요?', set: { title: '힘이란 <b>무엇</b>일까?', body: '<p>공을 <b>차요</b></p>' } });
-    assert.deepEqual(E.stages.think[3], { ref: 'k:accel', of: '‘가속도’는 무엇일까요?', hide: true });
+    assert.deepEqual(E.stages.think[1], { ref: 'k:force', of: '‘힘’은 무엇일까요?', set: { title: '힘이란 <b>무엇</b>일까?', body: '<p>공을 <b>차요</b></p>' } });
+    assert.deepEqual(E.stages.think[2], { ref: 'k:accel', of: '‘가속도’는 무엇일까요?', hide: true });
     assert.equal(E.stages.t1.every(x => x.ref && !x.set && !x.hide), true, '안 고친 단계는 자리만');
 
     const M = L.applyEdit(def, JSON.parse(JSON.stringify(E)));
     const t = M.stages.think;
-    assert.deepEqual(t.map(x => x.key || ''), ['my-intro1', '', 'force', 'pressure', '', '']);
-    assert.equal(t[2].title, '힘이란 <b>무엇</b>일까?');
-    assert.equal(t[2].ask, def.stages.think[2].ask, '고치지 않은 칸은 그대로');
-    assert.equal(t[2].mode, 'phone', 'mode·key 는 그대로');
-    assert.equal(t[5].title, def.stages.think[0].title, '원래 첫 장은 맨 뒤로');
+    assert.deepEqual(t.map(x => x.key || ''), ['my-intro1', 'force', 'pressure', '', '']);
+    assert.equal(t[1].title, '힘이란 <b>무엇</b>일까?');
+    assert.equal(t[1].ask, def.stages.think[1].ask, '고치지 않은 칸은 그대로');
+    assert.equal(t[1].mode, 'phone', 'mode·key 는 그대로');
+    assert.equal(t[4].title, def.stages.think[0].title, '원래 첫 장은 맨 뒤로');
     assert.deepEqual(M.stages._hidden.map(x => x.key), ['accel'], '숨긴 key 장은 모든 풀이 열기용으로만');
-    assert.deepEqual(L.slidesFor(M, 'think', '').map(x => x.key || ''), ['my-intro1', '', 'force', 'pressure', '', '']);
+    assert.deepEqual(L.slidesFor(M, 'think', '').map(x => x.key || ''), ['my-intro1', 'force', 'pressure', '', '']);
     assert.equal(L.slidesFor(M, 't1', '').length, def.stages.t1.length);
-    assert.equal(def.stages.think[2].title, '‘힘’은 무엇일까요?', '기본 내용은 그대로');
+    assert.equal(def.stages.think[1].title, '‘힘’은 무엇일까요?', '기본 내용은 그대로');
     // 그리기: 본문에 스크립트가 남지 않음
     assert.doesNotMatch(L.render(t[0], false, {}), /<img|onerror|script/);
 });

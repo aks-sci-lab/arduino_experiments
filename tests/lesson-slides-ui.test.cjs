@@ -55,10 +55,7 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         assert.equal(await T.isVisible('#btnPQr'), true);
         assert.equal(await T.isVisible('.ls-note summary'), true, '선생님용은 접기');
         assert.equal(await T.isVisible('.ls-note div'), false, '선생님 말은 바로 안 보임');
-        await T.keyboard.press('ArrowRight');
-        s = await slide(T);
-        assert.match(s.title, /폰에서 이렇게 해요/);
-        await T.keyboard.press('ArrowRight');
+        await T.keyboard.press('ArrowRight');   // 2026-11-27 분량 조절: '폰에서 이렇게 해요'는 첫 장에 합침
         s = await slide(T);
         assert.match(s.title, /힘/);
         assert.equal(s.rev, false, '물음 먼저, 풀이는 숨김');
@@ -70,7 +67,7 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         await T.keyboard.press('ArrowLeft');
         assert.equal((await slide(T)).rev, false, '← 는 풀이 접기');
         await T.keyboard.press('ArrowLeft');
-        assert.match((await slide(T)).title, /폰에서 이렇게 해요/, '← 앞 장');
+        assert.match((await slide(T)).title, /필름통 로켓/, '← 앞 장');
         await T.keyboard.press('ArrowLeft');
         assert.match((await slide(T)).title, /필름통 로켓/, '← 첫 장');
         await T.keyboard.press('ArrowLeft');
@@ -92,16 +89,16 @@ test('발표 보기 설명 화면: 단계마다 설명부터, 물음 뒤 풀이,
         await T.keyboard.press('Enter');
         await T.waitForFunction(() => document.querySelector('#presentPane.ls-on .ls-slide'), null, { timeout: 5000 });
         assert.match((await slide(T)).title, /펑/, '1차시 설명 첫 장');
-        // 답을 보여 주는 그림(기체가 뚜껑을 미는 화살표)은 풀이 뒤에
-        assert.equal(await T.locator('#pSlides .ls-fig').count(), 0, '풀이 전에는 그림 없음');
+        // 답을 보여 주는 그림(기체가 뚜껑을 미는 화살표·펑)은 풀이 뒤에 — 풀이 전에는 닫힌 통 물음 그림만 (2026-11-27 '펑' 두 장을 하나로)
+        assert.match(await T.getAttribute('#pSlides .ls-fig svg', 'aria-label'), /뚜껑이 닫힌 필름통/, '풀이 전에는 물음 그림');
         await T.keyboard.press('ArrowRight');
-        assert.equal(await T.locator('#pSlides .ls-fig svg').count(), 1, '풀이를 열면 그림');
+        assert.match(await T.getAttribute('#pSlides .ls-fig svg', 'aria-label'), /펑 열릴 때/, '풀이를 열면 답 그림');
         await T.keyboard.press('ArrowLeft');
         assert.equal(app.db.docs.get('labClasses/' + r.space).stage, 2, '단계는 열림');
-        // 변인 통제 장: 바꿀 것·같게 할 것·잴 것 표
-        for (let i = 0; i < 12 && (await slide(T)).kind !== 'vars'; i++) await T.keyboard.press('ArrowRight');
-        assert.equal((await slide(T)).kind, 'vars');
-        assert.match(await T.textContent('.ls-vars'), /바꿀 것.*같게 할 것.*잴 것/s);
+        // 우리 팀 실험 계획 🔮 (2026-11-27: 변인 통제 물음 + 계획 표를 폰 응답 장 하나로): 바꿀 것 하나 + 예측 물음, 풀이 = 변인 통제
+        for (let i = 0; i < 12 && !/실험 계획/.test((await slide(T)).title); i++) await T.keyboard.press('ArrowRight');
+        assert.match((await slide(T)).title, /우리 팀 실험 계획/);
+        assert.match(await T.textContent('#pSlides .ls-slide'), /바꿀 것 하나만[\s\S]*① → ② 로 바꾸면/);
         // 1차시 마지막 장(🎯 도전) 다음 → 학생 화면 없이 '2차시를 열까요?'
         for (let i = 0; i < 30 && !(await T.isVisible('#pAsk')); i++) await T.keyboard.press('ArrowRight');
         assert.equal(await T.isVisible('#pAsk'), true);
